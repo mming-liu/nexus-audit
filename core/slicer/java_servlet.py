@@ -153,6 +153,7 @@ class JavaSlicer:
         self.config_root = root
         self._cfg = None
         self._impls = None
+        self._wiring = None
 
     @staticmethod
     def _guess_project_root(p: Path) -> Path:
@@ -171,6 +172,20 @@ class JavaSlicer:
     # ---------- 跨文件实现体证据（MyBatis / 接口实现） ----------
 
     MAX_IMPL_HITS = 3
+
+    def _wiring_resolver(self):
+        """懒加载框架装配索引（URL → 全局 Filter / Interceptor）。
+
+        为什么不复用 JavaImplResolver：那个索引的方向是"方法 → 它调用了什么"，
+        而 CORS 这类的防护根本不在调用链上 —— `/cors/sec/originFilter` 的方法体
+        是 `return token;`，防护靠 `@WebFilter(urlPatterns=...)` 挂上去。
+        方向相反，必须单独建索引。
+        """
+        if self._wiring is None:
+            from core.context.framework_wiring import FrameworkWiringResolver
+            self._wiring = FrameworkWiringResolver(self.config_root,
+                                                   source_root=self.repo_path)
+        return self._wiring
 
     def _impl_resolver(self):
         """懒加载跨文件实现体索引（MyBatis Mapper / 接口实现 / @Select）。"""
@@ -550,6 +565,12 @@ class JavaSlicer:
             source += self._resolve_cross_file_helpers(source)
             # 跨文件实现体：MyBatis Mapper 的 #{} / ${} 决定 SQL 注入真值
             source += self._impl_block(source)
+            # 框架装配：CORS 这类的防护在 Filter/Bean 里，方法体里根本看不到。
+            # 放在 config 之后单独补一个换行，避免和配置块最后一行粘连。
+            if route_path:
+                w = self._wiring_resolver().describe(route_path)
+                if w:
+                    source += "\n" + w
 
             units.append(CodeUnit(
                 file_path=str(path),

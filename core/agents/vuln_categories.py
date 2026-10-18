@@ -155,11 +155,19 @@ CATEGORIES: dict[str, VulnCategory] = {
         sink_question=("函数是否把外部可控数据交给反序列化 API"
                        "（如 ObjectInputStream.readObject、"
                        "XStream.fromXML、readValue(...enableDefaultTyping)、"
-                       "fastjson parseObject 等）？"),
-        property=("反序列化前是否限制了可还原的类"
-                  "（如 ObjectInputFilter 类白名单、"
-                  "setBlacklist/setWhiteList、"
-                  "关闭 enableDefaultTyping、fastjson 开启 safeMode）？"),
+                       "fastjson parseObject、snakeyaml 默认 Yaml().load 等）？"),
+        # 判据要写死"黑名单不算防护"，否则模型会把任何"看起来在做校验"的代码
+        # 当成已防护。这不是理论问题：Deserialize.rememberMeVul 用了
+        # AntObjectInputStream 的 denyClasses 黑名单（只 deny 三个包名前缀），
+        # 模型 5 轮里有 2 轮判成"protected"，而黑名单本身就是可绕过的。
+        # 反序列化防护的可信判据只有两类：白名单（只允许确定的类），
+        # 或彻底关闭多态（SafeConstructor / safeMode / 关闭 DefaultTyping）。
+        property=("反序列化前是否用**白名单**限定可还原的类（ObjectInputFilter 白名单、"
+                  "SafeConstructor、fastjson safeMode、关闭 enableDefaultTyping），"
+                  "或根本不做多态反序列化？"
+                  "注意：黑名单/deny-list（如 resolveClass 里 startsWith 判断若干包名、"
+                  "setBlacklist）**不算防护** —— 黑名单天然可被未列举的 gadget 绕过，"
+                  "看到黑名单仍应判定防护缺失。"),
     ),
     "redir": VulnCategory(
         key="redir", display="开放重定向", cwe="CWE-601", owasp=False,

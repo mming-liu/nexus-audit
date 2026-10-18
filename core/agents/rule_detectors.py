@@ -23,6 +23,35 @@ RSA_FAMILY = ("RSA", "OAEP", "MGF1")
 WEAK_HASHES = ("MD2", "MD4", "MD5", "SHA", "SHA-0", "SHA-1", "SHA1")
 
 
+# ---------------- 入口体切分 ----------------
+#
+# 切片里除了入口方法体，还拼了同文件辅助方法、跨文件实现体、配置取值。
+# 逐行扫关键词做规则判定时，必须只扫**入口方法自己的体**，否则：
+#   - Cors.vuls1 的切片里躺着同类的 seccode()（安全写法，含 checkURL 白名单），
+#     扫"有没有白名单校验"会把 vuln 判成 safe；
+#   - Rce.yarm 的切片里躺着同文件的 CommandExec()（含 exec），
+#     扫"有没有 exec"会把 yaml 反序列化判成命令注入。
+# 两类污染都是真实踩出来的，所以统一先截到第一个分隔注释之前。
+
+_SEP = re.compile(r"^//\s*----", re.M)
+
+
+def entry_body(source: str) -> str:
+    """只保留入口方法体：截到第一个 `// ---- ...` 分隔注释之前。"""
+    m = _SEP.search(source)
+    return source[: m.start()] if m else source
+
+
+def _sibling_methods(source: str) -> str:
+    """分隔注释之后的部分（同文件辅助方法 + 实现体 + 配置），不含配置块本体。"""
+    m = _SEP.search(source)
+    if not m:
+        return ""
+    body = source[m.start():]
+    cfg = body.find("相关配置实际取值")
+    return body[:cfg] if cfg >= 0 else body
+
+
 def _norm(alg: str) -> str:
     return alg.strip().upper()
 
@@ -119,6 +148,93 @@ def parse_config_block(source: str) -> dict[str, str]:
     return out
 
 
+# ---------------- CORS ----------------
+#
+# 为什么 CORS 必须用规则而不是问模型：Java 里 CORS 防护的写法极度分散，
+# 同一个仓库里四种写法（@CrossOrigin 注解 / WebMvcConfigurer / Spring Security
+# CorsConfiguration / Filter），模型每次都在"这段代码有没有设置 ACAO"和
+# "有没有校验 Origin"之间摇摆。实测 8 条 CORS 样本 5 轮里 7 条结果不一致。
+# 而判据本身是完全客观的：回显 Origin 且带 Allow-Credentials 就是漏洞。
+#
+# 三种结论：
+#   True  — 入口体内回显了外部 Origin（或写 *），且没有本地 Origin 校验
+#   False — 有 Origin 白名单校验，或 ACAO 是写死的固定域名（不看请求）
+#   None  — 入口体内根本没有 CORS 响应头 → 防护在方法外（Filter/Bean 装配），
+#           这类必须交给装配解析器，规则不做猜测（见 core/context/framework_wiring.py）
+
+ACAO_RE = re.compile(
+    r"""setHeader\s*\(\s*["']Access-Control-Allow-Origin["']\s*,\s*([^)]*)\)""", re.I)
+ACAC_RE = re.compile(
+    r"""setHeader\s*\(\s*["']Access-Control-Allow-Credentials["']\s*,\s*["']true["']""", re.I)
+# 请求头读法：getHeader("Origin") 及其变体
+ORIGIN_READ_RE = re.compile(
+    r"""getHeader\s*\(\s*["']origin["']\s*\)""", re.I)
+# 本地 Origin 校验的迹象（白名单比对 / 正则 / equals 判断）
+ORIGIN_CHECK_RE = re.compile(
+    r"checkURL|checkOrigin|allowedOrigins?|whiteList|whitelist|"
+    r"isAllowedOrigin|matches\s*\(|\.equals\s*\(\s*origin", re.I)
+# 单个标识符即"原样回显请求头"
+_IDENT = re.compile(r"^[A-Za-z_]\w*(\s*\.\s*\w+\s*\(\s*\))?$")
+
+
+def cors_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    if not ACAO_RE.search(body):
+        return None                    # 入口体内没有 CORS 头，交给装配解析器
+
+    echoes_origin = False
+    for m in ACAO_RE.finditer(body):
+        val = m.group(1).strip()
+        if val in ('"*"', "'*'"):
+            # ACAO=* 且带 Credentials：浏览器实际会拒绝这种组合，
+            # 单独 * 不构成"读取任意响应"的漏洞，但仍是过宽的跨域策略。
+            # 这里保守判定为不安全（作者也把它标成 /vuln/setHeader）。
+            echoes_origin = True
+            continue
+        if val.startswith('"') or val.startswith("'"):
+            continue                   # 固定字面量域名，不看请求，安全
+        if _IDENT.match(val) and ORIGIN_READ_RE.search(body):
+            echoes_origin = True       # 变量 = getHeader("Origin")，原样回显
+        elif _IDENT.match(val):
+            # 变量来源不明，但 body 里出现过读 Origin 头的动作
+            echoes_origin = echoes_origin or bool(ORIGIN_READ_RE.search(body))
+
+    if ORIGIN_READ_RE.search(body) and ORIGIN_CHECK_RE.search(body):
+        return False                   # 读了 Origin，但先做了白名单校验
+    return echoes_origin or None
+
+
+# ---------------- 反序列化 ----------------
+#
+# 只有"白名单 / 关闭多态"才算防护。黑名单（resolveClass 里 startsWith 几个包名）
+# 天然可绕，必须判为不安全 —— 模型在这一条上会摇摆（Deserialize.rememberMeVul
+# 5 轮里 2 轮判成 protected），所以也交给规则。
+
+DESERIAL_SINK_RE = re.compile(
+    r"\.readObject\s*\(|new\s+(?:[A-Za-z_][\w.]*\.)?(?:ObjectInputStream|XStream)\b|"
+    r"\.fromXML\s*\(|enableDefaultTyping|readValue\s*\(|"
+    r"new\s+(?:[A-Za-z_][\w.]*\.)?Yaml\s*\(|\.load\s*\(", re.I)
+# 白名单式防护
+DESERIAL_SAFE_RE = re.compile(
+    r"SafeConstructor|safeMode|setAllowedClasses|ObjectInputFilter|"
+    r"createFilter\s*\(|allowList|whitelist|setWhiteList", re.I)
+# 黑名单式"防护"：看起来在防，实际可绕
+DESERIAL_BLACKLIST_RE = re.compile(
+    r"denyClasses|denyList|blacklist|setBlacklist|startsWith\s*\(\s*deny", re.I)
+
+
+def deserial_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    # 只有当**入口体自己**把外部数据交给反序列化 API 时才判；
+    # 体里没有 sink 就说明反序列化发生在别处（helper），交给 LLM。
+    if not re.search(r"readObject\s*\(|fromXML\s*\(|\.load\s*\(|readValue\s*\(|"
+                     r"enableDefaultTyping", body, re.I):
+        return None
+    if DESERIAL_SAFE_RE.search(body):
+        return False
+    return True                        # 含黑名单也算"未防护"
+
+
 # ---------------- 对外门面 ----------------
 
 def verdict(category: str, source: str) -> bool | None:
@@ -134,25 +250,34 @@ def verdict(category: str, source: str) -> bool | None:
         return hash_is_weak(alg) if alg else None
 
     if category == "weakrand":
-        # 只看实际生成安全敏感值的那一处随机源
-        if re.search(r"new\s+(java\.util\.)?Random\s*\(", source) or "Math.random()" in source:
+        # 只看实际生成安全敏感值的那一处随机源（同文件兄弟方法里的 Random
+        # 不能算到当前入口头上）
+        body = entry_body(source)
+        if re.search(r"new\s+(java\.util\.)?Random\s*\(", body) or "Math.random()" in body:
             return True
-        if "SecureRandom" in source:
+        if "SecureRandom" in body:
             return False
         return None
 
     if category == "securecookie":
-        cookies = re.findall(r"new\s+(?:javax\.servlet\.http\.)?Cookie\s*\(", source)
+        body = entry_body(source)
+        cookies = re.findall(r"new\s+(?:javax\.servlet\.http\.)?Cookie\s*\(", body)
         if not cookies:
             return None
         insecure = False
-        for m in re.finditer(r"Cookie\s+\w+\s*=\s*new\s+(?:javax\.servlet\.http\.)?Cookie\s*\(", source):
-            var = source[m.start():m.end()].split()[1]
-            seg = source[m.end(): m.end() + 1500]
+        for m in re.finditer(r"Cookie\s+\w+\s*=\s*new\s+(?:javax\.servlet\.http\.)?Cookie\s*\(", body):
+            var = body[m.start():m.end()].split()[1]
+            seg = body[m.end(): m.end() + 1500]
             has_secure = re.search(rf"{re.escape(var)}\s*\.\s*setSecure\s*\(\s*true\s*\)", seg)
             has_httponly = re.search(rf"{re.escape(var)}\s*\.\s*setHttpOnly\s*\(\s*true\s*\)", seg)
             if not (has_secure and has_httponly):
                 insecure = True
         return insecure
+
+    if category == "cors":
+        return cors_verdict(source)
+
+    if category == "deserial":
+        return deserial_verdict(source)
 
     return None
