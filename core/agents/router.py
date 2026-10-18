@@ -55,8 +55,24 @@ class OpenAICompatClient:
                 json={"model": self.model, "messages": messages,
                       "temperature": temperature, "max_tokens": 4096},
             )
-            resp.raise_for_status()
+            if resp.status_code != 200:
+                raise RuntimeError(self._diagnose(resp))
             return resp.json()["choices"][0]["message"]["content"]
+
+    def _diagnose(self, resp) -> str:
+        """调用失败时按需诊断：查询额度把根因（key 失效/额度耗尽/模型问题）带进异常。"""
+        body = resp.text[:300]
+        if resp.status_code == 401:
+            return f"模型调用 401：key 已失效（可能被静默下线）。响应：{body}。请去 opencode.ai Console 换 key 并同步到 ~/.dsh/.credentials.yaml 与项目 .env"
+        if resp.status_code in (402, 429):
+            try:  # 额度相关：查一次 usage 给出精确余量
+                from core.agents.model_selector import check_quota
+                quota = check_quota()
+                windows = {w: quota[w]["percent"] for w in ("rolling", "weekly", "monthly")}
+                return f"模型调用 {resp.status_code}：额度受限，当前用量 {windows}。响应：{body}"
+            except Exception as e:
+                return f"模型调用 {resp.status_code}，且额度查询也失败（{e}）。响应：{body}"
+        return f"模型调用 {resp.status_code}（模型 {self.model}）：{body}"
 
 
 def extract_json(text: str) -> Any:
