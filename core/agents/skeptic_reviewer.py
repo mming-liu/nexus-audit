@@ -72,11 +72,25 @@ class SkepticReviewer:
 
     async def review(self, h: VulnHypothesis) -> VulnHypothesis:
         lang = h.unit.language
-        # 用 own_body：source_code 里拼进了同文件其它路由方法，
-        # 质检员看到"同文件另一条路由有鉴权"就会推翻当前结论 —— 这跟
-        # CORS 那条注解污染是同一种错。own_body 为空时（非 Java 切片器
-        # 可能不填）才退回 source_code。
-        code = h.unit.own_body or h.unit.source_code
+        # 必须用 source_code，**不能用 own_body**。
+        #
+        # 这里踩过一次坑：P0-2 修好"兄弟路由被当辅助方法拼进切片"之后，
+        # 我以为 source_code 还是脏的，于是让质检员改读 own_body。结果
+        # own_body 只剩入口方法自己那几行：
+        #     @RequestMapping("/safe")
+        #     public static String safe(String xss) { return encode(xss); }
+        # 而 `encode` 的实际方法体（StringUtils.replace 逐字符转义）只在
+        # source_code 的「同文件辅助方法」段里。质检员看不见它，就只能对着
+        # `return encode(xss)` 猜"encode 大概做了编码吧"——这正是它该推翻
+        # 的那类误报，反而被放过去了。
+        #
+        # 边界应当这样切：
+        #   own_body    → 只给 taint_chain（判"本方法自己写了什么介质"）
+        #                 和 rule_detectors 的入口体截取用
+        #   source_code → 给所有"读代码做判断"的推理型 agent（ScenarioMatcher
+        #                 和 Skeptic）。P0-2 之后它已排除兄弟路由方法，
+        #                 剩下的辅助方法体 / 跨文件实现 / 框架装配都是必需证据。
+        code = h.unit.source_code or h.unit.own_body
         prompt = SKEPTIC_PROMPT_TMPL.format(
             vuln_type=h.vuln_type, property_missing=h.property_missing or "(未记录)",
             code=code,

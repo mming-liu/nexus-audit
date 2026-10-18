@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -152,6 +153,61 @@ def cmd_scan(args):
     print(f"确认漏洞 {sum(1 for r in results if r.verified)}/{len(results)}")
 
 
+def emit_github_annotations(flagged, failed, repo: Path) -> int:
+    """向 stdout 输出 GitHub Actions 行级 annotation，返回输出条数。
+
+    格式：`::warning file={path},line={n},title={cat}::{msg}`
+    GitHub 会把这条挂到 PR 的 Files Changed 里对应代码行下方 —— 这是审阅者
+    真正会看到的位置，比让人去翻 CI 日志有效得多。
+
+    只在 `GITHUB_ACTIONS` 环境下输出：本地跑时一堆 `::` 行会淹没正常输出。
+    路径必须转成相对仓库根，否则 GitHub 对不上文件（它按仓库相对路径索引）。
+    """
+    if not os.environ.get("GITHUB_ACTIONS"):
+        return 0
+    n = 0
+    for u, cat in flagged:
+        try:
+            rel = Path(u.file_path).resolve().relative_to(repo.resolve()).as_posix()
+        except ValueError:
+            rel = Path(u.file_path).as_posix()
+        # annotation 的消息体不能有裸换行（会截断），逗号和冒号要转义
+        msg = f"可能存在 {cat.upper()}；入口 {u.unit_name}".replace("\n", " ")
+        msg = msg.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+        print(f"::warning file={rel},line={u.start_line},title={cat.upper()}::{msg}")
+        n += 1
+    for u, cat in failed:
+        try:
+            rel = Path(u.file_path).resolve().relative_to(repo.resolve()).as_posix()
+        except ValueError:
+            rel = Path(u.file_path).as_posix()
+        print(f"::error file={rel},line={u.start_line},title=判定失败::"
+              f"{cat.upper()} 判定失败（限流/超时），需重跑，不是无漏洞")
+        n += 1
+    return n
+
+
+def emit_step_summary(report_path: Path) -> bool:
+    """把 Markdown 报告追加到 `$GITHUB_STEP_SUMMARY` 指向的文件。
+
+    这是 GitHub Actions 的原生能力：往那个文件写 Markdown，PR 页面就会多出
+    一张渲染好的看板，**不需要任何 Token 权限**。比"把报告塞进 artifact
+    让人下载"体验好得多，也比调 GitHub API 发评论少一层授权麻烦。
+
+    注意是**追加**：同一个 job 里多个步骤都可以往里写，各自成一段。
+    """
+    p = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not p:
+        return False
+    try:
+        body = Path(report_path).read_text(encoding="utf-8")
+    except OSError:
+        return False
+    with open(p, "a", encoding="utf-8") as f:
+        f.write("\n\n---\n\n" + body + "\n")
+    return True
+
+
 def cmd_scan_java(args, repo: Path):
     """Java Web 赛道：Servlet/Spring 入口切片 + 按漏洞类目两步法。"""
     from core.agents.vuln_categories import OWASP_KEYS
@@ -288,6 +344,18 @@ def cmd_scan_java(args, repo: Path):
     out = Path(args.output or "report_java.md")
     out.write_text("\n".join(lines), encoding="utf-8")
     print(f"\n完成：报告已写入 {out}")
+
+    # CI 集成：只在 GitHub Actions 里生效，本地跑是 no-op
+    if getattr(args, "github_comment", False):
+        n = emit_github_annotations(flagged, failed, repo)
+        summed = emit_step_summary(out)
+        if n:
+            print(f"      已输出 {n} 条 GitHub 行级 annotation")
+        if summed:
+            print(f"      已追加到 $GITHUB_STEP_SUMMARY（PR 页面会渲染成看板）")
+        if not n and not summed:
+            print("      [提示] 未检测到 GITHUB_ACTIONS / GITHUB_STEP_SUMMARY，"
+                  "GitHub 输出已跳过（本地运行时属正常）")
 
 
 def cmd_scan_web3(args, repo: Path):
@@ -444,7 +512,9 @@ def cmd_pr_scan(args):
     ns = argparse.Namespace(
         repo_path=str(repo), offline=args.offline, web3=False, java=True,
         categories=args.categories, model=args.model, concurrency=args.concurrency,
-        output=args.output or "report_pr.md", python=None, _units=subset)
+        output=args.output or "report_pr.md", python=None, _units=subset,
+        no_skeptic=getattr(args, "no_skeptic", False),
+        github_comment=getattr(args, "github_comment", False))
     print("\n进入审计（仅上述受影响路由）...")
     cmd_scan_java(ns, repo)
 
@@ -730,6 +800,8 @@ def main():
     p_scan.add_argument("--concurrency", type=int, default=6, help="LLM 并发数")
     p_scan.add_argument("--no-skeptic", action="store_true",
                         help="跳过反方挑刺复核（仅影响模型命中，规则命中不受影响）")
+    p_scan.add_argument("--github-comment", dest="github_comment", action="store_true",
+                        help="输出 GitHub Actions 行级 annotation + 写入 $GITHUB_STEP_SUMMARY")
     p_scan.add_argument("--output", default=None, help="报告输出路径")
     p_scan.add_argument("--python", default=None, help="PoC 执行使用的 Python 解释器")
     p_pr = sub.add_parser("pr-scan", help="PR 增量扫描（仅 git diff 影响的调用链）")
@@ -742,6 +814,8 @@ def main():
     p_pr.add_argument("--model", default=None, help="指定模型名")
     p_pr.add_argument("--concurrency", type=int, default=4, help="LLM 并发数")
     p_pr.add_argument("--offline", action="store_true", help="离线模式（不调用 LLM）")
+    p_pr.add_argument("--github-comment", dest="github_comment", action="store_true",
+                      help="输出 GitHub Actions 行级 annotation + 写入 $GITHUB_STEP_SUMMARY")
     p_pr.add_argument("--dry-run", action="store_true",
                       help="只列出受影响路由，不做审计")
     p_pr.add_argument("--output", default=None, help="报告输出路径")

@@ -118,6 +118,28 @@ python cli.py --help
 - [x] 跨路由串接：存储型 XSS 这类「写入点 + 读取点」分居两方法的漏洞
       —— `core/context/taint_chain.py`，按介质（Cookie/Session/Request/Model）
       与键名配对，`XSS.store → XSS.show` 被正确接上
+- [x] Cite-Before-Verdict：模型必须先逐字符引用它据以判断的那一行，
+      本地核验该行**真实存在于切片且不是注释行**，核验不过的采样直接作废。
+      这能整类掐掉"编造一行代码来解释结论"的幻觉型误报。
+- [x] CI 集成：`--github-comment` 双通道输出 —— 行级 annotation 挂到 PR 的
+      Files Changed 代码行下方，Markdown 报告写入 `$GITHUB_STEP_SUMMARY`
+      渲染成看板（两个通道都**不需要 Token 权限**）。
+
+### own_body 的使用边界（别越界）
+
+`CodeUnit.own_body` 只存入口方法自己那几行。它**只**该给两类逻辑用：
+
+| 消费者 | 为什么 |
+|---|---|
+| `taint_chain` | 判"本方法自己写了什么介质"，必须排除同文件兄弟方法 |
+| `rule_detectors` 的入口体截取 | 判"这个入口上的注解/配置"，同理 |
+
+而 `ScenarioMatcher`、`SkepticReviewer` 这类**推理型** agent 必须拿
+`source_code`：清洗逻辑常常写在同文件私有方法或 Service 实现层，那些证据
+只在 `source_code` 里。曾让 Skeptic 改读 `own_body`，结果 `XSS.safe` 只剩
+`return encode(xss);`，`encode` 的逐字符转义体全被挡住 —— 质检员看不见
+清洗逻辑，本该推翻的误报反而被放过去了。`smoke_test_chains.py` 的
+`[14]` 组用例把这条边界钉住了。
 
 
 ## 安全合规

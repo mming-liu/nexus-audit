@@ -246,6 +246,85 @@ from core.models import PoCResult
 check("默认认为跑过", PoCResult(hypothesis=None).sandbox_ran, True)
 check("可显式标为未跑", PoCResult(hypothesis=None, sandbox_ran=False).sandbox_ran, False)
 
+print("\n[14] own_body 的使用边界（回归 P2-5 引入的坑）")
+# own_body 只该给 taint_chain 和 rule_detectors 用。推理型 agent（Skeptic）
+# 必须拿 source_code：清洗逻辑写在同文件私有方法 / Service 实现层，
+# 那些证据只在 source_code 里，用 own_body 会让质检员变睁眼瞎。
+import asyncio, inspect
+from core.agents.skeptic_reviewer import SkepticReviewer
+_src = inspect.getsource(SkepticReviewer.review)
+check("Skeptic 读的是 source_code",
+      "h.unit.source_code" in _src and "own_body or" not in _src, True)
+
+# 用真实切片验证：同一入口，own_body 必须严格窄于 source_code，
+# 且 source_code 里含 own_body 看不到的清洗方法体。
+from pathlib import Path
+from core.slicer.java_servlet import JavaSlicer
+_fx = Path(__file__).resolve().parent.parent / "reference_repos" / "java-sec-code"
+if _fx.exists():
+    _us = JavaSlicer(_fx).extract_entry_units()
+    _u = next((x for x in _us if x.unit_name == "XSS.safe"), None)
+    if _u:
+        check("own_body 不含辅助方法体", "StringUtils.replace" in _u.own_body, False)
+        check("source_code 含辅助方法体（清洗逻辑可见）",
+              "StringUtils.replace" in _u.source_code, True)
+        check("source_code 不含兄弟路由方法（P0-2 已净化）",
+              "addCookie" in _u.source_code, False)
+
+print("\n[15] Cite-Before-Verdict：证据必须是切片里的真实执行行")
+from core.agents.scenario_matcher import verify_evidence
+_C = '''@RequestMapping("/vuln")
+public String vuln(String xss) {
+    // return HtmlUtils.htmlEscape(xss);   曾经的安全写法，已删
+    return xss;
+}'''
+check("真实执行行 → 通过", verify_evidence(_C, "return xss;")[0], True)
+check("带缩进 → 通过", verify_evidence(_C, "    return xss;")[0], True)
+check("带行号前缀 → 通过", verify_evidence(_C, '43: return xss;')[0], True)
+check("编造的行 → 拒绝",
+      verify_evidence(_C, "String out = HtmlUtils.htmlEscape(xss);")[0], False)
+check("含省略号（概述而非引用）→ 拒绝", verify_evidence(_C, "return xss; ...")[0], False)
+check("空 evidence → 拒绝", verify_evidence(_C, "")[0], False)
+# 注释行是最危险的假证据：它常常写着"原本的漏洞写法"，被当真会判反。
+check("引用行注释 → 拒绝",
+      verify_evidence(_C, "// return HtmlUtils.htmlEscape(xss);   曾经的安全写法，已删")[0], False)
+
+# 契约测试：用 mock 模型覆盖"守规矩 / 编造证据 / 混合投票"三种行为。
+# 为什么必须测这个：核验一旦把合规输出也判失败，全部采样都会作废，
+# 引擎会静默退化成"什么都判不出来" —— 比不启用这个机制更糟。
+import asyncio as _aio
+from core.agents.scenario_matcher import ScenarioMatcher as _SM
+_GOOD = '{"hit": "Yes", "evidence_line": "return xss;"}'
+_FAKE = '{"hit": "Yes", "evidence_line": "String safe = HtmlUtils.htmlEscape(xss);"}'
+check("合规输出 → 判定通过",
+      _aio.run(_SM(llm=lambda m: _GOOD)._vote("p", "hit", 1, code=_C))[0], True)
+def _raise_if_not_raise():
+    try:
+        _aio.run(_SM(llm=lambda m: _FAKE)._vote("p", "hit", 1, code=_C))
+        return False          # 没抛异常 = 编造的证据被放行了
+    except RuntimeError:
+        return True
+check("编造证据 → 抛异常（记判定失败，不记作 No）", _raise_if_not_raise(), True)
+_seq = {"n": 0}
+def _mixed(_m):
+    _seq["n"] += 1
+    return _FAKE if _seq["n"] == 1 else _GOOD
+check("3 票中 1 票编造 → 作废该票，剩 2 票计票",
+      _aio.run(_SM(llm=_mixed)._vote("p", "hit", 3, code=_C))[1], (True, True))
+
+print("\n[16] GitHub 双通道在本地必须 no-op")# 本地跑出一堆 `::warning` 会淹没正常输出；只在 GITHUB_ACTIONS 下才输出。
+import os
+os.environ.pop("GITHUB_ACTIONS", None)
+os.environ.pop("GITHUB_STEP_SUMMARY", None)
+from cli import emit_github_annotations, emit_step_summary
+from core.models import CodeUnit
+_fake = [(CodeUnit(file_path="a/b.py", language=Language.PYTHON_WEB, unit_name="f",
+                   start_line=1, end_line=2), "sqli")]
+check("无 GITHUB_ACTIONS 时不输出 annotation",
+      emit_github_annotations(_fake, [], Path(".")), 0)
+check("无 GITHUB_STEP_SUMMARY 时返回 False",
+      emit_step_summary(Path(__file__)), False)
+
 # ---------------- 汇总 ----------------
 
 print()

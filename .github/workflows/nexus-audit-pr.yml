@@ -1,0 +1,60 @@
+name: nexus-audit PR scan
+
+# 只审计 PR **改动影响到的**路由，不做全量扫描。
+# 全量扫描适合定时跑，PR 里跑全量既慢又会把历史遗留问题全泼到这一个 PR 上。
+
+on:
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 需要基线提交才能 diff，浅克隆只有 1 个 commit 会失败
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install
+        run: |
+          python -m pip install --quiet --upgrade pip
+          if [ -f requirements.txt ]; then python -m pip install --quiet -r requirements.txt; fi
+
+      - name: PR incremental scan
+        env:
+          # 走离线规则引擎时不需要任何密钥。要用模型兜底（cmdi/pathtraver 等
+          # 没有事实支点的类目）时再配这个 secret。
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python cli.py pr-scan \
+            --base "origin/${{ github.base_ref }}" \
+            --repo . \
+            --language java \
+            --github-comment \
+            --output report_pr.md
+
+      # --github-comment 已经在 CI 里做了两件事：
+      #   1. 向 stdout 打 `::warning file=...,line=...` → PR 的 Files Changed
+      #      里对应代码行下方直接出告警气泡，审阅者不必翻日志
+      #   2. 把 Markdown 报告追加进 $GITHUB_STEP_SUMMARY → PR 的 Summary 页面
+      #      自动渲染成表格看板（不需要任何 Token 权限）
+      #
+      # 所以这里**不**再调用 GitHub API 发评论：那需要 pull-requests: write
+      # 权限，对 fork PR 还有额外的权限限制，而上面两个通道已经覆盖了
+      # "在 PR 里看到结果"这个需求。
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-audit-report
+          path: report_pr.md
+          if-no-files-found: ignore

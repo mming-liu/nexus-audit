@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import re
 from typing import Callable, Sequence
 
 from core.agents import vuln_categories as VC
@@ -61,7 +62,13 @@ Decide whether the code below exhibits the described insecure condition.
 Question:
 {question}
 
-Answer with JSON only: {{"hit": "Yes"}} or {{"hit": "No"}}.
+Answer with JSON only, and you MUST cite the line you judged from:
+{{"hit": "Yes", "evidence_line": "<verbatim copy of ONE executable line>"}}
+or {{"hit": "No", "evidence_line": "<verbatim copy of ONE executable line>"}}.
+
+"evidence_line" must be copied character-for-character from the Code block below.
+Do not paraphrase, do not shorten with "...", do not quote a comment line.
+An answer whose evidence_line is not literally present in the code is discarded.
 
 Answer "Yes" only if BOTH hold: (1) the described dangerous operation or insecure
 configuration actually exists in the executable statements, and
@@ -81,7 +88,13 @@ Decide whether the code below exhibits the described insecure condition.
 Question:
 {question}
 
-Answer with JSON only: {{"hit": "Yes"}} or {{"hit": "No"}}.
+Answer with JSON only, and you MUST cite the line you judged from:
+{{"hit": "Yes", "evidence_line": "<verbatim copy of ONE executable line>"}}
+or {{"hit": "No", "evidence_line": "<verbatim copy of ONE executable line>"}}.
+
+"evidence_line" must be copied character-for-character from the Code block below.
+Do not paraphrase, do not shorten with "...", do not quote a comment line.
+An answer whose evidence_line is not literally present in the code is discarded.
 
 This is a configuration-strength check: it does NOT require external input to reach the
 call. Answer "Yes" if the insecure API or weak algorithm/configuration described above
@@ -98,7 +111,14 @@ PROPERTY_PROMPT_TMPL = """You are auditing whether one specific protective prope
 Property:
 {property}
 
-Answer with JSON only: {{"protected": "Yes"}} or {{"protected": "No"}}.
+Answer with JSON only, and you MUST cite the line you judged from:
+{{"protected": "Yes", "evidence_line": "<verbatim copy of ONE executable line>"}}
+or {{"protected": "No", "evidence_line": "<verbatim copy of ONE executable line>"}}.
+
+"evidence_line" must be copied character-for-character from the Code block below.
+Do not paraphrase, do not shorten with "...", do not quote a comment line.
+An answer whose evidence_line is not literally present in the code is discarded.
+
 Judge ONLY on executable statements that actually run on the audited path.
 Comments, string literals, log/error messages, and example URLs in comments are NOT
 evidence — they frequently describe the unsafe alternative that this code avoided.
@@ -144,6 +164,60 @@ def _is_yes(text: str, field: str) -> bool:
         return False
     return "yes" in low
 
+
+# ---- Cite-Before-Verdict -------------------------------------------------
+# 只问 "Yes/No" 时，模型可以凭印象作答，理由和证据脱钩：它能编出一行不存在的
+# 代码来解释结论，而这段编造恰好"听起来很合理"。要求它先逐字符引用它据以
+# 判断的那一行，然后在本地做子串核验 —— 引用的行必须**真的在切片里**，
+# 且不能是注释行。核验不过的采样直接作废，不参与多数票。
+#
+# 这一步几乎零成本（纯本地字符串操作），但能把"幻觉型误报"整类掐掉。
+
+# 判断一行是否是注释：Java/Python/Solidity 的 // # /* * 开头，以及 XML/HTML 的 <!--
+_COMMENT_LINE_RE = re.compile(r"^\s*(?://|#|/\*|\*|<!--|-->)")
+# 引用时模型容易带上的行号前缀（切片里是 `123: code` 形式），核验前要剥掉
+_LINENO_PREFIX_RE = re.compile(r"^\s*\d+\s*[:|]\s?")
+
+
+def _normalize_line(s: str) -> str:
+    return " ".join(_LINENO_PREFIX_RE.sub("", s).split())
+
+
+def verify_evidence(code: str, evidence: str) -> tuple[bool, str]:
+    """核验模型引用的代码行是否真实存在于切片中且不是注释行。
+
+    返回 (是否通过, 原因)。原因仅用于日志/审计，不影响判定。
+    """
+    ev = (evidence or "").strip()
+    if not ev:
+        return False, "evidence_line 为空"
+    if ev in ("...", "…") or "..." in ev:
+        # 省略号说明它在概述而不是引用。允许模型概述等于放弃核验。
+        return False, "evidence_line 含省略号，非逐字符引用"
+
+    raw_lines = (code or "").splitlines()
+    ev_norm = _normalize_line(ev)
+
+    hit_line = None
+    for ln in raw_lines:
+        if ev_norm and ev_norm in _normalize_line(ln):
+            hit_line = ln
+            break
+    if hit_line is None:
+        # 整行没匹配上时退一步：允许引用被切片折行后的前半段，
+        # 但要求长度足够（太短的片段容易在别处偶然命中，起不到核验作用）。
+        if len(ev_norm) >= 12 and ev_norm in _normalize_line(code):
+            # 找到它落在哪一行，仍然要检查那一行是不是注释
+            for ln in raw_lines:
+                if ev_norm in _normalize_line(ln):
+                    hit_line = ln
+                    break
+        if hit_line is None:
+            return False, "evidence_line 不在切片中（疑似编造）"
+
+    if _COMMENT_LINE_RE.match(hit_line):
+        return False, "evidence_line 命中注释行，不能作为执行证据"
+    return True, ""
 
 class ScenarioMatcher:
     """两步法初筛器（运行在 Tier-1 模型上）。
@@ -191,25 +265,55 @@ class ScenarioMatcher:
             raise RuntimeError("需要注入 router 或 llm")
         return await self.router.screen(messages)
 
-    async def _vote(self, prompt: str, field: str, n: int) -> tuple[bool, tuple[bool, ...]]:
+    async def _vote(self, prompt: str, field: str, n: int,
+                    code: str = "") -> tuple[bool, tuple[bool, ...]]:
         """问 n 次，多数票为结论。
 
         并发发出而不是串行：n=3 时串行等于把延迟乘 3，并发只多占一点配额。
         奇数票才不会平局；偶数票平局时按「不判定通过」处理（保守，避免误报）。
+
+        `code` 非空时启用 Cite-Before-Verdict：每轮采样必须先给出
+        `evidence_line`，且该行必须真实存在于 `code` 中、不是注释行。
+        核验不过的那一票**直接作废**（不进票箱），而不是记成 No ——
+        "证据编造"和"判定为安全"是两件完全不同的事，混在一起会让
+        置信度被虚假拉高。全部作废时抛异常，由调用方记为判定失败。
         """
         if n <= 1:
-            return _is_yes(await self._ask(prompt), field), ()
+            raw = await self._ask(prompt)
+            ok, why = self._check_evidence(raw, code)
+            if not ok:
+                raise RuntimeError(f"证据核验失败：{why}")
+            return _is_yes(raw, field), ()
         results = await asyncio.gather(
             *(self._ask(prompt) for _ in range(n)), return_exceptions=True)
         votes: list[bool] = []
+        discarded = 0
         for r in results:
             if isinstance(r, Exception):
                 continue
+            ok, _why = self._check_evidence(r, code)
+            if not ok:
+                discarded += 1
+                continue
             votes.append(_is_yes(r, field))
         if not votes:
-            raise RuntimeError("多次采样全部失败")
+            raise RuntimeError(
+                f"多次采样全部失败（其中 {discarded} 票因证据核验不过被作废）")
         yes = sum(votes)
         return yes * 2 > len(votes), tuple(votes)
+
+    @staticmethod
+    def _check_evidence(raw: str, code: str) -> tuple[bool, str]:
+        """提取 evidence_line 并核验。`code` 为空时不做核验（兼容旧调用）。"""
+        if not code:
+            return True, ""
+        try:
+            data = extract_json(raw)
+        except Exception:
+            return False, "输出不是合法 JSON，无法提取 evidence_line"
+        if not isinstance(data, dict):
+            return False, "输出不是 JSON 对象"
+        return verify_evidence(code, str(data.get("evidence_line", "")))
 
     # ---------- 新接口：按类目做两步法 ----------
 
@@ -228,7 +332,7 @@ class ScenarioMatcher:
                 hit, s_votes = await self._vote(
                     tmpl.format(lang=lang, question=cat.sink_question,
                                 code=unit.source_code),
-                    "hit", self.scenario_votes)
+                    "hit", self.scenario_votes, code=unit.source_code)
             except Exception as e:
                 out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=False,
                                           property_missing="",
@@ -241,7 +345,7 @@ class ScenarioMatcher:
                 protected, p_votes = await self._vote(
                     PROPERTY_PROMPT_TMPL.format(
                         property=cat.property, lang=lang, code=unit.source_code),
-                    "protected", self.property_votes)
+                    "protected", self.property_votes, code=unit.source_code)
             except Exception as e:
                 out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=True,
                                           property_missing="",

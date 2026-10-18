@@ -25,6 +25,15 @@ class CodeUnit:
     # own_body 存在的原因：source_code 为便于模型推理，拼进了同文件辅助方法，
     # 而"辅助方法"里会混入同类的其它路由方法。跨路由串接需要判断"当前方法
     # 自己写了什么"，用 source_code 会把它类方法的写入也算进来。
+    #
+    # 使用边界（踩过坑，别越界）：
+    #   只给 —— taint_chain（判本方法写了哪个介质）、rule_detectors 的入口体截取。
+    #   不给 —— ScenarioMatcher / SkepticReviewer 这类"读代码做判断"的推理 agent。
+    #   给它们的应当是 source_code：P0-2 之后它已排除兄弟路由方法，剩下的
+    #   同文件辅助方法体、跨文件实现体、框架装配证据全是必需上下文。
+    #   曾让 Skeptic 改读 own_body，结果 XSS.safe 只剩 `return encode(xss);`，
+    #   而 encode 的逐字符转义体在 source_code 里 —— 质检员看不见清洗逻辑，
+    #   本该推翻的误报被放过。
 
 
 @dataclass
