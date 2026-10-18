@@ -29,10 +29,24 @@ MYBATIS_ANNO = re.compile(
     r"@(?:Select|Insert|Update|Delete)\s*\(\s*(?:value\s*=\s*)?\"((?:[^\"\\]|\\.)*)\"",
     re.S,
 )
+# `@Select("select ... " + " from t where x = ${y}")` 跨行字符串拼接：
+# 上面的 MYBATIS_ANNO 只吃第一对双引号，拼接的第二段（往往正是带 `${}`
+# 或关键 WHERE 条件那一段）会整段丢失，`${}` 判据就看不到 → 真漏洞判成安全。
+# 这里补齐：注解参数开头到第一个不在字符串里的 `)` 之间的所有字符串字面量。
+MYBATIS_ANNO_CONCAT = re.compile(
+    r"@(?:Select|Insert|Update|Delete)\s*\(\s*(?:value\s*=\s*)?"
+    r"((?:\"(?:[^\"\\]|\\.)*\"\s*\+?\s*)+)", re.S)
 # @Select({"a", "b"}) 数组形式
 MYBATIS_ANNO_ARR = re.compile(
     r"@(?:Select|Insert|Update|Delete)\s*\(\s*\{(.*?)\}\s*\)", re.S
 )
+
+# `_enclosing_method()` 跳过后续注解时，这些名字出现在注解参数里，
+# 不能被当成方法名（`@Options(keyProperty = "id")` 之后紧跟的 `(` 属于注解）。
+_ANNO_LIKE_NAMES = {
+    "Options", "Results", "Result", "ResultMap", "Param", "MapKey",
+    "Select", "Insert", "Update", "Delete", "Value", "Type", "keyProperty",
+}
 
 # 调用点：obj.method(args) —— 取尾部方法名
 CALL_RE = re.compile(r"\b([A-Za-z_]\w*)\s*\.\s*([A-Za-z_]\w*)\s*\(")
@@ -95,6 +109,13 @@ class JavaImplResolver:
         if not root.exists():
             return
         scan_java = Path(self.source_root) if self.source_root else root
+        # 相对路径要按项目根解析：调用方可能传相对路径（切片器传的就是
+        # repo_path），而 `Path("src/main/java").exists()` 依赖当前工作目录，
+        # 在别的 cwd 下跑就静默返回 False → 回退成扫整个 root → 或干脆扫空。
+        # 实测踩过一次：`source_root` 是相对的，`exists()` 为 False，
+        # 索引里一条 @Select 都没有，6 条 MyBatis 样本全部退回模型 —— 不报错。
+        if not scan_java.is_absolute():
+            scan_java = (root / scan_java)
         if not scan_java.exists():
             scan_java = root
         for p in scan_java.rglob("*.java"):
@@ -121,10 +142,28 @@ class JavaImplResolver:
     def _index_java(self, p: Path, text: str) -> None:
         rel = self._rel(p)
         # 1) MyBatis 注解式语句
+        #    先用 CONCAT 版本取**拼接后的完整 SQL**（`"a" + "b"` 跨行也吃得到），
+        #    没有拼接时它与单段版本结果一致；两者都建索引会让同一条语句
+        #    出现两次，所以以 CONCAT 为主、单段版只兜它匹配不到的场合
+        #    （例如注解参数里有 `value = ` 之外的写法）。
+        seen_anno: set[tuple[str, str]] = set()
+        for m in MYBATIS_ANNO_CONCAT.finditer(text):
+            parts = re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(1))
+            sql = "".join(parts)
+            if not sql.strip():
+                continue
+            name = self._enclosing_method(text, m.end())
+            if not name:
+                continue
+            seen_anno.add((name, sql))
+            note = _mybatis_risk_note(sql)
+            self._add(ImplHit(name, "mybatis_anno", rel,
+                              f'@Select("{sql.strip()}")\n// {note}'))
         for m in MYBATIS_ANNO.finditer(text):
             sql = m.group(1)
             name = self._enclosing_method(text, m.end())
-            if not name:
+            if not name or (name, "".join(re.findall(
+                    r'"((?:[^"\\]|\\.)*)"', m.group(0)))) in seen_anno:
                 continue
             note = _mybatis_risk_note(sql)
             self._add(ImplHit(name, "mybatis_anno", rel,
@@ -170,10 +209,60 @@ class JavaImplResolver:
 
     @staticmethod
     def _enclosing_method(text: str, pos: int) -> str | None:
-        """从注解位置往后找它修饰的方法名。"""
-        seg = text[pos: pos + 600]
-        m = re.search(r"\b([A-Za-z_]\w*)\s*\(", seg)
-        return m.group(1) if m else None
+        """从注解位置往后找它修饰的方法名。
+
+        不能直接找"第一个 `word(`"：注解后面往往还跟着别的注解或注解参数，
+        例如
+
+            @Select("select ...")
+            @Options(useGeneratedKeys = true, keyProperty = "id")
+            int insert(User u);
+
+        `@Options(` 里的 `Options(` 会被当成方法名，把整条实现体挂到
+        `Options` 这个不存在的名字上 —— 不报错，只是查不到。
+        正确做法：先**跳过所有后续注解**（含其括号平衡的参数），
+        再取类型/修饰符之后的名字。返回的名字还必须后面紧跟 `(` 且不是
+        `Options`/`Results`/`Result` 这类已知注解名。
+        """
+        seg = text[pos: pos + 1200]
+        i = 0
+        # 逐段跳过后续注解：@Name(...) / @Name
+        while True:
+            while i < len(seg) and seg[i] in " \t\r\n":
+                i += 1
+            if i >= len(seg) or seg[i] != "@":
+                break
+            m = re.match(r"@\s*[A-Za-z_][\w.]*", seg[i:])
+            if not m:
+                break
+            i += m.end()
+            j = i
+            while j < len(seg) and seg[j] in " \t":
+                j += 1
+            if j < len(seg) and seg[j] == "(":
+                depth = 1
+                j += 1
+                while j < len(seg) and depth:
+                    if seg[j] == "(":
+                        depth += 1
+                    elif seg[j] == ")":
+                        depth -= 1
+                    j += 1
+                i = j
+        # 现在应到「修饰符 返回类型 方法名(」
+        rest = seg[i:]
+        # 去掉方法体前的类型与修饰符，取最后一个紧贴 `(` 的标识符
+        m = re.search(r"\b([A-Za-z_]\w*)\s*\(", rest)
+        if not m:
+            return None
+        name = m.group(1)
+        if name in _ANNO_LIKE_NAMES:
+            # 还在注解参数里（`keyProperty = "id")` 之类），继续往后找
+            m2 = re.search(r"\b([A-Za-z_]\w*)\s*\(", rest[m.end():])
+            if not m2 or m2.group(1) in _ANNO_LIKE_NAMES:
+                return None
+            return m2.group(1)
+        return name
 
     # ---------------- 查询 ----------------
 
@@ -405,12 +494,21 @@ def _iter_methods(text: str):
         tail = text_stripped[pc + 1: pc + 200]
         brace = tail.find("{")
         semi = tail.find(";")
+        # `throws Exception {` 里 `{` 在 `;` 之前，没问题；但 `throws A, B;`
+        # 这种畸形写法或注解尾部残留会出现 `;` 在前。真正的坑是**泛型返回值**：
+        #   public List<User> orderBySafe(String field) {
+        # 若 `tail` 里先撞到的是别处的 `;`，这里就判成抽象声明。
+        # 因此除了比较位置，还要求 `;` 之前**没有未闭合的花括号**。
         if semi >= 0 and (brace < 0 or semi < brace):
-            end = text_stripped.find(";", pc)
-            if end < 0:
+            # 再看一眼：`;` 与 `(` 之间是否夹着 `{`（跨过去了说明花括号其实在前）
+            between = text_stripped[pc + 1: pc + 1 + tail.find(";")] \
+                if semi < 200 else ""
+            if "{" not in between:
+                end = text_stripped.find(";", pc)
+                if end < 0:
+                    continue
+                out.append((name, text_stripped[m.start(): end + 1], True))
                 continue
-            out.append((name, text_stripped[m.start(): end + 1], True))
-            continue
         if brace < 0:
             continue
         bo = pc + 1 + brace

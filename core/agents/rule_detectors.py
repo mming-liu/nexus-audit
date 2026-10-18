@@ -1281,6 +1281,358 @@ def _has_unknown_url_guard(body: str) -> bool:
     return False
 
 
+# ---------------- cmdi（命令注入） ----------------
+#
+# 判据只有两个支点，都不需要语义推断：
+#   1) 有没有把可控值送进"能执行命令"的 API
+#   2) 送进去的值是否被**白名单枚举**限死
+#
+# 关键区分（这决定规则能不能上真实项目）：
+#   `Security.checkOs(cmd)` 返回 `contains("|") || contains(";") || ...` 时，
+#   Controller 里写的是 `if (!Security.checkOs(filepath)) { 执行 }`，
+#   看起来"不通过就拦住了"，可函数名是 checkXxx、调用形态和真正的白名单
+#   一模一样。这类**黑名单**天然可绕（换行、$()、反引号），不是防护。
+#   所以判据必须看"拦住的是不是**值的集合**"，而不是"有没有调用校验函数"。
+#
+# 另有两个"无注入面"的可核对事实：
+#   - 实参是纯字符串常量（无变量、无拼接）→ 攻击者影响不到命令
+#   - 形参是整型 → 绑定阶段就被解析成数字，字符串拼接无从发生
+CMDI_SINK_RE = re.compile(
+    r"Runtime\s*\.\s*getRuntime\s*\(\s*\)\s*\.\s*exec\s*\(|"
+    r"\bnew\s+(?:ProcessBuilder|Invoker)\s*\(|"
+    r"\.\s*command\s*\(|"
+    r"\.\s*load(?:Library)?\s*\(|"
+    r"ProcessImpl\s*\.\s*start\s*\(|"
+    r"\bmethod\s*\.\s*invoke\s*\(|"
+    r"ProcessUtils|CommandLine\s*\.\s*parse", re.I)
+# 形参级白名单：`if (!commands.contains(command)) return/throw;`
+# 与 spel 的判据同构 —— 拒绝路径才是防护，允许路径不是。
+#
+# 正则细节（踩过）：`[\w.]+` 是**贪婪**的，会把 `commands` 整串吃掉，
+# 后面的 `(?:white|safe|...|command)` 就无从匹配 —— 变量名本身就带关键字时
+# 反而永远匹配不上。必须写成「关键字可出现在标识符任意位置」的形态：
+#   标识符 = \w* KEY \w*      且整体不跨 `.`（点号是成员访问，不是名字的一部分）
+_IDENT_WITH = r"\b\w*{kw}\w*\b"
+_CMDI_WL_KEY = r"(?:white|safe|allow|permit|legal|valid|command|list|set|dic|map|pool|range)"
+
+CMDI_WHITELIST_RE = re.compile(
+    # if (!commands.contains(command))
+    r"if\s*\(\s*!\s*" + _IDENT_WITH.format(kw=_CMDI_WL_KEY) + r"\s*\.\s*contains\s*\(|"
+    # if (commands.contains(command) == false)
+    r"if\s*\(\s*" + _IDENT_WITH.format(kw=_CMDI_WL_KEY) + r"\s*\.\s*"
+    r"contains\s*\([^)]*\)\s*==\s*false|"
+    # if (WHITE_LIST.indexOf(cmd) < 0)  /  if (safeList.indexOf(cmd) == -1)
+    r"if\s*\(\s*" + _IDENT_WITH.format(kw=_CMDI_WL_KEY) + r"\s*\.\s*"
+    r"indexOf\s*\([^)]*\)\s*(?:<|==)\s*0\s*\)|"
+    # cmd.matches("ls|pwd|cat")：正则本身就是全串匹配的全集白名单
+    r"\.\s*(?:matches|equalsIgnoreCase)\s*\(\s*\"[\w|\-. ]+\"\s*\)", re.I)
+# 值的枚举定义（`commands.add("ls")` / `Arrays.asList("ls","pwd")`）
+CMDI_ENUM_RE = re.compile(
+    r"\b\w*(?:white|safe|allow|permit|legal|valid|command|list|set)\w*\s*\.\s*"
+    r"(?:add|put|of)\s*\(\s*\"|"
+    r"\b[A-Za-z_]\w*\s*=\s*\"[\w\-.]+\"\s*;\s*\n\s*[A-Za-z_]\w*\s*\.\s*add\s*\(|"
+    r"Arrays\s*\.\s*asList\s*\(\s*\"", re.I)
+# 拼接/传参形态：`exec("ls -l " + x)` 或 `exec(x)`
+_CONCAT_HINT_RE = re.compile(r"\"[^\"]*\"\s*\+|\+\s*[A-Za-z_]\w*")
+
+
+def _param_types(sig: str) -> dict[str, str]:
+    """从签名里取 {形参名: 类型}，用于判"数字类型无注入面"。"""
+    out: dict[str, str] = {}
+    sig = re.sub(r"@\w+\s*(?:\([^)]*\))?", " ", sig)
+    for typ, name in _PARAM_SEG_RE.findall(sig):
+        out[name] = typ
+    return out
+
+
+def _first_arg(call: str) -> str:
+    """从 `名字(...)` 里取出第一个实参（括号平衡），取不到就返回空串。
+
+    直接 `call[call.find("(") + 1:]` 会把后面的 `));\\n return;\\n}` 一起带上，
+    导致"实参里有没有字母"的判定被返回值/后续语句污染。
+    """
+    i = call.find("(")
+    if i < 0:
+        return ""
+    depth, start = 1, i + 1
+    for j in range(start, len(call)):
+        ch = call[j]
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+            if depth == 0:
+                return call[start:j]
+        elif ch == "," and depth == 1:
+            return call[start:j]
+    return call[start:start + 120]
+
+
+def _args_all_numeric(args: str, types: dict[str, str]) -> bool:
+    """实参全是整型形参/数字字面量 → 绑定阶段就已定型，不可能拼接出语法。
+
+    必须剥掉「把数字转成字符串」的转换调用再取标识符，否则
+    `exec(Integer.toString(n))` 会把 `Integer`/`toString` 当成两个未知变量，
+    判成"有注入面"。转换函数本身不引入可控字符，不是污点来源。
+    """
+    if not args or not args.strip():
+        return False
+    # 剥掉数字→字符串的转换包装（保留里面的表达式）
+    txt = args
+    for _ in range(3):  # 允许一层套一层
+        new = re.sub(r"\b(?:Integer|Long|Short|Byte|String|Objects)\s*\.\s*"
+                     r"(?:toString|valueOf|toHexString)\s*\(([^()]*)\)", r" \1 ", txt)
+        if new == txt:
+            break
+        txt = new
+    # 再剥掉 new String(...) / String.format(...) 这类不改字符集的包装
+    txt = re.sub(r"\bnew\s+String\s*\(([^()]*)\)", r" \1 ", txt)
+    idents = re.findall(r"\b[A-Za-z_]\w*\b", txt)
+    if not idents:
+        return bool(re.fullmatch(r"[\s\d+\-*/()\.,]+", txt))
+    return all(types.get(i) in _NUMERIC_TYPE_SET for i in idents)
+
+
+_NUMERIC_TYPE_SET = {"int", "Integer", "long", "Long", "short", "Short",
+                     "byte", "Byte", "BigInteger", "BigDecimal"}
+
+
+def cmdi_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    if not body:
+        return None
+    m = CMDI_SINK_RE.search(body)
+    if not m:
+        return None
+
+    # 1) 数字类型形参：exec(n) / load(id) 都没有注入面
+    types = _param_types(_entry_signature(body))
+    call = body[m.start(): m.start() + 200]
+    arg_text = _first_arg(call)
+    if _args_all_numeric(arg_text, types) and \
+            not re.search(r"\"[^\"]*\"\s*\+", arg_text):
+        return False
+
+    # 2) 实参是纯常量（没有 + 拼接、没有变量）→ 命令固定，不是注入
+    if not _CONCAT_HINT_RE.search(call) and not re.search(
+            r"exec\s*\(\s*[A-Za-z_]\w*\s*\)", body):
+        if re.search(r"exec\s*\(\s*\"[^\"]*\"\s*\)|"
+                     r"load\s*\(\s*\"[^\"]*\"\s*\)", body):
+            return False
+
+    # 3) 值级白名单 + 阻断
+    #    枚举定义可能在**跨文件辅助段**里（`SecurityUtil.checkOs` 的
+    #    whitelist 定义），所以两处都要看。只看入口体会把真白名单判成"未知防护"。
+    sib = _sibling_methods(source)
+    if _guard_blocks(body, CMDI_WHITELIST_RE) and \
+            (CMDI_ENUM_RE.search(body) or CMDI_ENUM_RE.search(sib)):
+        return False
+    # 3b) 入口体里没有可识别的白名单形态，但调了一个 checkXxx，
+    #     而它的实现体就在辅助段里且是值级白名单 —— 同样构成防护。
+    #     （`if (!SecurityUtil.isAllowed(cmd))` 这种名字不带 command/list，
+    #      第 3 步的正则匹配不到，只有读到实现体才知道它拦的是值的集合。）
+    if sib:
+        nat = _helper_guard_nature(body, sib)
+        if nat is False:
+            return False
+        if nat is True:
+            return True        # 黑名单 —— 明确不是防护，不必退回
+
+    # 4) 有校验调用但我们认不出的性质 —— 退回模型（黑名单 vs 白名单分不清）
+    if _has_unknown_input_guard(body):
+        return None
+    if _guard_blocks(body, CMDI_WHITELIST_RE):
+        # 白名单形态但没看到枚举定义（可能在跨文件段），仍按防护计
+        return False
+    return True
+
+
+# 辅助方法体里出现这些 → 拦截的是"值的集合"，是真白名单
+_HELPER_ALLOW_RE = re.compile(
+    r"\.\s*contains\s*\(\s*\w+\s*\)|"
+    r"\.\s*indexOf\s*\(\s*\w+\s*\)\s*(?:<|==)\s*0|"
+    r"\bswitch\s*\(\s*\w+\s*\)|\bcase\s*\"", re.I)
+# 出现这些 → 拦截的是"字符/片段"（黑名单），天然可绕
+_HELPER_DENY_RE = re.compile(
+    r"\.\s*contains\s*\(\s*\"|"
+    r"\.\s*indexOf\s*\(\s*\"|"
+    r"\.\s*matches\s*\(\s*\"[^\"]*[\[\]\.\*\+\?]", re.I)
+
+
+def _helper_guard_nature(body: str, sib: str) -> bool | None:
+    """入口调了认不出的校验函数，但辅助段里能读到它的实现 —— 直接判性质。
+
+    返回 True=vuln（黑名单）、False=safe（值级白名单）、None=读不到/矛盾。
+
+    `java-sec-code` 与 `Hello-Java-Sec` 的 `SecurityUtil.checkOs(filepath)`
+    实现体就是 `return param.contains("|") || param.contains(";")`，
+    而 `pathFilter` 是 `indexOf("..")` 与文件后缀的**拼接黑名单**。
+    这两段都在切片的跨文件辅助段里，规则只要肯去读，就不用退回给模型。
+
+    被调函数名**不能只按 check/filter/valid/verify 前缀挑** ——
+    `isAllowed` / `inWhitelist` / `isSafeCmd` 全是合法命名，
+    只认前缀会把它们整体漏掉。改为"入口体里所有被调用的名字都去辅助段找一遍"，
+    找到实现体才算数（找不到自然不贡献结论）。
+    """
+    if not sib:
+        return None
+    # 排除 Java 关键字与常见库方法，减少无谓扫描
+    _skip = {"if", "for", "while", "switch", "catch", "return", "new", "super",
+             "this", "exec", "start", "command", "getRuntime", "println"}
+    names = {n for n in re.findall(r"\b([A-Za-z_]\w*)\s*\(", body)
+             if n not in _skip}
+    if not names:
+        return None
+    hit_allow = hit_deny = False
+    for name in names:
+        # 在辅助段里找该方法的实现体（名字后跟 `(` ... `{` ... `}`）
+        for m in re.finditer(r"\b" + re.escape(name) + r"\s*\([^)]*\)\s*\{", sib):
+            depth, end = 1, len(sib)
+            for i in range(m.end(), len(sib)):
+                if sib[i] == "{":
+                    depth += 1
+                elif sib[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = i
+                        break
+            impl = sib[m.end(): end]
+            if _HELPER_DENY_RE.search(impl):
+                hit_deny = True
+            elif _HELPER_ALLOW_RE.search(impl):
+                hit_allow = True
+    if hit_deny and not hit_allow:
+        return True            # 黑名单：不算防护
+    if hit_allow and not hit_deny:
+        return False           # 值级白名单
+    return None
+
+
+# ---------------- pathtraver（路径遍历） ----------------
+#
+# 支点同样是两个可核对事实：
+#   1) 可控值有没有进入文件 API
+#   2) 路径是否被"限制在基目录内"（规范化 + 前缀校验 / 只取文件名）
+#
+# 必须区分的半吊子防护（真实项目里非常常见）：
+#   `if (!Security.checkTraversal(name)) { ... }` 而实现是
+#       return content.contains("..") || content.contains("/");
+#   函数名是 checkTraversal，写着"检测非法文件名"，看起来是防护；
+#   但靶场里 `safe` 那条**根本没有文件操作**（只是把结果放进 map 返回），
+#   而 `download` 那条压根没调用它。两个事实都必须核对，只看函数名会判反。
+PATH_SINK_RE = re.compile(
+    r"new\s+File(?:InputStream|OutputStream|Reader|Writer)?\s*\(|"
+    r"Files\s*\.\s*(?:readAllBytes|readAllLines|readString|newInputStream|"
+    r"newOutputStream|copy|write|delete|move)\s*\(|"
+    r"Paths\s*\.\s*get\s*\(|"
+    r"FileUtils\s*\.\s*(?:read|copy|writeFile|open)\w*\s*\(|"
+    r"IOUtils\s*\.\s*(?:toByteArray|copy|toString)\s*\(|"
+    r"\.\s*listFiles\s*\(|getResourceAsStream\s*\(|ZipFile\s*\(", re.I)
+# 真正的路径约束：规范化后再比较，或直接剥掉目录
+PATH_SAFE_RE = re.compile(
+    r"getCanonicalPath\s*\(\s*\)\s*\.\s*startsWith\s*\(|"
+    r"normalize\s*\(\s*\)\s*\.\s*(?:toString\s*\(\s*\)\s*\.\s*)?startsWith\s*\(|"
+    r"toRealPath\s*\(\s*\)\s*\.\s*startsWith\s*\(|"
+    r"FilenameUtils\s*\.\s*getName\s*\(|"
+    r"getFileName\s*\(\s*\)|"
+    r"\.\s*getName\s*\(\s*\)\s*;?\s*$", re.I)
+# 疑似防护调用（含黑名单），只用于决定"是否退回模型"
+_PATH_GUARD_RE = re.compile(
+    r"\b\w*(?:check|filter|valid|verify|allow|safe|traversal)\w*\s*\(", re.I)
+
+
+def pathtraver_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    if not body:
+        return None
+    sink_in = body
+    if not PATH_SINK_RE.search(body):
+        # 入口体没命中 sink 时**不能直接判安全** —— sink 往往在同文件的私有
+        # 辅助方法里。`java-sec-code` 的 `getImage(filepath)` 入口体只有一句
+        # `return getImgBase64(filepath);`，真正的 `new File` / `Files.readAllBytes`
+        # 全在 `getImgBase64` 里。只看入口体会把它误判成"无文件操作"。
+        # （这条是本轮真实踩到的回归：规则一度把 2/2 的 pathtraver 打成 1/2。）
+        #
+        # 依次退到：同文件私有辅助方法（在 source 的 `// ---- 同文件辅助方法`
+        # 段里，但 `entry_body` 截掉了）→ 跨文件辅助段。
+        sink_in = _all_evidence(source)
+        if not PATH_SINK_RE.search(sink_in):
+            # 到这里才能说"整份切片里都没有文件 API"。
+            # 半吊子样本（`if (!Security.checkTraversal(name)) {...}` 只返回字符串）
+            # 就是靠这一条与 `download` 那条真漏洞区分开的。
+            if _FILE_API_NAME_RE.search(sink_in):
+                return None      # 出现了文件相关名字但没命中 sink 形态，交给模型
+            return False
+
+    # 1) 规范化 + 前缀校验 / 只取文件名 → 目录逃逸被物理阻断
+    if PATH_SAFE_RE.search(body):
+        return False
+
+    # 2) 有疑似校验调用：先尝试在**跨文件辅助段**里读到它的实现体。
+    #    `SecurityUtil.pathFilter` 的实现是 `indexOf("..")` / 后缀黑名单，
+    #    读到黑名单特征就可以确定"这不是防护"，直接判漏洞，不用退回模型。
+    #    读不到（或读到值级白名单）才退回。
+    if _PATH_GUARD_RE.search(body):
+        sib = _sibling_methods(source)
+        nat = _helper_guard_nature(body, sib)
+        if nat is False:
+            return False       # 值级白名单（前缀校验/枚举）
+        if nat is True:
+            return True        # 黑名单 → 天然可绕，不是防护
+        return None
+    return True
+
+
+# "看起来像在做文件操作"的名字（含变量名、方法名），只用来把"完全没有文件面"
+# 与"有文件面但没命中 sink 形态"分开。前者可确定性判安全，后者必须交模型。
+_FILE_API_NAME_RE = re.compile(
+    r"\b(?:File|Files|Path|Paths|InputStream|OutputStream|FileInputStream|"
+    r"FileOutputStream|FileReader|FileWriter|RandomAccessFile|Resource|"
+    r"getResource|ClassPathResource|ZipEntry|ZipFile|FileSystem)\b", re.I)
+
+
+# 证据段头（切片器拼接的几段）。`entry_body()` 会在第一个 `// ----` 处截断，
+# 所以"入口体里有没有 sink"和"整份切片里有没有 sink"是两个不同的问题。
+_EVIDENCE_SEP_RE = re.compile(r"^\s*//\s*-{2,}", re.M)
+
+
+def _all_evidence(source: str) -> str:
+    """整份切片去掉分隔注释行后的全部代码（入口体 + 同文件辅助 + 跨文件段）。
+
+    为什么需要：sink 经常不在入口方法体里。
+    `PathTraversal.getImage(filepath)` 的入口体只有 `return getImgBase64(filepath);`，
+    `new File` / `Files.readAllBytes` 全在同文件的私有辅助方法里；
+    MyBatis 的 `${}` 在 Mapper 实现体里，`SecurityUtil.pathFilter` 的
+    黑名单实现在跨文件辅助段里。判"到底有没有 sink"必须看全量证据，
+    判"入口自己做了什么"才用 `entry_body`。
+
+    分隔注释行（`// ---- 同文件辅助方法 ----`）本身不是代码，逐行剥掉；
+    但它后面的**注入代码是真实代码**，不剥 —— 与 `wiring_block()` 的处理
+    相反，因为那一段是 `//   ` 逐行渲染的，这里不是。
+    """
+    out: list[str] = []
+    for ln in source.splitlines():
+        if _EVIDENCE_SEP_RE.match(ln):
+            continue
+        out.append(ln)
+    return strip_comments("\n".join(out), keep_lines=False)
+
+
+# "认不出性质的输入校验调用"：形参名带 cmd/file/path 的 if 判断，
+# 排除已识别的白名单形态。与 ssrf 的 `_has_unknown_url_guard` 同构。
+_UNKNOWN_INPUT_GUARD_RE = re.compile(
+    r"if\s*\(\s*[^)]*\b\w*(?:cmd|command|file|path|name|input|param)\w*\b[^)]*\)",
+    re.I)
+
+
+def _has_unknown_input_guard(body: str) -> bool:
+    for m in _UNKNOWN_INPUT_GUARD_RE.finditer(body):
+        if CMDI_WHITELIST_RE.search(m.group(0)):
+            continue
+        return True
+    return False
+
+
 # ---------------- 对外门面 ----------------
 
 def verdict(category: str, source: str) -> bool | None:
@@ -1343,5 +1695,11 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category == "ssrf":
         return ssrf_verdict(source)
+
+    if category == "cmdi":
+        return cmdi_verdict(source)
+
+    if category == "pathtraver":
+        return pathtraver_verdict(source)
 
     return None

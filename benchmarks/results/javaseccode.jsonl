@@ -10,7 +10,7 @@
 {"unit": "Deserialize.rememberMeBlackClassCheck", "route": "/rememberMe/security", "category": "deserial", "real_vuln": true, "truth_src": "doc", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "Deserialize.rememberMeVul", "route": "/rememberMe/vuln", "category": "deserial", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "PathTraversal.getImageSec", "route": "/path_traversal/sec", "category": "pathtraver", "real_vuln": false, "truth_src": "route", "flagged": null, "stage": "not_judged", "detail": "规则未覆盖（离线模式）", "elapsed_s": 0.0}
-{"unit": "PathTraversal.getImage", "route": "/path_traversal/vul", "category": "pathtraver", "real_vuln": true, "truth_src": "route", "flagged": null, "stage": "not_judged", "detail": "规则未覆盖（离线模式）", "elapsed_s": 0.0}
+{"unit": "PathTraversal.getImage", "route": "/path_traversal/vul", "category": "pathtraver", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "Rce.secYarm", "route": "/sec/yarm", "category": "deserial", "real_vuln": false, "truth_src": "route", "flagged": false, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "Rce.yarm", "route": "/vuln/yarm", "category": "deserial", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "SpEL.spel_vuln2", "route": "spel/vuln2", "category": "spel", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}

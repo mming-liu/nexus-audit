@@ -208,13 +208,32 @@ class JavaSlicer:
         **零参数**调用，按「有没有外部入参」过滤会被整体丢掉，模型只看到
         "没有 IP 校验" 就判成漏洞 —— 实测 8 条 SSRF 误报全部源于此。
         防护类调用恰恰常常不带参数，所以按方法名再补一轮。
+
+        为什么"本地方法"不能用 `_iter_methods` 判（真实根因，踩过一次）：
+        Controller 和 Mapper **方法同名**是 MyBatis 的常规写法 ——
+
+            // MyBatis.java（Controller）
+            public List<User> orderBySafe(String field) {
+                return userMapper.orderBySafe(field);      // 调的是 Mapper
+            }
+            // UserMapper.java（interface）
+            List<User> orderBySafe(String field);          // 同名声明
+
+        旧实现用 `{n for n,_b,_i in _iter_methods(body)}` 算"本地已定义的方法"，
+        而 `_iter_methods` 会把接口的抽象声明也算进去 —— 于是 `orderBySafe`
+        被判成"本地方法"，`continue` 掉，Mapper 实现体永远不注入。
+        Hello-Java-Sec 的 6 条 MyBatis 样本全部栽在这里，而且**不报错**：
+        切片看起来完整（有配置块、有装配证据），只是缺了最关键的那段 SQL。
+
+        正确判据是"切片里有没有它的**实现体**"，不是"有没有这个名字"。
         """
         from core.context.java_impl_resolver import _entry_only, _iter_methods as _im
 
         r = self._impl_resolver()
         r.build()
         body = _entry_only(source)
-        local = {n for n, _b, _i in _im(body)}
+        # 只看**带方法体**的定义（`_iter_methods` 第三位是 is_interface）。
+        local = {n for n, _b, is_iface in _im(body) if not is_iface}
         picked: list = []
         seen: set[str] = set()
 
@@ -222,19 +241,35 @@ class JavaSlicer:
             var, name, args = m.group(1), m.group(2), m.group(3)
             if name in seen or len(name) < 3 or var in ("this", "super"):
                 continue
-            if name in local:
-                continue
             a = args.strip()
             # 无参 / 纯字面量调用一般不可能是数据汇聚点，跳过省 token。
             # **但 Mapper / Repository 调用必须例外**：`userMapper.OrderByUsername()`
             # 零参，可它的语句在 Mapper XML 里 —— 那才是判定注入的面。
-            # 按"无参不可能有漏洞"跳过，等于让模型对着 `return x();` 猜。
             zero_arg_ok = bool(re.search(
                 r"(?i)(mapper|repository|dao|daoimpl)$", var)) or \
                 bool(re.search(r"(?i)(Mapper|Repository|Dao)$", name))
             if not a and not zero_arg_ok:
                 continue
             if a and not re.search(r"[A-Za-z_]\w*", a) and not zero_arg_ok:
+                continue
+            # "本地方法"判定必须放在过滤之后，而且只挡**切片里真有实现体**的同名方法。
+            #
+            # 为什么不能简单地 `if name in local: continue`：
+            # Controller 和 Mapper 同名是 MyBatis 的常规写法 ——
+            #     // MyBatis.java（Controller）
+            #     public List<User> orderBySafe(String field) {
+            #         return userMapper.orderBySafe(field);   // 调的是 Mapper
+            #     }
+            # `_entry_only` 保留了 Controller 这一个方法，`local` 里必然有
+            # `orderBySafe`，于是 Mapper 的 SQL 永远不注入 —— 而且不报错，
+            # 切片看起来完整（配置块、装配证据都在），只缺最关键那段 SQL。
+            # Hello-Java-Sec 的 6 条 MyBatis 样本全栽在这里。
+            #
+            # 正确判据是「调用点是不是自调用」：`this.x()` 或无接收者的 `x()`
+            # 才是自调用；`userMapper.x()` 的接收者是另一个对象，即使同名
+            # 也不是本地方法。这里用接收者判断，`local` 只作为
+            # "接收者等于当前类实例"的补充证据。
+            if name in local and var in ("this", "super"):
                 continue
             seen.add(name)
             for h in r.lookup(name, limit=1):

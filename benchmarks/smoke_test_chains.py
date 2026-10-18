@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -554,6 +555,171 @@ check("ObjectInputStream.readUnshared 算 deserial sink",
 check("JAXB unmarshal 算 xxe sink",
       _verdict("xxe", 'public Object u(String c) { '
                       'return unmarshaller.unmarshal(new StringReader(c)); }'), True)
+
+# ---------------- cmdi / pathtraver 规则化 ----------------
+# 这两类长期"没有干净支点"，实际有：只判两端（裸奔 True / 值级白名单 False），
+# 中间态（认不出性质的校验调用）一律 None。踩过的坑写在下面断言里。
+print("\n[19] cmdi / pathtraver 确定性规则")
+
+_CMDI_BARE = '''public static String vul(String cmd) {
+    Process proc = Runtime.getRuntime().exec(cmd);
+    return "";
+}'''
+check("裸 exec(形参) → vuln", _verdict("cmdi", _CMDI_BARE), True)
+
+_CMDI_WL = '''public static String safe(String cmd) {
+    Set<String> commands = new HashSet<>();
+    commands.add("ls");
+    commands.add("pwd");
+    String command = cmd.split("\\\\s+")[0];
+    if (!commands.contains(command)) {
+        return "不在白名单中";
+    }
+    Runtime.getRuntime().exec(command);
+    return "";
+}'''
+check("值级白名单 + 阻断 → safe", _verdict("cmdi", _CMDI_WL), False)
+
+# 黑名单 helper：函数名就叫 checkOs，调用形态与白名单一模一样。
+# 只看"有没有调 checkXxx"会把这条判成 safe —— 必须退回模型。
+_CMDI_BLACKLIST_HELPER = '''public static String safe(String filepath) {
+    if (!Security.checkOs(filepath)) {
+        String[] cmdList = {"sh", "-c", "ls -l " + filepath};
+        new ProcessBuilder(cmdList).start();
+        return "ok";
+    }
+    return "检测到非法命令注入";
+}'''
+check("认不出性质的 checkXxx（可能是黑名单）→ None，不臆断",
+      _verdict("cmdi", _CMDI_BLACKLIST_HELPER), None)
+
+_CMDI_INT = '''public static void f(Integer n) {
+    Runtime.getRuntime().load(Integer.toString(n));
+    return;
+}'''
+check("整型形参无注入面 → safe", _verdict("cmdi", _CMDI_INT), False)
+
+_CMDI_CONST = '''public void ping() {
+    Runtime.getRuntime().exec("/bin/ping -c1 127.0.0.1");
+    return;
+}'''
+check("常量命令 → safe", _verdict("cmdi", _CMDI_CONST), False)
+
+_PATH_VUL = '''public String download(String filename) {
+    String filePath = System.getProperty("user.dir") + "/logs/" + filename;
+    InputStream in = Files.newInputStream(Paths.get(filePath));
+    return "";
+}'''
+check("路径拼接进文件 API、无任何校验 → vuln",
+      _verdict("pathtraver", _PATH_VUL), True)
+
+_PATH_CANON = '''public String safe(String filename) {
+    String base = System.getProperty("user.dir") + "/logs/";
+    File f = new File(base, filename);
+    if (!f.getCanonicalPath().startsWith(new File(base).getCanonicalPath())) {
+        throw new RuntimeException("非法路径");
+    }
+    InputStream in = new FileInputStream(f);
+    return "";
+}'''
+check("规范化 + 前缀校验 → safe", _verdict("pathtraver", _PATH_CANON), False)
+
+_PATH_HALF = '''public String safe(String filename) {
+    if (!Security.checkTraversal(filename)) {
+        return "安全通过";
+    }
+    return "检测到非法的文件名";
+}'''
+check("只有校验调用、没有文件操作 → 无 sink，safe",
+      _verdict("pathtraver", _PATH_HALF), False)
+
+_PATH_GUARD = '''public String download(String filename) {
+    if (!Security.checkTraversal(filename)) {
+        throw new RuntimeException("非法");
+    }
+    InputStream in = Files.newInputStream(Paths.get(base + filename));
+    return "";
+}'''
+check("有文件操作 + 认不出的 checkXxx → None",
+      _verdict("pathtraver", _PATH_GUARD), None)
+
+# 跨文件辅助段：认不出的 checkXxx 能在证据段里读到实现体时，规则必须自己判性质，
+# 而不是继续退回模型。这两条对应 java-sec-code / Hello-Java-Sec 里的真实写法。
+_PATH_GUARD_BLACKLIST = _PATH_GUARD + '''
+
+// ---- 跨文件辅助方法实现 ----
+// 来自 SecurityUtil.java:18
+public static boolean checkTraversal(String content) {
+    return content.contains("..") || content.contains("/");
+}'''
+check("辅助段读到黑名单实现 → 不是防护，判 vuln",
+      _verdict("pathtraver", _PATH_GUARD_BLACKLIST), True)
+
+_CMD_HELPER_ALLOW = '''public static String safe(String filepath) {
+    if (!SecurityUtil.checkOs(filepath)) {
+        new ProcessBuilder("sh", "-c", "ls -l " + filepath).start();
+        return "ok";
+    }
+    return "非法";
+}
+
+// ---- 跨文件辅助方法实现 ----
+// 来自 SecurityUtil.java:31
+public static boolean checkOs(String param) {
+    return WHITE_LIST.contains(param);
+}'''
+check("辅助段读到值级白名单 → 判 safe",
+      _verdict("cmdi", _CMD_HELPER_ALLOW), False)
+
+# 枚举定义只出现在辅助段（入口体里只有 contains 判断）也要认
+_CMD_ENUM_IN_SIB = '''public static String safe(String cmd) {
+    if (!SecurityUtil.isAllowed(cmd)) {
+        return "非法";
+    }
+    Runtime.getRuntime().exec(cmd);
+    return "";
+}
+
+// ---- 跨文件辅助方法实现 ----
+public static boolean isAllowed(String c) {
+    return ALLOWED.indexOf(c) < 0;
+}'''
+check("白名单枚举在辅助段里 → 判 safe",
+      _verdict("cmdi", _CMD_ENUM_IN_SIB), False)
+
+print("\n[20] MyBatis 注解解析边界")
+from core.context.java_impl_resolver import (  # noqa: E402
+    JavaImplResolver, MYBATIS_ANNO_CONCAT)
+
+_MB = '''
+public interface UserMapper {
+    @Select("select * from users where name = "
+          + "'" + #{name} + "'")
+    List<User> byNameConcat(String name);
+
+    @Select("select * from users order by ${field}")
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    List<User> orderByUnsafe(String field);
+}
+'''
+_anno_hits = []
+for _m in MYBATIS_ANNO_CONCAT.finditer(_MB):
+    _sql = "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', _m.group(1)))
+    _anno_hits.append((JavaImplResolver._enclosing_method(_MB, _m.end()), _sql))
+
+_names = [n for n, _s in _anno_hits]
+check("跨行 `\"a\" + \"b\"` 拼接 → 取到拼接后的完整 SQL",
+      any(s.strip() == "select * from users where name = '" for _n, s in _anno_hits),
+      True)
+check("跨行拼接不丢第二段（第一段单独不足以判定）",
+      any("where name =" in s and len(s) > len("select * from users where name =")
+          for _n, s in _anno_hits), True)
+check("`@Options` 紧跟注解 → 不错位成方法名 Options",
+      "Options" not in _names and "orderByUnsafe" in _names, True)
+check("`${field}` 判据能看到（不被拼接截断掩掉）",
+      any("${field}" in s for _n, s in _anno_hits), True)
+check("两个方法名都解析正确",
+      sorted(n for n in _names if n) == ["byNameConcat", "orderByUnsafe"], True)
 
 
 
