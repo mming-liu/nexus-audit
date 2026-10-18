@@ -76,9 +76,11 @@ python benchmarks/check_stability.py
 12 条样本里 5 条结果不一致（41.7%）。单轮 TPR/FPR 因此不具备可复现性，
 详见 [`REAL_PROJECT_REPORT.md`](REAL_PROJECT_REPORT.md)。
 
-采样级补救已经试过并失效：`--votes 3`（三次取多数）在两轮 A/B 里翻转率仍是
-9/66 = 13.6%，与 `--votes 1` 完全相同，成本却是 3 倍。所以 `--votes` 默认 1，
-`VulnHypothesis.votes` 只作为「模型是否犹豫」的审计线索保留。
+采样级补救的效果取决于票数：`--votes 3`（三次取多数）在两轮 A/B 里翻转率仍是
+9/66 = 13.6%，与 `--votes 1` 完全相同——3 票几乎必然是 2:1，等于把一次抽样
+换成另一次抽样。但把 5 轮完整评测事后合并取多数，Score 从 0.639–0.724 抬到
+**0.793**（TPR 0.935 / FPR 0.143）。所以 `--votes` 默认 1（单轮跑分用），
+需要更高召回时用 5 票的代价换。
 
 
 ```bash
@@ -104,8 +106,9 @@ python cli.py --help
 - [ ] 第4周：PR 增量扫描的调用链过滤（`cmd_pr_scan` 仍是 TODO）
 - [x] 第5周：Java 赛道打通 + OWASP Benchmark 跑分（11 类，Score 0.98）
 - [x] 第6周：真实项目（java-sec-code）评测，暴露 4 个仅真实代码可见的切片缺陷
-- [ ] 降判定抖动：采样级手段已排除（3 票投票 A/B 实测翻转率不变，
-      见 `REAL_PROJECT_REPORT.md` 第四节）；下一个候选是 prompt 级证据指认
+- [ ] 降判定抖动：**抖动集中在无规则兜底的新类目**（cors 7/8、spel 2/3、
+      deserial 2/3 抖动，sqli 仅 1/10）→ 优先给这些类目补确定性规则，
+      优先级高于 prompt 调优
 - [ ] 跨路由串接：存储型 XSS 这类「写入点 + 读取点」分居两方法的漏洞
 
 

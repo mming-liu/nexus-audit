@@ -340,7 +340,8 @@ def main():
     ap.add_argument("--offline", action="store_true")
     ap.add_argument("--no-rules", action="store_true")
     ap.add_argument("--votes", type=int, default=1,
-                    help="每个问题问几次取多数（默认 1；实测 3 票不降抖动只增成本，见 REAL_PROJECT_REPORT.md）")
+                    help="每个问题问几次取多数。默认 1；3 票实测不降抖动，"
+                         "要提召回用 5（代价 5 倍调用）。见 REAL_PROJECT_REPORT.md 第四节")
     args = ap.parse_args()
     asyncio.run(run(args))
 

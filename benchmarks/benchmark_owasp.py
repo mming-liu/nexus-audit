@@ -340,7 +340,8 @@ def main():
     ap.add_argument("--categories", default=None,
                     help="只跑指定类目，逗号分隔，如 weakrand,crypto")
     ap.add_argument("--votes", type=int, default=1,
-                    help="每个问题问几次取多数（默认 1；实测 3 票不降抖动只增成本，见 REAL_PROJECT_REPORT.md）")
+                    help="每个问题问几次取多数。默认 1；3 票实测不降抖动，"
+                         "要提召回用 5（代价 5 倍调用）。见 REAL_PROJECT_REPORT.md 第四节")
     ap.add_argument("--no-rules", action="store_true",
                     help="关闭确定性规则前置，全部交给 LLM（用于对比规则增益）")
     args = ap.parse_args()
