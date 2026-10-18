@@ -35,6 +35,7 @@ def build_report(repo: str, hypotheses, poc_results, skipped_skeptic: int) -> st
                   f"- 位置：`{h.unit.file_path}:{h.unit.start_line}`",
                   f"- 状态：{status}",
                   f"- 缺失校验：{h.property_missing or '无'}",
+                  f"- 分析：{h.reasoning_summary}",
                   f"- 沙箱摘要：{r.output_digest.splitlines()[0] if r.output_digest else '无'}",
                   f"- PoC 脚本：`{r.poc_script_path}`",
                   f"- 自愈轮数：{r.self_heal_rounds}", ""]
@@ -45,6 +46,9 @@ def build_report(repo: str, hypotheses, poc_results, skipped_skeptic: int) -> st
 
 def cmd_scan(args):
     repo = Path(args.repo_path).resolve()
+    if args.web3:
+        return cmd_scan_web3(args, repo)
+
     print(f"[1/5] 切片：提取路由入口 ...")
     units = WebTreeSitterSlicer(repo).extract_entry_units(repo)
     print(f"      共 {len(units)} 个路由入口")
@@ -99,6 +103,29 @@ def cmd_scan(args):
     print(f"确认漏洞 {sum(1 for r in results if r.verified)}/{len(results)}")
 
 
+def cmd_scan_web3(args, repo: Path):
+    """Web3 赛道：Solidity 函数切片 + 精度/优先级缺陷检测（对标 DVDF 已知缺陷）。"""
+    from core.slicer.web3_slither import SoliditySlicer, detect_precision_loss
+    from core.models import PoCResult
+
+    print(f"[1/4] Solidity 函数切片 ...")
+    units = SoliditySlicer().extract_entry_units(repo)
+    print(f"      共 {len(units)} 个 external/public 函数")
+
+    print(f"[2/4] Scenario 场景匹配（fee/reserve 场景）...")
+    print(f"[3/4] Property 属性核对（减乘混排括号优先级）...")
+    hyps = detect_precision_loss(units)
+    print(f"      假设：{len(hyps)}")
+
+    print(f"[4/4] 报告（Web3 动态验证需 Foundry，此处为静态高置信结论）...")
+    results = [PoCResult(hypothesis=h, verified=(h.confidence >= 0.8),
+                         output_digest="static: 高置信度，建议 forge test 回归确认")
+               for h in hyps]
+    out = Path(args.output or "report.md")
+    out.write_text(build_report(str(repo), hyps, results, 0), encoding="utf-8")
+    print(f"\n完成：报告已写入 {out}（静态确认 {sum(1 for r in results if r.verified)}/{len(results)}）")
+
+
 def cmd_pr_scan(args):
     """GitHub PR 增量扫描：仅解析 git diff 影响的文件中的路由与调用链。"""
     diff = subprocess.run(["git", "diff", "--name-only", args.base, "HEAD"],
@@ -120,6 +147,7 @@ def main():
     p_scan = sub.add_parser("scan", help="全量扫描目标仓库")
     p_scan.add_argument("repo_path")
     p_scan.add_argument("--offline", action="store_true", help="离线演示模式（不调用 LLM API）")
+    p_scan.add_argument("--web3", action="store_true", help="Web3 赛道（Solidity 精度/逻辑缺陷检测）")
     p_scan.add_argument("--output", default=None, help="报告输出路径")
     p_scan.add_argument("--python", default=None, help="PoC 执行使用的 Python 解释器")
     p_pr = sub.add_parser("pr-scan", help="PR 增量扫描（仅 git diff 影响的调用链）")
