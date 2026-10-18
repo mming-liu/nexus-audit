@@ -1,0 +1,30 @@
+# nexus-audit 配置：两级模型漏斗路由
+# Tier-1 初筛：高吞吐、低成本（Qwen3-Coder / 本地 vLLM）
+tier1:
+  base_url: ${LLM_TIER1_BASE_URL}   # 默认本地 vLLM，如 http://localhost:8000/v1
+  model: qwen3-coder
+  api_key: ${LLM_TIER1_API_KEY}
+  max_concurrency: 8
+  temperature: 0.0
+
+# Tier-2 深度复核：推理模型（DeepSeek-R1）
+tier2:
+  base_url: ${LLM_TIER2_BASE_URL}   # 如 https://api.deepseek.com/v1
+  model: deepseek-reasoner
+  api_key: ${LLM_TIER2_API_KEY}
+  max_concurrency: 2
+  temperature: 0.2
+
+# 跨文件上下文扩展循环
+context_loop:
+  max_rounds: 3                     # 最多 3 轮按需索取
+  max_context_tokens: 60000
+
+# 沙箱自愈
+sandbox:
+  max_retries: 3                    # 编译报错自愈最多 3 轮
+  web_verify_timeout: 120
+  foundry_fork_url: ""              # Anvil 分叉链 RPC（留空则本地测试）
+
+# 目标语言
+languages: ["python_web", "java_web", "solidity_web3"]

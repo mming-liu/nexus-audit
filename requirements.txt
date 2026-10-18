@@ -1,0 +1,8 @@
+# requirements.txt
+tree-sitter>=0.22          # 语法树解析
+semgrep>=1.50              # 路由与敏感汇点定位
+slither-analyzer>=0.10     # Solidity 调用图与状态变量分析
+httpx>=0.27                # 异步 HTTP（模型调用 + 越权重放）
+pyyaml>=6.0                # settings 与 prompts 加载
+openai>=1.30               # 统一 OpenAI 兼容客户端（OpenAI/DeepSeek/vLLM）
+rich>=13.0                 # 终端输出

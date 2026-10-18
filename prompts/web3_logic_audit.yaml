@@ -1,0 +1,14 @@
+# Web3 逻辑漏洞属性核对提示词模板
+# 合规提示：统一使用防御合规视角措辞。
+
+web3_logic_audit:
+  scenario_question: |
+    该合约函数是否涉及代币兑换、资金提取或状态金额计算场景？
+  property_question: |
+    关键变量计算与外部调用前，是否缺失滑点保护、
+    权限修饰符（onlyOwner/onlyRole/onlyAuthorized）或前置条件检查（require/assert）？
+  checks:
+    - reentrancy: 外部调用是否发生在状态更新之前
+    - unauthorized_withdraw: 资金提取函数是否缺少权限修饰符
+    - price_manipulation: 是否使用未受保护的现货价格作为定价依据
+    - precision_loss: 除法运算是否在乘法之前执行且未使用精确定点数

@@ -1,0 +1,16 @@
+# nexus-audit
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.log
+reports/
+cache/
+reference_repos/*
+!reference_repos/.gitkeep
+.DS_Store
+.pytest_cache/
+.vscode/
+.idea/
