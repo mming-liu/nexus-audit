@@ -57,6 +57,12 @@ class PoCResult:
     hypothesis: VulnHypothesis
     poc_script_path: str = ""
     verified: bool = False               # 是否成功复现
+    # 沙箱到底有没有真跑过。
+    # `verified=False` 有两种完全不同的含义：跑过但没复现（结论可信）、
+    # 根本没跑（结论还是静态猜测）。早期只有 verified 一个字段，Web3 赛道
+    # 不跑 Foundry，于是静态置信度被塞进 verified，报告里把从未执行的
+    # 假设渲染成"已复现"——把猜测冒充成已验证，比漏报更危险。
+    sandbox_ran: bool = True
     output_digest: str = ""              # StateParser 压缩后的关键日志摘要
     self_heal_rounds: int = 0            # 编译报错自愈轮数
     patch_diff: str = ""                 # 修复补丁 Git Diff（验证通过后生成）

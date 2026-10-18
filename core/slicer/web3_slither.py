@@ -22,8 +22,14 @@ FUNC_RE = re.compile(
     r"function\s+(\w+)\s*\([^)]*\)[^{;]*?(?:external|public|internal|private)?[^{;]*?(\{)", re.S)
 
 # 减乘混排未加括号：a - b * C （且 b*C 紧邻 - 之后）， fee 常数特征 997/9970/970/3
+#
+# 结尾**不能**要求分号：真实写法里这个表达式通常是除法分母的一部分，
+# 形如 `amountIn - amountIn * 997 / 1000 / 9970`，`997` 后面跟的是 `/` 或换行，
+# 永远等不到 `;`。早期版本写了 `\s*;`，导致整个正则恒不匹配，
+# `prop_ok` 恒为 None、置信度恒为 0.6，三个真漏洞被渲染成"未复现"。
+# 现在的收尾是"后面不是数字或标识符"——足以界定常数边界，又不限制后续运算。
 PRECEDENCE_RE = re.compile(
-    r"(\w+)\s*-\s*(\w+)\s*\*\s*(\d+)\s*;")
+    r"(\w+)\s*-\s*(\w+)\s*\*\s*(\d+)(?![\w.])")
 
 FEE_CONSTANTS = {"997", "9970", "970", "1000", "10000", "3"}
 
@@ -163,8 +169,11 @@ def detect_precision_loss(units: List[CodeUnit]) -> List[VulnHypothesis]:
             if const not in FEE_CONSTANTS:
                 continue
             line = src[:m.start()].count("\n") + 1
-            # 属性核对：该模式是否用于除法分母（决定损失放大）
-            prop_ok = re.search(re.escape(m.group(0).rstrip(";").strip()) + r"\s*/", src)
+            # 属性核对：该表达式是否作为除法（或除法链）的被除数，决定误差是否被放大。
+            # 直接看匹配结束位置之后的字符，不再用 rstrip(";") 拼正则 —— 那个写法
+            # 依赖原表达式带分号，正是早期恒不命中 prop_ok 的根因。
+            tail = src[m.end(): m.end() + 20]
+            prop_ok = bool(re.match(r"\s*/\s*[\w(]", tail))
             line_abs = u.start_line + src[:m.start()].count("\n")  # 换算为文件绝对行号
             hyps.append(VulnHypothesis(
                 unit=u, vuln_type="precision_loss", scenario_hit=True,

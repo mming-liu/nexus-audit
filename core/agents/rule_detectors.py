@@ -613,8 +613,13 @@ SQLI_PREPARE_RE = re.compile(r"\.\s*prepare(?:Statement|Call)\s*\(\s*([^;]{0,300
 SQLI_CONCAT_RE = re.compile(
     r'"[^"]*"\s*\+|\+\s*"[^"]*"')
 # 白名单过滤：全串匹配的正则/校验
+# matches() 必须**带实参**才算白名单。别写成 `\([^)]*\)` —— 那样空括号
+# 也能匹配（`*` 允许零次），等于没改。这里要求括号内至少一个非空白字符。
+# 原因：`id.matches()` 在 Java 里没有这种重载，是编译不过的死代码；把它当
+# 白名单证据会让真实注入被漏判。而 `matcher(x).matches()` 的无参形式才是
+# 合法的全串校验，由第三条正则单独覆盖。
 SQLI_WHITELIST_RE = re.compile(
-    r"\.\s*matches\s*\(\s*\)|sqlFilter|checkSql|isValidOrder|"
+    r"\.\s*matches\s*\(\s*[^)\s][^)]*\)|sqlFilter|checkSql|isValidOrder|"
     r"FILTER_PATTERN\s*\.\s*matcher\s*\([^)]*\)\s*\.\s*matches", re.I)
 # MyBatis XML / 注解里的 ${} 与 #{}
 MYBATIS_DOLLAR_RE = re.compile(r"\$\{\s*_?\w+\s*\}")
@@ -914,8 +919,14 @@ SSRF_HOOK_RE = re.compile(
     r"installSSRF\w*\s*\(", re.I)
 SSRF_SCHEME_RE = re.compile(
     r"SecurityUtil\s*\.\s*isHttp\s*\(|"
-    r"\.\s*startsWith\s*\(\s*\"http\"\s*\)|"
+    r"\.\s*startsWith\s*\(\s*\"https?://[^\"]+\"|"      # 限定具体前缀，不能是裸协议名
     r"(?:URI|URL)\s*\.\s*getProtocol\s*\(\s*\)\s*\.\s*equalsIgnoreCase\s*\(", re.I)
+# 裸协议前缀 `startsWith("http")` / `startsWith("https://")`：
+#   "http" / "https" 只说明协议，`http://127.0.0.1` 照样通过 → 挡不住内网 SSRF
+#   但 "https://example.com/" 这种带主机的前缀确实限定了目标 → 算有效防护
+# 单独识别"形似校验、实则无效"的写法，避免把它当成安全证据。
+SSRF_WEAK_SCHEME_RE = re.compile(
+    r"\.\s*startsWith\s*\(\s*\"https?(:?//)?\"", re.I)
 # 有外部 URL 参与请求发起 —— 没有这一条就不是本类目的判定对象。
 #
 # 最后一类是必须的：java-sec-code 的真实请求几乎都封装在
@@ -947,8 +958,43 @@ def ssrf_verdict(source: str) -> bool | None:
     if SSRF_HOOK_RE.search(body):
         return False                   # socket 层校验已挂上
     if SSRF_SCHEME_RE.search(body):
-        return False                   # 至少阻断了 file:// 等非 http 协议
+        return False                   # 限定了具体协议+主机，或调用了专用校验
+
+    # 只写了裸协议名的 startsWith：形似校验但挡不住内网地址，算裸漏洞
+    if SSRF_WEAK_SCHEME_RE.search(body) and not SSRF_SCHEME_RE.search(body):
+        return True
+
+    # 关键：出现了**我们不认识的**校验调用时，不能直接判漏洞。
+    #
+    # 早期版本这里直接 return True，在 java-sec-code 上 16/16 全对，
+    # 但那是因为这个靶场只用 startSSRFHook 一种写法。真实项目各有各的
+    # `UrlValidator` / `checkInternalIp` / 黑白名单，名字我们不可能穷举；
+    # 一味判 True 就是"没见过的一律算漏洞"，换项目必然误报爆炸。
+    #
+    # 判断依据：入口里出现了针对 url 的校验性调用，且我们没识别出它的性质。
+    # 这类样本退回 None，交给模型结合跨文件证据判断。
+    if _has_unknown_url_guard(body):
+        return None
     return True
+
+
+# 可能承载"URL 合法性校验"的调用形态。命中即认为存在未识别的防护。
+# 判据刻意宽：宁可多退回模型，也不要在不认识的代码上武断判漏洞。
+_URL_GUARD_HINT_RE = re.compile(
+    r"\b(?:if|while)\s*\([^)]*\b\w*url\w*\b[^)]*\)|"          # if (url ...) / if (!check(url))
+    r"\b\w*(?:valid|check|verify|allow|safe|filter|whitelist|blacklist|"
+    r"isInternal|isPrivate|isLocal|isHttp|isValid|deny|forbid|restrict)\w*\s*\(",
+    re.I)
+
+
+def _has_unknown_url_guard(body: str) -> bool:
+    """入口里出现了针对 url 的校验性调用，且不是我们认识的那几种写法。"""
+    for m in _URL_GUARD_HINT_RE.finditer(body):
+        seg = m.group(0)
+        if SSRF_HOOK_RE.search(seg) or SSRF_SCHEME_RE.search(seg):
+            continue
+        return True
+    return False
 
 
 # ---------------- 对外门面 ----------------

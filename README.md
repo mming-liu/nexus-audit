@@ -109,8 +109,12 @@ python cli.py --help
 - [x] 第5周：Java 赛道打通 + OWASP Benchmark 跑分（11 类，Score 0.98）
 - [x] 第6周：真实项目（java-sec-code）评测，暴露 4 个仅真实代码可见的切片缺陷
 - [x] 降判定抖动：规则化 cors / deserial / spel / xxe / sqli / redir / xss / ssrf
-      八类，规则覆盖 10 → **64/67 条**。真实项目 Score 0.823 → **1.000**
+      八类，规则覆盖 10 → **63/66 条**。真实项目 Score 0.823 → **1.000**
       （TPR 1.00 / FPR 0.00），且规则判定是可复现的纯函数
+- [x] 外部代码审计修复（6 处真实缺陷）：
+      跨文件实现未回写切片、兄弟路由方法污染辅助段、ssrf 兜底过宽、
+      Web3 静态置信度冒充"已复现"、Skeptic 硬编码 `python` 且未接 Java 赛道、
+      `matches()` 空括号被当白名单证据
 - [x] 跨路由串接：存储型 XSS 这类「写入点 + 读取点」分居两方法的漏洞
       —— `core/context/taint_chain.py`，按介质（Cookie/Session/Request/Model）
       与键名配对，`XSS.store → XSS.show` 被正确接上

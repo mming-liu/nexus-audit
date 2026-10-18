@@ -8,25 +8,60 @@ from __future__ import annotations
 from typing import Callable
 
 from core.agents.router import TwoTierRouter
-from core.models import VulnHypothesis
+from core.models import Language, VulnHypothesis
+
+# 提示词不能把语言写死成 python。
+# 早期版本在 ``` 后面硬编码 `python`，Java 赛道接进来后，反方质检员会拿到一段
+# Java 代码却被告知这是 Python —— 它就会按 Python 的语义去挑刺（例如找
+# decorator 而非注解），挑出的"误报理由"和代码对不上。语言必须由 CodeUnit 决定。
+_LANG_FENCE = {
+    Language.PYTHON_WEB: "python",
+    Language.JAVA_WEB: "java",
+    Language.SOLIDITY_WEB3: "solidity",
+}
+
+# 各语言"可能推翻结论"的机制不同，逐项排查清单也得跟着换。
+# 共用一份 Python 版清单，在 Java 上会指向不存在的概念（ORM scope、
+# 中间件），质检员于是照抄清单里没命中任何一条的项、给出空洞的"不推翻"。
+_SKEPTIC_CHECKLIST = {
+    Language.PYTHON_WEB: """1. 全局网关/中间件级鉴权是否已覆盖该路由
+2. 框架级注解或装饰器是否隐式执行了权限校验
+3. 数据层默认过滤（如 ORM scope、父类基类校验）是否已限制资源归属
+4. 前置状态锁或事务隔离是否使场景不可达""",
+    Language.JAVA_WEB: """1. Filter / Interceptor / Spring Security 配置是否已覆盖该路由（注意：方法体里看不到装配）
+2. 类或方法上的注解（@PreAuthorize / @Secured / @CrossOrigin / @Valid）是否隐式生效
+3. 是否已有白名单校验（allowedOrigins、正则 match、枚举映射）真正收窄了输入
+4. 该 sink 是否其实不可达（代码路径前面 return、被注释、路由注解冲突）""",
+    Language.SOLIDITY_WEB3: """1. 是否已有 nonReentrant 等重入锁，或调用后不依赖状态一致性
+2. 调用前余额/份额快照是否已做，使余额差校验无法被绕过
+3. 精度/优先级写法是否真的会导致损失（可能只是写法不同，求值结果相同）
+4. 攻击者是否真的能在同一次交易内操纵相关状态""",
+}
 
 SKEPTIC_PROMPT_TMPL = """请作为反方质检员，审查以下静态分析结论是否为误报。
 
 结论：代码可能存在 {vuln_type}（属性缺失：{property_missing}）
 
 待审代码：
-```python
+```{lang}
 {code}
 ```
 
 请逐项排查以下可推翻结论的因素：
-1. 全局网关/中间件级鉴权是否已覆盖该路由
-2. 框架级注解或装饰器是否隐式执行了权限校验
-3. 数据层默认过滤（如 ORM scope、父类基类校验）是否已限制资源归属
-4. 前置状态锁或事务隔离是否使场景不可达
+{checklist}
 
 输出 JSON：{{"rejected": true/false, "reason": "..."}}
 rejected=true 表示这是误报，应剔除。"""
+
+# 兼容旧代码里直接 .format(vuln_type=..., property_missing=..., code=...) 的调用
+class _CompatPrompt(str):
+    def format(self, *a, **kw):  # type: ignore[override]
+        kw.setdefault("lang", "python")
+        kw.setdefault("checklist", _SKEPTIC_CHECKLIST[Language.PYTHON_WEB])
+        return super().format(*a, **kw)
+
+
+SKEPTIC_PROMPT_TMPL = _CompatPrompt(SKEPTIC_PROMPT_TMPL)
 
 
 class SkepticReviewer:
@@ -36,9 +71,17 @@ class SkepticReviewer:
         self._llm = llm
 
     async def review(self, h: VulnHypothesis) -> VulnHypothesis:
+        lang = h.unit.language
+        # 用 own_body：source_code 里拼进了同文件其它路由方法，
+        # 质检员看到"同文件另一条路由有鉴权"就会推翻当前结论 —— 这跟
+        # CORS 那条注解污染是同一种错。own_body 为空时（非 Java 切片器
+        # 可能不填）才退回 source_code。
+        code = h.unit.own_body or h.unit.source_code
         prompt = SKEPTIC_PROMPT_TMPL.format(
             vuln_type=h.vuln_type, property_missing=h.property_missing or "(未记录)",
-            code=h.unit.source_code)
+            code=code,
+            lang=_LANG_FENCE.get(lang, "text"),
+            checklist=_SKEPTIC_CHECKLIST.get(lang, _SKEPTIC_CHECKLIST[Language.PYTHON_WEB]))
         if self._llm is not None:
             raw = self._llm(prompt)
         else:

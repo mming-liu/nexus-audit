@@ -567,10 +567,37 @@ class JavaSlicer:
         wl = WEBSERVLET_RE.search(text)
 
         units: List[CodeUnit] = []
-        # 辅助方法 = 非入口方法。注意不能用 startswith("do") 判断：
+
+        # 先判定哪些方法是**路由方法**，再做辅助方法拼接。
+        #
+        # 这里必须单独算一遍，不能只看 SERVLET_METHODS：
+        # Servlet 的路由方法确实叫 doGet/doPost，但 Spring/JAX-RS 的路由方法
+        # 名字是任意的（`store` / `safe` / `getImage`）。若只排除 SERVLET_METHODS，
+        # 同一个 Controller 里的 vuln 路由和 sec 路由会互相被当成"辅助方法"
+        # 拼进对方的切片 —— 实测 XSS.safe 的切片里出现了 store 的 `addCookie`
+        # 和 reflect 的整个方法体，审 sec 时模型看到了 vuln 代码。
+        #
+        # 这条对规则层无害（规则用 entry_body() 截断），但走模型的分支
+        # （pathtraver / cmdi 等）会直接吃到污染证据。
+        route_methods: set[str] = set()
+        for _n, (_s, _e, _src, _anns) in methods.items():
+            if _n in SERVLET_METHODS and wl:
+                route_methods.add(_n)
+                continue
+            if any(SPRING_ROUTE_RE.match(a) for a in _anns):
+                route_methods.add(_n)
+                continue
+            if any(re.match(r"@(GET|POST|PUT|DELETE|PATCH)\b", a) for a in _anns):
+                route_methods.add(_n)
+            elif any(a.startswith("@Path") for a in _anns):
+                route_methods.add(_n)
+
+        # 辅助方法 = 既非 Servlet 动词、也非路由方法。
+        # 注意不能用 startswith("do") 判断：
         # OWASP Benchmark 的清洗辅助方法就叫 doSomething(request, param)。
         helper_src = "\n\n".join(src for n, (_, _, src, _a) in methods.items()
-                                 if n not in SERVLET_METHODS)
+                                 if n not in SERVLET_METHODS
+                                 and n not in route_methods)
 
         for name, (start, end, src, anns) in methods.items():
             decorators: List[str] = []

@@ -26,13 +26,31 @@ from core.slicer.web_treesitter import WebTreeSitterSlicer
 
 
 def build_report(repo: str, hypotheses, poc_results, skipped_skeptic: int) -> str:
+    ran = sum(1 for r in poc_results if r.sandbox_ran)
+    confirmed = sum(1 for r in poc_results if r.sandbox_ran and r.verified)
+    static_only = sum(1 for r in poc_results if not r.sandbox_ran and r.verified)
     lines = [f"# nexus-audit 扫描报告", "",
              f"- 目标仓库：`{repo}`",
              f"- 初筛漏洞假设：{len(hypotheses)}",
-             f"- 沙箱验证确认：{sum(1 for r in poc_results if r.verified)}", ""]
+             f"- 沙箱验证确认：{confirmed}",
+             # 没跑沙箱的高置信假设必须单独列出。混进"确认"是冒充验证结果，
+             # 完全不计又是漏报 —— 两者都会让读者对"到底验证过没有"产生误判。
+             f"- 静态高危候选（未跑沙箱）：{static_only}"
+             + ("（本赛道未执行 make test / forge test，需人工或 CI 复核）"
+                if static_only else ""), ""]
     for r in poc_results:
         h = r.hypothesis
-        status = "✔ 已复现（高危）" if r.verified else "✘ 未复现/访问被正确拒绝"
+        # 状态必须区分"跑过沙箱"和"没跑过沙箱"。
+        #
+        # 早期版本只有两档（verified / 未verified），而 Web3 赛道根本不跑
+        # Foundry，`verified` 是由静态置信度推出来的。结果报告里出现
+        # "✔ 已复现（高危）"—— 从未执行过任何 PoC 的静态猜测被冒充成
+        # 验证过的漏洞，比漏报更危险。现在把三种状态分开写。
+        if not r.sandbox_ran:
+            status = ("⚠ 静态高危候选（待 forge 验证）" if r.verified
+                      else "⚠ 静态低置信度候选（未验证）")
+        else:
+            status = "✔ 已复现（沙箱确认）" if r.verified else "✘ 未复现（沙箱已执行）"
         lines += [f"## [{h.vuln_type.upper()}] {h.unit.unit_name}",
                   f"- 位置：`{h.unit.file_path}:{h.unit.start_line}`",
                   f"- 状态：{status}",
@@ -62,6 +80,26 @@ def cmd_scan(args):
     print(f"[2/5] 跨文件上下文扩展循环 ...")
     ctx = run_context_loop(units, repo)
     print(f"      平均 {sum(r['rounds'] for r in ctx)/max(len(ctx),1):.1f} 轮索取")
+    # 把展开到的跨文件实现**写回切片**，否则下一步的 audit_repo 拿到的还是
+    # 未展开的原切片 —— 模型看不到被调用方法的内部实现，只能靠猜。
+    # run_context_loop 只负责返回 context_blocks，回写是调用方的责任。
+    by_name = {u.unit_name: u for u in units}
+    expanded = 0
+    for rec in ctx:
+        u = by_name.get(rec["unit"])
+        if not u:
+            continue
+        blocks = [b for b in rec.get("context_blocks", [])
+                  if b.get("role") == "expansion" and "未找到符号" not in (b.get("source") or "")]
+        if not blocks:
+            continue
+        extra = ["", "// ---- 跨文件上下文（按需展开） ----"]
+        for b in blocks:
+            extra.append(f"// [{b['symbol']}]")
+            extra.extend("//   " + ln for ln in (b["source"] or "").splitlines())
+        u.source_code += "\n".join(extra)
+        expanded += 1
+    print(f"      已回写 {expanded} 个入口的跨文件实现")
 
     print(f"[3/5] 两步法初筛（Scenario + Property）...")
     if args.offline:
@@ -190,6 +228,38 @@ def cmd_scan_java(args, repo: Path):
     flagged = [(u, c) for (name, c), v in decided.items() if v
                for u in units if u.unit_name == name] + model_flagged
 
+    # --- 反方挑刺（Skeptic）-----------------------------------------------
+    # 只复核**模型判出来**的命中。规则命中的结论是逐行可核对的事实
+    # （算法名、setSecure 调没调、${} vs #{}），让概率型质检员去推翻确定性
+    # 结论，等于把规则已经消掉的不确定性重新引进来 —— 方向反了。
+    # 这是记忆第 10 条的直接应用：能规则化的场合不要用抽样/复核去兜。
+    skeptic_rejected: list[tuple] = []
+    if model_flagged and not args.no_skeptic:
+        from core.models import VulnHypothesis
+        from core.agents.skeptic_reviewer import SkepticReviewer
+
+        hyps = [VulnHypothesis(unit=u, vuln_type=c, scenario_hit=True,
+                               property_missing="见扫描结论",
+                               reasoning_summary=f"两步法初筛命中 {c}")
+                for u, c in model_flagged]
+        if args.offline:
+            reviewer = SkepticReviewer(
+                llm=lambda p: '{"rejected": false, "reason": "offline 模式默认放行"}')
+        else:
+            from core.agents.router import TwoTierRouter
+            reviewer = SkepticReviewer(router=TwoTierRouter())
+        kept_h = asyncio.run(reviewer.filter_false_positives(hyps))
+        kept_pairs = {(h.unit.unit_name, h.vuln_type) for h in kept_h}
+        skeptic_rejected = [(u, c) for u, c in model_flagged
+                            if (u.unit_name, c) not in kept_pairs]
+        # 被推翻的从命中里剔除，但**单独列出**：静默删掉会让"漏报"和
+        # "被判定为误报"无法区分，事后无从审计复核质量。
+        model_flagged = [(u, c) for u, c in model_flagged
+                         if (u.unit_name, c) in kept_pairs]
+        flagged = [(u, c) for (name, c), v in decided.items() if v
+                   for u in units if u.unit_name == name] + model_flagged
+        print(f"      反方挑刺：推翻 {len(skeptic_rejected)} 项，保留 {len(model_flagged)} 项")
+
     print(f"      命中 {len(flagged)} 处")
     if failed:
         print(f"      [警告] {len(failed)} 项判定失败（不计为无漏洞，需重跑）："
@@ -202,6 +272,9 @@ def cmd_scan_java(args, repo: Path):
              f"- 审计入口：{len(units)}",
              f"- 规则直接判定：{len(decided)} 项（命中 {sum(decided.values())}）",
              f"- 交模型判定：{len(pending)} 项（命中 {len(model_flagged)}）",
+             f"- 反方挑刺推翻：{len(skeptic_rejected)} 项"
+             + ("（仅复核模型命中；规则命中为确定性事实，不经复核）"
+                if skeptic_rejected else ""),
              f"- **判定失败：{len(failed)} 项**" if failed else "- 判定失败：0",
              f"- 命中：{len(flagged)}", ""]
     for u, cat in flagged:
@@ -237,12 +310,16 @@ def cmd_scan_web3(args, repo: Path):
     print(f"      假设：{len(hyps)}")
 
     print(f"[4/4] 报告（Web3 动态验证需 Foundry，此处为静态高置信结论）...")
+    # sandbox_ran=False：本赛道不跑 Foundry，verified 只是静态置信度的阈值化，
+    # 不能当作"已复现"。报告侧据此渲染成"静态高危候选（待 forge 验证）"。
     results = [PoCResult(hypothesis=h, verified=(h.confidence >= 0.8),
-                         output_digest="static: 高置信度，建议 forge test 回归确认")
+                         sandbox_ran=False,
+                         output_digest="static: 未执行 forge test，仅静态推断")
                for h in hyps]
     out = Path(args.output or "report.md")
     out.write_text(build_report(str(repo), hyps, results, 0), encoding="utf-8")
-    print(f"\n完成：报告已写入 {out}（静态确认 {sum(1 for r in results if r.verified)}/{len(results)}）")
+    print(f"\n完成：报告已写入 {out}（静态高危候选 {sum(1 for r in results if r.verified)}/{len(results)}，"
+          f"均未执行 forge test）")
 
 
 def cmd_pr_scan(args):
@@ -651,6 +728,8 @@ def main():
                         help="Java 赛道指定漏洞类目，逗号分隔（默认全部 11 类）")
     p_scan.add_argument("--model", default=None, help="指定模型名（跳过免费模型探测）")
     p_scan.add_argument("--concurrency", type=int, default=6, help="LLM 并发数")
+    p_scan.add_argument("--no-skeptic", action="store_true",
+                        help="跳过反方挑刺复核（仅影响模型命中，规则命中不受影响）")
     p_scan.add_argument("--output", default=None, help="报告输出路径")
     p_scan.add_argument("--python", default=None, help="PoC 执行使用的 Python 解释器")
     p_pr = sub.add_parser("pr-scan", help="PR 增量扫描（仅 git diff 影响的调用链）")

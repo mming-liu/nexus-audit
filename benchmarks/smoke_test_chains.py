@@ -211,6 +211,41 @@ check("verdict('xss')", verdict("xss", REFLECT), True)
 check("verdict('redir')", verdict("redir", CONST), False)
 check("verdict('openredirect') 别名", verdict("openredirect", SEND_REDIRECT), True)
 
+print("\n[11] sqli 白名单必须带实参")
+# 空括号 `matches()` 在 Java 里没有这个重载，是死代码。曾被当成白名单证据，
+# 导致真实注入被漏判 —— 而这正是"死分支让人误以为已覆盖"的典型。
+from core.agents.rule_detectors import SQLI_WHITELIST_RE
+_WS = ('String sql = "select * from t where id=" + id;')
+check("仅拼接、无白名单",
+      bool(SQLI_WHITELIST_RE.search(_WS)), False)
+check("matches(\"[0-9]+\") 带实参 → 白名单",
+      bool(SQLI_WHITELIST_RE.search('if (id.matches("[0-9]+")) { }')), True)
+check("matches() 空括号 → 不算白名单（死代码）",
+      bool(SQLI_WHITELIST_RE.search('if (id.matches()) { }')), False)
+check("matches( ) 空白 → 不算白名单",
+      bool(SQLI_WHITELIST_RE.search('if (id.matches( )) { }')), False)
+check("FILTER_PATTERN.matcher(x).matches() → 白名单（真实写法，见 SecurityUtil:201）",
+      bool(SQLI_WHITELIST_RE.search('if (!FILTER_PATTERN.matcher(input).matches()) { }')), True)
+
+print("\n[12] Skeptic 提示词不硬编码语言")
+# Java 赛道接进反方质检后，若提示词仍写 ```python，质检员会按 Python 语义
+# 挑刺（找 decorator 而非注解），挑出的理由和代码对不上。
+from core.agents.skeptic_reviewer import SKEPTIC_PROMPT_TMPL, _LANG_FENCE
+from core.models import Language
+check("语言围栏覆盖全部赛道", set(_LANG_FENCE) == set(Language), True)
+check("Java 围栏是 java", _LANG_FENCE[Language.JAVA_WEB], "java")
+check("旧式三参调用仍默认 python",
+      "```python" in SKEPTIC_PROMPT_TMPL.format(
+          vuln_type="sqli", property_missing="x", code="x=1"), True)
+
+print("\n[13] 沙箱状态三分")
+# `verified=False` 有两种含义：跑过没复现（可信）、根本没跑（仍是猜测）。
+# 早期 Web3 赛道不跑 Foundry 却把静态置信度塞进 verified，报告渲染成
+# "✔ 已复现"——把猜测冒充成验证结果。
+from core.models import PoCResult
+check("默认认为跑过", PoCResult(hypothesis=None).sandbox_ran, True)
+check("可显式标为未跑", PoCResult(hypothesis=None, sandbox_ran=False).sandbox_ran, False)
+
 # ---------------- 汇总 ----------------
 
 print()
