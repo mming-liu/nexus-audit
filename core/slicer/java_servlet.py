@@ -176,7 +176,8 @@ class JavaSlicer:
         """懒加载跨文件实现体索引（MyBatis Mapper / 接口实现 / @Select）。"""
         if self._impls is None:
             from core.context.java_impl_resolver import JavaImplResolver
-            self._impls = JavaImplResolver(self.config_root)
+            self._impls = JavaImplResolver(self.config_root,
+                                           source_root=self.repo_path)
         return self._impls
 
     def _impl_block(self, source: str) -> str:
@@ -273,42 +274,56 @@ class JavaSlicer:
     }
 
     def _resolve_cross_file_helpers(self, source: str, depth: int = 1,
-                                    max_methods: int = 6) -> str:
+                                    max_methods: int = 4) -> str:
         """顺着源码里调用的方法名，在其他 Java 文件中找出方法体并附上。
 
         动机：`Utils.getCipher()` 这类工厂方法把算法/配置藏在 helper 类里，
         只看入口文件会缺失关键证据（OWASP Benchmark 的 crypto 误报主因）。
-        用惰性构建的方法索引查找，避免对每个用例重复扫描全仓库。
+
+        三道防污染闸门（都是真实项目评测里踩出来的）：
+          1. 只认数据/工厂类调用 `obj.method(...)`，不认裸调用 `foo(...)`
+             —— 否则 `source.indexOf(x)` 会把整个仓库里所有叫 indexOf 的方法
+             吸进来。
+          2. 方法名必须真的在代码里被 `obj.` 修饰调用过。
+          3. 本文件内已定义的方法体不再重复注入 —— 同文件里往往并排放着
+             「安全写法」和「漏洞写法」两个路由，重复注入等于把 vuln 代码
+             塞进 sec 样本，模型必然误报（实测 SpEL.spel_sec 与
+             SQLI.mybatisOrderBySec04 两条误报全部源于此）。
         """
         if depth <= 0:
             return ""
-        calls = {m.group(1) for m in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", source)}
-        calls -= self.TRACE_EXCLUDE
-        calls -= SERVLET_METHODS
+        # 先掐掉已注入的部分，避免把上一轮附加的代码再扫一遍
+        body = source.split("// ---- ", 1)[0]
+        from core.context.java_impl_resolver import _iter_methods as _im
+        local = {name for name, _b, _i in _im(body)}
+
+        calls: set[str] = set()
+        for m in self.DATA_CALL_RE.finditer(body):
+            name = m.group(2)
+            if name in local or len(name) < 4:
+                continue
+            if name in self.TRACE_EXCLUDE or name in SERVLET_METHODS:
+                continue
+            calls.add(name)
         if not calls:
             return ""
 
         index = self._method_index()
         found: list[str] = []
-        used = 0
-        # 按「安全相关性」排序：名字或方法体里出现算法/加密/随机/编解码/密钥等
-        # 关键字的优先。否则 max_methods 名额会被 doSomething/encodeForHTML
-        # 这类无关键噪声方法占满，真正的 getCipher 反而进不来。
         ranked = []
         for name in sorted(calls):
             hit = index.get(name)
             if hit is None:
                 continue
-            path, start_line, body = hit
-            score = self._security_relevance(name, body)
-            ranked.append((score, name, path, start_line, body))
+            path, start_line, hb = hit
+            # 同文件的方法体已在切片里，跳过
+            if Path(path).resolve() == getattr(self, "_current_file", None):
+                continue
+            ranked.append((self._security_relevance(name, hb), name, path, start_line, hb))
         ranked.sort(key=lambda x: -x[0])
 
-        for _score, _name, path, start_line, body in ranked:
-            found.append(f"// 来自 {Path(path).name}:{start_line}\n{body}")
-            used += 1
-            if used >= max_methods:
-                break
+        for _score, _name, path, start_line, hb in ranked[:max_methods]:
+            found.append(f"// 来自 {Path(path).name}:{start_line}\n{hb}")
 
         if not found:
             return ""
@@ -342,9 +357,9 @@ class JavaSlicer:
         for java in root.rglob("*.java"):
             if any(part in IGNORE_DIRS for part in java.parts):
                 continue
-            try:
-                text = java.read_text(encoding="utf-8", errors="replace")
-            except OSError:
+            from core.context.java_impl_resolver import _read_cached
+            text = _read_cached(java)
+            if not text:
                 continue
             for m in METHOD_RE.finditer(text):
                 name = m.group(2)
@@ -410,9 +425,9 @@ class JavaSlicer:
         root = Path(repo_path or self.repo_path)
         units: List[CodeUnit] = []
         for java in self._iter_java_files() if root == self.repo_path else self._iter_under(root):
-            try:
-                text = java.read_text(encoding="utf-8", errors="replace")
-            except OSError:
+            from core.context.java_impl_resolver import _read_cached
+            text = _read_cached(java)
+            if not text:
                 continue
             units.extend(self._slice_file(java, text))
         return units
@@ -427,6 +442,7 @@ class JavaSlicer:
     # ---------- 单文件切片 ----------
 
     def _slice_file(self, path: Path, text: str) -> List[CodeUnit]:
+        self._current_file = path.resolve()      # 供跨文件注入时排除本文件
         cls_m = CLASS_RE.search(text)
         if not cls_m:
             return []

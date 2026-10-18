@@ -37,9 +37,12 @@ nexus-audit/
 |---|---|
 | `core/slicer/java_servlet.py` | Servlet / Spring MVC / JAX-RS 入口切片，含跨文件辅助方法与配置取值回填 |
 | `core/context/config_resolver.py` | 解析 .properties/.yaml/.json，把代码里引用的配置键回填进切片 |
-| `core/agents/vuln_categories.py` | 11 类漏洞的 Scenario/Property 定义，`needs_taint` 区分污点型与配置型 |
+| `core/context/java_impl_resolver.py` | MyBatis 注解/XML、接口实现体的跨文件证据（`#{}` vs `${}` 的真值在这里） |
+| `core/agents/vuln_categories.py` | 17 类漏洞的 Scenario/Property 定义（11 类 OWASP + 6 类 Java 生态） |
 | `core/agents/rule_detectors.py` | 算法强度等客观事实的确定性判定，先于 LLM 执行 |
 | `benchmarks/benchmark_owasp.py` | OWASP Benchmark 跑分（TPR/FPR/Score，含断点续跑与误差归因） |
+| `benchmarks/benchmark_javaseccode.py` | 真实项目（java-sec-code）评测，真值取自路由命名 + 作者注释 |
+| `benchmarks/check_stability.py` | 判定稳定性复测：同一输入连问 N 次，测抖动率 |
 | `benchmarks/offline_baseline.py` | 对照组：纯 sink 关键词匹配 |
 
 ## OWASP Benchmark 跑分
@@ -57,6 +60,20 @@ python benchmarks/benchmark_owasp.py --categories sqli,xss --no-rules
 
 口径：`Score = TPR − FPR`（OWASP 官方）。调用失败的样本会被标记并剔除，
 不计入分数 —— 否则限流会被伪装成极低的误报率。
+
+## 真实项目评测（比 Benchmark 更能说明问题）
+
+```bash
+# 66 条可判定样本，约 15 分钟
+python benchmarks/benchmark_javaseccode.py --concurrency 4
+
+# 判定稳定性复测（同一输入连问 3 次）
+python benchmarks/check_stability.py
+```
+
+**结论要先看抖动率再看分数**：实测同一份代码、`temperature=0` 连问三次，
+12 条样本里 5 条结果不一致（41.7%）。单轮 TPR/FPR 因此不具备可复现性，
+详见 [`REAL_PROJECT_REPORT.md`](REAL_PROJECT_REPORT.md)。
 
 
 ```bash
@@ -80,7 +97,10 @@ python cli.py --help
 - [x] 第2周：web3_slither + scenario_matcher，大小模型漏斗路由
 - [x] 第3周：sandbox 层，Docker/Foundry 验证器
 - [ ] 第4周：PR 增量扫描的调用链过滤（`cmd_pr_scan` 仍是 TODO）
-- [x] 第5周：Java 赛道打通 + OWASP Benchmark 跑分（11 类）
+- [x] 第5周：Java 赛道打通 + OWASP Benchmark 跑分（11 类，Score 0.98）
+- [x] 第6周：真实项目（java-sec-code）评测，暴露 4 个仅真实代码可见的切片缺陷
+- [ ] 降判定抖动：同 unit 多次采样取多数（当前抖动率 41.7%，是最大阻碍）
+- [ ] 跨路由串接：存储型 XSS 这类「写入点 + 读取点」分居两方法的漏洞
 
 
 ## 安全合规

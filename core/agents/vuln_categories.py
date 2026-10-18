@@ -164,10 +164,24 @@ CATEGORIES: dict[str, VulnCategory] = {
     "redir": VulnCategory(
         key="redir", display="开放重定向", cwe="CWE-601", owasp=False,
         sink_question=("函数是否把外部可控字符串作为跳转目标传给 "
-                       "sendRedirect、ModelAndView(redirect:...)、"
-                       "RedirectView、response.setHeader(\"Location\", ...)？"),
+                       "sendRedirect、RequestDispatcher.getRequestDispatcher(...).forward(...)、"
+                       "ModelAndView(redirect:...)、RedirectView、"
+                       "response.setHeader(\"Location\", ...)？"),
         property=("跳转前是否把目标限制为站内相对路径或白名单域名"
                   "（如校验以 / 开头且不含 ://，或域名白名单校验）？"),
+    ),
+    "cors": VulnCategory(
+        key="cors", display="跨域配置缺陷", cwe="CWE-942", owasp=False, needs_taint=False,
+        # 配置型缺陷：问题出在 CORS 响应头的取值上。
+        # 注意 vuls2 写的是 `Access-Control-Allow-Origin: *`（常量），
+        # 若按污点可达提问会被判成"没有外部输入流入，无 sink"。
+        sink_question=("函数是否设置了 CORS 响应头 Access-Control-Allow-Origin"
+                       "（response.setHeader、CorsConfiguration、@CrossOrigin 等）？"),
+        property=("Access-Control-Allow-Origin 的取值是否受限（站内白名单）？"
+                  "若取值直接原样回写请求头（如 response.setHeader(..., "
+                  "request.getHeader(\"Origin\")) 未经校验），本属性为 No。"
+                  "注意：固定为 \"*\" 是公开可读的常规用法，"
+                  "只有同时设置了 Access-Control-Allow-Credentials: true 才构成缺陷。"),
     ),
 }
 
