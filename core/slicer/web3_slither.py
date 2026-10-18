@@ -75,6 +75,76 @@ class SoliditySlicer:
                        if m.group(1) not in {"if", "for", "while", "require", "return"}})
 
 
+def detect_reentrancy_surface(units: List[CodeUnit]) -> List[VulnHypothesis]:
+    """场景：闪电贷函数向 msg.sender 发起带 ETH 的外部调用，仅靠余额差值校验还款。
+    对标：side-entrance/SideEntranceLenderPool.flashLoan（可重入存入记账）。"""
+    hyps = []
+    for u in units:
+        if "flashLoan" not in u.unit_name and "flashloan" not in u.unit_name.lower():
+            continue
+        src = u.source_code
+        if re.search(r"\.\w+\{value:", src) or "call{value:" in src:
+            has_state_guard = re.search(r"nonReentrant|locked|entered", src)
+            hyps.append(VulnHypothesis(
+                unit=u, vuln_type="reentrancy_surface", scenario_hit=True,
+                property_missing="外部调用目标为 msg.sender 且无重入锁；"
+                                 "回调期间可通过 deposit 记账绕过余额差校验",
+                reasoning_summary="flashLoan 内 msg.sender 外部调用 @ 函数级检测",
+                confidence=0.7 if not has_state_guard else 0.4))
+    return hyps
+
+
+def detect_arbitrary_call(units: List[CodeUnit]) -> List[VulnHypothesis]:
+    """场景：放贷/提款函数以调用方提供的 target+calldata 执行任意外部调用。
+    对标：truster/TrusterLenderPool.flashLoan（target.functionCall(data) 可批准劫持）。"""
+    hyps = []
+    for u in units:
+        src = u.source_code
+        for m in re.finditer(r"(\w+)\.functionCall\((\w+)\)", src):
+            target, data = m.group(1), m.group(2)
+            params_in_sig = target in u.source_code.split("{")[0] and data in u.source_code.split("{")[0]
+            if params_in_sig:
+                hyps.append(VulnHypothesis(
+                    unit=u, vuln_type="arbitrary_external_call", scenario_hit=True,
+                    property_missing=f"外部调用目标 ({target}) 与 calldata ({data}) 均为调用方参数，"
+                                     "且还款仅靠余额差校验——可借 approve 劫持代币",
+                    reasoning_summary=f"target.functionCall(data) gadget @ {u.unit_name}",
+                    confidence=0.8))
+                break
+    return hyps
+
+
+def detect_missing_receive(units: List[CodeUnit], repo_path: str | Path) -> List[VulnHypothesis]:
+    """场景：合约处理 ETH 存取/闪电贷，但整个合约无 receive()/payable fallback。
+    对标：issue #104 —— SideEntranceLenderPool 无法通过普通转账接收 ETH。"""
+    hyps = []
+    by_file: dict[str, list[CodeUnit]] = {}
+    for u in units:
+        by_file.setdefault(u.file_path, []).append(u)
+    for file, us in by_file.items():
+        try:
+            text = Path(file).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        if re.search(r"receive\s*\(\s*\)|fallback\s*\(", text):
+            continue
+        # 收窄（对齐 issue #104 本质）：非 payable 函数中读取 address(this).balance，
+        # 说明合约依赖"直接转 ETH 进来"但根本没有 receive() 通道
+        hits = [u for u in us
+                if "address(this).balance" in u.source_code
+                and not re.search(r"\bpayable\b", u.source_code)]
+        if hits:
+            main = hits[0]
+            hyps.append(VulnHypothesis(
+                unit=main, vuln_type="missing_payable_receiver", scenario_hit=True,
+                property_missing="非 payable 函数中读取 address(this).balance，但合约未定义 "
+                                 "receive()/fallback——外部无法直接向合约注资，"
+                                 "只能靠 payable 入口内转（可能正是重入面）",
+                reasoning_summary=f"issue #104 同型缺陷 @ {Path(file).name}",
+                confidence=0.75))
+    return hyps
+
+
 def detect_precision_loss(units: List[CodeUnit]) -> List[VulnHypothesis]:
     """GPTScan 两步法（Web3 场景，离线启发式版）：
 

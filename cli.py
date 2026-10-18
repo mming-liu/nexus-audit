@@ -105,16 +105,21 @@ def cmd_scan(args):
 
 def cmd_scan_web3(args, repo: Path):
     """Web3 赛道：Solidity 函数切片 + 精度/优先级缺陷检测（对标 DVDF 已知缺陷）。"""
-    from core.slicer.web3_slither import SoliditySlicer, detect_precision_loss
+    from core.slicer.web3_slither import (SoliditySlicer, detect_precision_loss,
+                                          detect_reentrancy_surface, detect_arbitrary_call,
+                                          detect_missing_receive)
     from core.models import PoCResult
 
     print(f"[1/4] Solidity 函数切片 ...")
     units = SoliditySlicer().extract_entry_units(repo)
-    print(f"      共 {len(units)} 个 external/public 函数")
+    print(f"      共 {len(units)} 个函数")
 
-    print(f"[2/4] Scenario 场景匹配（fee/reserve 场景）...")
-    print(f"[3/4] Property 属性核对（减乘混排括号优先级）...")
-    hyps = detect_precision_loss(units)
+    print(f"[2/4] Scenario 场景匹配 ...")
+    print(f"[3/4] Property 属性核对（精度/重入/任意外部调用/ETH 接收）...")
+    hyps = (detect_precision_loss(units)
+            + detect_reentrancy_surface(units)
+            + detect_arbitrary_call(units)
+            + detect_missing_receive(units, repo))
     print(f"      假设：{len(hyps)}")
 
     print(f"[4/4] 报告（Web3 动态验证需 Foundry，此处为静态高置信结论）...")
