@@ -87,10 +87,54 @@ def _strip_comments(text: str) -> str:
     把一条已废弃的 CORS 白名单注入切片 —— 和 MyBatis XML 那次
     "注释掉的旧版本被当成当前版本"是同一类错误。
     注释保留换行是为了让后续 _method_body 的偏移仍然对得上。
+
+    特别注意：行注释替换成空串（而非整行删除）。`//` 注释不吞掉换行，
+    如果整行删掉，后面紧跟的链式调用会被"粘"到上一行末尾的分号之后，
+    看起来像已经结束 —— CustomCorsConfig 里就是这样：
+
+        registry.addMapping("/cors/sec/webMvcConfigurer") // 注释
+                //.allowedOrigins(allowOrigins)
+                .allowedMethods("GET", "POST")
+                .allowCredentials(true);
+
+    如果 `//.allowedOrigins(...)` 整行消失，`.allowedMethods(...)` 会贴到
+    `addMapping(...)` 那一行，从此与真正的链尾脱节。
     """
-    text = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)
-    text = re.sub(r"//[^\n]*", "", text)
+    text = _strip_java_comments(text, keep_lines=True)
     return text
+
+
+_JAVA_COMMENT_RE = re.compile(
+    r'"(?:\\.|[^"\\])*"'        # 字符串字面量整体跳过，避免把 "//" 当注释
+    r"|'(?:\\.|[^'\\])*'"       # 字符字面量
+    r"|//[^\n]*"                # 行注释
+    r"|/\*.*?\*/",              # 块注释
+    re.S,
+)
+
+
+def _strip_java_comments(text: str, keep_lines: bool = True) -> str:
+    """单遍词法剥离 Java 注释。
+
+    为什么不能分两步做正则替换：`registry.addMapping("...") // /**表示path`
+    这种行注释里含有 `/*`，先剥行注释就会留下一个孤立的 `/**`，
+    随后的块注释正则会把从它到下一个 `*/` 之间的**真实代码全部吃掉**。
+    实测 CustomCorsConfig 的 `.allowedMethods(...)` / `.allowCredentials(true)`
+    就是这样被静默删除的 —— 规则于是看到一个没有 allowedOrigins 的空配置。
+
+    单遍扫描按出现顺序处理，注释与字符串字面量互不干扰：
+      - 字符串内部出现 `//` 不受影响
+      - 行注释里的 `/*` 不会开启块注释
+    """
+    def repl(m: re.Match) -> str:
+        s = m.group(0)
+        if s.startswith('"') or s.startswith("'"):
+            return s                                # 字面量原样保留
+        if keep_lines:
+            return "\n" * s.count("\n")             # 保留行号
+        return " "
+
+    return _JAVA_COMMENT_RE.sub(repl, text)
 
 
 def _ant_match(pattern: str, url: str) -> bool:
@@ -109,6 +153,107 @@ def _ant_match(pattern: str, url: str) -> bool:
     regex = re.escape(pattern).replace(r"\*\*", "\x00").replace(r"\*", "[^/]*")
     regex = regex.replace("\x00", ".*")
     return re.fullmatch(regex, url) is not None
+
+
+def _chain_until_semicolon(text: str, start: int, limit: int = 800) -> str:
+    """从 start 起截取链式调用，直到分号为止。
+
+    只接受"紧接着"的链。一段空白算不算"链还连着"，看两侧：
+      - 下一个非空白字符是 `.` `,` `;` → 继续
+      - **上一个非空白字符是 `,`** → 继续（参数列表里的下一个值，
+        如 `.allowedMethods("GET", "POST")` 中逗号后的空格）
+    其余情况视为链条已断，就地停止 —— 否则会跨过几十行空白一路吃到
+    下一个类的花括号里（CustomCorsConfig 的真实踩坑：链尾后面紧跟内部类声明）。
+    """
+    out: list[str] = []
+    depth, i, n = 0, start, min(len(text), start + limit)
+    while i < n:
+        c = text[i]
+        # 注意顺序：先记字符，再按新层级判断，避免 ")" 让 depth 变成负数
+        # 后 `depth <= 0` 恒真、把参数内的空白误判成链结束。
+        if c == "(":
+            depth += 1
+        if c in " \t\r\n":
+            j = i
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            prev = next((ch for ch in reversed(out) if ch not in " \t"), "")
+            nxt = text[j] if j < n else ""
+            if depth <= 0 and nxt not in ".,;" and prev != ",":
+                return re.sub(r"\s+", " ", "".join(out)).rstrip()
+            out.append(" ")
+            i = j
+            continue
+        out.append(c)
+        if c == ")":
+            depth -= 1
+        if c == ";" and depth <= 0:
+            return re.sub(r"\s+", " ", "".join(out)).strip()
+        i += 1
+    return re.sub(r"\s+", " ", "".join(out)).strip()
+
+
+def _enclosing_class(text: str, pos: int) -> str:
+    """找 pos 之前最近的一个类声明名（用于给内部类里的装配起个可读名字）。"""
+    names = [m.group(1) for m in re.finditer(r"\bclass\s+(\w+)", text[:pos])]
+    return names[-1] if names else "CorsConfig"
+
+
+def _find_class_body(text: str, classname: str, root: Path | None = None) -> str:
+    """在给定文本里取某个类的类体；找不到则到仓库里按文件名搜一遍。"""
+    m = re.search(rf"class\s+{re.escape(classname)}\b[^{{]*\{{", text)
+    if m:
+        return _method_body(text, m.end() - 1)
+    if root is None:
+        return ""
+    for p in Path(root).rglob(f"{classname}.java"):
+        if any(part in SKIP_DIR_PARTS for part in p.parts):
+            continue
+        try:
+            body = _strip_java_comments(p.read_text(encoding="utf-8", errors="replace"),
+                                        keep_lines=True)
+        except OSError:
+            continue
+        m = re.search(rf"class\s+{re.escape(classname)}\b[^{{]*\{{", body)
+        if m:
+            return _method_body(body, m.end() - 1)
+    return ""
+
+
+def _cors_mapping_for(text: str, pos: int) -> list[str]:
+    """setCorsProcessor 所在的 Mapping 配置类，其 addMapping 路径即其作用域。"""
+    pats = re.findall(r"addMapping\s*\(\s*\"([^\"]+)\"", text)
+    return pats or ["/*"]
+
+
+def _config_builder_snippet(text: str, reg_pos: int, limit: int = 2000) -> str:
+    """取构造 CorsConfiguration 的那段方法体作为 CORS 配置证据。
+
+    优先选择"包含 new CorsConfiguration() 且包含 registerCorsConfiguration"的
+    **同一个方法**；找不到时退化为 register 所在方法体。这样拿到的才是
+    `setAllowCredentials(true)` / `addAllowedOrigin("...")` 这类带取值的事实，
+    而不是 `http.cors()` 这种不含任何取值的链式 DSL。
+    """
+    # 收集所有方法起始位置（按花括号配对切出候选方法体）
+    starts = [m.start() for m in re.finditer(
+        r"(?:public|private|protected|static|final|\s)+\s[\w<>\[\],\s]+\s+\w+\s*\([^;{]*\)\s*\{",
+        text)]
+    best = ""
+    for s in starts:
+        if s > reg_pos:
+            break
+        body = _method_body(text, text.find("{", s), limit=limit)
+        end = text.find("{", s) + len(body)
+        if s <= reg_pos <= end or reg_pos < end + 200:
+            if "new CorsConfiguration" in body and "registerCorsConfiguration" in body:
+                return body
+            if "new CorsConfiguration" in body and not best:
+                best = body
+    if best:
+        return best
+    # 兜底：直接截 register 调用附近一段
+    lo = max(0, reg_pos - 900)
+    return text[lo: reg_pos + 200]
 
 
 def _method_body(text: str, start: int, limit: int = 3000) -> str:
@@ -207,17 +352,50 @@ class FrameworkWiringResolver:
             for m in re.finditer(
                     r"registerCorsConfiguration\s*\(\s*\"([^\"]+)\"", text):
                 path_pat = m.group(1)
-                # 向后找这个 register 调用所属的方法体
-                mstart = text.rfind("private", 0, m.start())
-                mstart = max(mstart, text.rfind("public", 0, m.start()))
-                mstart = max(mstart, text.rfind("protected", 0, m.start()))
-                snippet = _method_body(text, mstart) if mstart > 0 else ""
+                # 证据优先取**同文件里构造 CorsConfiguration 的那个方法体**，
+                # 而不是 registerCorsConfiguration 所在的方法体。
+                # 反例：WebSecurityConfig 里 registerCorsConfiguration 在
+                # corsConfigurationSource() 内，但如果按"最近的 public/private"
+                # 回退去找，会落到 configure(HttpSecurity) 上，
+                # 取到的是 http.cors() 这种没有取值的 DSL —— 等于没证据。
+                snippet = _config_builder_snippet(text, m.start())
                 cls = CLASS_DECL_RE.search(text)
                 cname = cls.group(1) if cls else "CorsConfiguration"
                 wirings.append(Wiring(
                     kind="cors-config", name=cname, url_patterns=[path_pat],
-                    body=snippet[-1600:], source=rel,
+                    body=snippet, source=rel,
                     note="CorsConfigurationSource 显式注册"))
+
+            # --- WebMvcConfigurer.addCorsMappings：registry.addMapping("/path")
+            #     后面跟 .allowedOrigins(...) / .allowedOriginPatterns(...) /
+            #     .allowCredentials(true) 链式调用。
+            #     getCsrfToken_01 就是这种写法，此前完全没被解析，
+            #     切片里只剩一个全文匹配的 ReferFilter，等于没有 CORS 证据。 ---
+            for m in re.finditer(r"addMapping\s*\(\s*\"([^\"]+)\"", text):
+                path_pat = m.group(1)
+                chain = _chain_until_semicolon(text, m.end())
+                wirings.append(Wiring(
+                    kind="cors-mvc", name=_enclosing_class(text, m.start()),
+                    url_patterns=[path_pat],
+                    body=f'registry.addMapping("{path_pat}"){chain}',
+                    source=rel,
+                    note="WebMvcConfigurer.addCorsMappings"))
+
+            # --- 自定义 CorsProcessor：setCorsProcessor(new Xxx())。
+            #     这是 CORS 白名单的第五种藏法 —— 既不在入口里、也不在
+            #     allowedOrigins 里，而是重写了 CorsProcessor.checkOrigin()。
+            #     CustomCorsConfig 就是这种：allowedOrigins(...) 整行被注释，
+            #     真正生效的是 CustomCorsProcessor 里的 SecurityUtil.checkURL。
+            #     不解析它，`/cors/sec/webMvcConfigurer` 会被误判成"不限 Origin"。---
+            for m in re.finditer(r"setCorsProcessor\s*\(\s*new\s+(\w+)", text):
+                pname = m.group(1)
+                pbody = _find_class_body(text, pname, self.source_root)
+                if pbody:
+                    wirings.append(Wiring(
+                        kind="cors-processor", name=pname,
+                        url_patterns=_cors_mapping_for(text, m.start()),
+                        body=pbody, source=rel,
+                        note="自定义 CorsProcessor.checkOrigin"))
 
             # --- 见到但解析不了的全局装配：显式记录，别假装没有 ---
             if re.search(r"http\s*\.\s*cors\s*\(\s*\)", text):

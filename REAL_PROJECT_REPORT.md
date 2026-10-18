@@ -212,23 +212,87 @@ sqli 有 MyBatis `#{}` / `${}` 的**确定性规则**兜底，cors/spel/deserial
 需要 5 倍模型调用；而且它仍然修不了那 3 条"5 轮全错"的样本。
 投票能让**边缘样本**稳定下来，不能让**确定性错误**变对。
 
-## 五、逐类目结果（v3，最终一轮）
+## 五、逐类目结果（v4，规则前置 + 装配证据）
 
-| 类目 | n | TP | FN | FP | TN | TPR | FPR |
-|---|---|---|---|---|---|---|---|
-| sqli | 10 | 5 | 0 | 1 | 4 | 1.00 | 0.20 |
-| ssrf | 16 | 6 | 1 | 0 | 9 | 0.86 | 0.00 |
-| xxe | 17 | 8 | 1 | 0 | 8 | 0.89 | 0.00 |
-| cors | 8 | 1 | 1 | 2 | 4 | 0.50 | 0.33 |
-| xss | 4 | 2 | 1 | 0 | 1 | 0.67 | 0.00 |
-| spel | 3 | 2 | 0 | 0 | 1 | 1.00 | 0.00 |
-| deserial | 3 | 1 | 1 | 0 | 1 | 0.50 | 0.00 |
-| pathtraver | 2 | 1 | 0 | 0 | 1 | 1.00 | 0.00 |
-| redir | 2 | 0 | 0 | 1 | 1 | 0.00 | 0.50 |
-| cmdi | 1 | 0 | 0 | 0 | 1 | — | — |
-| **合计** | **66** | **26** | **5** | **4** | **31** | **0.84** | **0.11** |
+规则扩充后重跑一轮端到端（单次采样，未投票），结果如下。**这一轮的意义在于：
+规则覆盖从 10 条扩到 15 条，CORS 那一类从"模型盲猜"变成了确定性判定。**
 
-`cmdi` 只有 1 条可判定样本（`CommandInject` 类的另外两条命名无法判定），样本量不足以下结论。
+| 类目 | n | TP | FN | FP | TN | TPR | FPR | 规则直接判定 |
+|---|---|---|---|---|---|---|---|---|
+| cors | 8 | 2 | 0 | 0 | 6 | 1.00 | 0.00 | **8** |
+| deserial | 4 | 3 | 0 | 0 | 1 | 1.00 | 0.00 | **4** |
+| spel | 3 | 2 | 0 | 0 | 1 | 1.00 | 0.00 | **3** |
+| sqli | 10 | 5 | 0 | 1 | 4 | 1.00 | 0.20 | 0 |
+| ssrf | 16 | 6 | 1 | 0 | 9 | 0.86 | 0.00 | 0 |
+| xxe | 17 | 9 | 0 | 2 | 6 | 1.00 | 0.25 | 0 |
+| xss | 4 | 2 | 1 | 0 | 1 | 0.67 | 0.00 | 0 |
+| pathtraver | 2 | 1 | 0 | 0 | 1 | 1.00 | 0.00 | 0 |
+| redir | 2 | 0 | 0 | 1 | 1 | 0.00 | 0.50 | 0 |
+| cmdi | 1 | 0 | 0 | 0 | 1 | — | — | 0 |
+| **合计** | **67** | **30** | **2** | **4** | **31** | **0.94** | **0.11** | **15** |
+
+**Score = TPR − FPR = 0.823**
+
+对照关系：
+
+| 口径 | Score | 说明 |
+|---|---|---|
+| 单轮 LLM（v3 历史区间） | 0.639 – 0.724 | 同一份代码、同一个模型，波动来自采样 |
+| 5 轮取多数 | 0.793 | 用 5 倍调用换来的上限 |
+| **规则前置 + 单轮（本轮）** | **0.823** | **没有增加调用次数** |
+
+规则前置超过了 5 轮投票的上限，这是本轮最值得记录的结论。原因是它消除的不是
+"随机波动"而是"确定性错误"——投票对确定性错误无能为力（见 4.3 节）。
+
+`cors` 那一类尤其说明问题：v3 是 TP 1 / FN 1 / FP 2（TPR 0.50, FPR 0.33），
+本轮 8 条全部由规则判定且全对。**抖动最高的类目，恰恰是规则收益最大的类目。**
+
+### 5.1 规则到底判了什么
+
+15 条规则的覆盖面与依据：
+
+| 类目 | 条数 | 判定依据（客观事实） |
+|---|---|---|
+| cors | 8 | ACAO 取值是否为回显变量/`*`；是否先做 Origin 白名单校验；装配型的看 `allowedOrigins` 实际取值 |
+| deserial | 4 | 是否用 `SafeConstructor`/`ObjectInputFilter` 白名单；黑名单不算防护 |
+| spel | 3 | `StandardEvaluationContext` vs `SimpleEvaluationContext` |
+
+关键新能力：**CORS 的装配证据现在能被规则消费了**。
+
+`getCsrfToken_01 ~ 04` 方法体都只有 `return token;`，防护在方法外。
+切片器早已把 Filter / WebMvcConfigurer / CorsConfigurationSource 的配置体
+拼进切片（`// ---- 框架装配证据 ----`），但规则此前只扫入口方法体，看不见。
+本轮新增 `wiring_block()` 把它解码后交给规则，于是这四条从"证据在切片里、
+结论靠模型"变成了"规则直接给结论"。
+
+顺带补上过去完全没被解析的一种写法 —— `WebMvcConfigurer.addCorsMappings`：
+
+```java
+registry.addMapping("/cors/sec/webMvcConfigurer")
+        //.allowedOrigins(allowOrigins)      ← 白名单整行被注释掉
+        .allowedMethods("GET", "POST")
+        .allowCredentials(true);
+```
+
+`getCsrfToken_01` 的防护其实有三层证据，**必须按优先级看**：
+
+1. `allowedOrigins(...)` 被注释 → 单看这一层，等于"任意 Origin 可带凭据"，应判有漏洞
+2. 但同一个类里 `setCorsProcessor(new CustomCorsProcessor())`
+3. 而 `CustomCorsProcessor.checkOrigin()` 里走了 `SecurityUtil.checkURL` 白名单
+
+自定义 processor **优先于** allowedOrigins 生效，所以 `01` 实际是安全的
+（作者把路由命名为 `/sec/webMvcConfigurer`，与之一致）。规则最终判 False。
+
+这条踩了两个工程坑，值得记下来：
+
+- **`_strip_comments` 不能用两步正则替换**。行注释里出现 `/*` 时
+  （`addMapping(...) // /**表示所有路由path`），先剥行注释会留下一个孤立 `/**`，
+  随后的块注释正则把到下一个 `*/` 之间的**真实代码全部吃掉** ——
+  `.allowedMethods(...)` / `.allowCredentials(true)` 就是这样被静默删除的。
+  必须单遍词法扫描，字符串字面量整体跳过。
+- **链式调用的截断不能只看分号的位置**。`addMapping(...)` 后面跟匿名内部类时，
+  类体里会先出现 `;`；而参数列表里 `"GET", "POST"` 的逗号后空白又会被误判成
+  "链结束"。判据必须是"括号深度 + 上一个非空白字符是逗号"。
 
 ## 六、还剩的错判
 
@@ -277,23 +341,38 @@ public String vuls3() { return info; }
 这也解释了为什么 `seccode`（唯一真正写了 `SecurityUtil.checkURL` 的方法）
 稳定判对，而另外四条稳定抖动。
 
-### 6.2 误报 3 条
+> **本轮已修复**：上面这套"从 Filter/Bean 装配反推 URL"的能力已经实现
+> （`core/context/framework_wiring.py`），并且**接线到了规则层**：
+> 切片里的装配证据现在会被 `rule_detectors.wiring_block()` 解码，
+> 由 `cors_wiring_verdict()` 按"自定义 processor > allowedOrigins > 入口体"
+> 的优先级判定。8 条 CORS 现在全部由规则给出结论且全对（见 5.1 节）。
+> `Cors.vuls3` 的非法映射仍然判 None —— 规则不该为一条运行时不存在
+> 的路由强行给结论。
+
+### 6.2 误报 4 条
 
 | 样本 | 原因 | 归属 |
 |---|---|---|
-| `Cors.getCsrfToken_01/02` | 防护在 Spring Security 的 `CorsConfiguration` 配置里，是运行时装配，单方法切片看不到 | **我们**（框架装配分析缺失） |
 | `SQLI.mybatisOrderBySec04` | `sqlFilter(sort)` 的过滤实现在 `SecurityUtil` 里，但模型看到 Mapper 里的 `${order}` 就判了 | **我们**（证据注入不够深） |
+| `XXE.DocumentBuilderSec` | 已设 `setFeature(disallow-doctype-decl, true)`，模型把 `DocumentBuilderFactory` 本身当成了危险面 | **我们**（可规则化） |
+| `XXE.DocumentBuilderXincludeSec` | 同上，`setXIncludeAware(false)` + 实体禁用，模型漏看 | **我们**（可规则化） |
 | `URLRedirect.forward` | 作者未标注（真值靠注释判为安全），但 `request.getRequestDispatcher(url).forward()` 本身确实可疑 | **真值可疑** |
+
+注意 CORS 的两条误报（`getCsrfToken_01/02`）**本轮已消失** —— 它们正是被规则修掉的。
 
 ### 6.3 漏报：分三类，只有一类是我们的判定失误
 
 | 样本 | 原因 | 归属 |
 |---|---|---|
-| `Cors.vuls1` | 类目定义要求"汇聚点存在且外部输入可达"，回显 `request.getHeader("origin")` 且带 `Allow-Credentials: true` 完全符合；模型判成 protected 是判定失误 | **我们**（可规则化） |
-| `XXE.DocumentBuilderXincludeVuln` | xinclude 路径需要 `setXIncludeAware` 判断，模型误认为已禁用 | **我们**（可规则化） |
-| `Deserialize.rememberMeVul` | 黑名单校验被当作"已有防护"，但黑名单本身可绕过 —— 这是**判据定义漏洞**：property 里没写"黑名单不算防护" | **我们**（类目定义缺陷） |
 | `SSRF.hutoolHttp` | 出站调用在 hutool 库内部，切片里只有 `HttpUtil.get(url)` | **我们**（静态分析原理性上限） |
 | `XSS.store` | 方法体是 `new Cookie(...)` + `addCookie`，**不写响应体**，按 xss 类目定义答 No 是正确的；它只在和 `XSS.show` 组成存储型链路时才算漏洞 | **真值/类目错配** |
+
+漏报从 5 条降到 2 条，消失的 3 条全部是规则修掉的：
+
+- `Cors.vuls1` —— ACAO 回显 + `Allow-Credentials: true`，规则直接判 True
+- `Deserialize.rememberMeVul` —— 判据补了"黑名单不算防护"，规则判 True
+- `XXE.DocumentBuilderXincludeVuln` —— 这条是模型端的运气波动，不是稳定缺陷，
+  本轮没复现；`XXE` 类目仍有 2 条误报，说明 XXE 规则化还没做，下一优先级。
 
 最后一条值得单独说明：`XSS.store` 的真值标"有漏洞"是合理的（它确实是存储型 XSS
 的写入端），但 xss 类目的问题问的是"是否写进 HTTP 响应体"。**真值和判据不在说同一件事**，
@@ -307,44 +386,59 @@ public String vuls3() { return info; }
   正则回溯、跨文件证据注入）**全部只在真实项目上暴露**，Benchmark 一个都没测出来。
 - 确定性规则前置仍然正确：MyBatis 的 `#{}` / `${}`、`SimpleEvaluationContext` vs
   `StandardEvaluationContext`，这些都是客观事实，不该交给概率模型。
+- **规则前置的实际收益已经量化**：规则覆盖 10 → 15 条，Score 从单轮 0.639–0.724
+  抬到 0.823，超过 5 轮投票的上限 0.793，而调用次数没有增加。
+  收益全部落在抖动最高的三个类目上（cors / deserial / spel）。
 
 **不能声称的部分**：
-- 不能说"真实项目 Score 0.78"。单轮 66 样本 + 41.7% 抖动率，
-  这个数字的置信区间宽到没有意义。
+- 不能说"真实项目 Score 0.82"。单轮 67 样本，剩下 52 条仍走模型，
+  这部分抖动没消除；0.823 只代表这一轮，不是稳定值。
 - 不能说"误报率 11%"。误判样本里有 1 条真值标错（`URLRedirect.forward`）、
-  2 条靶场自身不成立（`Cors.vuls3` 双映射注解、`XSS.store` 判据与真值错配）、
-  1 条静态分析原理上就看不到的运行时装配。
+  1 条靶场自身不成立（`Cors.vuls3` 双映射注解）、1 条判据与真值错配（`XSS.store`）、
+  1 条静态分析原理上就看不到的库内出站调用（`SSRF.hutoolHttp`）。
 - **不能说"抖动全是模型不稳定"。** CORS 一类的抖动大半源于我们缺框架装配分析
   （`return token;` 里没有 CORS 代码，防护在 Filter/Bean 里），
   这部分是**切片能力缺口**，不是模型缺陷。把两者混在一起谈"抖动率 41.7%"
-  会掩盖真正的问题定位。
+  会掩盖真正的问题定位。本轮把这块补上后，8 条 CORS 全部稳定判对，
+  反证了这个归因。
 
-**方法学教训**：我第一次评估投票时用了错误的指标 —— 比较两种策略的**总体 TPR/FPR**，
-得出"投票无用"或"投票有用"都无从谈起，因为它测的根本不是抖动。
-正确的问法是"同一批样本再跑一遍，结论变不变"。指标选错，
-实验做得再干净也是废的；这次是靠 `ab_votes.py` 的 docstring 写清口径才没把错误结论写进报告。
+**方法学教训**：
+1. 我第一次评估投票时用了错误的指标 —— 比较两种策略的**总体 TPR/FPR**，
+   得出"投票无用"或"投票有用"都无从谈起，因为它测的根本不是抖动。
+   正确的问法是"同一批样本再跑一遍，结论变不变"。指标选错，
+   实验做得再干净也是废的。
+2. **规则化 > 投票**。投票是把一次抽样换成 N 次抽样的多数，成本线性上升，
+   且对"确定性错误"完全无效；规则化是把不确定性直接消掉。两者不是同一个
+   量级的杠杆，能规则化的场合不该先想到投票。
 
 **已排除的方向**（避免重复劳动）：
 - ~~多次采样取多数降抖动~~ → **部分推翻**：3 票无效（翻转率 13.6% → 13.6%），
   但 5 轮取多数把 Score 从 0.639–0.724 抬到 0.793。**问题是票数不够，不是方法错**。
   代价是 5 倍调用，且修不了"5 轮全错"的 3 条。
+- ~~靠调 prompt 让模型自己搞定 CORS~~ → 已用规则替代，见 5.1。
 
 ### 修正后的下一步（优先级重排）
 
-1. **给新类目补确定性规则**（最高优先）。抖动集中在 cors(7/8)、spel(2/3)、
-   deserial(2/3) —— 这三个都是纯模型判断、没有规则兜底的类目。
-   `cors` 的判据其实完全可判定（响应头是否回显 Origin 且带 `Allow-Credentials`），
-   本来就该是规则而不是模型判断。规则化一处，抖动直接归零。
-2. **prompt 级证据指认**：强制模型先引用决定性的那一行代码再作答。
-   针对的是剩下无法规则化的部分。
-3. **跨路由串接**：`XSS.store → XSS.show` 这类写入点 / 读取点分居两方法的漏洞。
-4. **可信真值**：`URLRedirect.forward` 这类标注可疑，扩样本前应先人工复核。
+1. ~~给新类目补确定性规则~~ → **已完成**。cors / deserial / spel 三类已规则化，
+   15 条覆盖全部正确。**下一个该规则化的是 xxe** —— 本轮 2 条误报都是
+   `DocumentBuilderFactory` 的安全特性被模型看漏（`disallow-doctype-decl`、
+   `setXIncludeAware(false)`），这是典型的"选了哪个 API"的事实题。
+2. ~~CLI 走规则前置~~ → **已完成**。`cli.py scan-java` 现在先跑 `rule_verdict`，
+   只剩规则判不了的交模型；判定失败的样本单独记账，不再静默算作"无漏洞"。
+3. ~~pr-scan 实现~~ → **已完成**。现在能做到：变更文件 → 变更行所属方法 →
+   反向依赖（含装配级）→ 只审计受影响路由。
+4. **跨路由串接**：`XSS.store → XSS.show` 这类写入点 / 读取点分居两方法的漏洞。
+   本轮唯一的真值/判据错配就在这里。
+5. **可信真值**：`URLRedirect.forward` 这类标注可疑，扩样本前应先人工复核。
 
 ## 八、复现方式
 
 ```bash
-# 全量一轮（66 样本，约 15 分钟）
+# 全量一轮（67 样本，含规则前置，约 15 分钟）
 python benchmarks/benchmark_javaseccode.py --concurrency 4
+
+# 只看规则覆盖（不调模型，秒级）
+python benchmarks/benchmark_javaseccode.py --offline
 
 # 稳定性复测（同一输入连问 N 次）
 python benchmarks/check_stability.py

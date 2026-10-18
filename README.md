@@ -103,12 +103,11 @@ python cli.py --help
 - [x] 第1周：slicer + context 层
 - [x] 第2周：web3_slither + scenario_matcher，大小模型漏斗路由
 - [x] 第3周：sandbox 层，Docker/Foundry 验证器
-- [ ] 第4周：PR 增量扫描的调用链过滤（`cmd_pr_scan` 仍是 TODO）
+- [x] 第4周：PR 增量扫描 —— `pr-scan` 已实现变更行→方法→反向依赖（含装配级）
 - [x] 第5周：Java 赛道打通 + OWASP Benchmark 跑分（11 类，Score 0.98）
 - [x] 第6周：真实项目（java-sec-code）评测，暴露 4 个仅真实代码可见的切片缺陷
-- [ ] 降判定抖动：**抖动集中在无规则兜底的新类目**（cors 7/8、spel 2/3、
-      deserial 2/3 抖动，sqli 仅 1/10）→ 优先给这些类目补确定性规则，
-      优先级高于 prompt 调优
+- [x] 降判定抖动：cors / deserial / spel 三类已规则化，规则覆盖 10 → 15 条
+      （Score 0.823，超过 5 轮投票的 0.793）。**下一个该规则化的是 xxe**
 - [ ] 跨路由串接：存储型 XSS 这类「写入点 + 读取点」分居两方法的漏洞
 
 

@@ -52,6 +52,82 @@ def _sibling_methods(source: str) -> str:
     return body[:cfg] if cfg >= 0 else body
 
 
+_WIRING_MARK = "框架装配证据"
+
+
+def wiring_block(source: str) -> str:
+    """抽取切片里的框架装配证据段（Filter / Interceptor / CORS Bean 的配置体）。
+
+    为什么需要：CORS 有一半样本入口方法体是空的 ——
+
+        @GetMapping("/sec/webMvcConfigurer")
+        public CsrfToken getCsrfToken_01(CsrfToken token) { return token; }
+
+    防护完全在方法外的 Filter / WebMvcConfigurer / CorsConfigurationSource 里。
+    切片器已经把那段配置体当证据拼进来了（`// ---- 框架装配证据 ----`），
+    但规则此前只扫入口体，看不见 —— 于是这几条仍然靠模型猜。
+    有了这个函数，规则就能吃到同一份证据。
+
+    返回的是**去掉了每行 `// ` 前缀的纯代码**，方便直接复用正则。
+    """
+    i = source.find(_WIRING_MARK)
+    if i < 0:
+        return ""
+    # 回退到该行行首，避免把 "// ---- " 截一半
+    lo = source.rfind("\n", 0, i)
+    lines: list[str] = []
+    for ln in source[lo + 1:].splitlines():
+        s = ln.lstrip()
+        if not s.startswith("//"):
+            break                       # 装配块结束
+        body = s[2:]
+        if body.startswith("   ") or body.startswith("  "):
+            lines.append(body[3:] if body.startswith("   ") else body.strip())
+        else:
+            lines.append(body)          # 头部说明行（[filter] ...）保留也无害
+    return "\n".join(lines)
+
+
+def _wiring_sections(wblock: str) -> list[tuple[str, str]]:
+    """把装配块切成 [(组件名, 组件体)]。
+
+    头部形如 `[filter] ReferFilter  urlPatterns=['/*'] ...` / `[cors-config] ...`。
+    块首那一行 `---- 框架装配证据：... ----` 不是组件，必须丢掉 ——
+    否则会产出一个名字为空、体为说明文字的伪组件。
+    """
+    out: list[tuple[str, str]] = []
+    name = ""
+    buf: list[str] = []
+
+    def flush() -> None:
+        if name:
+            out.append((name, "\n".join(buf)))
+
+    for ln in wblock.splitlines():
+        m = re.match(r"\s*\[([\w-]+)\]\s+(\w+)", ln)
+        if m:
+            flush()
+            name, buf = m.group(2), []
+        elif name:
+            buf.append(ln)
+        # 组件出现之前的任何行（标题、空行）直接忽略
+    flush()
+    return out
+
+
+_DECORATOR = re.compile(r"^\s*@\w+", re.M)
+
+
+def _entry_head(source: str) -> str:
+    """入口方法的注解 + 签名 + 方法体（不含兄弟方法）。
+
+    `entry_body()` 截到第一个分隔注释，已经排除了兄弟**方法体**，
+    但注解行也在入口体前面，这里不需要额外处理 —— 保留此别名是为了
+    语义清晰：凡涉及"这个入口上的注解"都应走它，而不是裸 `source`。
+    """
+    return entry_body(source)
+
+
 def _norm(alg: str) -> str:
     return alg.strip().upper()
 
@@ -177,31 +253,197 @@ ORIGIN_CHECK_RE = re.compile(
 _IDENT = re.compile(r"^[A-Za-z_]\w*(\s*\.\s*\w+\s*\(\s*\))?$")
 
 
+# ---------------- CORS：装配型证据 ----------------
+#
+# 入口方法体里没有 CORS 头时，防护只可能在方法外，共有四种装配形态：
+#
+#   1. @WebFilter + doFilter 里 setHeader           → OriginFilter
+#   2. WebMvcConfigurer.addMapping(...).allowedOrigins(...)  → CustomCorsConfig
+#   3. CorsConfigurationSource.registerCorsConfiguration("/path", cfg)
+#                                                    → BaseCorsFilter / WebSecurityConfig
+#   4. @CrossOrigin 注解直接写在入口方法上（入口体里，不走这里）
+#
+# 判据与入口体型完全一致：**回显外部 Origin 且允许携带凭据 = 漏洞**。
+# 关键客观事实是 `allowedOrigins` / `addAllowedOrigin` 的取值：
+#   - 全部是固定字面量域名（且不是 "*"）→ 有白名单，安全
+#   - 出现 "*" 或 allowedOriginPatterns("*")     → 过宽，不安全
+#   - allowedOrigins 被注释掉 / 完全缺失          → 等于不限 Origin，不安全
+# 最后一条是 CustomCorsConfig 的真实情况：`.allowedOrigins(allowOrigins)` 整行
+# 被注释掉，只剩 allowCredentials(true)，即"任意 Origin 可携带 Cookie"。
+
+CORS_CFG_ALLOW_RE = re.compile(
+    r"""\.\s*(?:allowedOrigins?|addAllowedOrigin|setAllowedOrigins?|"""
+    r"""addAllowedOriginPattern|setAllowedOriginPatterns?)\s*\(([^;]*?)\)\s*(?:\.|;|$)""",
+    re.I | re.S)
+CORS_CFG_CRED_RE = re.compile(
+    r"(?:allowCredentials|setAllowCredentials)\s*\(\s*true\s*\)", re.I)
+CORS_CFG_ANY_RE = re.compile(
+    r"""setAllowedOrigins?\s*\(\s*(?:Arrays\s*\.\s*asList\s*\(\s*)?"\*"|"""
+    r"""addAllowedOrigin\s*\(\s*"\*"|"""
+    r"""allowedOriginPatterns?\s*\(\s*"\*"|addAllowedOriginPattern\s*\(\s*"\*"|"""
+    r"""setAllowedOriginPatterns?\s*\(\s*"\*"|"""
+    r"""\.\s*allowedOrigins?\s*\(\s*"\*"|\.\s*allowedOriginPatterns?\s*\(\s*"\*" """,
+    re.I)
+
+
+def cors_wiring_verdict(wblock: str) -> bool | None:
+    """从装配证据判定 CORS。True=有漏洞，False=有防护，None=证据不足以判定。
+
+    **组件有优先级，不能简单"任一不安全即不安全"**：
+
+      cors-processor  自定义 CorsProcessor 重写了 checkOrigin。
+                      它**优先于** allowedOrigins 生效 —— Spring 的
+                      DefaultCorsProcessor 先按 config 校验，取不到再走
+                      子类覆写。所以只要 processor 做了白名单校验，
+                      allowedOrigins 缺失就不再等于"不限 Origin"。
+                      实测反例：CustomCorsConfig 里 allowedOrigins(...)
+                      整行被注释，只有 allowCredentials(true)，
+                      单看它是"任意源可带凭据"；但同一个 Mapping 类
+                      setCorsProcessor(new CustomCorsProcessor())，
+                      而 CustomCorsProcessor.checkOrigin 里走了
+                      SecurityUtil.checkURL 白名单。作者把该路由标为
+                      /sec/webMvcConfigurer（安全），是对的。
+
+    因此：先看 processor 的结论，有结论就以它为准；没有再看配置型组件。
+    """
+    if not wblock.strip():
+        return None
+
+    sections = _wiring_sections(wblock)
+    proc = [v for name, body in sections
+            if re.search(r"checkOrigin\s*\(", _strip_java_comments(body))
+            for v in [_cors_from_one(body)] if v is not None]
+    if proc:
+        return True if any(proc) else False
+
+    verdicts: list[bool] = []
+    for name, body in sections:
+        v = _cors_from_one(body)
+        if v is None:
+            continue
+        # 配置型组件：任一装配放宽了 Origin，整体就是可跨域读取。
+        # 因此"任一处不安全"即不安全，全部安全才算安全。
+        verdicts.append(v)
+
+    if not verdicts:
+        return None
+    return True if any(verdicts) else False
+
+
+def _cors_from_one(body: str) -> bool | None:
+    """对单个装配组件给出的配置体做 CORS 判定。"""
+    txt = _strip_java_comments(body)
+
+    # --- 形态 D：自定义 CorsProcessor，重写 checkOrigin 做域名校验 ---
+    # checkOrigin() 的返回契约：返回请求源 = 允许，返回 null = 拒绝。
+    # 只要它调用了白名单校验（checkURL / 白名单集合 contains / endsWith）
+    # 并在失败时 return null，就等价于 allowedOrigins 白名单，判安全。
+    if re.search(r"\bcheckOrigin\s*\(", txt):
+        if re.search(r"checkURL|allowedOrigins?|whiteList|whitelist|safeDomains?|"
+                     r"isAllowedOrigin", txt, re.I) and re.search(r"return\s+null", txt):
+            return False
+        if re.search(r"return\s+requestOrigin\s*;|return\s+origin\s*;", txt) and \
+                not re.search(r"checkURL|whiteList|whitelist", txt, re.I):
+            return True                 # 原样返回任意 Origin
+        return None
+
+    # --- 形态 A：Filter.doFilter 里直接写响应头（与入口体同一判据） ---
+    if ACAO_RE.search(txt):
+        echoes = False
+        for m in ACAO_RE.finditer(txt):
+            val = m.group(1).strip()
+            if val in ('"*"', "'*'"):
+                echoes = True
+            elif val.startswith('"') or val.startswith("'"):
+                continue                # 固定域名
+            elif _IDENT.match(val):
+                echoes = True           # 变量，通常是 getHeader("Origin")
+        if not echoes:
+            return False
+        if ORIGIN_READ_RE.search(txt) and ORIGIN_CHECK_RE.search(txt):
+            return False                # 先校验再回显
+        return True
+
+    # --- 形态 B/C：CorsConfiguration 的 allowedOrigins 取值 ---
+    if not re.search(r"allowedOrigin|AllowCredentials", txt, re.I):
+        return None
+
+    cred = bool(CORS_CFG_CRED_RE.search(txt))
+    if CORS_CFG_ANY_RE.search(txt):
+        return True                     # "*"：任意 Origin（带凭据时更危险）
+
+    allowed = CORS_CFG_ALLOW_RE.findall(txt)
+    if allowed:
+        # 有非空取值：必须全部是固定字面量域名
+        for raw in allowed:
+            vals = re.findall(r'"([^"]*)"', raw)
+            if not vals:
+                # 传的是变量（如 allowOrigins 列表），看它是否被定义过
+                if re.search(r"\.\s*(?:add|set)Origin", txt, re.I):
+                    return None         # 列表内容不在切片里，交回 LLM
+                continue
+            if any(v.strip() == "*" for v in vals):
+                return True
+        return False
+
+    # 完全没有 allowedOrigins 取值：等于不限 Origin。
+    # 只有**同时**开了 allowCredentials 才构成"任意源可带凭据读取"，
+    # 否则只是没限制，不构成该类的判定依据。
+    return True if cred else None
+
+
+def _strip_java_comments(text: str) -> str:
+    """剥掉 // 与 /* */ 注释，避免把被注释掉的配置当成生效。
+
+    CustomCorsConfig 里 `.allowedOrigins(allowOrigins)` 是注释状态，
+    不剥注释会误判成"有白名单"。
+    """
+    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+    text = re.sub(r"//[^\n]*", " ", text)
+    return text
+
+
 def cors_verdict(source: str) -> bool | None:
     body = entry_body(source)
-    if not ACAO_RE.search(body):
-        return None                    # 入口体内没有 CORS 头，交给装配解析器
 
-    echoes_origin = False
-    for m in ACAO_RE.finditer(body):
-        val = m.group(1).strip()
-        if val in ('"*"', "'*'"):
-            # ACAO=* 且带 Credentials：浏览器实际会拒绝这种组合，
-            # 单独 * 不构成"读取任意响应"的漏洞，但仍是过宽的跨域策略。
-            # 这里保守判定为不安全（作者也把它标成 /vuln/setHeader）。
-            echoes_origin = True
-            continue
-        if val.startswith('"') or val.startswith("'"):
-            continue                   # 固定字面量域名，不看请求，安全
-        if _IDENT.match(val) and ORIGIN_READ_RE.search(body):
-            echoes_origin = True       # 变量 = getHeader("Origin")，原样回显
-        elif _IDENT.match(val):
-            # 变量来源不明，但 body 里出现过读 Origin 头的动作
-            echoes_origin = echoes_origin or bool(ORIGIN_READ_RE.search(body))
+    # 入口体里自己写了 CORS 头 → 就地判（含 @CrossOrigin 走 Spring 默认策略的情况）
+    if ACAO_RE.search(body):
+        echoes_origin = False
+        for m in ACAO_RE.finditer(body):
+            val = m.group(1).strip()
+            if val in ('"*"', "'*'"):
+                # ACAO=* 且带 Credentials：浏览器实际会拒绝这种组合，
+                # 单独 * 不构成"读取任意响应"的漏洞，但仍是过宽的跨域策略。
+                # 这里保守判定为不安全（作者也把它标成 /vuln/setHeader）。
+                echoes_origin = True
+                continue
+            if val.startswith('"') or val.startswith("'"):
+                continue               # 固定字面量域名，不看请求，安全
+            if _IDENT.match(val) and ORIGIN_READ_RE.search(body):
+                echoes_origin = True   # 变量 = getHeader("Origin")，原样回显
+            elif _IDENT.match(val):
+                # 变量来源不明，但 body 里出现过读 Origin 头的动作
+                echoes_origin = echoes_origin or bool(ORIGIN_READ_RE.search(body))
 
-    if ORIGIN_READ_RE.search(body) and ORIGIN_CHECK_RE.search(body):
-        return False                   # 读了 Origin，但先做了白名单校验
-    return echoes_origin or None
+        if ORIGIN_READ_RE.search(body) and ORIGIN_CHECK_RE.search(body):
+            return False               # 读了 Origin，但先做了白名单校验
+        return echoes_origin or None
+
+    # @CrossOrigin 注解：Spring 按 origins 列表做白名单，列的是固定域名即安全。
+    # 必须只看**入口方法自己的注解**（entry_body），不能用整份 source ——
+    # 切片里拼了同文件兄弟方法，Cors.secCrossOrigin 就带 @CrossOrigin，
+    # 在全文里搜会把 getCsrfToken_01 也判成"有白名单"，直接漏报。
+    own = _entry_head(source)
+    if re.search(r"@CrossOrigin", own):
+        m = re.search(r"@CrossOrigin\s*\(([^)]*)\)", own)
+        if m and re.search(r"origins?\s*=\s*\{", m.group(1)):
+            vals = re.findall(r'"([^"]+)"', m.group(1))
+            if vals and all(v.strip() != "*" for v in vals):
+                return False
+        return None
+
+    # 入口体没有 CORS 头 → 防护在方法外，交给装配证据
+    return cors_wiring_verdict(wiring_block(source))
 
 
 # ---------------- 反序列化 ----------------

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import re
 import subprocess
 from pathlib import Path
 
@@ -124,41 +125,93 @@ def cmd_scan_java(args, repo: Path):
     categories = [c.strip() for c in args.categories.split(",")] if args.categories else OWASP_KEYS
 
     print(f"[1/4] Java 入口切片 ...")
-    units = JavaSlicer(repo).extract_entry_units()
-    # 同一用例的 doGet 只是转发，保留 doPost 即可，避免重复计费
-    units = [u for u in units if not u.unit_name.endswith(".doGet")]
-    print(f"      共 {len(units)} 个入口")
+    preset = getattr(args, "_units", None)
+    if preset is not None:
+        units = preset
+        print(f"      使用 PR 增量受影响子集，共 {len(units)} 个入口")
+    else:
+        units = JavaSlicer(repo).extract_entry_units()
+        # 同一用例的 doGet 只是转发，保留 doPost 即可，避免重复计费
+        units = [u for u in units if not u.unit_name.endswith(".doGet")]
+        print(f"      共 {len(units)} 个入口")
     if not units:
         print("      未发现 Java Web 入口（需 @WebServlet / @GetMapping 等注解）")
         return
 
     print(f"[2/4] 类目选择：{', '.join(categories)}")
-    print(f"[3/4] 两步法初筛（并发 {args.concurrency}）...")
-    if args.offline:
+    print(f"[3/4] 两步法初筛（规则前置 + 并发 {args.concurrency}）...")
+
+    from core.agents.rule_detectors import verdict as rule_verdict
+
+    # --- 规则前置 ---------------------------------------------------------
+    # 凡客观可判定的（用了哪个算法 / 哪个 Context / ACAO 取值 / 反序列化白名单），
+    # 先由确定性规则给结论，模型只处理剩余部分。
+    # 理由见 core/agents/rule_detectors.py 顶部：模型在这些"事实题"上会摇摆，
+    # 而摇摆无法靠补充上下文纠正。
+    decided: dict[tuple[str, str], bool] = {}     # (unit_name, cat) -> bool
+    pending: list[tuple] = []
+    for u in units:
+        for c in categories:
+            v = rule_verdict(c, u.source_code)
+            if v is None:
+                pending.append((u, c))
+            else:
+                decided[(u.unit_name, c)] = v
+    print(f"      规则直接判定 {len(decided)} 项，余 {len(pending)} 项交模型")
+
+    failed: list[tuple] = []          # 调用失败，必须与"判为无漏洞"区分
+    model_flagged: list[tuple] = []
+    if pending and args.offline:
         from benchmarks.offline_baseline import offline_predict
-        flagged = [(u, c) for u in units for c in categories if offline_predict(u.source_code, c)]
-    else:
+        model_flagged = [(u, c) for u, c in pending if offline_predict(u.source_code, c)]
+    elif pending:
         from core.agents.model_selector import auto_select_and_print
         from core.agents.router import OpenAICompatClient, TwoTierRouter
         model = args.model or auto_select_and_print(tier=1)
         matcher = ScenarioMatcher(
             router=TwoTierRouter(tier1=OpenAICompatClient(model=model)),
             max_concurrency=args.concurrency, code_language="java_web")
-        results = asyncio.run(matcher.audit_many([(u, categories) for u in units], "java_web"))
-        flagged = [(u, h.vuln_type) for u, hs in zip(units, results)
-                   for h in hs if h.property_missing]
+        # 按入口聚合待判类目，避免同一入口被拆成多次调用
+        by_unit: dict[str, tuple] = {}
+        for u, c in pending:
+            prev = by_unit.get(u.unit_name)
+            by_unit[u.unit_name] = (u, [c]) if prev is None else (u, prev[1] + [c])
+        batch = list(by_unit.values())
+        results = asyncio.run(matcher.audit_many(batch, "java_web"))
+        pairs = {u.unit_name: (u, cs) for u, cs in batch}
+        for (u, cs), hs in zip(batch, results):
+            if not hs:
+                # 空结果 = 该入口所有类目都没走完，视为调用失败而非"无漏洞"
+                failed += [(u, c) for c in cs]
+                continue
+            got = {h.vuln_type for h in hs if h.property_missing}
+            model_flagged += [(u, c) for c in cs if c in got]
+
+    flagged = [(u, c) for (name, c), v in decided.items() if v
+               for u in units if u.unit_name == name] + model_flagged
 
     print(f"      命中 {len(flagged)} 处")
+    if failed:
+        print(f"      [警告] {len(failed)} 项判定失败（不计为无漏洞，需重跑）："
+              f"{', '.join(f'{u.unit_name}:{c}' for u, c in failed[:5])}"
+              f"{' ...' if len(failed) > 5 else ''}")
 
     print(f"[4/4] 写报告 ...")
     lines = [f"# nexus-audit Java 扫描报告", "",
              f"- 目标仓库：`{repo}`",
              f"- 审计入口：{len(units)}",
+             f"- 规则直接判定：{len(decided)} 项（命中 {sum(decided.values())}）",
+             f"- 交模型判定：{len(pending)} 项（命中 {len(model_flagged)}）",
+             f"- **判定失败：{len(failed)} 项**" if failed else "- 判定失败：0",
              f"- 命中：{len(flagged)}", ""]
     for u, cat in flagged:
         lines += [f"## [{cat.upper()}] {u.unit_name}",
                   f"- 位置：`{u.file_path}:{u.start_line}`",
                   f"- 路由：{', '.join(u.decorators_or_modifiers)}", ""]
+    if failed:
+        lines += ["## 判定失败（需重跑，不是无漏洞）", ""]
+        for u, c in failed:
+            lines.append(f"- `{u.unit_name}` / {c} @ `{u.file_path}:{u.start_line}`")
     out = Path(args.output or "report_java.md")
     out.write_text("\n".join(lines), encoding="utf-8")
     print(f"\n完成：报告已写入 {out}")
@@ -193,18 +246,383 @@ def cmd_scan_web3(args, repo: Path):
 
 
 def cmd_pr_scan(args):
-    """GitHub PR 增量扫描：仅解析 git diff 影响的文件中的路由与调用链。"""
-    diff = subprocess.run(["git", "diff", "--name-only", args.base, "HEAD"],
+    """PR 增量扫描：只审计受 git diff 影响的路由。
+
+    为什么不能只列文件名：一个 `SecurityUtil.checkURL()` 的改动会影响所有
+    调用它的路由，而调用关系是**反向**的（改的是被调方，风险在调用方）。
+    所以这里做三件事：
+      1. 从 diff 取出变更文件与变更函数名
+      2. 在全量切片里找"直接位于变更文件中的入口"（hot）
+      3. 再找"调用了变更函数的入口"（dependent）—— 这是漏报最容易发生的地方
+
+    注意：只扫 `.py` 是旧实现的遗留限制，Java 赛道同样要覆盖，否则改了
+    Controller 却报"无变更，跳过"。
+    """
+    repo = Path(args.repo or ".").resolve()
+    # git 命令必须在**被审计仓库**里执行。否则 `--repo /tmp/target`
+    # 会读到当前工作目录（引擎自己）的 diff，把引擎改动当成目标仓库变更 ——
+    # 实测就是这么误报的。
+    diff = subprocess.run(["git", "-C", str(repo), "diff", "--name-only",
+                           args.base, "HEAD"],
                           capture_output=True, text=True)
-    changed = [l for l in diff.stdout.splitlines() if l.endswith(".py")]
-    print(f"PR 增量扫描：{len(changed)} 个 Python 文件变更（基于 {args.base}）")
+    if diff.returncode != 0:
+        print(f"[!] git diff 失败：{diff.stderr.strip()[:200]}")
+        print(f"    检查 `{repo}` 是否为 git 仓库、`{args.base}` 是否存在"
+              f"（可用 --base HEAD~1 或具体 commit）")
+        return
+    changed = [l.strip() for l in diff.stdout.splitlines() if l.strip()]
+    code_exts = (".py", ".java", ".kt", ".go", ".js", ".ts", ".sol")
+    changed = [f for f in changed if f.endswith(code_exts)]
+    print(f"PR 增量扫描：{len(changed)} 个代码文件变更（基于 {args.base}）")
     for f in changed:
         print(f"  - {f}")
     if not changed:
-        print("无 Python 变更，跳过")
+        print("无代码变更，跳过")
         return
-    # TODO(第4周): 将 changed 文件的调用链与全量符号表求交，仅审计受影响路由
-    print("提示：受影响路由过滤逻辑将在下一迭代接入 audit_repo(units_subset)")
+
+    # 变更函数名：用 diff 里被改动的行反推所属方法，避免整文件当成变更面
+    funcs = _changed_symbols(repo, args.base, changed)
+    if funcs:
+        print(f"  涉及的函数/方法：{', '.join(sorted(funcs)[:12])}"
+              f"{' ...' if len(funcs) > 12 else ''}")
+
+    repo = Path(args.repo or ".")
+    units = _slice_for_pr(repo, args.language)
+    if not units:
+        print("未发现在支持的赛道上可切的入口，跳过")
+        return
+    # 防呆：如果切出来几千个入口，说明 repo 指到了引擎自己或巨型仓库，
+    # 这时"受影响子集"的判定没有意义（引擎代码不是被审计目标）。
+    if len(units) > 2000:
+        print(f"[!] {repo} 切出 {len(units)} 个入口，疑似指向了引擎自身或过大的仓库。"
+              f"请用 --repo 指定**被审计的业务仓库**。")
+        return
+    print(f"  全量入口 {len(units)} 个，开始求受影响子集 ...")
+
+    hot, dependent = [], []
+    changed_set = {str(Path(f).as_posix()) for f in changed}
+
+    # 精确到"变更行落在哪个方法里"。只按文件判定会把同文件的所有路由
+    # 都算成受影响 —— Cors.java 里改 vuls2 一行，9 个路由全被拉进来，
+    # 增量扫描就退化成全量扫描了。
+    changed_methods = _changed_methods_of(repo, args.base, changed)
+
+    # 所有被改动的方法名（跨文件合并），供反向依赖使用。
+    # 注意不能只用 _changed_symbols()：它从 diff 文本抓签名，改动内容是
+    # `// patched` 这种注释时抓不到任何签名。_changed_methods_of() 是按
+    # 行号反查所属方法，更可靠，两者取并集。
+    changed_funcs: set[str] = set()
+    for v in changed_methods.values():
+        changed_funcs |= (v or set())
+    changed_funcs |= funcs
+
+    for u in units:
+        up = str(u.file_path).replace("\\", "/")
+        match_file = next((c for c in changed_set if up.endswith(c) or c.endswith(up)), None)
+        if match_file:
+            meths = changed_methods.get(match_file)
+            if meths is None:
+                hot.append(u)          # 拿不到方法级信息，退回文件级（宁多不漏）
+                continue
+            if u.unit_name.split(".")[-1] in meths:
+                hot.append(u)
+            continue
+        # 2) 入口调用了变更函数 —— 反向依赖。
+        #    这是增量扫描真正的价值所在：改一个 SecurityUtil.checkURL，
+        #    所有调用它的路由都可能受影响，而改动文件本身一个入口都没有。
+        called = set(getattr(u, "called_symbols", []) or [])
+        if changed_funcs and called & changed_funcs:
+            dependent.append(u)
+
+    # 3) 装配级反向依赖：改动的函数被某个 Filter / Interceptor / CorsProcessor
+    #    调用，而该组件作用于一批路由 —— 这些路由全部受影响。
+    #    只做方法级调用链会漏掉这一层：改 SecurityUtil.checkURL，入口直接调它的
+    #    只有 4 条，但 OriginFilter / ReferFilter / CustomCorsProcessor 都调它，
+    #    它们保护的路由同样受影响，而这层关系只存在于框架装配里。
+    wired = _wiring_dependents(repo, changed_funcs, units, {u.unit_name for u in hot + dependent})
+    dependent += wired
+
+    print(f"  直接变更的入口 {len(hot)} 个；反向依赖命中 {len(dependent)} 个")
+
+    subset = hot + dependent
+    if not subset:
+        print("无受影响路由，本次 PR 无需审计")
+        return
+
+    if args.dry_run:
+        lines = ["# PR 增量扫描：受影响路由（dry-run）", "",
+                 f"- 基线：`{args.base}`",
+                 f"- 变更文件：{len(changed)}",
+                 f"- 受影响入口：{len(subset)}", ""]
+        for u in hot:
+            lines.append(f"- [变更文件] `{u.unit_name}` @ `{u.file_path}:{u.start_line}`")
+        for u in dependent:
+            lines.append(f"- [反向依赖] `{u.unit_name}` @ `{u.file_path}:{u.start_line}`")
+        out = Path(args.output or "report_pr.md")
+        out.write_text("\n".join(lines), encoding="utf-8")
+        print(f"\n完成（dry-run）：受影响路由已写入 {out}")
+        return
+
+    # 真正进入审计：复用 scan 的规则前置 + 模型两步法
+    ns = argparse.Namespace(
+        repo_path=str(repo), offline=args.offline, web3=False, java=True,
+        categories=args.categories, model=args.model, concurrency=args.concurrency,
+        output=args.output or "report_pr.md", python=None, _units=subset)
+    print("\n进入审计（仅上述受影响路由）...")
+    cmd_scan_java(ns, repo)
+
+
+def _changed_symbols(repo: Path, base: str, files: list[str]) -> set[str]:
+    """从 diff 的新增/删除行里反推被改动的函数名。
+
+    不做完整语法解析，只抓"变更行附近最近的方法签名"。够用于
+    「这次改动影响了哪些方法」这种粗粒度判断；误报方向是多抓，
+    宁可多审计一个入口也不要漏。"""
+    funcs: set[str] = set()
+    for f in files:
+        r = subprocess.run(["git", "-C", str(repo), "diff", "-U15", base, "HEAD", "--", f],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            continue
+        for ln in r.stdout.splitlines():
+            if not ln.startswith(("+", "-")) or ln.startswith(("+++", "---")):
+                continue
+            s = ln[1:]
+            for pat in (
+                r"\bdef\s+(\w+)\s*\(",                        # python
+                r"\b(?:public|private|protected)\s[\w<>\[\],\s]+\s+(\w+)\s*\(",  # java
+                r"\bfunction\s+(\w+)\s*\(",                   # solidity/js
+                r"\bfunc\s+(?:\([^)]*\)\s*)?(\w+)\s*\(",      # go
+            ):
+                for m in re.finditer(pat, s):
+                    if m.group(1) not in {"if", "for", "while", "switch", "catch"}:
+                        funcs.add(m.group(1))
+    return funcs
+
+
+_HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", re.M)
+_METHOD_SIG_RE = re.compile(
+    r"^\s*(?:(?:public|private|protected|static|final|abstract|synchronized|native)\s+)*"
+    r"(?:[\w<>\[\],.?\s]+\s+)?(\w+)\s*\([^;{]*\)\s*(?:throws\s+[\w.,\s]+)?\{",
+    re.M)
+
+
+def _changed_methods_of(repo: Path, base: str, files: list[str]) -> dict[str, set[str] | None]:
+    """返回 {变更文件相对路径: 受影响的函数名集合}；None 表示解析不出、退回文件级。
+
+    做法：解析 unified diff 的 hunk 头拿到"变更起点在新文件中的行号"，
+    再在**当前工作区文件**里查这一行落在哪个方法体内。
+    之所以不靠 diff 的上下文行抓签名：`+int patched = 1;` 这种改动
+    周围 3 行内可能一个签名都没有，抓不到就只能退回文件级，
+    结果一个文件的全部路由都被当成受影响。
+    """
+    out: dict[str, set[str] | None] = {}
+    for f in files:
+        r = subprocess.run(["git", "-C", str(repo), "diff", "-U3", base, "HEAD", "--", f],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            out[f] = None
+            continue
+        starts = _added_line_numbers(r.stdout)
+        if not starts:
+            out[f] = None
+            continue
+        try:
+            src = (repo / f).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            out[f] = None
+            continue
+        names: set[str] = set()
+        ok = False
+        for ln in starts:
+            n = _method_at_line(src, ln)
+            if n:
+                names.add(n)
+                ok = True
+        out[f] = names if ok else None
+    return out
+
+
+def _method_at_line(src: str, line_no: int) -> str | None:
+    """找出第 line_no 行（1-based）属于哪个方法。
+
+    从该行**往前**扫，用花括号收支判断"什么时候走出了方法体"：
+    向前看时，`}` 表示"我在这个块外面"（+1），`{` 表示"我进了这个块"（-1）。
+    当收支回到 <=0 时遇到的第一个方法签名，就是所属方法。
+    这个方向不能反：反过来会让上一行的方法（vuls1）把下一行抢走。
+    """
+    lines = src.splitlines()
+    if not (1 <= line_no <= len(lines)):
+        return None
+    depth = 0
+    for i in range(min(line_no, len(lines)) - 1, -1, -1):
+        s = lines[i]
+        # 先看签名（当前行就是签名行时 depth 才是 0），再更新收支
+        m = _METHOD_SIG_RE.match(s)
+        if m and depth <= 0:
+            name = m.group(1)
+            if name not in {"if", "for", "while", "switch", "catch",
+                            "synchronized", "try", "else"}:
+                return name
+        depth += s.count("}") - s.count("{")
+        if depth < -2:
+            break
+    return None
+
+
+def _wiring_dependents(repo: Path, changed_funcs: set[str], units, already: set[str]) -> list:
+    """找出受"被改动的全局组件"影响的入口。
+
+    路径：变更函数 → 哪个 Filter/Processor 调了它 → 该组件作用于哪些 URL
+         → 这些 URL 对应的入口。
+    用 framework_wiring 的 URL→组件映射做反查，避免再造一套 Filter 解析。
+    """
+    if not changed_funcs:
+        return []
+    try:
+        from core.context.framework_wiring import FrameworkWiringResolver
+    except Exception:
+        return []
+    try:
+        fw = FrameworkWiringResolver(repo)
+        comps = fw.wiring
+    except Exception:
+        return []
+
+    # 哪些组件的代码里调用了变更函数
+    dirty = []
+    for w in comps:
+        body = getattr(w, "body", "") or ""
+        if not body:
+            continue
+        if any(re.search(rf"\b{re.escape(f)}\s*\(", body) for f in changed_funcs):
+            dirty.append(w)
+    if not dirty:
+        return []
+
+    # 每个入口的路由 → 是否被 dirty 组件覆盖
+    out = []
+    # 把"作用于全部路由"的组件单独摘出来：它一旦命中，受影响的确实是全部路由，
+    # 但那不是"精确增量"，而应提示走全量回归。同时**不能**因此丢弃
+    # 其它精确组件的命中 —— 否则 CustomCorsProcessor 那一条就白算了。
+    global_comps = [w.name for w in dirty
+                    if any(p in ("/*", "/**", "*", "**") for p in (w.url_patterns or []))]
+    precise = [w for w in dirty if w.name not in global_comps]
+
+    for u in units:
+        if u.unit_name in already:
+            continue
+        url = _route_of_unit(u)
+        if not url:
+            continue
+        if any(_ant_match_simple(p, url) for w in precise for p in (w.url_patterns or [])):
+            out.append(u)
+
+    if global_comps:
+        print(f"  [提示] 改动同时命中全局组件 {', '.join(sorted(set(global_comps)))}"
+              f"（urlPatterns=/*），理论上影响全部路由；"
+              f"上方只列出精确命中的 {len(out)} 条，建议对全局组件覆盖范围做全量回归。")
+    return out
+
+
+def _route_of_unit(u) -> str:
+    """取出**完整**路由 = 类级 @RequestMapping 前缀 + 方法级路径。
+
+    必须带类前缀：framework_wiring 里的 urlPatterns 是完整 URL
+    （`/cors/sec/httpCors`），而切片里 annotations 只记方法级路径
+    （`/sec/httpCors`）。不拼前缀就永远匹配不上，装配级反向依赖全部失效。
+    """
+    route = (u.decorators_or_modifiers[0] if getattr(u, "decorators_or_modifiers", None) else "")
+    m = re.search(r'"([^"]*)"', route)
+    method_path = m.group(1) if m else ""
+
+    prefix = ""
+    try:
+        lines = Path(u.file_path).read_text(encoding="utf-8", errors="ignore").splitlines()
+        # 先定位**类声明行**，再往上找它的注解。
+        # 直接向上扫 @RequestMapping 会拿到上一个方法的注解：
+        # Cors.java 里 `@RequestMapping("/sec/corsFilter")` 就在相邻方法上，
+        # 结果拼出 `/sec/corsFilter/sec/checkOrigin` 这种不存在的路由。
+        cls_line = None
+        for i in range(min(u.start_line - 1, len(lines)) - 1, -1, -1):
+            if re.search(r"^\s*(?:public\s+|final\s+|abstract\s+)*(?:class|interface|enum)\s+\w+",
+                         lines[i]):
+                cls_line = i
+                break
+        if cls_line is not None:
+            for i in range(cls_line, max(cls_line - 12, -1), -1):
+                cm = re.search(r'@RequestMapping\s*\(\s*(?:value\s*=\s*)?"([^"]*)"', lines[i])
+                if cm:
+                    prefix = cm.group(1)
+                    break
+    except (OSError, AttributeError):
+        pass
+
+    if not prefix:
+        return method_path
+    if not method_path:
+        return prefix
+    return prefix.rstrip("/") + "/" + method_path.lstrip("/")
+
+
+def _ant_match_simple(pattern: str, url: str) -> bool:
+    """轻量 ant 匹配，与 framework_wiring._ant_match 语义一致（宁多不少）。"""
+    import fnmatch
+    if pattern in ("/*", "/**", "*", "**"):
+        return True
+    if pattern == url:
+        return True
+    rx = re.escape(pattern).replace(r"\*\*", "\x00").replace(r"\*", "[^/]*")
+    rx = rx.replace("\x00", ".*")
+    return re.fullmatch(rx, url) is not None
+
+
+def _added_line_numbers(diff_text: str) -> list[int]:
+    """从 unified diff 里取出所有**新增/删除行**在新文件中的行号。
+
+    必须逐行跟踪，不能只用 hunk 头。hunk 头 `@@ -32,6 +32,7 @@` 的 `+32`
+    是**上下文起始行**，真正被改的那一行可能是 32+3=35。
+    只听 hunk 头会落到上一个方法末尾的空白行上，方法定位直接失效 ——
+    实测就是这样把 vuls2 的改动算到了 vuls1 头上。
+    """
+    out: list[int] = []
+    cur, in_hunk = 0, False
+    for ln in diff_text.splitlines():
+        m = _HUNK_RE.match(ln)
+        if m:
+            cur, in_hunk = int(m.group(1)), True
+            continue
+        if not in_hunk or ln.startswith(("+++", "---")):
+            continue
+        if ln.startswith("+"):
+            out.append(cur)
+            cur += 1
+        elif ln.startswith("-"):
+            out.append(cur)          # 删除行在当前游标处生效
+        elif ln[:1] in (" ", ""):
+            cur += 1
+        else:
+            in_hunk = False
+    return out
+
+
+def _slice_for_pr(repo: Path, language: str):
+    """按语言选切片器；auto 时先试 Java 再试 Python。"""
+    lang = (language or "auto").lower()
+    units = []
+    if lang in ("auto", "java"):
+        try:
+            from core.slicer.java_servlet import JavaSlicer
+            units = JavaSlicer(repo).extract_entry_units()
+        except Exception:
+            units = []
+    if not units and lang in ("auto", "py", "python"):
+        try:
+            from core.slicer.flask_routes import FlaskRouteSlicer
+            units = FlaskRouteSlicer().extract_entry_units(repo)
+        except Exception:
+            units = []
+    return units
 
 
 def load_dotenv(path: str | Path = ".env") -> None:
@@ -236,7 +654,18 @@ def main():
     p_scan.add_argument("--output", default=None, help="报告输出路径")
     p_scan.add_argument("--python", default=None, help="PoC 执行使用的 Python 解释器")
     p_pr = sub.add_parser("pr-scan", help="PR 增量扫描（仅 git diff 影响的调用链）")
-    p_pr.add_argument("--base", default="origin/main")
+    p_pr.add_argument("--base", default="origin/main", help="diff 基线，如 origin/main 或 HEAD~1")
+    p_pr.add_argument("--repo", default=".", help="仓库根目录（默认当前目录）")
+    p_pr.add_argument("--language", default="auto", choices=["auto", "java", "python"],
+                      help="目标语言；auto 时先试 Java 再试 Python")
+    p_pr.add_argument("--categories", default=None,
+                      help="漏洞类目，逗号分隔（默认 OWASP 11 类）")
+    p_pr.add_argument("--model", default=None, help="指定模型名")
+    p_pr.add_argument("--concurrency", type=int, default=4, help="LLM 并发数")
+    p_pr.add_argument("--offline", action="store_true", help="离线模式（不调用 LLM）")
+    p_pr.add_argument("--dry-run", action="store_true",
+                      help="只列出受影响路由，不做审计")
+    p_pr.add_argument("--output", default=None, help="报告输出路径")
     args = parser.parse_args()
     if args.command == "scan":
         cmd_scan(args)
