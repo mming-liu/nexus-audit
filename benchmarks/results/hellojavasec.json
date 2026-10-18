@@ -7,9 +7,9 @@
     "route": 6,
     "apiop": 59
   },
-  "rule_decided": 56,
-  "rule_correct": 55,
-  "rule_none": 9,
+  "rule_decided": 57,
+  "rule_correct": 56,
+  "rule_none": 8,
   "disputed_truth": [
     {
       "unit": "XMLDecoderVul.safe",
@@ -37,8 +37,8 @@
     },
     "ssrf": {
       "n": 4,
-      "decided": 1,
-      "correct": 1
+      "decided": 2,
+      "correct": 2
     },
     "pathtraver": {
       "n": 4,
@@ -91,12 +91,6 @@
       "category": "ssrf",
       "real_vuln": true,
       "route": "/URLConnection/vul2"
-    },
-    {
-      "unit": "SSRF.URLConnection3",
-      "category": "ssrf",
-      "real_vuln": false,
-      "route": "/URLConnection/safe"
     },
     {
       "unit": "Traversal.safe2",

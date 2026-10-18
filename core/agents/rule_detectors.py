@@ -1276,10 +1276,90 @@ def ssrf_verdict(source: str) -> bool | None:
     # 一味判 True 就是"没见过的一律算漏洞"，换项目必然误报爆炸。
     #
     # 判断依据：入口里出现了针对 url 的校验性调用，且我们没识别出它的性质。
-    # 这类样本退回 None，交给模型结合跨文件证据判断。
+    # 这类样本退回 None，交给模型结合跨文件证据判断 —— 但**先自己去看一眼**
+    # 实现体在不在切片里（见 `_ssrf_helper_nature`）。
     if _has_unknown_url_guard(body):
+        nat = _ssrf_helper_nature(body, _sibling_methods(source))
+        if nat is not None:
+            return nat
         return None
     return True
+
+
+# SSRF 的黑白名单之争，在实现体里有**语法级**的区别，不需要语义推断：
+#
+#   白名单（值集合）      `url_list.contains(host)` / `WHITE.contains(domain)`
+#                        → 把 host 拿去和一组字符串比对，不在集合里就拒
+#   黑名单（文本形态）    `Pattern.compile("^(127\\.0\\.0\\.1)|(localhost)|...")`
+#                        `matcher.find()` / `matches()`
+#                        → 拦的是"像内网地址的字符串"，可被 0x7f.1 / 十进制 IP /
+#                          短域名 / DNS 重绑定绕过（Hello-Java-Sec 的
+#                          `URLConnection2` 与 `URLConnection3` 就是这对样本）
+#
+# 判据因此很干脆：读到的实现里**有没有一份字符串集合 + contains/indexOf**。
+# 有 → 值级白名单 → safe。只有正则匹配 → 黑名单 → vuln（这条能判 True，
+# 与 cmdi/pathtraver 不同：那边"够不够严"是开放问题；这边**正则匹配 IP 段
+# 必然可绕**是有确定答案的，靶场也给出了 vul/safe 对照样本）。
+_SSRF_HELPER_ALLOW_RE = re.compile(
+    r"\b\w*(?:list|set|map|white|allow|permit|domain|hosts?|urls?|trusted)\w*"
+    r"\s*\.\s*(?:contains|indexOf)\s*\(\s*\w+\s*\)|"
+    r"\.\s*add\s*\(\s*\"[^\"]+\"\s*\)\s*;?", re.I)
+_SSRF_HELPER_DENY_RE = re.compile(
+    r"Pattern\s*\.\s*compile\s*\(|"
+    r"\.\s*matcher\s*\(|"
+    r"\.\s*matches\s*\(\s*\"[^\"]*[\\(\[\|]", re.I)
+# 只限定协议的方法（isHttp）不是 SSRF 防护，读到时不能当成白名单证据
+_SSRF_PROTOCOL_ONLY_RE = re.compile(
+    r"startsWith\s*\(\s*\"https?(:?//)?\"|getProtocol\s*\(\s*\)\s*\.\s*equals", re.I)
+
+
+def _ssrf_helper_nature(body: str, sib: str) -> bool | None:
+    """入口调了认不出的 URL 校验，去辅助段读实现体判性质。
+
+    返回 False=safe（值级域名白名单）、None=规则不该下结论。
+
+    **不敢返回 True**，和 `_helper_guard_nature()` 同理，虽然理由不同：
+
+    我一度认为"用正则匹配 IP 段拦内网一定可绕"是确定命题，据此判 True。
+    Hello-Java-Sec 立刻给出反例 —— 同一个 `Security.isIntranet(ip)`：
+
+        URLConnection2      if (isIntranet(urltoIp(url)))  → 真值 vul（标"绕过"）
+        HTTPURLConnection   ip = urltoIp(url); if (isIntranet(ip)) → 真值 safe
+
+    两条调的是同一个函数、同一个参数来源，只是内联还是先赋中间变量，
+    作者一处标 vul 一处标 safe。这说明真值口径本身不是"这个校验够不够严"，
+    还掺了别的因素（样本想演示的是不同客户端/不同绕过姿势）。
+
+    规则手里能核对的只有"拦的是值集合还是正则"，而这个事实**不足以**
+    区分上面两条。那就只能是 None —— 拿到一个不能推出结论的事实，
+    不能当成结论用（第 5 条）。
+
+    能确认的只剩白名单：拦截的是 host 字符串集合（`list.contains(host)`），
+    不在集合里直接拒 —— 这是"值的集合"，攻击者构造不出集合外的合法 host。
+    """
+    if not sib:
+        return None
+    names = {n for n in re.findall(r"\b([A-Za-z_]\w*)\s*\(", body)
+             if n not in {"if", "else", "while", "return", "new", "catch"}}
+    if not names:
+        return None
+    hit_allow = False
+    for name in names:
+        for m in re.finditer(r"\b" + re.escape(name) + r"\s*\([^)]*\)\s*\{", sib):
+            depth, end = 1, len(sib)
+            for i in range(m.end(), len(sib)):
+                if sib[i] == "{":
+                    depth += 1
+                elif sib[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = i
+                        break
+            impl = sib[m.end(): end]
+            if _SSRF_HELPER_ALLOW_RE.search(impl) and \
+                    not _SSRF_HELPER_DENY_RE.search(impl):
+                hit_allow = True
+    return False if hit_allow else None
 
 
 # 可能承载"URL 合法性校验"的调用形态。命中即认为存在未识别的防护。

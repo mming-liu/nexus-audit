@@ -715,6 +715,49 @@ public static boolean checkOs(String content) {
 check("辅助段黑名单循环（content.contains(s)）→ 不判漏洞，退回模型",
       _verdict("cmdi", _CMD_BLACKLIST_LOOP), None)
 
+# ssrf：读辅助段实现体，只有"host 字符串集合"能判 safe。
+# 正则匹配 IP 段不能判 vul —— Hello-Java-Sec 里同一个 isIntranet，
+# 内联写法标 vul、先赋中间变量标 safe，规则的事实支点区分不了这两条。
+_SSRF_WL = '''public String URLConnection3(String url) {
+    if (!Security.isHttp(url)) {
+        return "no";
+    } else if (!Security.isWhite(url)) {
+        return "非可信域名！";
+    } else {
+        return HttpClientUtils.URLConnection(url);
+    }
+}
+
+// ---- 跨文件证据：isWhite() 的接口实现类方法体 @ Security.java ----
+public static boolean isWhite(String url) {
+    List<String> url_list = new ArrayList<String>();
+    url_list.add("baidu.com");
+    URI uri = new URI(url);
+    String host = uri.getHost().toLowerCase();
+    return url_list.contains(host);
+}'''
+check("辅助段读到 host 值集合白名单 → 判 safe",
+      _verdict("ssrf", _SSRF_WL), False)
+
+_SSRF_REGEX = '''public String URLConnection2(String url) {
+    if (!Security.isHttp(url)) {
+        return "no";
+    } else if (Security.isIntranet(Security.urltoIp(url))) {
+        return "不允许访问内网!!!";
+    } else {
+        return HttpClientUtils.URLConnection(url);
+    }
+}
+
+// ---- 跨文件证据：isIntranet() 的接口实现类方法体 @ Security.java ----
+public static boolean isIntranet(String ip) {
+    Pattern reg = Pattern.compile("^(127\\\\.0\\\\.0\\\\.1)|(localhost)|^(10\\\\.\\\\d{1,3})");
+    Matcher match = reg.matcher(ip);
+    return match.find();
+}'''
+check("辅助段只有正则 IP 段匹配 → 不能判 vul，退回模型",
+      _verdict("ssrf", _SSRF_REGEX), None)
+
 print("\n[20] MyBatis 注解解析边界")
 from core.context.java_impl_resolver import (  # noqa: E402
     JavaImplResolver, MYBATIS_ANNO_CONCAT)
