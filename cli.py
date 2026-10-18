@@ -78,7 +78,12 @@ def cmd_scan(args):
         matcher = OfflineMatcher()
         hypotheses = asyncio.run(matcher.audit_repo(units))
     else:
-        matcher = ScenarioMatcher(router=TwoTierRouter())  # 走真实 LLM API（.env 配置 OpenCode）
+        # 免费模型优先：探测 FREE_CANDIDATES，全不可用再走付费降级链
+        from core.agents.model_selector import auto_select_and_print
+        tier1_model = auto_select_and_print(tier=1)
+        tier1 = TwoTierRouter()
+        tier1.tier1.model = tier1_model
+        matcher = ScenarioMatcher(router=tier1)
         hypotheses = asyncio.run(matcher.audit_repo(units))
     if hypotheses and isinstance(hypotheses[0], list):
         hypotheses = [h for sub in hypotheses for h in sub]
