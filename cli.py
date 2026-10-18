@@ -15,6 +15,7 @@ import asyncio
 import subprocess
 from pathlib import Path
 
+from core.agents.router import TwoTierRouter
 from core.agents.scenario_matcher import ScenarioMatcher
 from core.agents.skeptic_reviewer import SkepticReviewer
 from core.context.tool_handlers import run_context_loop
@@ -77,8 +78,8 @@ def cmd_scan(args):
         matcher = OfflineMatcher()
         hypotheses = asyncio.run(matcher.audit_repo(units))
     else:
-        matcher = ScenarioMatcher()  # 走真实 LLM API（需配置 LLM_* 环境变量）
-        hypotheses = matcher.audit_repo(units)
+        matcher = ScenarioMatcher(router=TwoTierRouter())  # 走真实 LLM API（.env 配置 OpenCode）
+        hypotheses = asyncio.run(matcher.audit_repo(units))
     if hypotheses and isinstance(hypotheses[0], list):
         hypotheses = [h for sub in hypotheses for h in sub]
     hypotheses = [h for h in hypotheses if h.property_missing]
@@ -89,7 +90,7 @@ def cmd_scan(args):
         skeptic = SkepticReviewer(llm=lambda p: '{"rejected": false, "reason": "offline 模式默认放行进入沙箱"}')
         kept = asyncio.run(skeptic.filter_false_positives(hypotheses))
     else:
-        kept = asyncio.run(SkepticReviewer().filter_false_positives(hypotheses))
+        kept = asyncio.run(SkepticReviewer(router=TwoTierRouter()).filter_false_positives(hypotheses))
     print(f"      保留 {len(kept)} 个假设进入沙箱")
 
     print(f"[5/5] 沙箱动态验证 ...")
@@ -146,7 +147,21 @@ def cmd_pr_scan(args):
     print("提示：受影响路由过滤逻辑将在下一迭代接入 audit_repo(units_subset)")
 
 
+def load_dotenv(path: str | Path = ".env") -> None:
+    """极简 .env 加载（不覆盖已有环境变量）。"""
+    import os
+    p = Path(path)
+    if not p.exists():
+        return
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
+
+
 def main():
+    load_dotenv(Path(__file__).resolve().parent / ".env")
     parser = argparse.ArgumentParser(prog="nexus-audit", description="AI 自动化漏洞挖掘审计框架")
     sub = parser.add_subparsers(dest="command", required=True)
     p_scan = sub.add_parser("scan", help="全量扫描目标仓库")

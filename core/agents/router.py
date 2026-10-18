@@ -32,19 +32,26 @@ class OpenAICompatClient:
     """OpenAI 兼容 API 异步客户端。"""
 
     def __init__(self, base_url: str | None = None, model: str | None = None,
-                 api_key: str | None = None, timeout: float = 120.0):
+                 api_key: str | None = None, timeout: float = 120.0,
+                 extra_headers: dict[str, str] | None = None):
         self.base_url = (base_url or os.getenv("LLM_BASE_URL", "http://localhost:8000/v1")).rstrip("/")
         self.model = model or os.getenv("LLM_MODEL", "qwen3-coder")
         self.api_key = api_key or os.getenv("LLM_API_KEY", "EMPTY")
         self.timeout = timeout
+        # OpenCode Go 平面要求：稳定会话头 + 真实 User-Agent（官方使用规范）
+        self.extra_headers = extra_headers or {
+            "x-opencode-session": os.getenv("LLM_SESSION_ID", "nexus-audit-fixed-session"),
+            "User-Agent": os.getenv("LLM_USER_AGENT", "nexus-audit/1.0"),
+        } if os.getenv("LLM_BASE_URL", "").endswith("/go/v1") or "opencode" in os.getenv("LLM_BASE_URL", "") else (extra_headers or {})
 
     async def chat(self, messages: list[dict[str, str]], temperature: float = 0.0) -> str:
         if httpx is None:
             raise RuntimeError("httpx 未安装：pip install httpx")
+        headers = {"Authorization": f"Bearer {self.api_key}", **self.extra_headers}
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.post(
                 f"{self.base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {self.api_key}"},
+                headers=headers,
                 json={"model": self.model, "messages": messages,
                       "temperature": temperature, "max_tokens": 4096},
             )
