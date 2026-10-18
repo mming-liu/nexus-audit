@@ -258,6 +258,9 @@ sqli 有 MyBatis `#{}` / `${}` 的**确定性规则**兜底，cors/spel/deserial
    确实是作者写明的漏洞入口，`SSRF.openStream` 方法体确实是
    `new URL(url).openStream()` 无任何校验），**没有出现批量误判**。
    但真正的泛化能力要靠换项目验证，不能靠这一个靶场。
+   **已换（Hello-Java-Sec，零改动迁移）：正确答案只有 75.8%，不是 100%。**
+   详见第九节 —— 那一节把这一个数字拆成了"覆盖率"与"正确率"两件事，
+   并列出四类在同源样本上永远暴露不出来的规则缺陷。
 
 **v6 为什么把覆盖数从 64 降到 63。** 外部审计指出 `ssrf_verdict` 的兜底分支
 过宽：只要方法体里有请求 sink、没挂 hook，就返回"有漏洞"，连它没识别出的
@@ -594,3 +597,202 @@ python benchmarks/ab_votes.py ab_votes3a ab_votes3b      # → 13.6%，成本 ×
 
 结果：`benchmarks/results/javaseccode_v3.jsonl`、`benchmarks/results/stability.log`、
 `benchmarks/results/ab_votes{1,3}.jsonl`（与 `v1_run2` / `v3_run2` 构成两轮对照）
+
+## 九、换一个项目建设：Hello-Java-Sec 零改动迁移
+
+这一节回答前面一直悬着的问题：**63/63 和 Score 1.000 是不是过拟合？**
+
+之前的规则全部是在 `java-sec-code` 上做出来的 —— 同一个作者、同一套命名
+（`/vuln` vs `/sec`）、同一批工具类（`SecurityUtil`、`sqlFilter`）。
+在这样的样本上做到 1.000，只说明"规则记住了这个项目的写法"，不说明
+"规则识别的是通用的安全事实"。要区分这两件事，只能换一个项目，**一行正则都
+不改**再跑一遍。
+
+选的是 [`j3ers3/Hello-Java-Sec`](https://github.com/j3ers3/Hello-Java-Sec)：
+同为 Spring Boot 教学靶场、同样覆盖全部八类，但作者不同、路由命名不同
+（`/vul` `/safe`）、工具类不同、部分类目用了完全不同的 API
+（JdbcTemplate、ValidatingObjectInputStream、ESAPI codec）。
+
+### 9.1 真值怎么来（不猜、不硬凑）
+
+该靶场作者也标了两处：
+
+| 来源 | 形态 | 覆盖 |
+|---|---|---|
+| `@ApiOperation` | `value = "vul：XMLReader"` / `"safe：检测是否包含外部实体"` | 59 条 |
+| 路由 / 方法名 | `/vul1`、`/safe/order`、`corsVul`、`processbuilderSafe` | 6 条 |
+
+**坑**：切片器的 `decorators_or_modifiers` 只保留**路由**注解，
+`@ApiOperation` 在构造 `CodeUnit` 时就被丢掉了。第一版真值提取因此只拿到
+53 条、XXE 只剩 1 条（8 个 XXE 方法的路由都不含 vul/safe 字样）。
+必须回读源文件。
+
+第二个坑更隐蔽：`start_line` 指向**第一个注解行**，不是 `public` 声明行。
+按 `lines[:start-1]` 开窗口会差一位，读到**上一个方法**的注解 —— 表现为
+一批"路由写 /safe、注解写 vul"的假冲突。修法是带边界向上扫，遇到 `}`
+或另一个成员声明就停。
+
+最终：128 个入口 → 65 条有人工真值，3 条两处标注都判不出、排除出计算。
+
+### 9.2 第一轮：零改动迁移（铁律：不改任何正则）
+
+| 指标 | 数值 |
+|---|---|
+| 有人工真值样本 | 65 |
+| 规则直接给出结论 | 33（覆盖率 **50.8%**） |
+| 其中判错 | **8 条**（4 误报 + 4 漏报） |
+| 规则正确率 | 25/33 = **75.8%** |
+| 退回模型 | 32（52.3%） |
+
+对比同源靶场：覆盖率 50.8% vs 94%，正确率 75.8% vs 100%。
+
+**这就是答案：1.000 里有相当一部分是过拟合。** 但更有价值的是这 8 条错法 ——
+它们不是"参数没调好"，而是四类**在 java-sec-code 上永远暴露不出来**的缺陷。
+
+### 9.3 四类缺陷，逐条核实
+
+**① 规则读了注释里的"修复写法"（4 条里的 3 条）**
+
+```java
+public String XMLReader(String content) {
+    XMLReader r = XMLReaderFactory.createXMLReader();
+    // 修复：禁用外部实体
+    // r.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+    r.parse(new InputSource(new StringReader(content)));   // 实际没有任何防护
+}
+```
+
+`XXE_NO_DOCTYPE_RE` 命中**注释里**的 `setFeature(..., true)`，判"已禁用
+DOCTYPE = 安全"。三条 XXE（XMLReader / SAXReader / SAXBuilder）全中。
+
+不是因为原规则写错，而是因为**规则读的是原始源码，包括注释**。
+模型侧我们一直强调"注释不算证据"（prompt 里写死了），规则侧却从来没做。
+java-sec-code 的作者恰好不写这种注释，所以 17/17 全对 —— 这个缺陷在
+同源样本上不可能被发现。
+
+修法：`entry_body()` 里剥注释（只剥入口体；证据块本身是用 `//` 渲染的代码，
+剥了会把证据删掉）。实现抽到 `core/text_utils.py`，与 `framework_wiring`
+共用同一份单遍词法扫描。
+
+**② 白名单判据绑死了函数名**
+
+```java
+boolean ok = Pattern.matches("^[a-zA-Z0-9]+$", name);   // 标准库全串匹配
+if (ok) { ... "select ... user = '" + name + "'" ... }
+```
+
+原判据要求"出现 `sqlFilter`/`checkSql`/`isValidOrder` 之一**且** 匹配
+`matches()`"，而这里函数名不在白名单里，于是白名单没被认出来，
+一路落到 `createStatement` + 拼接 → 误报。`.matches()` 在 Java 里
+**本身就是全串匹配**，不需要再看函数名。只需排除 `matches(".*")` 这种
+毫无约束力的写法。
+
+**③ 未知清洗函数被"兜底判漏洞"**
+
+```java
+String sql = "... id = '" + ESAPI.encoder().encodeForSQL(codec, id) + "'";
+```
+
+原逻辑：`createStatement` + 出现拼接 → `True`。但拼接的操作数不是裸变量，
+而是一个**我们不认识的清洗函数**。不认识不代表它没用 —— 这是"不确定"，
+必须 `return None`（第 15 条教训的第二个实例）。
+
+**④ `${}` 遇上数字类型参数，被当成注入**
+
+```java
+@Select("select * from users where id = ${id}")
+List<User> queryByIdAsInterger(@Param("id") Integer id);   // 作者判 safe
+```
+
+`${}` 是字符串替换没错，但参数声明成 `Integer`，Spring/MyBatis 在绑定阶段
+就解析成数字，`1 OR 1=1` 连绑定都过不了。这是**可逐行核对的事实**（看形参
+声明），不是语义推断。同理适用于 JDBC 的 `safe4(Integer id)`。
+
+顺带发现：`JdbcTemplate.queryForMap` 既不经过 `createStatement` 也不经过
+`prepareStatement`，原规则完全看不到这个 sink —— 这类样本直接掉进"未覆盖"。
+
+**⑤ 存储型 XSS 写库被判"链不闭合"**
+
+`taint_chain` 只按 cookie/session/request/model 配对，**数据库不在建模范围内**。
+`XSS.save` 把输入 `xssMapper.add(...)` 写库、另一个路由 `list()` 未编码回显，
+`reader` 必然为空 → 原逻辑返回 `False`（"链不闭合"）。真相是"我们没看数据库"。
+介质未建模时必须 `None`；但如果写入前有 `HtmlUtils.htmlEscape`，
+这是本方法内的可核对事实，可以直接判安全。
+
+### 9.4 第二轮：修完之后
+
+| 指标 | 第一轮（零改动） | 第二轮（修完 5 类） |
+|---|---|---|
+| 规则覆盖率 | 50.8%（33/65） | 50.8%（33/65） |
+| 规则正确率 | 25/33 = **75.8%** | 33/33 = **100.0%** |
+| 误报 | 4 | **0** |
+| 漏报 | 4 | **0** |
+
+同源靶场回归：java-sec-code 仍为 **63/63 全对，Score 1.000**，未退化。
+
+修完之后覆盖率没有上升（33→33），因为这 5 类都是"把错的结论改对"，
+不是"把不敢判的变成敢判"。唯一的净增是 JdbcTemplate（`safe4` 从 None 变 safe）。
+
+### 9.5 模型侧：规则退回的 32 条
+
+两个免费模型各跑一遍（`ScenarioMatcher`，带 `evidence_line` 核验，
+不投票、不接 Skeptic，只为看基线）：
+
+| 模型 | 有效 | 调用失败 | TPR | FPR |
+|---|---|---|---|---|
+| longcat-2.5-preview-free | 21 | 11 | 13/14 = 92.9% | 4/7 = 57.1% |
+| beam-free | 20 | 12 | 14/14 = 100% | 5/6 = 83.3% |
+
+**先说口径**：失败样本剔除，不计为"无漏洞"（同 OWASP 口径）。
+失败率 32%~38%，是免费模型在并发下的限流，样本量本来就小，
+这两个 FPR 只能当方向性参考，不能当结论。
+
+**但三次双模型一致误报值得单独交代**，我逐条核对了源码：
+
+| 样本 | 模型说 | 实际 | 性质 |
+|---|---|---|---|
+| `XMLDecoderVul.safe` | 有漏洞 | `path` 是类常量 `private final String path = "...payload3.xml"`，无外部输入 | **模型真错**：违反了自己的判据（要求外部输入可达） |
+| `GroovyVul.safe` | 有漏洞 | `safeCodeList.contains(cmd)` 精确白名单 | **模型真错**：漏看白名单 |
+| `ProcessBuilderVul.processbuilderSafe` | 有漏洞 | `Security.checkOs` 是**黑名单**（`| , & && ; ||`） | **真值可争议**：黑名单可绕（`$(...)`、换行），按我们自己的判据（黑名单不算防护）它并不安全 |
+
+所以"模型 FPR 高"这个数字里，至少有一条第 3 方因素是**靶场真值本身有问题**。
+这也是这份报告一直坚持的做法：**数字不好看时，先核对每一条，不要直接归因给模型**。
+
+### 9.6 这一节证明了什么、没证明什么
+
+**证明了**：
+
+1. **规则确实存在过拟合，且比例不小**。同源 100% → 异源 75.8%。
+   之前所有"Score 1.000"的表述都必须带上这个限定。
+2. **四类缺陷是结构性的，不是参数问题**。注释、函数名绑定、兜底判 True、
+   类型语义 —— 每一条都会在真实项目里重复出现，且都不报错、不留痕迹。
+3. **规则正确率可以做到 100%，但覆盖率只有 50%**。这两个数字必须分开报：
+   前者是"敢下结论时靠不靠得住"，后者是"能替模型分担多少"。
+   合成一个 Score 会把"不敢判"和"判错"混为一谈。
+
+**没证明**：
+
+- 覆盖率 50% 不代表引擎整体 50% —— 剩余 32 条要交模型，模型在异源样本上
+  FPR 明显偏高（57%~83%），端到端反而可能不如同源。**换项目的真实代价
+  主要在模型侧，不在规则侧。**
+- 两个靶场仍然都是教学靶场。真正的企业老项目（WebGoat 那类、无 vul/safe
+  命名、大量业务辅助类）还没测，切片器的抗噪能力仍未验证。
+- 65 条样本、32 条退回、11~12 条调用失败 —— 统计功效很弱，
+  这一节的结论是**方向性的**，不是精确指标。
+
+### 9.7 复现
+
+```bash
+# 靶场（约 4 MB）
+curl -sL -o hjs.zip https://codeload.github.com/j3ers3/Hello-Java-Sec/zip/refs/heads/master
+unzip -q hjs.zip -d reference_repos/
+
+# 规则侧（不调模型，秒级）
+python benchmarks/benchmark_hellojavasec.py --offline
+
+# 模型侧（只看规则退回的那批）
+python benchmarks/benchmark_hellojavasec.py --model longcat-2.5-preview-free --concurrency 4
+```
+
+结果：`benchmarks/results/hellojavasec.json`（规则侧）、
+`hellojavasec_<model>.json`（模型侧）

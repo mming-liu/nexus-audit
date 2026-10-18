@@ -124,6 +124,12 @@ python cli.py --help
 - [x] CI 集成：`--github-comment` 双通道输出 —— 行级 annotation 挂到 PR 的
       Files Changed 代码行下方，Markdown 报告写入 `$GITHUB_STEP_SUMMARY`
       渲染成看板（两个通道都**不需要 Token 权限**）。
+- [x] **换项目验证泛化（Hello-Java-Sec，零改动迁移）**：规则在同源靶场上是
+      63/63，换一个作者/命名/工具类后覆盖率降到 **47.7%**，规则侧正确率
+      **31/31**。首次盲测暴露 5 类规则缺陷（注释里的"修复写法"被当防护、
+      白名单判据绑死函数名、未知清洗函数被兜底判漏洞、`${}`+数字类型误报、
+      存储型 XSS 写库被判"链不闭合"），已全部修正并补进 smoke `[17]`。
+      详细数据见 `REAL_PROJECT_REPORT.md` 第九节。
 
 ### own_body 的使用边界（别越界）
 

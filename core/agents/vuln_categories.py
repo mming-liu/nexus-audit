@@ -35,11 +35,18 @@ class VulnCategory:
 CATEGORIES: dict[str, VulnCategory] = {
     "sqli": VulnCategory(
         key="sqli", display="SQL 注入", cwe="CWE-89",
-        sink_question=("函数是否把外部可控的字符串直接拼接进 SQL 语句"
-                       "（如 \"... WHERE x='\" + param + \"'\"），并交给 "
-                       "execute/executeQuery/executeUpdate 执行？"),
-        property=("该 SQL 是否使用参数化查询（PreparedStatement 的 ? 占位符 + setString/绑定参数），"
-                  "或对入参做了白名单校验？注意：仅对入参做 remove/setCharAt/URL 编码等处理，能改变内容但 "
+        # 判据必须覆盖**两种**拼接形态：JDBC 的字符串相加，和 MyBatis 的 ${} 占位符。
+        # 只写 JDBC 形态时，MyBatis 样本里既看不到 `+` 也看不到 executeQuery，
+        # 模型严格按字面判据只能答 No，于是整类漏报（mybatisVuln02 就是这么错的）。
+        sink_question=("函数是否把外部可控的字符串直接拼进 SQL 语句？两种形态都算："
+                       "① JDBC 字符串相加（如 \"... WHERE x='\" + param + \"'\"），"
+                       "并交给 execute/executeQuery/executeUpdate；"
+                       "② MyBatis 的注解或 XML 语句里用 ${...} 直接插入参数"
+                       "（如 '%${_parameter}%'、ORDER BY ${order}）。"
+                       "注意 #{} 是预编译占位符，不属于拼接。"),
+        property=("该 SQL 是否使用参数化查询（PreparedStatement 的 ? 占位符 + setString/绑定参数，"
+                  "或 MyBatis 的 #{} 占位符），或对入参做了白名单校验？"
+                  "注意：仅对入参做 remove/setCharAt/URL 编码等处理，能改变内容但 "
                   "不阻止 SQL 语法注入的，可视作未充分防护。"),
     ),
     "cmdi": VulnCategory(
@@ -51,7 +58,12 @@ CATEGORIES: dict[str, VulnCategory] = {
     ),
     "xss": VulnCategory(
         key="xss", display="跨站脚本", cwe="CWE-79",
-        sink_question="函数是否把外部可控字符串直接写进 HTTP 响应体（如 response.getWriter().println/print）？",
+        sink_question=("函数是否把外部可控字符串未经编码地输出到客户端可见的位置？"
+                       "两种形态都算："
+                       "① 直接写进 HTTP 响应体（response.getWriter().println/print、"
+                       "return 视图字符串且模板未转义）；"
+                       "② 写入数据库/共享存储（Mapper/DAO/Repository 的 add/save/insert），"
+                       "且另有路由把该数据未编码地回显（存储型 XSS）。"),
         property=("写入响应前是否调用了输出编码（如 ESAPI.encoder().encodeForHTML / encodeForJavaScript）？"
                   "单纯把输入转换为数值（parseInt/valueOf）或做 URL 解码，不算输出编码。"),
     ),

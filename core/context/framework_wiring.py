@@ -37,6 +37,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from core.text_utils import strip_java_comments
+
 # 只扫这些目录，避免把 target/ 里的编译产物和测试代码带进来
 SKIP_DIR_PARTS = {".git", "target", "build", "node_modules", "test", "tests"}
 
@@ -114,27 +116,12 @@ _JAVA_COMMENT_RE = re.compile(
 
 
 def _strip_java_comments(text: str, keep_lines: bool = True) -> str:
-    """单遍词法剥离 Java 注释。
+    """单遍词法剥离 Java 注释。实现已移到 `core.text_utils`，规则层共用同一份。
 
-    为什么不能分两步做正则替换：`registry.addMapping("...") // /**表示path`
-    这种行注释里含有 `/*`，先剥行注释就会留下一个孤立的 `/**`，
-    随后的块注释正则会把从它到下一个 `*/` 之间的**真实代码全部吃掉**。
-    实测 CustomCorsConfig 的 `.allowedMethods(...)` / `.allowCredentials(true)`
-    就是这样被静默删除的 —— 规则于是看到一个没有 allowedOrigins 的空配置。
-
-    单遍扫描按出现顺序处理，注释与字符串字面量互不干扰：
-      - 字符串内部出现 `//` 不受影响
-      - 行注释里的 `/*` 不会开启块注释
+    两处共用一份很重要：装配分析和规则判定都靠"注释里的代码不算数"这条，
+    各自维护一份迟早会漂移 —— 一边修好了 `// /**` 的坑，另一边不知道。
     """
-    def repl(m: re.Match) -> str:
-        s = m.group(0)
-        if s.startswith('"') or s.startswith("'"):
-            return s                                # 字面量原样保留
-        if keep_lines:
-            return "\n" * s.count("\n")             # 保留行号
-        return " "
-
-    return _JAVA_COMMENT_RE.sub(repl, text)
+    return strip_java_comments(text, keep_lines)
 
 
 def _ant_match(pattern: str, url: str) -> bool:

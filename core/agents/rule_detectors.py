@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import re
 
+from core.text_utils import strip_comments
+
 # ---------------- 算法强度表 ----------------
 
 WEAK_CIPHERS = ("DES", "DESEDE", "TRIPLEDES", "RC2", "RC4", "ARCFOUR", "BLOWFISH", "IDEA")
@@ -37,9 +39,26 @@ _SEP = re.compile(r"^//\s*----", re.M)
 
 
 def entry_body(source: str) -> str:
-    """只保留入口方法体：截到第一个 `// ---- ...` 分隔注释之前。"""
+    """只保留入口方法体：截到第一个 `// ---- ...` 分隔注释之前，并**剥掉注释**。
+
+    剥注释这一步不能省。Hello-Java-Sec 的 XXE 样本里，作者把修复写法注释掉
+    留在原地：
+
+        // 修复：禁用外部实体
+        // xmlReader.setFeature("...disallow-doctype-decl", true);
+        xmlReader.parse(...);
+
+    不剥注释，`XXE_NO_DOCTYPE_RE` 就会命中那行注释，把真漏洞判成"已禁用
+    DOCTYPE = 安全" —— 一条规则把整个类的真值判反，而且不报错、不留痕迹。
+    真实项目里"留一行注释掉的修复"很常见（java-sec-code 整个 CorsConfig2.java
+    就是被注释掉的死配置）。
+
+    注意只剥**入口体**的注释：分隔符之后的证据块本身是用 `//` 渲染的代码，
+    剥掉就把证据删了。
+    """
     m = _SEP.search(source)
-    return source[: m.start()] if m else source
+    body = source[: m.start()] if m else source
+    return strip_comments(body, keep_lines=False)
 
 
 def _sibling_methods(source: str) -> str:
@@ -459,7 +478,8 @@ DESERIAL_SINK_RE = re.compile(
 # 白名单式防护
 DESERIAL_SAFE_RE = re.compile(
     r"SafeConstructor|safeMode|setAllowedClasses|ObjectInputFilter|"
-    r"createFilter\s*\(|allowList|whitelist|setWhiteList", re.I)
+    r"createFilter\s*\(|allowList|whitelist|setWhiteList|"
+    r"ValidatingObjectInputStream|\.\s*accept\s*\(\s*[\w.]+\.class", re.I)
 # 黑名单式"防护"：看起来在防，实际可绕
 DESERIAL_BLACKLIST_RE = re.compile(
     r"denyClasses|denyList|blacklist|setBlacklist|startsWith\s*\(\s*deny", re.I)
@@ -608,6 +628,12 @@ def xxe_verdict(source: str) -> bool | None:
 SQLI_JDBC_SINK_RE = re.compile(
     r"\.\s*(?:executeQuery|executeUpdate|execute)\s*\(", re.I)
 SQLI_CREATE_STMT_RE = re.compile(r"\.\s*createStatement\s*\(", re.I)
+# Spring 的 JdbcTemplate 直接收原始 SQL，不经过 Statement/PreparedStatement。
+# 只看这两个 API 会把 `jdbctemplate.queryForMap("..." + id)` 整类漏掉
+# （Hello-Java-Sec 的 JDBC.safe4 就是这样，规则返回 None 交模型，模型判错）。
+SQLI_JDBCTEMPLATE_RE = re.compile(
+    r"\.\s*(?:queryForMap|queryForList|queryForObject|queryForRowSet|"
+    r"update|batchUpdate)\s*\(", re.I)
 SQLI_PREPARE_RE = re.compile(r"\.\s*prepare(?:Statement|Call)\s*\(\s*([^;]{0,300})", re.I | re.S)
 # 字符串拼接：`"..." + 变量` 或 `变量 + "..."`
 SQLI_CONCAT_RE = re.compile(
@@ -631,13 +657,23 @@ def sqli_verdict(source: str) -> bool | None:
     impl = _impl_segment(source)
 
     # C) 白名单过滤优先：入参被全串白名单约束过，后续拼接不构成注入。
-    #    但要求过滤函数**作用在这个入口的实参上**，不能是别处的方法名。
-    if SQLI_WHITELIST_RE.search(body) and re.search(
-            r"\b(?:sqlFilter|checkSql|isValidOrder)\s*\(", body):
+    #    这里曾经要求"必须同时出现 sqlFilter/checkSql/isValidOrder 这几个名字之一"，
+    #    等于把判据绑死在某几个函数名上。Hello-Java-Sec 的 JDBC.safe5 用的是
+    #    标准库写法 `Pattern.matches("^[a-zA-Z0-9]+$", name)`，名字不在白名单里，
+    #    于是白名单没被认出来，一路落到 createStatement + 拼接 → 误报。
+    #    `.matches(...)` 在 Java 里**本身就是全串匹配**，不需要再看函数名。
+    m_wl = SQLI_WHITELIST_RE.search(body)
+    if m_wl and not _TRIVIAL_WHITELIST_RE.search(m_wl.group(0)):
         return False
 
     # B) MyBatis：只有能确认用的是 ${} 还是 #{} 才判
     if MYBATIS_DOLLAR_RE.search(impl):
+        # `${}` 是字符串替换，但对**数字类型**的参数无注入面：Spring/MyBatis
+        # 已经把入参解析成 int/Integer 了，`1 OR 1=1` 根本绑不上。
+        # Hello-Java-Sec 的 queryById（/safe/id/{id}）正是这种，作者注明
+        # 「使用${}，但写死Int类型，无法注入」。这是可核对的事实，不是语义推断。
+        if _dollar_params_all_numeric(body, impl):
+            return False
         return True
     if MYBATIS_HASH_RE.search(impl) and not SQLI_JDBC_SINK_RE.search(body):
         return False
@@ -648,10 +684,17 @@ def sqli_verdict(source: str) -> bool | None:
         return False
 
     # A) JDBC：看 SQL 是怎么造出来的
-    if SQLI_CREATE_STMT_RE.search(body):
-        # createStatement 无法绑定参数，只要 SQL 里出现拼接就可注入
+    if SQLI_CREATE_STMT_RE.search(body) or SQLI_JDBCTEMPLATE_RE.search(body):
+        # createStatement 无法绑定参数，只要 SQL 里出现拼接就可注入。
+        # 但两种情况必须让路：
+        #   1) 参与拼接的参数全是数字类型（`safe4(Integer id)`）——
+        #      和 MyBatis 的 `${}` 同构，Spring 已把它解析成 int，注入不了；
+        #   2) 拼接的操作数是**我们没见过的清洗函数**（ESAPI.encodeForSQL）——
+        #      那是"不确定"，不是"有把握"。
         if SQLI_CONCAT_RE.search(body):
-            return True
+            if _concat_params_all_numeric(body):
+                return False
+            return None if _concat_only_sanitized(body) else True
         return None                    # 常量 SQL，不是注入面
     m = SQLI_PREPARE_RE.search(body)
     if m:
@@ -666,6 +709,82 @@ def sqli_verdict(source: str) -> bool | None:
             return False
         return None
     return None
+
+
+# 毫无约束力的"白名单"：`matches(".*")`、`matches("^.*$")` 匹配一切，
+# 把它当防护会让真实注入漏判。只挡这两种最常见的写法。
+_TRIVIAL_WHITELIST_RE = re.compile(r'matches\s*\(\s*"\s*(?:\^?\.\*\$?|)\s*"\s*[,)]')
+
+# 拼接右操作数是函数调用（而不是裸变量）时，说明入参经过了某个清洗/编码函数。
+# 我们不认识那个函数不代表它没用 —— 这种情况必须交模型，不能判 True。
+_ASSIGN_RHS_RE = re.compile(r"(?:String\s+)?\w+\s*\+?=\s*([^;]{0,400});")
+_STR_LIT_RE = re.compile(r'"(?:\\.|[^"\\])*"')
+# 数字类型的参数声明（入口形参或 Mapper 接口声明）
+_NUMERIC_TYPES = r"(?:int|Integer|long|Long|short|Short|byte|Byte|BigDecimal|BigInteger)"
+
+
+def _concat_only_sanitized(body: str) -> bool:
+    """SQL 拼接的操作数是否**全部**是函数调用（没有任何裸变量参与）。
+
+    只对"字符串 + 函数调用"这种形态成立：
+        "select ... id = '" + ESAPI.encoder().encodeForSQL(codec, id) + "'"
+    只要还有一处 `+ id +`（裸变量），就说明入参原样进了 SQL，仍可判 True。
+
+    实现上按赋值语句拆操作数，而不是用一条大正则去套调用形态 ——
+    `ESAPI.encoder().encodeForSQL(a, b)` 这种链式调用，正则很容易写成只认
+    单层调用（我第一版就是这样，结果漏掉了 safe3）。
+    """
+    found_call = False
+    for m in _ASSIGN_RHS_RE.finditer(body):
+        rhs = m.group(1)
+        if '"' not in rhs or "+" not in rhs:
+            continue
+        bare = _STR_LIT_RE.sub('""', rhs)
+        for part in bare.split("+"):
+            p = part.strip()
+            if not p or p == '""':
+                continue                    # 纯字面量
+            if "(" in p:
+                found_call = True           # 函数调用：可能是清洗
+            elif re.fullmatch(r"[A-Za-z_]\w*", p):
+                return False                # 裸变量原样进 SQL
+    return found_call
+
+
+def _dollar_params_all_numeric(body: str, impl: str) -> bool:
+    """`${x}` 里的每个参数是否都被声明成数字类型。"""
+    names = set(re.findall(r"\$\{\s*_?(\w+)\s*\}", impl))
+    if not names:
+        return False
+    hay = body + "\n" + impl
+    for n in names:
+        if not re.search(rf"\b{_NUMERIC_TYPES}\s+{re.escape(n)}\b", hay):
+            return False
+    return True
+
+
+def _concat_params_all_numeric(body: str) -> bool:
+    """JDBC 拼接里出现的裸变量是否**全部**是数字类型形参。
+
+        safe4(Integer id)  →  "select ... id = " + id   ⇒ 不可注入
+        vul1(String id)    →  "select ... id = '" + id + "'"  ⇒ 可注入
+
+    为什么这是确定性事实而不是语义推断：入参声明成 `Integer` 之后，
+    Spring 在参数绑定阶段就把它解析成数字，`1 OR 1=1` 连绑定都过不了。
+    规则只需要核对"形参声明"这一行，不需要理解 SQL 语义。
+    """
+    bare: list[str] = []
+    for m in _ASSIGN_RHS_RE.finditer(body):
+        rhs = m.group(1)
+        if '"' not in rhs or "+" not in rhs:
+            continue
+        for part in _STR_LIT_RE.sub('""', rhs).split("+"):
+            p = part.strip()
+            if re.fullmatch(r"[A-Za-z_]\w*", p or ""):
+                bare.append(p)
+    if not bare:
+        return False
+    return all(re.search(rf"\b{_NUMERIC_TYPES}\s+{re.escape(n)}\b", body) for n in bare)
 
 
 _SQL_VAR_ASSIGN_RE = r"String\s+{name}\s*=\s*"
@@ -809,7 +928,17 @@ def xss_verdict(source: str) -> bool | None:
             return False               # 读取点做了输出编码
         return True
 
-    # 3) 既无回显也无串接证据 → 本方法确实没有把输入写进响应体。
+    # 3) 存储型，但介质不在串接建模范围内：写进数据库（Mapper/DAO/Repository）。
+    #    跨路由串接只按 cookie/session/request/model 配对，DB 不在其中，所以
+    #    `reader` 一定是空的。此时判 False 是错的 —— Hello-Java-Sec 的
+    #    `XSS.save`（`xssMapper.add(user, content, date)` + 另一路由 `list()`
+    #    未编码回显）就是标准存储型 XSS。看不见读取点不等于不存在。
+    #    但如果写入前做了编码（`HtmlUtils.htmlEscape(content)` 再 add），
+    #    这在本方法内就是可核对的事实，可以直接判安全。
+    if has_param and XSS_PERSIST_RE.search(body):
+        return False if XSS_ENCODE_RE.search(body) else None
+
+    # 4) 既无回显也无串接证据 → 本方法确实没有把输入写进响应体。
     #
     #    这里必须返回 False 而不是 None。曾经写成 `False if not has_param else None`，
     #    理由是"有形参但没回显，可能是存储型的写入点，交模型判断" —— 那是错的：
@@ -817,6 +946,15 @@ def xss_verdict(source: str) -> bool | None:
     #    还没有证据，说明全库都找不到读取点，链根本不闭合。把 None 漏给模型，
     #    等于让模型对着一个注定无法回答的样本自由裁量，而自由裁量正是抖动来源。
     return False
+
+
+# 持久层写入：仓库类调用的通用形态（MyBatis Mapper / DAO / JPA Repository）。
+# 不写成 `\.add(` —— 那会把 `sb.append` 之外的 `list.add(x)` 也卷进来。
+XSS_PERSIST_RE = re.compile(
+    r"\b\w*(?:[Mm]apper|[Dd]ao|DAO|[Rr]epository)\s*\.\s*\w+\s*\(|"
+    r"\b\w*(?:[Mm]apper|[Dd]ao|DAO|[Rr]epository)\s*\.\s*(?:save|add|insert|update|create)\w*\s*\(",
+    re.I)
+
 
 
 # ---------------- redir（开放重定向） ----------------

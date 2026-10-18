@@ -289,6 +289,132 @@ check("空 evidence → 拒绝", verify_evidence(_C, "")[0], False)
 check("引用行注释 → 拒绝",
       verify_evidence(_C, "// return HtmlUtils.htmlEscape(xss);   曾经的安全写法，已删")[0], False)
 
+# 证据块里的代码被渲染成 `//   <code>`（防止规则把它当入口方法体的语句），
+# 而"注释行一律不许当证据"的规则会连它一起拒 —— 结果是**最有力的那条证据
+# 无法被引用**，模型只能退回入口方法体随便找一行交差。这正是
+# mybatisVuln02 引用 `return userMapper...` 的机制性成因。
+_BLOCK = '''@GetMapping("/sec/httpCors")
+public CsrfToken getCsrfToken_02(CsrfToken token) {
+    return token;
+}
+
+// ---- 框架装配证据：以下全局组件会作用于本路由 ----
+// [Filter] OriginFilter  urlPatterns=[/*]  来源 CorsConfig.java
+//   if (SecurityUtil.checkURL(refer) == null) {
+//       response.sendError(403);
+//   }
+// [注意] 以下装配无法静态确定生效路径：
+//   - 某处 registerCorsConfiguration
+'''
+check("证据块里的代码（带 //   原样）→ 通过",
+      verify_evidence(_BLOCK, "//   if (SecurityUtil.checkURL(refer) == null) {")[0], True)
+check("证据块里的代码（只拷代码）→ 通过",
+      verify_evidence(_BLOCK, "if (SecurityUtil.checkURL(refer) == null) {")[0], True)
+# 同样的 `//   ` 前缀，出现在**非证据块**里就还是注释，不能放行 ——
+# 否则"注释里写着原本的漏洞写法"会被当成执行证据。
+check("非证据块里的 //   仍是注释 → 拒绝",
+      verify_evidence('public class A {\n    //   if (x) { sql="..."+y; }\n    return 1;\n}',
+                      "if (x) { sql")[0], False)
+check("证据块里的说明条目（//   - xxx）不可引用",
+      verify_evidence(_BLOCK, "- 某处 registerCorsConfiguration")[0], False)
+
+# sqli 判据必须覆盖 MyBatis 的 ${} 形态。只写 JDBC 拼接时，MyBatis 样本里
+# 既没有 `+` 也没有 executeQuery，模型严格按字面只能答 No（整类漏报）。
+from core.agents.vuln_categories import CATEGORIES as _CATS
+_sq = _CATS["sqli"]
+check("sqli 判据含 ${}", "$" + "{" in _sq.sink_question, True)
+check("sqli 判据明确 #{} 不算拼接", "#{}" in _sq.sink_question, True)
+check("sqli 判据仍保留 JDBC 形态", "executeQuery" in _sq.sink_question, True)
+
+# ---------------- 跨项目迁移暴露的 5 处规则缺陷 ----------------
+# 全部来自 Hello-Java-Sec 盲测，且都是"在 java-sec-code 上永远测不出来"的那类：
+# 换一个作者、换一种写法，规则就从"全对"掉到 76%。这里逐条钉住。
+print("\n[17] 跨项目迁移暴露的规则缺陷")
+
+from core.agents.rule_detectors import verdict as _verdict, entry_body as _eb
+
+# (a) 注释里的"修复写法"绝不能当防护。真实项目里留一行注释掉的修复极常见，
+#     靶场作者就是这么写的，规则照读就把真漏洞判成安全。
+_XXE_COMMENTED = '''public String XMLReader(String content) {
+    XMLReader r = XMLReaderFactory.createXMLReader();
+    // 修复：禁用外部实体
+    // r.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+    r.parse(new InputSource(new StringReader(content)));
+}'''
+check("注释里的 setFeature 不算防护（xxe → vuln）",
+      _verdict("xxe", _XXE_COMMENTED), True)
+_XXE_REAL = _XXE_COMMENTED.replace(
+    "// r.setFeature", 'r.setFeature')
+check("真实生效的 setFeature 算防护（xxe → safe）",
+      _verdict("xxe", _XXE_REAL), False)
+check("entry_body 已剥注释", "disable-doctype" not in _eb(_XXE_COMMENTED), True)
+
+# (b) 白名单判据不能绑死函数名。`Pattern.matches(...)` 是标准库全串匹配，
+#     之前因为"必须出现 sqlFilter/checkSql/isValidOrder"而没被认出来。
+_SQLI_PATTERN_MATCHES = '''public String safe5(String name) {
+    boolean ok = Pattern.matches("^[a-zA-Z0-9]+$", name);
+    if (ok) {
+        Statement st = conn.createStatement();
+        String sql = "select * from users where user = '" + name + "'";
+        st.executeQuery(sql);
+    }
+}'''
+check("Pattern.matches 白名单 → safe", _verdict("sqli", _SQLI_PATTERN_MATCHES), False)
+_SQLI_TRIVIAL = _SQLI_PATTERN_MATCHES.replace('"^[a-zA-Z0-9]+$"', '".*"')
+check("matches(\".*\") 不算白名单 → vuln", _verdict("sqli", _SQLI_TRIVIAL), True)
+
+# (c) 拼接的操作数是"我们没见过的清洗函数"时，是"不确定"而不是"有把握"。
+#     兜底判 True 会把正确防护冤枉成漏洞（ESAPI.encodeForSQL 就是）。
+_SQLI_ESAPI = '''public String safe3(String id) {
+    Statement st = conn.createStatement();
+    String sql = "select * from users where id = '" + ESAPI.encoder().encodeForSQL(codec, id) + "'";
+    st.executeQuery(sql);
+}'''
+check("未知清洗函数参与拼接 → None（交模型）",
+      _verdict("sqli", _SQLI_ESAPI), None)
+_SQLI_BARE = '''public String vul(String id) {
+    Statement st = conn.createStatement();
+    String sql = "select * from users where id = '" + id + "'";
+    st.executeQuery(sql);
+}'''
+check("裸变量拼接 → vuln", _verdict("sqli", _SQLI_BARE), True)
+
+# (d) `${}` 遇上数字类型参数没有注入面：Spring/MyBatis 已把它解析成 int。
+#     这是可核对的事实（形参声明），不是语义推断。
+_SQLI_INT_DOLLAR = '''public List queryById(@PathVariable Integer id) {
+    return mapper.queryByIdAsInterger(id);
+}'''
+_MAPPER_IMPL = '''// ---- 跨文件证据：queryByIdAsInterger() 的 MyBatis 注解语句 ----
+@Select("select * from users where id = ${id}")
+List<User> queryByIdAsInterger(@Param("id") Integer id);'''
+check("${} + Integer 形参 → safe",
+      _verdict("sqli", _SQLI_INT_DOLLAR + "\n\n" + _MAPPER_IMPL), False)
+check("${} + String 形参 → vuln",
+      _verdict("sqli", _SQLI_INT_DOLLAR.replace("Integer id", "String id")
+               + "\n\n" + _MAPPER_IMPL.replace("Integer id", "String id")), True)
+
+# (e) 反序列化白名单还认 ValidatingObjectInputStream（commons-io 的 allowlist）
+_DESER_VALIDATING = '''public String safe(String b64) {
+    ValidatingObjectInputStream ois = new ValidatingObjectInputStream(new ByteArrayInputStream(bs));
+    ois.accept(Student.class);
+    ois.readObject();
+}'''
+check("ValidatingObjectInputStream.accept → safe",
+      _verdict("deserial", _DESER_VALIDATING), False)
+
+# (f) 存储型 XSS 写库：读取点不在本方法，介质（DB）也不在串接建模内。
+#     判 False 会把"看不见读取点"说成"链不闭合"，必须交模型。
+_XSS_STORE_DB = '''public String save(HttpServletRequest request) {
+    String content = request.getParameter("content");
+    xssMapper.add(user, content, date);
+    return "success";
+}'''
+check("写库但未编码 → None（介质未建模）", _verdict("xss", _XSS_STORE_DB), None)
+check("写库前已编码 → safe",
+      _verdict("xss", _XSS_STORE_DB.replace(
+          "xssMapper.add(user, content", 'xssMapper.add(user, HtmlUtils.htmlEscape(content)')), False)
+
+
 # 契约测试：用 mock 模型覆盖"守规矩 / 编造证据 / 混合投票"三种行为。
 # 为什么必须测这个：核验一旦把合规输出也判失败，全部采样都会作废，
 # 引擎会静默退化成"什么都判不出来" —— 比不启用这个机制更糟。

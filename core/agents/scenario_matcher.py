@@ -178,6 +178,60 @@ _COMMENT_LINE_RE = re.compile(r"^\s*(?://|#|/\*|\*|<!--|-->)")
 # 引用时模型容易带上的行号前缀（切片里是 `123: code` 形式），核验前要剥掉
 _LINENO_PREFIX_RE = re.compile(r"^\s*\d+\s*[:|]\s?")
 
+# 切片里的证据块（框架装配 / 跨路由串接）会把**代码**逐行加上 `//   ` 前缀渲染，
+# 以免它们被规则当成入口方法体的可执行语句。但这对核验器是个陷阱：
+# 那些行确实以 `//` 开头，而注释行一律不许当证据 —— 于是"最有价值的证据"
+# （CorsProcessor 的白名单判断、Filter 的装配参数）恰好无法被引用，模型只能
+# 退回入口方法体那一行来交差。这正是 mybatisVuln02 引用入口 `return` 行的机制性
+# 成因：不是它偷懒，是核验器只给它留了那一条路。
+# 判据：只有**这两类段**里的 `//   ` 是代码引用；其它段里的 `//` 仍是真注释。
+_QUOTED_EVIDENCE_HEADERS = ("框架装配证据", "跨路由串接证据")
+# 前缀是 `//` + 至少三个空格，然后是原行的内容（串接段贴方法体时保留了原缩进，
+# 所以填充空格可能远多于三个，必须用 {3,} 而不是固定三格）
+_QUOTED_LINE_RE = re.compile(r"^//(\s{3,})(.*\S)\s*$")
+
+
+def _dequote_evidence_line(s: str) -> str | None:
+    """把 `//   <code>` 还原成 `<code>`；不是这种形态就返回 None。
+
+    只认 `//` + 三个以上空格 —— 真实注释通常是 `// 说明` 或 `//说明`，
+    不能顺手去前缀，否则"注释里写着原本的漏洞写法"会被当成执行证据。
+    """
+    m = _QUOTED_LINE_RE.match(s.strip())
+    return m.group(2).strip() if m else None
+_SECTION_HEADER_RE = re.compile(r"^\s*//\s*----\s*(.*?)\s*-*\s*$")
+
+
+def _quotable_lines(code: str) -> list[tuple[str, bool]]:
+    """返回 [(归一化后的可引用文本, 是否来自证据块)]。
+
+    证据块里的 `//   if (x) {` 会被还原成 `if (x) {`：模型引用带不带前缀都认，
+    因为它在切片里看到的两种形态都存在（前缀是渲染加的，代码本身没有）。
+    `//   - 说明文字` 这类条目是在描述而不是代码，不参与引用。
+    """
+    out: list[tuple[str, bool]] = []
+    quoted_section = False
+    for ln in (code or "").splitlines():
+        stripped = ln.strip()
+        m = _SECTION_HEADER_RE.match(stripped)
+        if m:
+            head = m.group(1)
+            quoted_section = any(h in head for h in _QUOTED_EVIDENCE_HEADERS)
+            continue
+        if quoted_section:
+            inner = _dequote_evidence_line(stripped)
+            if inner is not None:
+                if not inner.startswith("-"):
+                    out.append((_normalize_line(inner), True))
+                continue
+            if stripped.startswith("//"):
+                continue  # 证据块内的说明行（段落标题、截断提示）
+        if _COMMENT_LINE_RE.match(ln):
+            continue
+        if stripped:
+            out.append((_normalize_line(ln), False))
+    return out
+
 
 def _normalize_line(s: str) -> str:
     return " ".join(_LINENO_PREFIX_RE.sub("", s).split())
@@ -196,27 +250,42 @@ def verify_evidence(code: str, evidence: str) -> tuple[bool, str]:
         return False, "evidence_line 含省略号，非逐字符引用"
 
     raw_lines = (code or "").splitlines()
-    ev_norm = _normalize_line(ev)
+    # 模型可能把切片里看到的 `//   <code>` 原样拷过来，也可能只拷 code 部分。
+    # 两种都算同一行 —— 前缀是渲染加的，不是代码的一部分。
+    cands = [_normalize_line(ev)]
+    _dq = _dequote_evidence_line(ev)
+    if _dq:
+        cands.append(_normalize_line(_dq))
+    cands = [c for c in cands if c]
 
-    hit_line = None
-    for ln in raw_lines:
-        if ev_norm and ev_norm in _normalize_line(ln):
-            hit_line = ln
+    quotable = _quotable_lines(code)
+    hit: tuple[str, bool] | None = None
+    for ev_norm in cands:
+        for text, is_ev in quotable:
+            if ev_norm in text:
+                hit = (text, is_ev)
+                break
+        if hit:
             break
-    if hit_line is None:
+    if hit is None:
         # 整行没匹配上时退一步：允许引用被切片折行后的前半段，
         # 但要求长度足够（太短的片段容易在别处偶然命中，起不到核验作用）。
-        if len(ev_norm) >= 12 and ev_norm in _normalize_line(code):
-            # 找到它落在哪一行，仍然要检查那一行是不是注释
+        if any(len(c) >= 12 for c in cands):
+            joined = "\n".join(t for t, _ in quotable)
+            if any(c in joined for c in cands if len(c) >= 12):
+                hit = ("", False)
+        if hit is None:
+            # 区分两种失败：引用的是注释行，还是根本不存在。
+            # 前者是最危险的假证据（靶场里常写"原本的漏洞写法，已删"），
+            # 后者是编造 —— 两者都不作数，但日志里要能分开。
             for ln in raw_lines:
-                if ev_norm in _normalize_line(ln):
-                    hit_line = ln
-                    break
-        if hit_line is None:
+                ln_norm = _normalize_line(ln)
+                if _COMMENT_LINE_RE.match(ln) and any(c in ln_norm for c in cands):
+                    return False, "evidence_line 命中注释行，不能作为执行证据"
             return False, "evidence_line 不在切片中（疑似编造）"
 
-    if _COMMENT_LINE_RE.match(hit_line):
-        return False, "evidence_line 命中注释行，不能作为执行证据"
+    if hit[1]:
+        return True, "引用自证据块（框架装配/跨路由串接），按代码计入"
     return True, ""
 
 class ScenarioMatcher:
