@@ -316,6 +316,18 @@ class JavaSlicer:
             self._cfg = ConfigResolver(self.config_root)
         return self._cfg.resolve_for(source)
 
+    def _template_block(self, own_body: str) -> str:
+        """视图模板渲染点证据（见 `core/context/view_templates.py`）。
+
+        只用**入口方法自己的体**去取视图名和 model 键：切片里已经拼进来的
+        同文件辅助方法/证据段会让视图名取自别的路由，贴错页面比不贴更糟。
+        """
+        try:
+            from core.context.view_templates import template_evidence
+            return template_evidence(self.config_root or self.repo_path, own_body)
+        except Exception:                       # noqa: BLE001 —— 增强项，宁可没有
+            return ""
+
     # ---------- 跨文件辅助方法解析 ----------
 
     # 只追踪"可能决定安全语义"的调用，避免把整个仓库拖进切片
@@ -501,6 +513,9 @@ class JavaSlicer:
         读取方本身没有外部参数，单看它无从谈起污点；而写入方缺的恰恰是
         "我写出去的值最终会原样出现在别处的响应里"这个事实。
 
+        例外是 db 介质：同一仓储字段上的"调用"分不出写和读（`xssMapper.add`
+        与 `xssMapper.list()` 形态相同），所以两侧都贴 —— 谁写谁读交给判定层。
+
         失败必须静默降级：串接是增强项，索引出错不能拖垮整个切片流程。
         """
         if not units:
@@ -509,7 +524,7 @@ class JavaSlicer:
             from core.context.taint_chain import build_chains, render_chain_block
             # 不传 entries_only：build_chains 默认优先读 CodeUnit.own_body，
             # 那里存的正是未追加辅助方法的入口方法体。
-            chains = build_chains(units)
+            chains = build_chains(units, repo_root=self.config_root or self.repo_path)
         except Exception:                       # noqa: BLE001 —— 增强项，宁可没有
             return
         if not chains.links:
@@ -520,14 +535,19 @@ class JavaSlicer:
             links = chains.links_of_writer(u.unit_name)
             if not links:
                 continue
-            # 读取点方法体：只贴方法本体，不贴它的跨文件证据（避免切片膨胀）
-            reader_bodies = []
+            # 读取点方法体：只贴方法本体，不贴它的跨文件证据（避免切片膨胀）。
+            # 必须按读取方逐个给（db 介质一次会连上多个读取点，只贴第一个
+            # 会让判定层以为"读取点没回显"）。
+            reader_bodies: dict[str, str] = {}
             for l in links:
+                if l.reader.unit_name in reader_bodies:
+                    continue
                 reader = by_name.get(l.reader.unit_name) or l.reader
-                body = reader.source_code or ""
-                sep = body.find("// ----")
-                reader_bodies.append(body[:sep].strip() if sep > 0 else body.strip())
-            block = render_chain_block(links, "\n\n".join(reader_bodies))
+                text = reader.source_code or ""
+                sep = text.find("// ----")
+                reader_bodies[l.reader.unit_name] = (
+                    text[:sep].strip() if sep > 0 else text.strip())
+            block = render_chain_block(links, reader_bodies)
             if block:
                 u.source_code += block
 
@@ -672,6 +692,10 @@ class JavaSlicer:
             source = src if not helper_src else f"{src}\n\n// ---- 同文件辅助方法 ----\n{helper_src}"
             # 回填配置实际取值：算法名/参数常来自配置文件，缺了它模型只能猜
             source += self._config_block(source)
+            # 视图模板：`model.addAttribute("k", v)` + `return "view"` 的渲染点
+            # 在 .html/.ftl 里，不在 Java 里。这是存储/反射型 XSS 最常见的
+            # 跨文件形态，不贴进来判定层就只能看到"放进 model 就返回了"。
+            source += self._template_block(src)
             # 跨文件辅助方法：工厂方法里的真实算法是关键证据
             source += self._resolve_cross_file_helpers(source)
             # 跨文件实现体：MyBatis Mapper 的 #{} / ${} 决定 SQL 注入真值

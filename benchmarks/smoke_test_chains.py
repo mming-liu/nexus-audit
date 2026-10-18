@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from core.agents.rule_detectors import (       # noqa: E402
-    redir_verdict, verdict, xss_verdict,
+    has_external_input, redir_verdict, verdict, xss_verdict,
 )
 from core.context.taint_chain import (         # noqa: E402
     build_chains, reads_of, render_chain_block, writes_of,
@@ -855,6 +855,325 @@ check("同文件无关的 switch 不算白名单 → 不判 safe（退回模型�
       _verdict("cmdi", _CMDI_SWITCH_ELSEWHERE), None)
 
 
+print("\n[23] 判据的扫描作用域：只认入口真正调用的那个辅助方法")
+
+# 同一个类里并存"给别的路由用的值级白名单"和"当前路由真正调的校验"。
+# 扫整段辅助证据会把前者算进来 → 当前入口被静默判 safe。这是
+# `_helper_guard_nature` 从"扫整段"改成"只截名字命中的方法体"的原因。
+_CMDI_FOREIGN_ALLOW = '''public static String vul(String cmd) {
+    if (!Security.checkOs(cmd)) {
+        return "非法";
+    }
+    Runtime.getRuntime().exec(cmd);
+    return "";
+}
+
+// ---- 跨文件辅助方法实现 ----
+public static boolean checkOs(String content) {
+    String[] black_list = {"|", ",", "&", "&&", ";", "||"};
+    for (String s : black_list) {
+        if (content.contains(s)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+public static boolean isAllowedHost(String h) {
+    return ALLOWED_HOSTS.contains(h);
+}'''
+check("未调用的白名单方法不得让当前入口判 safe → 退回模型",
+      _verdict("cmdi", _CMDI_FOREIGN_ALLOW), None)
+
+_CMDI_REAL_ALLOW = '''public static String safe(String cmd) {
+    if (!SecurityUtil.isAllowedCmd(cmd)) {
+        return "非法";
+    }
+    Runtime.getRuntime().exec(cmd);
+    return "";
+}
+
+// ---- 跨文件辅助方法实现 ----
+public static boolean isAllowedCmd(String content) {
+    return ALLOWED_CMDS.contains(content);
+}'''
+check("真正调用的值级白名单 → safe", _verdict("cmdi", _CMDI_REAL_ALLOW), False)
+
+print("\n[24] SQL 拼接：条件片段也要认")
+# SQL 被拆成多段拼接时，当前这一行的字面量只剩 `" AND id = "`。
+# 只认 select/from 会整行漏掉，"这条拼接里有裸变量"的事实没被检查。
+_SQLI_TAIL_ONLY = '''public String query(String id) {
+    Statement st = conn.createStatement();
+    String sql = "SELECT * FROM users WHERE 1=1";
+    sql += " AND id = " + id;
+    st.executeQuery(sql);
+}'''
+check("尾段拼接（AND … = ）里的裸变量 → vuln",
+      _verdict("sqli", _SQLI_TAIL_ONLY), True)
+_SQLI_TAIL_SAFE = '''public String query(String id) {
+    Statement st = conn.createStatement();
+    String sql = "SELECT * FROM users WHERE 1=1";
+    sql += " AND id = " + Integer.valueOf(id);
+    st.executeQuery(sql);
+}'''
+check("尾段拼接里是纯函数调用 → 无裸变量，不判漏洞", _verdict("sqli", _SQLI_TAIL_SAFE), None)
+
+print("\n[25] 模板介质：th:utext vs th:text")
+# 切片器把「视图名解析到的模板渲染点」贴进证据段（view_templates.py）。
+# 判定支点是模板里的渲染指令本身：th:utext 不转义、th:text 转义。
+_TPL_EVIDENCE = '''
+// ---- 关联视图模板（视图名解析到的模板文件，渲染点原文）----
+// src/main/resources/templates/vul/xss/other.html:118  {how} 键 "html"
+// >>  118| <p {directive}="${{html}}"></p>
+//
+'''
+_TPL_VUL = '''@GetMapping("/vul2OtherTemplate")
+public String vul2OtherTemplate(@RequestParam("payload") String payload, Model model) {
+    model.addAttribute("html", payload);
+    return "vul/xss/other";
+}
+'''
+check("model 写入 + th:utext 不转义 → vuln",
+      _verdict("xss", _TPL_VUL + _TPL_EVIDENCE.format(how="不转义渲染", directive="th:utext")), True)
+check("model 写入 + th:text 自动转义 → safe",
+      _verdict("xss", _TPL_VUL + _TPL_EVIDENCE.format(how="转义渲染", directive="th:text")), False)
+check("写入前已编码 → 模板不转义也不成立（safe）",
+      _verdict("xss", _TPL_VUL.replace("model.addAttribute(\"html\", payload)",
+                                       "model.addAttribute(\"html\", HtmlUtils.htmlEscape(payload))")
+               + _TPL_EVIDENCE.format(how="不转义渲染", directive="th:utext")), False)
+
+print("\n[26] 数据库介质：同一仓储字段的写-读配对")
+_DB_WRITE = '''@PostMapping("/save")
+public String save(HttpServletRequest request) {
+    String content = request.getParameter("content");
+    xssMapper.add(user, content, date);
+    return "success";
+}'''
+_DB_READ = '''@GetMapping("/getStored")
+public List getStored() {
+    return xssMapper.list();
+}'''
+ch_db = build_chains([unit("XSS.save", _DB_WRITE), unit("XSS.getStored", _DB_READ)],
+                     repo_root=None)
+check("同字段 → 双向各 1 条连接", len(ch_db.links), 2)
+check("介质是 db", {l.medium for l in ch_db.links}, {"db"})
+check("键是字段名", {l.key for l in ch_db.links}, {"xssMapper"})
+
+_db_block = render_chain_block(ch_db.links, {"XSS.getStored": _DB_READ})
+check("db 证据里写出字段与方向", '数据库持久层 "xssMapper"' in _db_block, True)
+check("db 读取点直取库值并返回 → vuln",
+      xss_verdict(_DB_WRITE + "\n" + _db_block), True)
+check("写入前编码 → safe",
+      xss_verdict(_DB_WRITE.replace("xssMapper.add(user, content",
+                                    "xssMapper.add(user, HtmlUtils.htmlEscape(content)")
+                 + "\n" + _db_block), False)
+# 删除接口与写入接口共用同一 Mapper：不能因为"有连接"就报存储型 XSS。
+# 这条路由唯一形参是 `int id` —— 没有可注入的字符串，服务端判无此漏洞。
+_DB_DELETE = '''@GetMapping("/delete")
+public String delete(int id) {
+    xssMapper.deleteFeedById(id);
+    return "success";
+}'''
+ch_del = build_chains([unit("XSS.delete", _DB_DELETE), unit("XSS.getStored", _DB_READ)],
+                      repo_root=None)
+check("只按主键删除的接口 → 不判漏洞",
+      xss_verdict(_DB_DELETE + "\n" + render_chain_block(
+          ch_del.links, {"XSS.getStored": _DB_READ})), False)
+# 同样的删除逻辑，但形参换成 String —— 此时"有没有把值写进库"才是真问题，
+# 规则不替模型下结论。
+_DB_DELETE_STR = _DB_DELETE.replace("int id", "String id")
+ch_del_s = build_chains([unit("XSS.delete", _DB_DELETE_STR), unit("XSS.getStored", _DB_READ)],
+                        repo_root=None)
+check("String 形参的删除接口 → 退回模型",
+      xss_verdict(_DB_DELETE_STR + "\n" + render_chain_block(
+          ch_del_s.links, {"XSS.getStored": _DB_READ})), None)
+
+print("\n[27] 串接证据解析：db 连接不得污染普通介质分支")
+# db 的连接描述行也以 `//` 起头，早期实现把它一起吞进来，于是
+# `_chain_reader_body` 非空、`_has_plain_chain` 为真 → 走进 cookie/session
+# 分支判 False，DB 判定被整段跳过。
+from core.agents.rule_detectors import _chain_reader_body as _crb, _has_plain_chain as _hpc
+check("db 证据不产生普通读取点", _crb(_DB_WRITE + "\n" + _db_block), "")
+check("db 证据不算普通连接", _hpc(_DB_WRITE + "\n" + _db_block), False)
+_cookie_block = render_chain_block(
+    build_chains([unit("A.store", STORE), unit("B.show", SHOW)]).links, SHOW)
+check("cookie 证据仍是普通连接", _hpc(STORE_FULL + _cookie_block), True)
+
+print("\n[28] xss 回显点：printf/format 计入 sink")
+# OWASP 里 `printf`/`format` 占 xss sink 的 41%。只认 print/write/println
+# 会把它们的真阳性整批漏成"无回显"（BenchmarkTest00149 就是这样漏的）。
+_X_FMT_LIT = '''response.setContentType("text/html;charset=UTF-8");
+String param = request.getParameter("p");
+String bar = param + "_SafeStuff";
+Object[] obj = {"a", bar};
+response.getWriter().printf(java.util.Locale.US, "Formatted like: %1$s and %2$s.", obj);'''
+_X_FMT_VAR = '''String param = request.getParameter("p");
+String bar = param;
+Object[] obj = {"a", "b"};
+response.getWriter().format(bar, obj);'''
+check("printf 字面量格式串 + 无编码 → 真漏洞", xss_verdict(_X_FMT_LIT), True)
+check("format 变量当格式串 → 真漏洞", xss_verdict(_X_FMT_VAR), True)
+
+print("\n[29] xss 格式串位置决定 ENCODE 能否当防护")
+# 同样是 encode + printf：格式串是字面量时脏值只是 `%s` 的实参，编码有效；
+# 格式串本身可控时，转换说明符（`%n` 换行、`%x` 宽度）由用户决定，
+# ENCODE 未必覆盖，规则不下结论。
+_X_ENC_LITFMT = '''String param = request.getParameter("p");
+String bar = org.owasp.esapi.ESAPI.encoder().encodeForHTML(param);
+Object[] obj = {"a", bar};
+response.getWriter().printf(java.util.Locale.US, "Formatted like: %1$s and %2$s.", obj);'''
+_X_ENC_VARFMT = '''String param = request.getParameter("p");
+String bar = org.owasp.esapi.ESAPI.encoder().encodeForHTML(param);
+Object[] obj = {"a", "b"};
+response.getWriter().printf(bar, obj);'''
+check("编码 + 字面量格式串 → 安全", xss_verdict(_X_ENC_LITFMT), False)
+check("编码 + 变量格式串 → 退回模型", xss_verdict(_X_ENC_VARFMT), None)
+_X_ENC_PLAIN = '''String param = request.getParameter("p");
+String bar = org.owasp.esapi.ESAPI.encoder().encodeForHTML(param);
+response.getWriter().println(bar);'''
+check("编码 + 普通回显（无格式串）→ 安全", xss_verdict(_X_ENC_PLAIN), False)
+
+print("\n[30] xss 外部输入：值从别的类的包装对象里取")
+# `new SeparateClassRequest(request)` 之后 `scr.getTheParameter(...)` ——
+# 入口体里一个 `getParameter(` 都没有，但请求对象被整个传出去了。
+_X_FOREIGN = '''response.setContentType("text/html;charset=UTF-8");
+org.owasp.benchmark.helpers.SeparateClassRequest scr =
+        new org.owasp.benchmark.helpers.SeparateClassRequest(request);
+String param = scr.getTheParameter("BenchmarkTest01507");
+if (param == null) param = "";
+String bar = new Test().doSomething(request, param);
+response.getWriter().println(bar.toCharArray());'''
+check("request 传给别的类再取值 → 算外部输入", has_external_input(_X_FOREIGN), True)
+# 回显值来自 `new Test().doSomething(request, param)` —— 值在辅助方法里产出，
+# 是否转义取决于那个方法体。**这是有意的保守**：宁可交模型，也不在没有
+# 看到辅助方法体的情况下判 True（否则一路"看见外部输入 + 看见回显"就报）。
+# 线上对照：OWASP BenchmarkTest01507 真值是 vul，但同一形态的
+# BenchmarkTest01046/01335/01417 用 `doSomething` 里换成字面量或转义，
+# 真值是 safe，规则在本靶场分不开这两类，只能交模型。
+check("值来自辅助方法产出 → 退回模型（范围没看全）", xss_verdict(_X_FOREIGN), None)
+_X_CONST_ONLY = '''String bar = readFromConfig();
+response.getWriter().println(bar.toCharArray());'''
+check("没有任何外部输入 → 不判漏洞", xss_verdict(_X_CONST_ONLY), False)
+
+# `getTheValue` 名字像 `getTheParameter`，但 OWASP 的 SeparateClassRequest
+# 里它写着 `// This method is a 'safe' source.` 且 `return "bar";`。
+# 按名字算脏 → 260 条样本里 205 条 safe 全部翻成误报。
+_X_SAFE_SOURCE = '''org.owasp.benchmark.helpers.SeparateClassRequest scr =
+        new org.owasp.benchmark.helpers.SeparateClassRequest(request);
+String param = scr.getTheValue("BenchmarkTest00887");
+String bar = "safe!";
+java.util.HashMap<String, Object> map39726 = new java.util.HashMap<String, Object>();
+map39726.put("keyA-39726", "a-Value");
+map39726.put("keyB-39726", param);
+bar = (String) map39726.get("keyB-39726");
+response.getWriter().println(bar.toCharArray());'''
+check("getTheValue 是声明过的安全源 → 不判漏洞",
+      xss_verdict(_X_SAFE_SOURCE), False)
+check("getTheValue 不算外部输入",
+      has_external_input(_X_SAFE_SOURCE), False)
+check("getTheParameter 算外部输入",
+      has_external_input('String p = scr.getTheParameter("x");'), True)
+
+print("\n[31] 容器「先放常量再覆盖」→ 不判 True，交模型")
+# OWASP 的两组同构写法：差别只在覆盖顺序，真值相反。
+_LS = '''String param = request.getParameter("p");
+String bar = "alsosafe";
+if (param != null) {
+    java.util.List<String> valuesList = new java.util.ArrayList<String>();
+    valuesList.add("safe");
+    valuesList.add(param);
+    valuesList.add("moresafe");
+    valuesList.remove(0);
+    bar = valuesList.get(%s); // get the last 'safe' value
+}
+response.getWriter().println(bar.toCharArray());'''
+check("List remove(0) 后 get(1) 取到常量 → 安全", xss_verdict(_LS % "1"), False)
+check("List remove(0) 后 get(0) 取到 param → 真漏洞", xss_verdict(_LS % "0"), True)
+_MP = '''String param = request.getParameter("p");
+String bar = "safe!";
+java.util.HashMap<String, Object> m = new java.util.HashMap<String, Object>();
+m.put("keyA", "a_Value");
+m.put("keyB", param);
+bar = (String) m.get("keyB");
+%s
+response.getWriter().println(bar);'''
+check("Map 先取 param 再被 keyA 覆盖 → 安全",
+      xss_verdict(_MP % 'bar = (String) m.get("keyA");'), False)
+check("Map 只取 param（无覆盖）→ 真漏洞", xss_verdict(_MP % ""), True)
+
+print("\n[32] 恒真/恒假分支：常量条件可求值")
+# OWASP 用 `(7*18)+num > 200` 这种恒真条件承载 true/false 样本。
+# 恒真分支赋字面量 ⇒ 脏值没进回显 ⇒ 安全；赋 param ⇒ 维持 True。
+_IF_LIT = '''String param = request.getParameter("p");
+String bar;
+int num = 106;
+if ((7 * 18) + num > 200) bar = "always";
+else bar = param;
+response.getWriter().println(bar);'''
+_IF_VAR = '''String param = request.getParameter("p");
+String bar;
+int num = 106;
+if ((7 * 18) + num > 200) bar = param;
+else bar = "never";
+response.getWriter().println(bar);'''
+check("恒真分支赋字面量 → 安全", xss_verdict(_IF_LIT), False)
+# 恒真分支赋 param：语义上确实是漏洞，但"回显值来自 if 行内赋值"这一形态
+# 本方法里**没有一处行首的 `bar = …`** 可供逐行核对，按第 5 条铁律
+# 只能交模型，不能拿"条件解出来是真的"替模型下结论。
+check("恒真分支赋 param → 退回模型（不替它下结论）", xss_verdict(_IF_VAR), None)
+_IF_UNKNOWN = '''String param = request.getParameter("p");
+String bar;
+if (flag > 200) bar = "x";
+else bar = param;
+response.getWriter().println(bar);'''
+# 条件里是未知变量 → 两个分支都可能生效，bar 也可能是 `"x"`。
+# 规则判不准"哪一支生效"，同样交给模型。
+check("条件含变量 → 两支都可能，退回模型", xss_verdict(_IF_UNKNOWN), None)
+_LOOP = '''String param = request.getParameter("p");
+String bar = "safe";
+boolean go = false;
+while (false) {
+    bar = param;
+}
+response.getWriter().println(bar);'''
+check("while(false) 块内的赋值不生效 → 安全", xss_verdict(_LOOP), False)
+
+print("\n[33] cmdi 字符集正则白名单：锚定 + matches() 全串匹配")
+# java-sec-code SecurityUtil.cmdFilter 的形态。三个条件缺一不可。
+_CMD_CHARSET = '''// ---- 跨文件辅助方法实现 ----
+// 来自 SecurityUtil.java:200
+    public static String cmdFilter(String input) {
+        if (!FILTER_PATTERN.matcher(input).matches()) {
+            return null;
+        }
+        return input;
+    }
+FILTER_PATTERN = Pattern.compile("^[a-zA-Z0-9_/\\\\.-]+$");'''
+_entry = '''public String codeInjectSec(String filepath) {
+    String filterFilePath = SecurityUtil.cmdFilter(filepath);
+    if (null == filterFilePath) { return "Bad boy. I got u."; }
+    String[] cmdList = new String[]{"sh", "-c", "ls -la " + filterFilePath};
+    ProcessBuilder builder = new ProcessBuilder(cmdList);
+    builder.start();
+    return "";
+}'''
+check("字符集锚定白名单 → 判安全",
+      _verdict("cmdi", _entry + "\n" + _CMD_CHARSET), False)
+# 未锚定 = find 语义，`";;ls"` 能过 → 不是白名单
+check("正则未锚定 → 不认",
+      _verdict("cmdi", _entry + "\n" + _CMD_CHARSET.replace(
+          '^[a-zA-Z0-9_/\\\\.-]+$', '[a-zA-Z0-9_/\\\\.-]+')),
+      None)
+# 有 `|` = 几个片段之一，退化成黑名单
+check("正则含 | → 不认",
+      _verdict("cmdi", _entry + "\n" + _CMD_CHARSET.replace(
+          '[a-zA-Z0-9_/\\\\.-]+', 'cat|dog')),
+      None)
+# 用了 .find() 而不是 .matches() → 子串命中即可，不是全串
+check("用 find() 而非 matches() → 不认",
+      _verdict("cmdi", _entry + "\n" + _CMD_CHARSET.replace(
+          '.matches()', '.find()')),
+      None)
 
 print()
 if FAILS:

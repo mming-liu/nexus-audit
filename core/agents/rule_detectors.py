@@ -832,7 +832,19 @@ _NUMERIC_TYPES = r"(?:int|Integer|long|Long|short|Short|byte|Byte|BigDecimal|Big
 # 这与 memory 第 11 条（切片污染）是同一类错误：判据扫了不该扫的范围。
 _SQL_STMT_HINT_RE = re.compile(
     r"\b(?:select|insert|update|delete|from|where|order\s+by|group\s+by|"
-    r"values|set|join|limit|union)\b", re.I)
+    r"values|set|join|limit|union)\b|"
+    # 条件片段：SQL 被拆成多段拼接、或者语句头存在常量里时，
+    # 当前这一行的字面量只剩 `" AND id = "` 这种尾巴。只认 select/from
+    # 会把整行漏掉，于是"这条拼接里有裸变量"的事实根本没被检查。
+    #
+    # 但 `and` / `or` / `set` 也是英文常用词：`"张三 and 李四"` 会被误认成
+    # SQL。误认的代价是**多扫一条无关拼接**，只有当它恰好含裸变量时才退回
+    # 模型（保守方向），不会凭空判漏洞 —— 所以宁松不宁漏。
+    r"\band\b|\bor\b|\blike\b|\bin\s*\(|"
+    # `= '` 这类"等号后面紧跟引号"的形态，是"值要进 SQL"的强特征。
+    # 注意字面量本身已经被引号包住，`id = ` 后面那一位在**字面量内部**
+    # 是结尾引号，所以这里不该再要求 `'` —— 只认 "等号 + 空格" 即可。
+    r"=\s", re.I)
 
 
 def _sql_rhs_iter(body: str):
@@ -975,8 +987,11 @@ def _impl_segment(source: str) -> str:
 #   3) 本方法无回显、也无串接 → 假（不是本类目的判定对象）
 
 XSS_ECHO_SINK_RE = re.compile(
-    r"\.\s*getWriter\s*\(\s*\)\s*\.\s*(?:print|write|println)\s*\(|"
-    r"\.\s*getOutputStream\s*\(\s*\)\s*\.\s*write\s*\(|"
+    # 五个方法全都要认：`printf` / `format` 在 OWASP 里占 sink 的 41%
+    # （字面量格式串 55 条 + 用户可控格式串 51 条），只认 print/write/println
+    # 会把它们的真阳性整批漏成"无回显"。
+    r"\.\s*getWriter\s*\(\s*\)\s*\.\s*(?:print|write|println|printf|format)\s*\(|"
+    r"\.\s*getOutputStream\s*\(\s*\)\s*\.\s*(?:write|printf|format)\s*\(|"
     # `return xss;` —— 原样交出变量
     r"return\s+[A-Za-z_]\w*\s*;|"
     # `return encode(xss);` 这类"过了一层函数"的返回同样是回显点。
@@ -990,6 +1005,28 @@ XSS_ENCODE_RE = re.compile(
 XSS_PARAM_RE = re.compile(
     r"@RequestParam|@PathVariable|@RequestHeader|@CookieValue|@ModelAttribute|"
     r"request\s*\.\s*getParameter\s*\(|request\s*\.\s*getHeader\s*\(", re.I)
+# 输入可能来自**别的类**：入口手里只有一个包装对象。
+#
+#     SeparateClassRequest scr = new SeparateClassRequest(request);
+#     String param = scr.getTheParameter("BenchmarkTest01507");
+#
+# 这里没有任何 `getParameter(`，但有包装对象上的取值调用。
+#
+# **`new Xxx(request)` 这一句本身不算判据**（曾用它，被记了一次错）：
+# 同一个类里可能既有脏源也有安全源。OWASP 的 `SeparateClassRequest`
+# 里 `getTheParameter` 走 `request.getParameter`，而 `getTheValue`
+# 写着 `// This method is a 'safe' source.` 且 `return "bar";`。
+# "请求对象整个传出去"这件事分不出取回来的是哪一种 ——
+# 260 条调 `getTheValue` 的用例里 205 条真值是 safe，按"对象出门"判脏
+# 会把 00887/00889/00890/00892/00894 这批**本来判对**的样本一起翻成误报。
+#
+# 所以判据落回**取值方法名**这个可逐行核对的事实上，且只认公认的脏源；
+# `getTheValue` 这类"名字像但不是"的一律不认。认错的方向是把 205 条 safe
+# 全判成漏洞，代价不对称。
+_XSS_FOREIGN_SOURCE_RE = re.compile(
+    r"\.\s*(?:getTheParameter|getParameter|getParameterValues|"
+    r"getParameterMap|getHeader|getHeaders|getHeaderNames|getCookieValue|"
+    r"getQueryString|getInputStream|getReader|getCookies)\s*\(", re.I)
 # Spring MVC / JAX-RS 的**裸形参**同样绑定请求参数：
 #     public static String reflect(String xss) { return xss; }
 # 没有注解不等于没有外部输入。只有框架注入的几个类型（HttpServletRequest /
@@ -1021,28 +1058,353 @@ _CHAIN_SEP = "// ---- 跨路由串接证据 ----"
 
 
 def _chain_reader_body(source: str) -> str:
-    """取出串接证据里贴出的读取点方法体（去掉 `// ` 前缀）。"""
+    """取出**非 db 介质**的串接证据里贴出的读取点方法体（去掉 `// ` 前缀）。
+
+    db 介质的证据要排除在外：它的连接描述行以 `// 数据库持久层` 开头，同样
+    以 `//` 起头，早期实现会把它一起吞进来，于是调用方误以为"有普通串接
+    证据"，走进 (2) 分支判 False —— 而 db 证据本该由 (2b) 处理。
+    """
     i = source.find(_CHAIN_SEP)
     if i < 0:
         return ""
     seg = source[i:]
+    nxt = re.search(r"^//\s*----", seg[len(_CHAIN_SEP):], re.M)
+    if nxt:
+        seg = seg[: len(_CHAIN_SEP) + nxt.start()]
     j = seg.find("读取点方法体")
     if j < 0:
         return ""
-    out = []
-    for ln in seg[j:].splitlines()[1:]:
+    body_lines = seg[j:].splitlines()[1:]
+    # 连接描述行（`// 数据库持久层 "x"：…`）在 "读取点方法体" 之前，不在
+    # 这里；这里只看读取点正文。若正文里全是 db 连接留下的痕迹（方法体本身
+    # 就是仓储调用），仍要返回空 —— 由 (2b) 处理，不要让 (2) 误判 False。
+    out: list[str] = []
+    for ln in body_lines:
         s = ln.strip()
         if not s.startswith("//"):
             break
         out.append(s[2:].lstrip())
-    return "\n".join(out)
+    joined = "\n".join(out)
+    if joined and not _has_plain_chain(source):
+        return ""
+    return joined
+
+
+def _has_plain_chain(source: str) -> bool:
+    """是否有 cookie/session/request/model 介质的串接连接（不含 db）。"""
+    i = source.find(_CHAIN_SEP)
+    if i < 0:
+        return False
+    seg = source[i:]
+    nxt = re.search(r"^//\s*----", seg[len(_CHAIN_SEP):], re.M)
+    if nxt:
+        seg = seg[: len(_CHAIN_SEP) + nxt.start()]
+    for ln in seg.splitlines():
+        s = ln.strip()
+        if s.startswith("// ") and not s.startswith("// 数据库持久层") \
+                and "写入 →" in s:
+            return True
+    return False
 
 
 def _entry_signature(source: str) -> str:
-    """取入口方法的签名括号（用于判断有没有裸形参）。"""
+    """取入口方法的签名括号（用于判断有没有裸形参）。
+
+    **不能写 `\\(([^)]*)\\)`**：形参上的注解带括号，且**先于**形参本身的括号闭合 ——
+
+        public String vul2(@ApiParam(name = "payload", required = true)
+                           @RequestParam String payload) {
+
+    非贪婪的 `[^)]*` 会在 `@ApiParam(...)` 的 `)` 处停下，于是拿到的签名是
+    `@ApiParam(name = "payload", required = true`，`_bare_params` 一个都析不出。
+    症状是 `tainted` 为空集 → 回显值"追不到" → 整条样本退回模型，
+    而且**不报错**（只是覆盖率悄悄掉了）。
+    JavaSecLab 的 ReflectController.vul1/vul2、StoreController.vul 全栽在这里。
+
+    正确做法是按括号深度配平，取到真正配平的那个右括号。
+    """
     body = entry_body(source)
-    m = re.search(r"\b\w+\s*\(([^)]*)\)\s*(?:throws[^{]*)?\{", body)
-    return m.group(1) if m else ""
+    # 跳过注解：注解名前面的 `@` 是唯一可靠的区分标志。
+    # 不跳会匹配到 `@ApiOperation(...)` 或 `@GetMapping("/vul2")`。
+    m = re.search(r"(?<![@\w])\b\w+\s*\(", body)
+    if not m:
+        return ""
+    open_idx = m.end() - 1
+    depth = 0
+    for i in range(open_idx, len(body)):
+        ch = body[i]
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return body[open_idx + 1: i]
+    return ""
+
+
+# ---------------- 视图模板证据 ----------------
+#
+# 切片器会把「`model.addAttribute("k", v)` 写入的键，在 `return "view"`
+# 指向的模板里被怎么渲染」贴进来（格式见 core/context/view_templates.py）：
+#
+#     // ---- 关联视图模板（视图名解析到的模板文件，渲染点原文）----
+#     // src/main/resources/templates/vul/xss/other.html:118  不转义渲染 键 "html"
+#     // >>  118| <p th:utext="${html}"></p>
+#
+# 这里解析成 {键: 是否不转义}。**只认证据块内部**，不拿整份模板字符串去扫，
+# 理由与 `entry_body` 相同：范围内的事实才是事实。
+
+_TEMPLATE_SEP = "// ---- 关联视图模板"
+_TPL_HIT_RE = re.compile(r"不转义渲染\s+键\s+\"(?P<key>[^\"]+)\"")
+_TPL_SAFE_RE = re.compile(r"转义渲染\s+键\s+\"(?P<key>[^\"]+)\"")
+
+
+def _template_render(source: str) -> dict[str, bool]:
+    """{model 键: 该键在模板里是否被不转义渲染}。"""
+    i = source.find(_TEMPLATE_SEP)
+    if i < 0:
+        return {}
+    seg = source[i:]
+    out: dict[str, bool] = {}
+    for ln in seg.splitlines():
+        m = _TPL_HIT_RE.search(ln)
+        if m:
+            out[m.group("key")] = True      # 不转义一旦成立就锁定
+            continue
+        m = _TPL_SAFE_RE.search(ln)
+        if m:
+            out.setdefault(m.group("key"), False)
+    return out
+
+
+# 模板介质本身不构成漏洞时，返回 False 的理由要能站得住：
+#   - 模板里只有 `th:text`（自动转义）→ 输入进不去 HTML 解析
+#   - 本方法写入前做了编码 → 模板再怎么渲染都是被转义过的文本
+# 这两条都是可逐行核对的事实，不需要模型理解模板语义。
+_TPL_VIEW_LIT_RE = re.compile(
+    r"\breturn\s+\"[A-Za-z0-9_./-]+\"\s*;|"
+    r"new\s+ModelAndView\s*\(\s*\"[A-Za-z0-9_./-]+\"")
+
+
+# ---------------- `printf` / `format` 的格式串位置 ----------------
+#
+# 同一个回显方法，脏值落在哪个参数位上，结论完全不同：
+#
+#   printf(java.util.Locale.US, "Formatted like: %1$s and %2$s.", obj)
+#       → 格式串是编译期常量，脏值只作为 `%s` 的**实参**
+#
+#   printf(bar, obj)
+#       → `bar` 自己被当成格式串。`%n` 换行、`%x` 宽度这类转换说明符
+#         由用户控制，而且格式串里的字面量部分直接进响应体。
+#
+# 规则不看"转义没转义"（那需要理解 Formatter 语义），只核一件事：
+# **格式串那个位置上是字面量还是变量**。这是可逐行核对的事实，与
+# `hash` 类目核对算法名同构。
+#
+# 调用方把这当成"否定证据"使用：只有确认了"脏值不是格式串"，才允许在
+# 同时存在编码调用时判 False。否则退回 None，把 Formatter 语义交给模型。
+_FMT_SINK_RE = re.compile(
+    r"\.\s*get(?:Writer|OutputStream)\s*\(\s*\)\s*\.\s*(?:printf|format)\s*\("
+    r"(?P<args>[^;]*)\)\s*;", re.I)
+_FMT_LOCALE_PREFIX_RE = re.compile(r"^\s*(?:java\s*\.\s*util\s*\.\s*)?Locale\s*\.\s*\w+\s*,")
+_STR_LIT_ONLY_RE = re.compile(r"^\s*\"[^\"]*\"\s*$")
+
+
+def _value_never_format_string(body: str) -> bool:
+    """本方法里所有 `printf`/`format` 的**格式串位置**都是字面量。
+
+    返回 True 的含义很窄：脏值只可能作为转换说明符的实参传进去，
+    不存在"用户控制的格式串"。调用方据此才敢把 ENCODE 当作真防护。
+    一处都找不到调用时返回 False —— 宁可退回模型，不做无依据的放行。
+    """
+    hits = list(_FMT_SINK_RE.finditer(body))
+    if not hits:
+        return False
+    for m in hits:
+        args = _FMT_LOCALE_PREFIX_RE.sub("", m.group("args").strip())
+        first = args.split(",")[0]
+        if not _STR_LIT_ONLY_RE.match(first):
+            return False               # 格式串位置是变量（或拼接）→ 不由我们放行
+    return True
+
+
+# ---------------- 数据库介质的读取点 ----------------
+#
+# 串接层现在会为同一仓储字段上两个不同路由产出连接（见
+# `taint_chain.build_chains` 的 db 分支）。证据形态：
+#
+#     // 数据库持久层 "xssMapper"：StoreController.vul 写入 → StoreController.getXssList 读出
+#     // 读取点方法体：
+#     //   public R getXssList(...) { ... }
+#
+# 与 cookie/session 的读取点不同，DB 的读取点**结构上**必须自己判一次：
+# "从库里取出来的值，有没有原样进响应体"。判据与反射型一致（回显 + 无编码），
+# 但这里额外允许一个前提 —— 读取点自己也有外部参数（列表接口常有查询条件），
+# 那不改变结论：值来自库，不由该参数决定。
+
+_DB_CHAIN_SEP = "// 数据库持久层"
+
+# 仓储方法读出来的"值"直接当响应体返回。这是 XSS 类目成立的那一半：
+#     return xssMapper.list();          → 库里存的原样字符串就是响应内容
+#     return JSON.toJSONString(list);   → 序列化后进响应
+_DB_DIRECT_ECHO_RE = re.compile(
+    r"return\s+[^;]*\b\w*(?:Mapper|Dao|DAO|Repository|Service)\s*\.\s*\w+\s*\(", re.I)
+# 读取点里出现"往仓储发写指令" → 它自己是写入方，不是读取点。
+# db 连接是**双向**产出的（同一字段上的调用分不出读写），所以必须在这里
+# 把方向判出来：`deleteFeedById` / `add` / `insert` / `update` 都是写。
+_DB_WRITE_CALL_RE = re.compile(
+    r"\.\s*(?:insert|add|save|update|delete|remove|removeById|deleteById|"
+    r"deleteFeedById|batchSave|merge|persist)\w*\s*\(", re.I)
+# 从库取值的调用。MyBatis 的方法名由作者自定（`list` / `getStored` /
+# `selectAll` / `page`），所以这里不按动词穷举，而是**排除写指令后
+# 剩下的仓储调用**就算取值调用 —— 见 `_db_render_points`。
+_DB_FETCH_CALL_RE = re.compile(
+    r"\.\s*(?!insert|add|save|update|delete|remove|removeById|deleteById|"
+    r"batchSave|merge|persist)[A-Za-z_]\w*\s*\(", re.I)
+# 读出来的值被塞进**统一响应包装**（R.ok(...) / Result.success(...) /
+# ResponseEntity.ok(...)）。项目把数据放进 JSON 字段，响应体本身是固定结构，
+# 页面由前端渲染。这类**不构成本类目的证据支点**：
+# 值确实进了响应，但"是否原样进 HTML"取决于前端怎么渲染，Java 侧看不到。
+# 规则手里没有可核对的事实，按第 5 条只能 None。
+_DB_WRAPPED_ECHO_RE = re.compile(
+    r"return\s+(?:R|Result|AjaxResult|CommonResult|ResponseEntity|BaseResponse)\s*\."
+    r"\s*(?:ok|success|error|fail)\s*\(", re.I)
+
+
+def _db_writer_takes_value(body: str) -> bool:
+    """入口是不是**真的把外部字符串写进库**（而不是只按 id 删除/查询）。
+
+    判据：仓储调用里出现了"值型实参"。只传主键/条件的不算：
+
+        xssMapper.add(user, content, date);      → 有 String 值 → 是写入
+        xssMapper.insertAll(content, ua, date);  → 是
+        xssService.deleteById(id);               → 只有 int 主键 → 不是
+
+    为什么要这层：`XSS.delete(int id)` 与 `XSS.save` 共用同一个 `xssMapper`
+    字段，db 串接是双向的，于是 `delete` 也拿到了"读取点 = getStored 直接
+    return list"。不区分"这个路由到底往库里写了什么"，就会把删除接口报成
+    存储型 XSS —— 这正是"看见仓储调用就报漏洞"的那种廉价误报。
+    """
+    for m in re.finditer(
+            r"\.\s*(?P<verb>[A-Za-z_]\w*)\s*\((?P<args>[^)]*)\)", body):
+        verb = m.group("verb").lower()
+        if not re.match(r"(?:insert|add|save|update|create|persist|batch|merge)", verb):
+            continue
+        args = m.group("args")
+        # 以字面量结尾、或含变量引用 → 有值型实参
+        if re.search(r"[A-Za-z_]\w*", args):
+            return True
+    return False
+
+
+def _repo_write_in_evidence(source: str) -> bool:
+    """切片证据里是否能看到"值真的落库"的实现体。
+
+    形态（`JavaImplResolver` 产出的证据块）：
+
+        // ---- 跨文件证据：insertOne() 的接口实现类方法体 @ …/XssServiceImpl.java ----
+        public int insertOne(String content, String ua) {
+            final int code = xssMapper.insertAll(content, ua, DateUtil.now());
+            return code;
+        }
+
+    判据是**证据段内出现了带值实参的仓储写调用**。只扫 `// ----` 之后的部分，
+    入口体由 `_db_writer_takes_value` 单独处理 —— 两段语义不同，不能混扫。
+    """
+    i = source.find("// ----")
+    if i < 0:
+        return False
+    seg = source[i:]
+    for m in re.finditer(
+            r"\b\w*(?:Mapper|Dao|DAO|Repository)\s*\.\s*(?P<verb>[A-Za-z_]\w*)\s*\("
+            r"(?P<args>[^)]*)", seg):
+        if not re.match(r"(?:insert|add|save|update|create|persist|batch|merge)",
+                        m.group("verb"), re.I):
+            continue
+        if re.search(r"[A-Za-z_]\w*", m.group("args")) and '"' not in m.group("args")[:1]:
+            return True
+    return False
+
+
+def _db_echo(readers: str) -> bool:
+    """数据库读取点是否**直接把值交进响应体**。
+
+    三档，都要能逐行核对：
+      - 仓储方法的读取结果直接 `return …Mapper.list()`  → 真
+      - `return R.ok(listPage)` 这类统一包装              → 假（结构固定，前端渲染）
+      - 其余（`log.info(list)`、`list.forEach(...)`）     → 假（没进响应体）
+
+    这条区分不是吹毛求疵：`StoreController.getXssList` 返回的是 MyBatis-Plus
+    的 `R.ok().setData(listPage)`，真正触发 XSS 的是前端页面循环渲染后的
+    innerHTML —— 模板文件里读不到这条链，Java 侧也没有可核对的"不转义输出"。
+    判 True 会变成"看见写库就报漏洞"，那是最廉价也最容易被推翻的误报。
+    """
+    if _DB_WRAPPED_ECHO_RE.search(readers):
+        return False
+    if _DB_DIRECT_ECHO_RE.search(readers):
+        return True
+    # 读取点自己写响应体（getWriter().print(...)）也算回显
+    return bool(re.search(r"getWriter\s*\(\s*\)\s*\.\s*(?:print|write|println)\s*\(", readers))
+
+
+def _db_render_points(readers: list[str]) -> list[str]:
+    """从 db 读取点里筛出**真正把库里的值交进响应体**的形态。
+
+    db 连接是双向的：`XSS.save` 与 `XSS.delete` 共用 `xssMapper`，于是
+    `save` 的读取点里会包含 `delete`；`delete` 的读取点里也会包含 `save`。
+    不筛就会把"有连接"误读成"有回显"。
+
+    判据只有一条且可逐行核对：**方法里既有"从库取值"又有"把值交出去"**。
+    `delete` / `save` 都是写指令，没有取值；`getStored` 有取值且直接
+    `return xssMapper.list()` —— 这一条算回显（库里原样字符串就是响应体）。
+
+    读取点的第一段是它自己的签名 + 方法体，后面才是证据里附带的其它内容；
+    **只看第一段**，避免把后面的写入方法当成读取点。
+    """
+    out: list[str] = []
+    for body in readers:
+        head = body.strip().split("// ----")[0].split("// 读取点方法体")[0]
+        if _DB_WRAPPED_ECHO_RE.search(head):
+            continue                     # 统一包装响应，无法判"不转义"
+        has_fetch = bool(_DB_FETCH_CALL_RE.search(head))
+        has_out = bool(_DB_DIRECT_ECHO_RE.search(head)) or bool(
+            re.search(r"getWriter\s*\(\s*\)\s*\.\s*(?:print|write|println)\s*\(", head))
+        if has_fetch and has_out:
+            out.append(body)
+    return out
+
+
+def _db_readers(source: str) -> list[str]:
+    """取出 db 串接证据里贴出的**每一个**读取点方法体（按 `//   ` 空行分段）。
+
+    早先的实现每遇到一条 `数据库持久层 "x"：…` 就整段收一次，结果同一个读取点
+    被重复收 6 遍，而最后那个真正回显的读取点反而没被收进来 —— 于是判定层
+    看到"读取点都没有回显"，把存储型 XSS 判成安全。分段必须在**证据块内部**
+    按分隔空行切，而不是按描述行切。
+    """
+    i = source.find(_DB_CHAIN_SEP)
+    if i < 0:
+        return []
+    seg = source[i:]
+    j = seg.find("读取点方法体")
+    if j < 0:
+        return []
+    texts: list[str] = []
+    cur: list[str] = []
+    for ln in seg[j:].splitlines()[1:]:
+        s = ln.strip()
+        if not s.startswith("//"):
+            break
+        code = s[2:].lstrip()
+        if not code:                      # `//   ` 空行 = 两个读取点之间的分隔
+            if cur:
+                texts.append("\n".join(cur))
+                cur = []
+            continue
+        cur.append(code)
+    if cur:
+        texts.append("\n".join(cur))
+    return texts
 
 
 # ---------------- 外部输入来源（Source Gate） ----------------
@@ -1080,6 +1442,267 @@ _REQUEST_READ_RE = re.compile(
     re.I)
 
 
+# ---------------- 容器「先放常量再覆盖」 ----------------
+#
+# OWASP 里有两组写法看起来一模一样、真值却相反，差别全在**覆盖的顺序**：
+#
+#   List:  bar = "alsosafe";
+#          valuesList.add("safe"); add(param); add("moresafe"); remove(0);
+#          bar = valuesList.get(1);
+#      → remove(0) 之后剩余是 [param, "moresafe"]，下标 1 是常量 → 真值 False
+#      → 若写 get(0)，剩余下标 0 就是 param                   → 真值 True
+#      （"remove 之后第一个元素是 param" 可以直接从 add 的顺序核对出来，
+#        不需要理解 List 的语义）
+#
+#   Map:   put("keyA", "a_Value"); put("keyB-N", param); put("keyC", "...");
+#          bar = map.get("keyB-N");   // 拿到 param
+#          bar = map.get("keyA");     // **被常量覆盖**      → 真值 False
+#      → 若 get("keyA") 那行不存在，真值就是 True（00153 就是这样）
+#
+# 判据只有一个：**回显点之前 `bar` 的最后一次赋值上溯到什么**。
+# 上溯到常量字面量 → 判 None（看见了覆盖，但 Formatter 语义仍不归规则管）；
+# 仍能上溯到外部输入 → 保持 True。
+#
+# 为什么不直接判 False：`get(1)` 的"常量"依赖"remove 之后顺序如何"这条推演，
+# 样本一旦变体（连 remove 两次、add 在 remove 之后）推演就错。规则只做
+# "我现在不知道"的诚实表达，不拿推演冒充事实。
+
+_LIST_ADD_RE = re.compile(
+    r"(?P<var>[A-Za-z_]\w*)\s*\.\s*(?:add|push|offer|addLast)\s*\(\s*(?P<val>[^)]*)\)")
+_LIST_REMOVE_RE = re.compile(
+    r"(?P<var>[A-Za-z_]\w*)\s*\.\s*remove\s*\(\s*(?P<idx>\d+)\s*\)")
+_MAP_PUT_RE = re.compile(
+    r"(?P<var>[A-Za-z_]\w*)\s*\.\s*put\s*\(\s*\"(?P<key>[^\"]+)\"\s*,\s*(?P<val>[^)]*)\)")
+_ASSIGN_RE = re.compile(
+    r"^\s*(?:[\w<>\[\],.\s]+?\s+)?(?P<var>[A-Za-z_]\w*)\s*=(?!=)\s*(?P<rhs>.+)$")
+
+
+def _literal_or_none(expr: str) -> str | None:
+    """`"abc"` → abc；其他（变量/方法调用）→ None。"""
+    m = re.fullmatch(r"\"([^\"]*)\"", expr.strip())
+    return m.group(1) if m else None
+
+
+def _last_assignment_untainted(body: str, var: str) -> bool:
+    """`var` 的最后一次赋值能否上溯到**常量字面量**。
+
+    形如 `bar = valuesList.get(1)` / `bar = map.get("keyA")` 的赋值会回溯到
+    同方法内该容器的 add / put 记录。回溯不到一律 False（= 不做判断，
+    交回原逻辑）—— 绝不在"看不见"的时候断言安全。
+    """
+    lines = body.splitlines()
+    last_rhs: str | None = None
+    last_i = -1
+    for i, ln in enumerate(lines):
+        m = _ASSIGN_RE.match(ln)
+        if m and m.group("var") == var:
+            last_rhs, last_i = m.group("rhs"), i
+    if last_rhs is None:
+        return False
+
+    if _literal_or_none(last_rhs) is not None:
+        return True                     # 直接赋字面量
+
+    m = re.search(r"\b(?P<cont>[A-Za-z_]\w*)\s*\.\s*get\s*\(\s*(?P<arg>[^)]*)\)", last_rhs)
+    if not m:
+        return False
+    cont, arg = m.group("cont"), m.group("arg").strip()
+    head = "\n".join(lines[: last_i + 1])
+
+    # Map：按键回溯最后一次 put
+    key = _literal_or_none(arg)
+    if key is not None:
+        val = None
+        for pm in _MAP_PUT_RE.finditer(head):
+            if pm.group("var") == cont and pm.group("key") == key:
+                val = pm.group("val")
+        return val is not None and _literal_or_none(val) is not None
+
+    # List：按 add 顺序 + remove 推演
+    if re.fullmatch(r"\d+", arg):
+        seq = [am.group("val").strip()
+               for am in _LIST_ADD_RE.finditer(head) if am.group("var") == cont]
+        for rm in _LIST_REMOVE_RE.finditer(head):
+            if rm.group("var") == cont:
+                k = int(rm.group("idx"))
+                if 0 <= k < len(seq):
+                    seq.pop(k)
+        idx = int(arg)
+        return idx < len(seq) and _literal_or_none(seq[idx]) is not None
+
+    return False
+
+
+# ---------------- 三元 / 循环：「常量分支可直接判定」 ----------------
+#
+# OWASP 用一堆"看起来像分支、其实恒真恒假"的写法来承载 true/false 样本，
+# 这些条件全部只由编译期常量构成（`(7 * 18) + num > 200`），不可能失败。
+#
+# 结论的方向是**精确**的，先想清楚再落地：
+#
+#   恒真分支被选中 → 该分支赋字面量 ⇒ 脏值没进回显 ⇒ 安全（可以判 False）
+#   恒真分支被选中 → 该分支赋 param  ⇒ 脏值进回显     ⇒ 真漏洞（维持 True）
+#
+# 所以这是"否定证据"性质的闸门：它只会把 True 改成 False，绝不反过来。
+# 恒假条件、循环（OWASP 的循环一律是 `while(false)`，一次都不执行）、
+# 或者条件里出现任何变量，一律不介入 —— 返回"无法判定"。
+#
+# 之前我把它写成"If 分支里出现字面量赋值就交模型"，方向保守但会白白丢掉
+# 一批可判定的安全样本；正确的做法是判**哪一支会被选中**，再读那一支的值。
+
+_CONST_TOKEN_RE = re.compile(r"\d+|true|false|&&|\|\||[()<>=!+\-*/%]|\s+|'.'")
+_IF_RE = re.compile(r"\bif\s*\(")
+_WHILE_RE = re.compile(r"\bwhile\s*\(")
+
+
+def _balanced_cond(line: str, start: int) -> str | None:
+    """从 `start`（左括号之后）取到配平的右括号，返回括号内文本。"""
+    depth = 1
+    for k in range(start, len(line)):
+        ch = line[k]
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return line[start:k]
+    return None
+
+
+def _numeric_locals(body: str) -> dict[str, str]:
+    """局部变量里哪些是**编译期常量数字**：`int num = 106;` → {num: "106"}。
+
+    OWASP 的条件全部写在这类变量上（`(7 * 18) + num > 200`）。必须代入
+    **真实数值**而不是占位符 —— 代入 0 会把 `252 > 200` 从真算成假。
+    右侧只要出现标识符或方法调用就不算常量，不代入。
+    """
+    out: dict[str, str] = {}
+    for m in re.finditer(
+            r"\b(?:int|long|short|byte|double|float)\s+(\w+)\s*=(?!=)\s*([^;]+);",
+            body):
+        name, rhs = m.group(1), m.group(2).strip()
+        if re.search(r"[A-Za-z_$]", rhs):
+            continue                     # 右侧含变量/调用 → 不是编译期常量
+        if re.fullmatch(r"[\d\s.+\-*/%()]+", rhs):
+            out[name] = rhs
+    return out
+
+
+def _const_cond_truth(cond: str, env: dict[str, bool] | None = None) -> bool | None:
+    """只由数字/布尔/算术/比较/位运算符（以及已确认的常量局部变量）组成的条件求值。
+
+    含未确认变量则返回 None。注意**变量替换必须写 `\\b` 边界**：写成
+    `expr.replace("true", "")` 会把 `String` 里的 `tru` 一起削掉
+    （`String bar` → `S bar`），于是所有含 String 声明的条件都被误判成
+    "有变量"。这是踩过的一次。
+    """
+    expr = cond.strip()
+    if not expr:
+        return None
+    if env:
+        for name, val in env.items():
+            # 代入**真实数值**而不是占位符：代入 0 会把 `(7*18)+106 > 200`
+            # 从真算成假。env 里的值已在 `_numeric_locals` 里核过是纯数字表达式。
+            expr = re.sub(rf"\b{re.escape(name)}\b", f"({val})", expr)
+    scrubbed = re.sub(r"\b(?:true|false)\b", " ", expr)
+    if re.search(r"[A-Za-z_$]", scrubbed):
+        return None                      # 有标识符 → 不可常量求值
+    # `!` 必须在标识符检查**之后**才换成 `not`，否则 `not` 的字母
+    # 会被当成变量，条件永远判不出来。
+    py = re.sub(r"\btrue\b", "True", expr)
+    py = re.sub(r"\bfalse\b", "False", py)
+    py = py.replace("&&", " and ").replace("||", " or ")
+    py = re.sub(r"!(?!=)", " not ", py)
+    try:
+        return bool(eval(py, {"__builtins__": {}}, {}))   # noqa: S307 —— 已白名单化
+    except Exception:
+        return None
+
+
+def _assign_kind(line: str) -> str | None:
+    """一行赋值右侧是字面量还是有变量。返回 'lit' / 'var' / None。"""
+    m = _ASSIGN_RE.match(line)
+    if not m:
+        return None
+    return "lit" if _literal_or_none(m.group("rhs")) is not None else "var"
+
+
+def _const_branch_overrides(body: str, var: str = "bar") -> str | None:
+    """当 `var` 的最后一次赋值落在**恒真分支**上时，返回那一支的值类型。
+
+    返回 'lit'  → 回显的是常量，脏值没进去
+    返回 'var'  → 回显的仍是变量（真漏洞维持）
+    返回 None   → 判不出来（条件含变量、循环体、结构不认识）
+
+    实现上只处理"最后一次赋值"：它决定了回显时 `var` 里到底是什么。
+    往前找最近的一行 `if (cond) ... var = X`，条件是常量就求值。
+    """
+    lines = body.splitlines()
+    env = _numeric_locals(body)
+    last_i = -1
+    for i, ln in enumerate(lines):
+        m = _ASSIGN_RE.match(ln)
+        if m and m.group("var") == var:
+            last_i = i
+    if last_i < 0:
+        return None
+
+    # 关键：`_ASSIGN_RE` 是行首锚定的，行内赋值（`if (c) bar = x;`）
+    # 单看这一行**匹配不到**，必须回头找它前面最近的 if 行。
+    # 反例是 `if (c) bar = "lit"; else bar = param;` —— 看到 else 行
+    # 仍要继续往前找 if，不能停在 else 上。
+    for i in range(last_i, -1, -1):
+        m = _IF_RE.search(lines[i])
+        if not m:
+            continue
+        cond = _balanced_cond(lines[i], m.end())
+        if cond is None:
+            return None
+        truth = _const_cond_truth(cond, env)
+        if truth is None or truth is False:
+            # None = 条件含变量；False = 恒假（说明还有别的路径给 var 赋值）
+            return None
+        # 恒真：先看 if 那一行的行内赋值，再看紧跟的块
+        blk = "\n".join(lines[i: min(last_i + 2, len(lines))])
+        for cand in blk.splitlines():
+            am = _ASSIGN_RE.match(cand)
+            if am and am.group("var") == var:
+                return _assign_kind(cand)
+            inline = re.search(rf"\b{re.escape(var)}\s*=(?!=)\s*(.+?);", cand)
+            if inline:
+                return "lit" if _literal_or_none(inline.group(1)) else "var"
+        return None
+    return None
+
+
+def _in_never_run_loop(body: str, var: str = "bar") -> bool:
+    """`var` 的回显是否落在 `while(false)` 这类一次都不执行的块里。
+
+    只认条件可常量求值为 False 的 while —— 其它循环语义（break/continue、
+    异常退出）规则不碰，返回 False 表示"不介入"。
+    """
+    lines = body.splitlines()
+    for i, ln in enumerate(lines):
+        m = _WHILE_RE.search(ln)
+        if not m:
+            continue
+        cond = _balanced_cond(ln, m.end())
+        if cond is None or _const_cond_truth(cond, _numeric_locals(body)) is not False:
+            continue
+        # 从 while 这一行往后数花括号，找块里对 var 的赋值
+        depth = 0
+        started = False
+        for j in range(i, len(lines)):
+            if j > i and re.search(rf"\b{re.escape(var)}\b", lines[j]):
+                return True
+            depth += lines[j].count("{") - lines[j].count("}")
+            if "{" in lines[j]:
+                started = True
+            if started and depth <= 0:
+                break
+    return False
+
+
 def has_external_input(source: str) -> bool:
     """入口方法是否存在外部可控输入（形参 / 请求读取 / 跨路由串接）。
 
@@ -1094,11 +1717,147 @@ def has_external_input(source: str) -> bool:
         return True                    # 截不出入口体，不在此处下结论
     if XSS_PARAM_RE.search(body) or _REQUEST_READ_RE.search(body):
         return True                    # 注解绑定或 request 读取
+    if _XSS_FOREIGN_SOURCE_RE.search(body):
+        return True                    # 值从别的类的 `xxx(request)` 里取出来
     if _bare_params(_entry_signature(body)):
         return True                    # Spring/JAX-RS 裸形参（框架注入类型已排除）
     if _chain_reader_body(source):
         return True                    # 本方法写的值经介质被另一路由读取
     return False
+
+
+def _has_inline_assign_after(body: str, var: str, pos: int) -> bool:
+    """`pos` 之后是否还有对 `var` 的行内赋值（`if (c) bar = x;` 这种）。
+
+    行首锚定的赋值正则抓不到行内赋值，所以"最后一行被识别到的赋值是
+    字面量"并不等于"回显时 var 是字面量"：
+        String bar;                                   ← 声明
+        if ((7*18)+num > 200) bar = param;            ← 行内赋值（正则漏掉）
+        else bar = "never";                           ← 正则看到的是这行
+    """
+    return bool(re.search(
+        rf"(?<![\w.]){re.escape(var)}\s*=(?!=)[^;]*;", body[pos + 1:]))
+
+
+def _echo_value_traced_locally(body: str, var: str = "bar") -> bool | None:
+    """回显的 `var` 能否在本方法内追到一个**来自外部输入的赋值**。
+
+    三态，``None`` 是刻意保留的中间档：
+
+        True   —— 能逐行追到（`bar = param` / `bar = scr.getTheParameter(..)`
+                  / `bar = request.getParameter(..)`），且链上没有别的加工。
+                  调用方据此判 True。
+        False  —— 追不到：`var` 由**别的方法**产出（`String bar =
+                  doSomething(request, param)`），或从未在本方法赋值。
+                  此时"入口体无编码"不等于"链上无编码" —— 编码常在 helper
+                  里（`return StringEscapeUtils.escapeHtml(param);`）。
+                  调用方不得判 True，只能 None。
+        None   —— 追到了输入面，但值确实被"请求对象出门"这一句弱信号推出去了：
+                  `String bar = doSomething(request, param)`。输入成立，但是否
+                  加工取决于那个方法体；OWASP 里同形态真值相反。调用方只能 None。
+
+    只处理可逐行核对的情形，其余一律 False（= 交模型）：
+
+        String bar = param;                  → 直接来自形参/请求读取
+        bar = request.getParameter("x");     → 直接来自请求
+        String bar = "safe";  /  bar = "..."; → 字面量：调用方已由
+                                               `_last_assignment_untainted`
+                                               处理，这里视作"本地可追"
+    反例（判 False 的那些）：
+        String bar = helper(request, param);  → 值在 helper 里产出，
+                                               helper 里可能已经转义
+        String bar = thing.doSomething(x);    → 同上（反射调度）
+
+    为什么不需要追"赋值右侧包含变量"这种更宽的定义：本闸门只用于
+    **阻止判 True**，判 False 的方向不归它管；宁可把可疑样本交给模型，
+    也不要给出一个"范围没看全"的结论。
+    """
+    # 形参名与请求读取出来的变量：`String param = request.getParameter(...)`
+    tainted: set[str] = set()
+    for m in re.finditer(
+            r"\b(?:String|var|[\w.]+\s+[\w.]+)\s+(\w+)\s*=(?!=)\s*"
+            r"(request\s*\.\s*(?:getParameter|getParameterValues|getHeader|"
+            r"getHeaders|getQueryString|getCookies)|values\[0\]|headers\.nextElement)",
+            body):
+        tainted.add(m.group(1))
+    # 从包装对象里取值：`String param = scr.getTheParameter("x");`
+    # `getTheValue` 刻意不在此列 —— 见 `_XSS_FOREIGN_SOURCE_RE` 上的说明，
+    # OWASP 里它是**声明过的安全源**，按名字算脏会整批误报。
+    for m in re.finditer(
+            r"\b(?:String|var)\s+(\w+)\s*=(?!=)\s*[\w.]+\s*\.\s*"
+            r"(?:getTheParameter|getParameter|getHeader)\s*\(", body):
+        tainted.add(m.group(1))
+    sig = _entry_signature(body)
+    tainted.update(_bare_params(sig))
+    # 兜底：本方法里任何 `String x = ...(...)` 的右侧只要出现 `request`
+    # 或 `scr.` 这类请求包装对象，`x` 也算脏的
+    # （`String param = scr.getTheParameter("x")`）。
+    # **不要把右侧是"调用本类辅助方法"的那条也算进来** —— 那是被加工过的值，
+    # 由 `_echo_value_traced_locally` 单独判定，算进来会让"回显的就是它自己"
+    # 被当成"回显来自外部输入"。
+    for m in re.finditer(r"\b(?:String|var)\s+(\w+)\s*=(?!=)\s*([^;]+);", body):
+        if re.search(r"\brequest\b|\bscr\s*\.", m.group(2)):
+            tainted.add(m.group(1))
+    if not tainted:
+        return False
+
+    # 先处理行内赋值（`if (c) bar = param;`）：行首锚定的赋值正则对它
+    # **是瞎的** —— 它只会看到 `else bar = "never";` 那一行，于是把
+    # "字面量覆盖"当成定论。这一步必须在读 assigns 之前做。
+    for il in body.splitlines():
+        if re.search(rf"\bif\s*\([^)]*\)\s*[^;]*\b{re.escape(var)}\s*=(?!=)", il):
+            # 恒真分支赋字面量 → False（由调用方的 `_const_branch_overrides`
+            # 先拦掉）。这里只剩"分支里赋的是脏值"和"条件解不出来"两种，
+            # 都够不上逐行核对的 True，交模型。
+            return False if _const_branch_overrides(body, var) == "lit" else None
+
+    assigns = [m for m in re.finditer(
+        rf"^\s*(?:(?:final|static|private|public|protected)\s+)*"
+        rf"(?:[\w<>\[\],.]+\s+)?{re.escape(var)}\s*=(?!=)\s*(?P<rhs>.+)$",
+        body, re.M)]
+    # 取**最后一次**赋值：前面的字面量初始化（`String bar = "alsosafe";`）
+    # 会被后面的 `bar = valuesList.get(0);` 覆盖，回显时生效的是后者。
+    assigns = assigns[-1:]
+    if not assigns:
+        # 本方法没给 var 赋过值。三种情形要分开：
+        #   a) 回显的是**形参/请求读出的变量本身**（`return xss;`）→ 可追
+        #   b) 回显的是一个从未赋值的局部（`println(bar)` 而 bar 无赋值）→ 不可追
+        #   c) 赋值写在 `if (...)` 行内（`if (c) bar = param;`），行首锚定的
+        #      正则抓不到 —— 由 `_const_branch_overrides` 判定那一支生效
+        if any(re.search(rf"^\s*return\s+{re.escape(t)}\s*;", body, re.M)
+               for t in tainted):
+            return True
+        return None                  # 没赋过值就回显：范围没看全，交模型
+
+    for m in assigns:
+        rhs = m.group("rhs").strip()
+        # 右侧是**别的方法的调用**（`doSomething(request, param)`、
+        # `new Test().doSomething(request, param)`）时，值经过加工 —— 是否
+        # 已转义取决于那个方法体，而它不一定在入口体范围内。
+        # 但**参数里有 request 就是输入面成立**的硬证据，返回 None 而不是
+        # False：这两种情况的处置一样（交模型），可语义必须分开记，
+        # 否则以后想收紧成 False 时看不出哪里丢了信息。
+        if re.match(r"(?:new\s+\w+\s*\(\s*[^)]*\)\s*\.\s*)?[A-Za-z_]\w*\s*\(\s*(?:request|scr)",
+                    rhs):
+            return None
+        if _literal_or_none(rhs) is not None:
+            return True                  # 字面量：脏值已被常量顶掉
+        head = re.match(r"[A-Za-z_]\w*", rhs)
+        if head and head.group(0) in tainted and head.group(0) != var:
+            return True                  # `var = param;`（右侧就是外部输入变量）
+        if re.match(r"\(?\s*\(?\s*(?:[A-Za-z_][\w.]*\s*\)\s*)?[A-Za-z_]\w*\s*\.\s*get\s*\(",
+                    rhs):
+            return True                  # 容器取值，安全性由上游闸门判定
+        if rhs.startswith("request") or rhs.startswith("scr"):
+            return True                  # 直接读请求 / 从请求包装对象里取
+        # `var = helper(request, param)`：值由本文件（或别的类）的方法产出。
+        # 靶场里 `doSomething(request, param)` 的产物确实是脏值，但**是否
+        # 被转义取决于那个方法体**，而它不一定被切进 entry_body。看不到
+        # 那一层就不下结论 —— 这正是 OWASP 里 100 余条误报的根因形态。
+        if re.match(r"(?:new\s+[\w.()]+\s*\.\s*)?[A-Za-z_]\w*\s*\(", rhs):
+            return False
+        # 其它形态（拼接、三元、下标……）→ 范围没看全，不判 True
+        return None
 
 
 def xss_verdict(source: str) -> bool | None:
@@ -1107,23 +1866,130 @@ def xss_verdict(source: str) -> bool | None:
         return None
 
     has_param = has_external_input(source)
+    # 注意用 `_chain_reader_body`（只认 cookie/session/request/model 那条证据块）
+    # 而不是"有串接证据" —— db 证据块由下面的 (2b) 专门处理。
     reader = _chain_reader_body(source)
 
     # 1) 反射型：有外部入参 + 有回显 + 无编码
     if has_param and XSS_ECHO_SINK_RE.search(body):
         if XSS_ENCODE_RE.search(body):
+            # `printf`/`format` 的格式串位置如果是变量，说明用户能控制
+            # Formatter 的转换说明符 —— 那是另一套注入面，ENCODE 未必覆盖。
+            # 只有确认格式串是字面量，才允许把 ENCODE 当真防护判 False。
+            if _FMT_SINK_RE.search(body) and not _value_never_format_string(body):
+                return None
             return False
+        # 回显的 `bar` 在回显点之前被"确定性覆盖"：容器 get 取到常量、
+        # 或恒真分支赋了字面量。这是可逐行核对的事实，不是推演。
+        if _last_assignment_untainted(body, "bar"):
+            return False
+        if _const_branch_overrides(body, "bar") == "lit":
+            return False
+        if _in_never_run_loop(body, "bar"):
+            return False                 # 回显落在一次都不执行的 while 里
+        # 回显的 `bar` 来自**别的方法**产出的：本方法里没有任何一处
+        # `bar = …`（只有 `String bar = helper(param)` 这种初始化）。
+        # 此时"入口体无编码"不等于"链上无编码" —— 编码常常在 helper 里：
+        #     String bar = doSomething(request, param);
+        #     private static String doSomething(...) {
+        #         return StringEscapeUtils.escapeHtml(param);   // 编码在这
+        #     }
+        # 这正是 OWASP 里 150 余条误报的共同根因，也是"判据扫的范围
+        # 先于判据内容"那条铁律的又一例：**范围错了，结论一定是错的**。
+        # 只有确认"回显值就是本方法里能追到的那个变量"时，才敢判 True。
+        traced = _echo_value_traced_locally(body, "bar")
+        if not traced:
+            return None
+        # `traced is None` 是"请求对象被整个传给了别的方法"这种**弱信号**：
+        #     String bar = doSomething(request, param);
+        # 输入面成立（request 确实出门了），但回显值是否被加工/转义取决于
+        # 那个方法体。OWASP 里 `doSomething` 有的原样返回、有的在内部
+        # `escapeHtml` —— 同形态真值相反，规则分不开，只能交模型。
+        if traced is None:
+            return None
         return True
 
-    # 2) 存储型：本方法只写不读，值经介质流到另一个回显点
-    if reader:
+    # 1b) 反射/存储型，但回显点在**模板文件**里。
+    #
+    #     这是 Spring MVC 最典型的形态，而 Java 方法体里完全看不到渲染：
+    #         model.addAttribute("html", payload);
+    #         return "vul/xss/other";        → other.html: th:utext="${html}"
+    #
+    #     判定支点是模板里的渲染指令本身，两档都能确定：
+    #       th:utext / <#noescape> / [[${}]]  → 不转义，输入原样进 DOM → True
+    #       只有 th:text / ${} 文本节点        → 框架自动转义        → False
+    #     前提是写入端没有先编码（编码了则模板怎么渲染都是文本）。
+    if has_param:
+        tpl = _template_render(source)
+        if tpl:
+            if any(unescaped for unescaped in tpl.values()):
+                return False if XSS_ENCODE_RE.search(body) else True
+            if _TPL_VIEW_LIT_RE.search(body):
+                return False           # 命中的键全部走自动转义
+            return None                # 键写进了 model，但模板里没找到渲染点
+
+    # 2) 存储型：本方法只写不读，值经介质（cookie/session/request/model）
+    #    流到另一个回显点。
+    #
+    #    **必须要求"确有非 db 的连接"**，不能只看 `reader` 非空：db 介质的
+    #    连接描述行同样以 `//` 起头，会让 `reader` 取到内容却没有任何普通
+    #    介质连接 —— 于是 (2b) 的 DB 判定被整段跳过，写入方被判 False。
+    if reader and _has_plain_chain(source):
         if not XSS_ECHO_SINK_RE.search(reader):
             return False               # 读取点没有回显，链路不闭合
         if XSS_ENCODE_RE.search(reader):
             return False               # 读取点做了输出编码
         return True
 
-    # 3) 存储型，但介质不在串接建模范围内：写进数据库（Mapper/DAO/Repository）。
+    # 2b) 存储型，介质是数据库：写入方与读取方共用同一个仓储字段。
+    #
+    #     串接层现在能把"同一 Mapper 字段上的两个路由"配成连接（见
+    #     `taint_chain.build_chains` 的 db 分支），于是这里拿到了读取点方法体。
+    #     判据与 (2) 一致，但方向不同：(2) 的读取点自己没有外部输入，(2b) 的
+    #     读取点通常是列表接口 —— 它有没有参数都不影响结论，值来自库。
+    #
+    #     仍然不直接判 True 而不看写入端：写入前做了编码（`HtmlUtils.htmlEscape`
+    #     再 insert），库里存的已经是转义文本，读取点原样回显也不会执行。
+    if has_param and XSS_PERSIST_RE.search(body):
+        # 写入前已编码：本方法内即可核对，直接判安全（库里存的就是转义文本）
+        if XSS_ENCODE_RE.search(body):
+            return False
+        # 自己只是"按主键删/按主键取单条"这类操作：没有把外部字符串写进库，
+        # 不可能构成存储型 XSS 的写入端。判 None（交模型核对意图），不判 True。
+        if _db_writer_takes_value(body):
+            readers = _db_render_points(_db_readers(source))
+            if readers:
+                joined = "\n".join(readers)
+                if _db_echo(joined) and not XSS_ENCODE_RE.search(joined):
+                    return True
+        # 写入端经 Service 转调（`xssService.insertOne(...)` → `xssMapper.insertAll(...)`）：
+        # 切片器已经把那层实现体贴进 `// ---- 跨文件证据：insertOne() 的接口实现类
+        # 方法体 ----`。读到它，就是可逐行核对的事实 —— 值确实落库了。
+        if _repo_write_in_evidence(source):
+            readers = _db_render_points(_db_readers(source))
+            if readers:
+                joined = "\n".join(readers)
+                if _db_echo(joined) and not XSS_ENCODE_RE.search(joined):
+                    return True
+        # 落在这里的两种情况都必须交模型，不能判 False：
+        #   a) 有写入、但读取点没把值原样交进响应体（或根本没找到读取点）
+        #   b) 本路由只按主键删/查，不写值
+        # "看不见读取点"不等于"链不闭合"——读取点在库的另一侧，Java 侧看不到。
+        return None
+
+    # 2c) 文件上传介质：上传的文件本身会被浏览器当页面解析。
+    #
+    #     判据是**用户能否决定落盘扩展名**，这是可核对的事实：
+    #       - 走 switch/白名单枚举扩展名 → 攻击面收敛到那几个值，判 False
+    #       - 扩展名直接取自 `getOriginalFilename()` 且无枚举 → True
+    #     这条与 pathtraver 无关（那条判的是"能不能跳出目录"），
+    #     也不与文件类目的其它样本冲突：它只在"上传后返回可访问 URL"时成立。
+    if _UPLOAD_SINK_RE.search(body) and XSS_UPLOAD_EXT_RE.search(body):
+        if XSS_UPLOAD_EXT_ALLOWED_RE.search(body):
+            return None            # 有枚举但要对每个分支逐个核实，交模型
+        return True
+
+    # 3) 存储型，介质不在串接建模范围内：写进数据库（Mapper/DAO/Repository）。
     #    跨路由串接只按 cookie/session/request/model 配对，DB 不在其中，所以
     #    `reader` 一定是空的。此时判 False 是错的 —— Hello-Java-Sec 的
     #    `XSS.save`（`xssMapper.add(user, content, date)` + 另一路由 `list()`
@@ -1143,12 +2009,33 @@ def xss_verdict(source: str) -> bool | None:
     return False
 
 
+# 文件落盘 + 返回可按 URL 访问的位置
+_UPLOAD_SINK_RE = re.compile(
+    r"\.\s*transferTo\s*\(|"
+    r"Files\s*\.\s*(?:copy|write|newOutputStream)\s*\(|"
+    r"\w*[Uu]til\w*\s*\.\s*upload\w*\s*\(|"
+    r"\.\s*store\s*\(", re.I)
+# 扩展名由用户决定（取原始文件名、或直接取请求参数当后缀）
+XSS_UPLOAD_EXT_RE = re.compile(
+    r"getOriginalFilename\s*\(\s*\)|"
+    r"getExtension\s*\(|"
+    r"getName\s*\(\s*\)\s*\.\s*(?:split|substring)|"
+    r"request\s*\.\s*getParameter\s*\(\s*\"(?:type|suffix|ext)", re.I)
+# 扩展名走了白名单枚举（switch 分支 / 集合 contains）
+XSS_UPLOAD_EXT_ALLOWED_RE = re.compile(
+    r"switch\s*\(\s*\w*(?:type|suffix|ext)\w*\s*\)|"
+    r"\b(?:allowed|whitelist|whiteList|ALLOWED|exts|suffixes)\w*\s*\.\s*contains\s*\(", re.I)
+
+
 # 持久层写入：仓库类调用的通用形态（MyBatis Mapper / DAO / JPA Repository）。
 # 不写成 `\.add(` —— 那会把 `sb.append` 之外的 `list.add(x)` 也卷进来。
+#
+# 补上 Service 层：`xssService.insertOne(payload, ua)`。Service 方法名不一定
+# 带 save/add/insert（也可以是 `insertOne` / `store` / `persistXxx`），
+# 只看动词会漏；判据落在"接收者是不是仓储字段"上，字段命名更有规律
+# （与 `taint_chain._REPO_FIELD_RE` 保持同一套后缀）。
 XSS_PERSIST_RE = re.compile(
-    r"\b\w*(?:[Mm]apper|[Dd]ao|DAO|[Rr]epository)\s*\.\s*\w+\s*\(|"
-    r"\b\w*(?:[Mm]apper|[Dd]ao|DAO|[Rr]epository)\s*\.\s*(?:save|add|insert|update|create)\w*\s*\(",
-    re.I)
+    r"\b\w*(?:Mapper|Dao|DAO|Repository|Service)\s*\.\s*\w+\s*\(", re.I)
 
 
 
@@ -1644,6 +2531,30 @@ def cmdi_verdict(source: str) -> bool | None:
 _HELPER_ALLOW_RE = re.compile(
     r"\b\w*(?:white|allow|permit|legal|valid|safe|list|set|map|pool|range|"
     r"commands?|allowed)\w*\s*\.\s*(?:contains|indexOf)\s*\(\s*\w+\s*\)", re.I)
+# **字符集正则也是"值的集合"**，只是写法不同：
+#
+#     private static final Pattern FILTER_PATTERN =
+#             Pattern.compile("^[a-zA-Z0-9_/\\.-]+$");
+#     public static String cmdFilter(String input) {
+#         if (!FILTER_PATTERN.matcher(input).matches()) return null;
+#         return input;
+#     }
+#
+# `Matcher.matches()` 是**全串**匹配（不是 find），配上一个
+# `^...+$` 的字符集枚举，等价于"这个串的每个字符都必须在集合里" ——
+# 和 `whitelist.contains(cmd)` 拦的是同一件事，只是粒度从"整值"降到"逐字符"。
+# 空格、`;`、`|`、`&` 全部拒绝，命令拼接无从下手。
+#
+# 判据必须同时要求三件事，缺一不可：
+#   ① `.matches(` 是**无参**调用（`matcher(x).matches()`），不是
+#      `x.matches("regex")` —— 后者是另一种形态，先不管；
+#   ② 能找到 `Pattern.compile("…")` 且模式是**锚定**的（`^` 开头或 `$` 结尾）；
+#   ③ 模式主体只由字符集/量词构成，**不含 `.` 通配以外的"任意"**，
+#      也不能含 `|` —— 有 `|` 就说明是"几个片段之一"，那退化成片段黑名单。
+# ①②③ 都满足才认。少一条就不认（返回 None），不猜。
+_ANCHORED_REGEX_ALLOW_RE = re.compile(
+    r"Pattern\s*\.\s*compile\s*\(\s*\"(?P<pat>[^\"]+)\"\s*\)")
+_MATCHES_NOPARAM_RE = re.compile(r"\.\s*matches\s*\(\s*\)")
 # 出现这些 → 拦截的是"字符/片段"（黑名单），天然可绕
 _HELPER_DENY_RE = re.compile(
     r"\.\s*contains\s*\(\s*\"|"                       # content.contains("|")
@@ -1660,6 +2571,78 @@ _DECODE_BEFORE_CHECK_RE = re.compile(
     r"\.\s*normalize\s*\(\s*\)|"
     r"getCanonicalPath\s*\(\s*\)|"
     r"while\s*\([^)]*indexOf\s*\(\s*'%'\s*\)", re.I)
+
+
+def _named_method_bodies(sib: str, names: set[str]) -> list[tuple[str, str]]:
+    """在证据段里只截出**名字命中**的方法体，返回 [(方法名, 方法体)]。
+
+    为什么必须截：`sib` 是整个 `// ----` 之后的内容 —— 同文件辅助方法整块、
+    跨文件实现体、装配证据全在里面。原来 `_helper_guard_nature` 对每个候选
+    名字在整段 `sib` 上做正则，等于"在这个 Controller 里所有非路由方法 +
+    所有跨文件证据中找白名单"。两个后果都真实出现过：
+
+      - `CommandController.vul3` 的 `switch(actionCode)` 落在同文件另一个路由
+        方法里，被当成"当前入口做了枚举校验"，**真漏洞被静默判 safe**；
+      - 只要同一个类里有任何一个别的私有方法写了 `ALLOWED.contains(x)`，
+        当前入口就会被判 safe —— 而它可能压根没调过那个方法。
+
+    正确做法就是这里的做法：先确定"入口实际调了哪些名字"，再只取这些名字
+    的实现体。判断范围先于判断内容（记忆第 30 条）。
+    """
+    out: list[tuple[str, str]] = []
+    for name in sorted(names):
+        for m in re.finditer(r"\b" + re.escape(name) + r"\s*\([^)]*\)\s*\{", sib):
+            depth, end = 1, len(sib)
+            for i in range(m.end(), len(sib)):
+                if sib[i] == "{":
+                    depth += 1
+                elif sib[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = i
+                        break
+            out.append((name, sib[m.end():end]))
+    return out
+
+
+def _is_anchored_charset_guard(impl: str, sib: str) -> bool:
+    """实现体是不是"锚定字符集正则 + matches() 全串匹配"这种白名单。
+
+    形态（java-sec-code `SecurityUtil.cmdFilter`）：
+
+        Pattern.compile("^[a-zA-Z0-9_/\\.-]+$")   ← 类字段，不一定在 impl 里
+        if (!FILTER_PATTERN.matcher(input).matches()) return null;   ← 在 impl 里
+        return input;
+
+    为什么算白名单：`matches()` 是全串匹配，配上 `^…+$` 的字符集，等价于
+    "每个字符都必须在集合内"。空格 / `;` / `|` / `&` / `$` 全被拒绝，
+    `"ls -la " + input` 这种拼接没有注入面。
+
+    为什么不干脆认所有 `.matcher(`：`Pattern.compile(".*")`、
+    `Pattern.compile("[abc]")`（未锚定 = `find` 语义）、
+    `Pattern.compile("cat|dog")`（片段之一）全都拦不住注入。
+    只认**锚定 + 纯字符集**，其余不表态。
+    """
+    if not _MATCHES_NOPARAM_RE.search(impl):
+        return False
+    for m in _ANCHORED_REGEX_ALLOW_RE.finditer(sib):
+        pat = m.group("pat")
+        anchored = pat.startswith("^") or pat.endswith("$")
+        if not anchored:
+            continue
+        # 有 `|` → 是"几个片段之一"，不是字符集枚举
+        if "|" in pat:
+            continue
+        # 主体必须只剩字符类 `[...]`、量词、锚点、转义。
+        # 出现裸字母（除转义外）说明它匹配的是**具体字符串**，不是字符集。
+        body = pat.replace("^", "").replace("$", "")
+        body = re.sub(r"\[[^\]]*\]", " ", body)      # 挖掉字符类
+        body = re.sub(r"\\[A-Za-z]|\\[^\w]", " ", body)  # 挖掉转义
+        body = re.sub(r"[+*?{}\s]", " ", body)       # 挖掉量词
+        if re.search(r"[A-Za-z0-9_.]", body):
+            continue                                  # 还剩裸字面 → 不是字符集
+        return True
+    return False
 
 
 def _helper_guard_nature(body: str, sib: str) -> bool | None:
@@ -1699,26 +2682,21 @@ def _helper_guard_nature(body: str, sib: str) -> bool | None:
     if not names:
         return None
     hit_allow = hit_deny = hit_ambiguous = False
-    for name in names:
-        # 在辅助段里找该方法的实现体（名字后跟 `(` ... `{` ... `}`）
-        for m in re.finditer(r"\b" + re.escape(name) + r"\s*\([^)]*\)\s*\{", sib):
-            depth, end = 1, len(sib)
-            for i in range(m.end(), len(sib)):
-                if sib[i] == "{":
-                    depth += 1
-                elif sib[i] == "}":
-                    depth -= 1
-                    if depth == 0:
-                        end = i
-                        break
-            impl = sib[m.end(): end]
-            if _HELPER_DENY_RE.search(impl) and not _HELPER_ALLOW_RE.search(impl):
-                # 读到的是黑名单（含"先解码再判"那种）—— 够不够严取决于
-                # 攻击者能构造什么编码变体，没有可逐行核对的事实支点。
-                # 一律不回 True，见函数 docstring。
-                hit_ambiguous = True
-            elif _HELPER_ALLOW_RE.search(impl) and not _HELPER_DENY_RE.search(impl):
-                hit_allow = True
+    # 只取**名字命中**的实现体，不在整段证据里乱找（见 _named_method_bodies）
+    for _name, impl in _named_method_bodies(sib, names):
+        if _HELPER_DENY_RE.search(impl) and not _HELPER_ALLOW_RE.search(impl):
+            # 读到的是黑名单（含"先解码再判"那种）—— 够不够严取决于
+            # 攻击者能构造什么编码变体，没有可逐行核对的事实支点。
+            # 一律不回 True，见函数 docstring。
+            hit_ambiguous = True
+        elif _HELPER_ALLOW_RE.search(impl) and not _HELPER_DENY_RE.search(impl):
+            hit_allow = True
+        # 字符集正则白名单：`!FILTER_PATTERN.matcher(input).matches()` 拦
+        # 干净退出。注意**不能只看这一个方法体** —— 模式字符串本体
+        # （`^[a-zA-Z0-9_/\.-]+$`）定义在类的静态字段上，与方法是同级兄弟，
+        # 不在 `impl` 里。所以要到整段 `sib` 里找 `Pattern.compile("…")`。
+        if _is_anchored_charset_guard(impl, sib):
+            hit_allow = True
     if hit_ambiguous:
         return None
     if hit_allow:

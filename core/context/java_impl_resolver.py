@@ -62,6 +62,34 @@ MYBATIS_BIND = re.compile(r"#\{[^}]*\}")
 MYBATIS_CONCAT = re.compile(r"\$\{[^}]*\}")
 
 
+def _static_field_defs(text: str) -> dict[str, str]:
+    """取出类级字段定义：`NAME = <表达式>;`，返回 {NAME: 定义行}。
+
+    只收**字面量/构造式**（`Pattern.compile("…")`、`new String[]{…}`、
+    常量字符串/数组），不收方法调用式的动态初始化 —— 那些的取值取决于
+    运行时，写在证据块里只会增加噪声。
+    """
+    out: dict[str, str] = {}
+    for m in re.finditer(
+            r"^[ \t]*(?:(?:private|protected|public|static|final|transient|"
+            r"volatile)\s+)+[\w<>\[\],.?\s]+?\b([A-Za-z_]\w*)\s*=(?!=)\s*"
+            r"(?P<init>[^;]{1,300});", text, re.M):
+        name, init = m.group(1), m.group("init").strip()
+        if not re.search(r"\"|new\s+[\w.<>]+\s*[\[(]", init):
+            continue                      # 没有字面量/构造，价值低
+        out.setdefault(name, f"{name} = {init};")
+    return out
+
+
+def _referenced_fields(body: str, fields: dict[str, str]) -> str:
+    """从类字段里挑出**方法体真的引用了**的那些（最多 6 条）。"""
+    if not fields:
+        return ""
+    hit = [defn for name, defn in fields.items()
+           if re.search(rf"\b{re.escape(name)}\b", body)]
+    return "\n".join(hit[:6])
+
+
 @dataclass
 class ImplHit:
     """一个被调用方法在别处的实现体。"""
@@ -70,6 +98,10 @@ class ImplHit:
     file: str
     body: str
     note: str = ""
+    # 方法体引用的**类级静态字段定义**（`Pattern.compile("^[a-z]+$")`、
+    # 白名单数组初始化之类）。方法体本身常常只写 `FILTER_PATTERN.matcher(x)`，
+    # 真正决定"拦的是什么"的那个字面量在类字段上 —— 分开渲染会把证据切成两半。
+    fields: str = ""
 
     def render(self) -> str:
         tag = {
@@ -79,7 +111,10 @@ class ImplHit:
             "java_interface": "接口声明（无实现体，签名如下）",
         }.get(self.kind, self.kind)
         head = f"// ---- 跨文件证据：{self.name}() 的{tag} @ {self.file} ----"
-        return f"{head}\n{self.body.rstrip()}"
+        out = f"{head}\n{self.body.rstrip()}"
+        if self.fields:
+            out += f"\n// 同类的字段定义（上文的字面量在这里）：\n{self.fields.rstrip()}"
+        return out
 
 
 @dataclass
@@ -181,12 +216,14 @@ class JavaImplResolver:
                               f"// {_mybatis_risk_note(sql)}"))
 
         # 2) 普通 Java 方法体（含 interface 的抽象方法声明）
+        static_fields = _static_field_defs(text)
         for name, body, is_iface in _iter_methods(text):
             kind = "java_interface" if is_iface else "java_impl"
             snippet = body[: self.max_body_chars]
             if len(body) > self.max_body_chars:
                 snippet += f"\n// ...（省略 {len(body) - self.max_body_chars} 字符）"
-            self._add(ImplHit(name, kind, rel, snippet))
+            self._add(ImplHit(name, kind, rel, snippet,
+                              fields=_referenced_fields(body, static_fields)))
 
     def _index_mapper_xml(self, p: Path, text: str) -> None:
         rel = self._rel(p)

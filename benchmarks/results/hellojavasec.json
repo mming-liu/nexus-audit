@@ -7,9 +7,9 @@
     "route": 6,
     "apiop": 59
   },
-  "rule_decided": 57,
-  "rule_correct": 56,
-  "rule_none": 8,
+  "rule_decided": 58,
+  "rule_correct": 57,
+  "rule_none": 7,
   "disputed_truth": [
     {
       "unit": "XMLDecoderVul.safe",
@@ -62,8 +62,8 @@
     },
     "xss": {
       "n": 8,
-      "decided": 7,
-      "correct": 7
+      "decided": 8,
+      "correct": 8
     },
     "xxe": {
       "n": 8,
@@ -109,12 +109,6 @@
       "category": "sqli",
       "real_vuln": false,
       "route": "/safe3"
-    },
-    {
-      "unit": "XSS.save",
-      "category": "xss",
-      "real_vuln": true,
-      "route": "/save"
     },
     {
       "unit": "XXE.handleCustomer",
