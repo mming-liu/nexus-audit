@@ -652,8 +652,12 @@ _PATH_GUARD_BLACKLIST = _PATH_GUARD + '''
 public static boolean checkTraversal(String content) {
     return content.contains("..") || content.contains("/");
 }'''
-check("辅助段读到黑名单实现 → 不是防护，判 vuln",
-      _verdict("pathtraver", _PATH_GUARD_BLACKLIST), True)
+# 读到黑名单也**不能**判漏洞：够不够严取决于能否构造编码变体，
+# 规则手里只有 `contains("..")` 这一行，没有可核对的事实支点。
+# 两个靶场的真值都按"作者做了校验"标 safe，规则若判 True 会同时
+# 打坏 java-sec-code(getImageSec) 与 Hello-Java-Sec(processbuilderSafe)。
+check("辅助段读到黑名单实现 → 不判漏洞，退回模型",
+      _verdict("pathtraver", _PATH_GUARD_BLACKLIST), None)
 
 _CMD_HELPER_ALLOW = '''public static String safe(String filepath) {
     if (!SecurityUtil.checkOs(filepath)) {
@@ -686,6 +690,30 @@ public static boolean isAllowed(String c) {
 }'''
 check("白名单枚举在辅助段里 → 判 safe",
       _verdict("cmdi", _CMD_ENUM_IN_SIB), False)
+
+# 黑名单循环：`for (String s : black_list) { if (content.contains(s))`
+# 与白名单 `if (ALLOWED.contains(x))` 只差**接收者**是容器还是被检对象。
+# 只看 `.contains(\w+)` 会把前者判成白名单（实测 checkOs 被误判成 safe）。
+_CMD_BLACKLIST_LOOP = '''public static String safe(String filepath) {
+    if (!Security.checkOs(filepath)) {
+        new ProcessBuilder("sh", "-c", "ls -l " + filepath).start();
+        return "ok";
+    }
+    return "非法";
+}
+
+// ---- 跨文件证据：checkOs() 的接口实现类方法体 @ Security.java ----
+public static boolean checkOs(String content) {
+    String[] black_list = {"|", ",", "&", "&&", ";", "||"};
+    for (String s : black_list) {
+        if (content.contains(s)) {
+            return true;
+        }
+    }
+    return false;
+}'''
+check("辅助段黑名单循环（content.contains(s)）→ 不判漏洞，退回模型",
+      _verdict("cmdi", _CMD_BLACKLIST_LOOP), None)
 
 print("\n[20] MyBatis 注解解析边界")
 from core.context.java_impl_resolver import (  # noqa: E402

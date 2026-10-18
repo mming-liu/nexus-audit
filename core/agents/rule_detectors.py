@@ -62,13 +62,33 @@ def entry_body(source: str) -> str:
 
 
 def _sibling_methods(source: str) -> str:
-    """分隔注释之后的部分（同文件辅助方法 + 实现体 + 配置），不含配置块本体。"""
+    """分隔注释之后的部分（同文件辅助方法 + 跨文件实现体 + 装配证据），不含配置块。
+
+    这里踩过一个坑：切片有两种"实现体"通道，位置不同 ——
+
+        // ---- 跨文件辅助方法实现（入口方法调用的外部方法…）----   ← obj.method() 形式
+        // ---- 跨文件证据：checkOs() 的接口实现类方法体 @ … ----     ← 接口实现/MyBatis 通道
+
+    `Security.checkOs(...)` 走的是**第二条**（静态工具类被当"接口实现类"解析）。
+    只截到第一个「相关配置实际取值」之前、或者只认段名里带"辅助方法"的那一段，
+    这段就会被整体漏掉 —— 于是明明证据就在下面 10 行，规则却说"读不到实现"。
+    这里改为：配置块之后的所有内容都算证据（配置在段首，实现在段尾）。
+    """
     m = _SEP.search(source)
     if not m:
         return ""
     body = source[m.start():]
-    cfg = body.find("相关配置实际取值")
-    return body[:cfg] if cfg >= 0 else body
+    cfg_mark = "相关配置实际取值"
+    i = body.find(cfg_mark)
+    if i < 0:
+        return body
+    # 配置段从它自己的 `// ----` 行开始，结束于下一个 `// ----` 行。
+    # 跳过整段配置，保留其后所有实现体/装配证据。
+    nxt = _SEP.search(body, body.find("\n", i) + 1)
+    if nxt and nxt.start() > i:
+        # 保留配置段之前的头部说明 + 配置段之后的全部内容
+        return body[: body.rfind("\n", 0, i) + 1] + body[nxt.start():]
+    return body[: body.rfind("\n", 0, i) + 1]
 
 
 _WIRING_MARK = "框架装配证据"
@@ -1431,12 +1451,10 @@ def cmdi_verdict(source: str) -> bool | None:
     #     而它的实现体就在辅助段里且是值级白名单 —— 同样构成防护。
     #     （`if (!SecurityUtil.isAllowed(cmd))` 这种名字不带 command/list，
     #      第 3 步的正则匹配不到，只有读到实现体才知道它拦的是值的集合。）
-    if sib:
-        nat = _helper_guard_nature(body, sib)
-        if nat is False:
-            return False
-        if nat is True:
-            return True        # 黑名单 —— 明确不是防护，不必退回
+    #     注意：这里**只采纳 False**。读到黑名单不代表一定可绕，见
+    #     `_helper_guard_nature()` 的 docstring。
+    if sib and _helper_guard_nature(body, sib) is False:
+        return False
 
     # 4) 有校验调用但我们认不出的性质 —— 退回模型（黑名单 vs 白名单分不清）
     if _has_unknown_input_guard(body):
@@ -1448,31 +1466,60 @@ def cmdi_verdict(source: str) -> bool | None:
 
 
 # 辅助方法体里出现这些 → 拦截的是"值的集合"，是真白名单
+# 注意：`X.contains(s)` 与 `content.contains(s)` 长得一样，区别只在**接收者**
+# 是不是一个枚举容器。只看 `.contains(\w+)` 会把
+#   for (String s : black_list) { if (content.contains(s)) ...
+# 这种黑名单循环判成白名单（实测：checkOs 被误判）。所以：
+#   黑名单判据优先（`contains("字面量")` / 遍历黑名单数组）
+#   白名单判据要求接收者看起来是容器名（list/set/map/白名单…）或显式枚举
 _HELPER_ALLOW_RE = re.compile(
-    r"\.\s*contains\s*\(\s*\w+\s*\)|"
-    r"\.\s*indexOf\s*\(\s*\w+\s*\)\s*(?:<|==)\s*0|"
+    r"\b\w*(?:white|allow|permit|legal|valid|safe|list|set|map|pool|range|"
+    r"commands?|allowed)\w*\s*\.\s*(?:contains|indexOf)\s*\(\s*\w+\s*\)|"
     r"\bswitch\s*\(\s*\w+\s*\)|\bcase\s*\"", re.I)
 # 出现这些 → 拦截的是"字符/片段"（黑名单），天然可绕
 _HELPER_DENY_RE = re.compile(
-    r"\.\s*contains\s*\(\s*\"|"
-    r"\.\s*indexOf\s*\(\s*\"|"
+    r"\.\s*contains\s*\(\s*\"|"                       # content.contains("|")
+    r"\.\s*indexOf\s*\(\s*\"|"                        # content.indexOf("..")
+    r"\bblack_?list\b|\bdeny_?list\b|\bblackList\b|"   # 变量就叫黑名单
     r"\.\s*matches\s*\(\s*\"[^\"]*[\[\]\.\*\+\?]", re.I)
+
+# 黑名单前置了「解码 / 规范化 / 归一化」——作者意识到编码绕过并做了还原。
+# 这类实现到底够不够（解码一次还是循环解码、Unicode 变体、大小写…）
+# 没有可以逐行核对的事实支点，规则不应替模型下结论。
+_DECODE_BEFORE_CHECK_RE = re.compile(
+    r"URLDecoder\s*\.\s*decode|"
+    r"URLEncoder\s*\.\s*decode|"
+    r"\.\s*normalize\s*\(\s*\)|"
+    r"getCanonicalPath\s*\(\s*\)|"
+    r"while\s*\([^)]*indexOf\s*\(\s*'%'\s*\)", re.I)
 
 
 def _helper_guard_nature(body: str, sib: str) -> bool | None:
-    """入口调了认不出的校验函数，但辅助段里能读到它的实现 —— 直接判性质。
+    """入口调了认不出的校验函数，但辅助段里能读到它的实现 —— 判性质。
 
-    返回 True=vuln（黑名单）、False=safe（值级白名单）、None=读不到/矛盾。
+    返回 False=safe（值级白名单可确认）、None=规则不该下结论。
+    **不返回 True**：黑名单读到了也不代表"一定可绕"。
 
-    `java-sec-code` 与 `Hello-Java-Sec` 的 `SecurityUtil.checkOs(filepath)`
-    实现体就是 `return param.contains("|") || param.contains(";")`，
-    而 `pathFilter` 是 `indexOf("..")` 与文件后缀的**拼接黑名单**。
-    这两段都在切片的跨文件辅助段里，规则只要肯去读，就不用退回给模型。
+    为什么不肯给 True —— 这是本轮踩出来的边界，两次都栽在同一处：
 
-    被调函数名**不能只按 check/filter/valid/verify 前缀挑** ——
-    `isAllowed` / `inWhitelist` / `isSafeCmd` 全是合法命名，
-    只认前缀会把它们整体漏掉。改为"入口体里所有被调用的名字都去辅助段找一遍"，
-    找到实现体才算数（找不到自然不贡献结论）。
+    `java-sec-code` 的 `SecurityUtil.pathFilter(filepath)` 是
+    `indexOf('%')` 循环 URLDecode 之后再判 `contains("..")`；
+    `Hello-Java-Sec` 的 `Security.checkOs(filepath)` 是
+    `black_list = {"|", ",", "&", "&&", ";", "||"}` 循环 `contains(s)`。
+    两个都是黑名单，但**两个靶场都把对应路由标成 safe**。
+
+    起初我把"黑名单"判成 True，结果 java-sec-code 的 `getImageSec`
+    与 Hello-Java-Sec 的 `processbuilderSafe` 双双误报 —— 一个规则同时
+    打坏两个靶场。加一层"有解码前置就退回"后，pathFilter 修好了，
+    checkOs 仍然误报。
+
+    根因不是判据写得不够细，而是**这类问题的答案不在"是不是黑名单"上**：
+    "这条黑名单够不够严"取决于攻击者能构造出什么编码变体，
+    而规则手里只有 `contains("|")` 这一行，没有可逐行核对的事实支点。
+    按第 5 条（兜底分支不能 return True），这种情况只能是 None。
+
+    能确认为 False 的只剩真正可核对的那种：拦截的是**值的集合**
+    （`whitelist.contains(cmd)` 且拒绝路径阻断），不是字符片段。
     """
     if not sib:
         return None
@@ -1483,7 +1530,7 @@ def _helper_guard_nature(body: str, sib: str) -> bool | None:
              if n not in _skip}
     if not names:
         return None
-    hit_allow = hit_deny = False
+    hit_allow = hit_deny = hit_ambiguous = False
     for name in names:
         # 在辅助段里找该方法的实现体（名字后跟 `(` ... `{` ... `}`）
         for m in re.finditer(r"\b" + re.escape(name) + r"\s*\([^)]*\)\s*\{", sib):
@@ -1497,13 +1544,16 @@ def _helper_guard_nature(body: str, sib: str) -> bool | None:
                         end = i
                         break
             impl = sib[m.end(): end]
-            if _HELPER_DENY_RE.search(impl):
-                hit_deny = True
-            elif _HELPER_ALLOW_RE.search(impl):
+            if _HELPER_DENY_RE.search(impl) and not _HELPER_ALLOW_RE.search(impl):
+                # 读到的是黑名单（含"先解码再判"那种）—— 够不够严取决于
+                # 攻击者能构造什么编码变体，没有可逐行核对的事实支点。
+                # 一律不回 True，见函数 docstring。
+                hit_ambiguous = True
+            elif _HELPER_ALLOW_RE.search(impl) and not _HELPER_DENY_RE.search(impl):
                 hit_allow = True
-    if hit_deny and not hit_allow:
-        return True            # 黑名单：不算防护
-    if hit_allow and not hit_deny:
+    if hit_ambiguous:
+        return None
+    if hit_allow:
         return False           # 值级白名单
     return None
 
@@ -1569,16 +1619,16 @@ def pathtraver_verdict(source: str) -> bool | None:
         return False
 
     # 2) 有疑似校验调用：先尝试在**跨文件辅助段**里读到它的实现体。
-    #    `SecurityUtil.pathFilter` 的实现是 `indexOf("..")` / 后缀黑名单，
-    #    读到黑名单特征就可以确定"这不是防护"，直接判漏洞，不用退回模型。
-    #    读不到（或读到值级白名单）才退回。
+    #    读到值级白名单（前缀校验/枚举）→ 判 safe。
+    #    读到黑名单（`contains("..")` / `indexOf("/")`）→ **不判漏洞**，
+    #    交回模型。"这条黑名单够不够严"取决于能否构造出编码变体，
+    #    java-sec-code 的 `pathFilter` 做了循环 URLDecode 前置、
+    #    Hello-Java-Sec 的 `checkOs` 直接黑名单，两处都标 safe ——
+    #    规则手里没有可逐行核对的支点，只能退回（见 _helper_guard_nature）。
     if _PATH_GUARD_RE.search(body):
         sib = _sibling_methods(source)
-        nat = _helper_guard_nature(body, sib)
-        if nat is False:
+        if _helper_guard_nature(body, sib) is False:
             return False       # 值级白名单（前缀校验/枚举）
-        if nat is True:
-            return True        # 黑名单 → 天然可绕，不是防护
         return None
     return True
 
