@@ -232,23 +232,73 @@ sqli 有 MyBatis `#{}` / `${}` 的**确定性规则**兜底，cors/spel/deserial
 
 ## 六、还剩的错判
 
-### 误报 4 条
+在逐条归因之前，先说清楚一个更根本的问题：**这些错判里，有几条是我们判错，
+有几条是这个靶场本身"判不出唯一答案"。**
 
-| 样本 | 原因 |
+### 6.1 CORS 这一类，问题在靶场结构，不在判定器
+
+`Cors.getCsrfToken_01 ~ 04` 四个方法体一模一样：
+
+```java
+@GetMapping("/sec/webMvcConfigurer")
+public CsrfToken getCsrfToken_01(CsrfToken token) { return token; }
+```
+
+**方法体里一行 CORS 代码都没有。** 防护完全来自方法外的装配：
+
+| 路由 | 防护实际实现位置 |
 |---|---|
-| `Cors.getCsrfToken_01/02` | 防护在 Spring Security 的 `CorsConfiguration` 配置里，是**运行时装配**，静态切片里看不到 |
-| `SQLI.mybatisOrderBySec04` | `sqlFilter(sort)` 的过滤实现在 `SecurityUtil` 里，但模型看到 Mapper 里的 `${order}` 就判了 |
-| `URLRedirect.forward` | 作者未标注（真值靠注释判为安全），但 `request.getRequestDispatcher(url).forward()` 本身确实可疑 —— **这条可能是真值标错** |
+| `/sec/webMvcConfigurer` | `CorsConfig.java`（不在入口文件里） |
+| `/sec/httpCors` | `WebSecurityConfig.corsConfigurationSource()` + `http.cors()` |
+| `/sec/originFilter` | `OriginFilter.doFilter()`，`@WebFilter(urlPatterns="/cors/sec/originFilter")` |
+| `/sec/corsFilter` | `BaseCorsFilter`（`@Order(HIGHEST_PRECEDENCE)` 全局生效） |
 
-### 漏报 5 条
+要判对，必须**从 Servlet Filter 注册和 Spring Bean 装配反推回 URL 路由**。
+这是框架配置语义分析，不是数据流分析。我们的切片器做的是"方法 → 它调用了什么"，
+从来没做"URL → 哪些 Filter / Interceptor / CorsConfigurationSource 会作用于它"。
 
-| 样本 | 原因 |
-|---|---|
-| `Cors.vuls1` | CORS 类目是新增的，prompt 措辞还在打磨 |
-| `Deserialize.rememberMeVul` | `readObject` 之前有黑名单校验，模型判定"已有防护"；实际黑名单可绕过 |
-| `SSRF.hutoolHttp` | 出站调用在 hutool 库内部，切片里只有一行 `HttpUtil.get(url)` |
-| `XSS.store` | 写 Cookie 的跨请求存储型 XSS，单方法切片无法串起「存 → 取」两条路由 |
-| `XXE.DocumentBuilderXincludeVuln` | xinclude 路径需要 `setXIncludeAware` 判断，模型误认为已禁用 |
+而且 `Cors.vuls3` 的标注本身就不成立：
+
+```java
+@GetMapping("*")
+@RequestMapping("/vuln/crossOrigin")
+public String vuls3() { return info; }
+```
+
+`@RequestMapping` 和 `@GetMapping("*")` 同时出现在一个方法上，这是**非法的**
+（两个映射注解会冲突），Spring 启动时就会报错，或者至少不会同时生效。
+也就是说这个"漏洞样本"在真实运行时根本不存在那条路径。
+
+**结论：CORS 这一类的抖动，35% 归我们（缺框架装配分析），
+但至少 2/8 条是靶场自身的问题，不该计入任何指标。**
+把它当成"模型不擅长 CORS"来调 prompt 是浪费时间 —— 再怎么调，
+`return token;` 里也长不出 CORS 代码。
+
+这也解释了为什么 `seccode`（唯一真正写了 `SecurityUtil.checkURL` 的方法）
+稳定判对，而另外四条稳定抖动。
+
+### 6.2 误报 3 条
+
+| 样本 | 原因 | 归属 |
+|---|---|---|
+| `Cors.getCsrfToken_01/02` | 防护在 Spring Security 的 `CorsConfiguration` 配置里，是运行时装配，单方法切片看不到 | **我们**（框架装配分析缺失） |
+| `SQLI.mybatisOrderBySec04` | `sqlFilter(sort)` 的过滤实现在 `SecurityUtil` 里，但模型看到 Mapper 里的 `${order}` 就判了 | **我们**（证据注入不够深） |
+| `URLRedirect.forward` | 作者未标注（真值靠注释判为安全），但 `request.getRequestDispatcher(url).forward()` 本身确实可疑 | **真值可疑** |
+
+### 6.3 漏报：分三类，只有一类是我们的判定失误
+
+| 样本 | 原因 | 归属 |
+|---|---|---|
+| `Cors.vuls1` | 类目定义要求"汇聚点存在且外部输入可达"，回显 `request.getHeader("origin")` 且带 `Allow-Credentials: true` 完全符合；模型判成 protected 是判定失误 | **我们**（可规则化） |
+| `XXE.DocumentBuilderXincludeVuln` | xinclude 路径需要 `setXIncludeAware` 判断，模型误认为已禁用 | **我们**（可规则化） |
+| `Deserialize.rememberMeVul` | 黑名单校验被当作"已有防护"，但黑名单本身可绕过 —— 这是**判据定义漏洞**：property 里没写"黑名单不算防护" | **我们**（类目定义缺陷） |
+| `SSRF.hutoolHttp` | 出站调用在 hutool 库内部，切片里只有 `HttpUtil.get(url)` | **我们**（静态分析原理性上限） |
+| `XSS.store` | 方法体是 `new Cookie(...)` + `addCookie`，**不写响应体**，按 xss 类目定义答 No 是正确的；它只在和 `XSS.show` 组成存储型链路时才算漏洞 | **真值/类目错配** |
+
+最后一条值得单独说明：`XSS.store` 的真值标"有漏洞"是合理的（它确实是存储型 XSS
+的写入端），但 xss 类目的问题问的是"是否写进 HTTP 响应体"。**真值和判据不在说同一件事**，
+所以这条永远判不对，只会给抖动率贡献噪声。正确的处理是：在跨路由串接做出来之前，
+把它从可判定样本里剔除，或者给它单独一个"存储型 XSS 写入端"的类目。
 
 ## 七、结论
 
@@ -261,8 +311,13 @@ sqli 有 MyBatis `#{}` / `${}` 的**确定性规则**兜底，cors/spel/deserial
 **不能声称的部分**：
 - 不能说"真实项目 Score 0.78"。单轮 66 样本 + 41.7% 抖动率，
   这个数字的置信区间宽到没有意义。
-- 不能说"误报率 11%"。4 条误报里有 1 条疑似真值标错，1 条是静态分析原理上就看不到的
-  运行时装配。
+- 不能说"误报率 11%"。误判样本里有 1 条真值标错（`URLRedirect.forward`）、
+  2 条靶场自身不成立（`Cors.vuls3` 双映射注解、`XSS.store` 判据与真值错配）、
+  1 条静态分析原理上就看不到的运行时装配。
+- **不能说"抖动全是模型不稳定"。** CORS 一类的抖动大半源于我们缺框架装配分析
+  （`return token;` 里没有 CORS 代码，防护在 Filter/Bean 里），
+  这部分是**切片能力缺口**，不是模型缺陷。把两者混在一起谈"抖动率 41.7%"
+  会掩盖真正的问题定位。
 
 **方法学教训**：我第一次评估投票时用了错误的指标 —— 比较两种策略的**总体 TPR/FPR**，
 得出"投票无用"或"投票有用"都无从谈起，因为它测的根本不是抖动。
