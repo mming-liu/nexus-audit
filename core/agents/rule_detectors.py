@@ -782,15 +782,21 @@ def sqli_verdict(source: str) -> bool | None:
     # A) JDBC：看 SQL 是怎么造出来的
     if SQLI_CREATE_STMT_RE.search(body) or SQLI_JDBCTEMPLATE_RE.search(body):
         # createStatement 无法绑定参数，只要 SQL 里出现拼接就可注入。
-        # 但两种情况必须让路：
+        # 但三种情况必须让路：
         #   1) 参与拼接的参数全是数字类型（`safe4(Integer id)`）——
         #      和 MyBatis 的 `${}` 同构，Spring 已把它解析成 int，注入不了；
-        #   2) 拼接的操作数是**我们没见过的清洗函数**（ESAPI.encodeForSQL）——
+        #   2) 拼接的操作数是**已知 SQL 编码函数**（ESAPI.encodeForSQL）且
+        #      拼接点在引号内 —— 见 `_sql_encoded_concat_safe`；
+        #   3) 拼接的操作数是**没见过的清洗函数** ——
         #      那是"不确定"，不是"有把握"。
         if SQLI_CONCAT_RE.search(body):
             if _concat_params_all_numeric(body):
                 return False
-            return None if _concat_only_sanitized(body) else True
+            if _concat_only_sanitized(body):
+                # 操作数全是函数调用：是已知 SQL 编码且拼接点在引号内 → safe；
+                # 是没见过的清洗函数 → "不确定"，退模型。
+                return False if _sql_encoded_concat_safe(body) else None
+            return True
         return None                    # 常量 SQL，不是注入面
     m = SQLI_PREPARE_RE.search(body)
     if m:
@@ -810,6 +816,49 @@ def sqli_verdict(source: str) -> bool | None:
 # 毫无约束力的"白名单"：`matches(".*")`、`matches("^.*$")` 匹配一切，
 # 把它当防护会让真实注入漏判。只挡这两种最常见的写法。
 _TRIVIAL_WHITELIST_RE = re.compile(r'matches\s*\(\s*"\s*(?:\^?\.\*\$?|)\s*"\s*[,)]')
+
+# ---------------- SQL 编码函数（拼接点的确定性 safe） ----------------
+#
+#     "select * from users where id = '"
+#         + ESAPI.encoder().encodeForSQL(oracleCodec, id) + "'"
+#
+# Hello-Java-Sec `JDBC.safe3` 与 JavaSecLab `JdbcController.safe5` 同形态，
+# 跨两个靶场一致 —— 这正是"同一判据在两个靶场同时成立"的先例条件。
+#
+# **单引号上下文是硬前提，对两个函数都一样**：
+# `encodeForSQL(OracleCodec, x)` 与 `escapeSql(x)` 做的是同一件事 —— 把 `'`
+# 中和成 `''`。这只在**字符串位置**（拼接点前紧邻 `'`）有效；若代码写的是
+# 无引号拼接 `"SELECT ... WHERE id = " + encodeForSQL(codec, id)`（数字型
+# 注入位），`1 OR 1=1` 原样穿过编码函数。所以判据不是"调了编码函数"，
+# 而是"**编码函数的拼接点前面是一个以 `'` 结尾的字面量**"。
+# 查不出引号上下文就不表态（None），不猜。
+SQL_ENCODE_RE = re.compile(
+    r"(?:ESAPI\s*\.\s*encoder\s*\(\s*\)\s*\.\s*)?encodeForSQL\s*\(|"
+    r"escapeSql\s*\(", re.I)
+
+
+def _sql_encoded_concat_safe(body: str) -> bool | None:
+    """SQL 拼接的操作数是否全部是**已知 SQL 编码函数**且拼接点在引号内。
+
+    返回 True = 全部满足，判 safe；None = 有编码函数但引号上下文查不出
+    （或混着别的未知函数），维持退模型。**不返回 False** —— 这条判据
+    只用于放行 safe，发现"裸变量原样进 SQL"是 `_concat_only_sanitized`
+    的事，两条判据不要互相越界。
+    """
+    saw_encode = False
+    for rhs in _sql_rhs_iter(body):
+        for m in SQL_ENCODE_RE.finditer(rhs):
+            before = rhs[: m.start()]
+            last_lit = None
+            for lm in _STR_LIT_RE.finditer(before):
+                last_lit = lm
+            # 前一个字面量必须存在且以 `'` 结尾（引号内的拼接点）。
+            # 注意 `group(0)` 自带结尾的双引号，要先剥掉再判 ——
+            # 直接 `endswith("'")` 永远是 False（实测栽过）。
+            if last_lit is None or not last_lit.group(0)[:-1].endswith("'"):
+                return None             # 无引号上下文 → 数字注入位，不表态
+            saw_encode = True
+    return saw_encode
 
 # 拼接右操作数是函数调用（而不是裸变量）时，说明入参经过了某个清洗/编码函数。
 # 我们不认识那个函数不代表它没用 —— 这种情况必须交模型，不能判 True。

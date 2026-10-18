@@ -2,9 +2,9 @@
   "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\JavaSecLab-main",
   "total_units": 227,
   "with_truth": 59,
-  "rule_covered": 32,
-  "rule_coverage": 0.5424,
-  "rule_correct": 31,
+  "rule_covered": 33,
+  "rule_coverage": 0.5593,
+  "rule_correct": 32,
   "rule_accuracy": 1.0,
   "per_category": {
     "xxe": {
@@ -33,9 +33,9 @@
     },
     "sqli": {
       "n": 9,
-      "safe_n": 2,
-      "decided": 2,
-      "correct": 2
+      "safe_n": 3,
+      "decided": 3,
+      "correct": 3
     },
     "cmdi": {
       "n": 4,
@@ -136,12 +136,6 @@
       "route": "/vul2"
     },
     {
-      "unit": "JdbcController.safe5",
-      "category": "sqli",
-      "real_vuln": false,
-      "route": "/safe5"
-    },
-    {
       "unit": "JPAController.safe",
       "category": "sqli",
       "real_vuln": false,
@@ -231,10 +225,10 @@
       "unit": "XXEController.xxeSafe",
       "category": "xxe",
       "real_vuln": false,
-      "flagged": null,
-      "stage": "error",
-      "detail": "调用失败",
-      "elapsed_s": 187.6
+      "flagged": false,
+      "stage": "protected",
+      "detail": "Scenario=xxe=HIT, PropertyCheck=PRESENT（采样不一致）",
+      "elapsed_s": 68.5
     },
     {
       "unit": "XXEController.xxeVul",
@@ -243,16 +237,16 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 13.2
+      "elapsed_s": 35.8
     },
     {
       "unit": "OtherController.vul1Upload",
       "category": "xss",
       "real_vuln": true,
-      "flagged": true,
-      "stage": "missing_property",
-      "detail": "Scenario=xss=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 47.2
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 9.8
     },
     {
       "unit": "ReflectController.vul1",
@@ -261,7 +255,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=xss=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 87.2
+      "elapsed_s": 113.5
     },
     {
       "unit": "StoreController.vul",
@@ -270,7 +264,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=xss=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 56.5
+      "elapsed_s": 76.8
     },
     {
       "unit": "SSTIController.safe1",
@@ -279,16 +273,16 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 14.5
+      "elapsed_s": 29.6
     },
     {
       "unit": "SSTIController.vul1",
       "category": "spel",
       "real_vuln": true,
-      "flagged": null,
-      "stage": "error",
-      "detail": "调用失败",
-      "elapsed_s": 150.0
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "Scenario=spel=HIT, PropertyCheck=MISSING（采样不一致）",
+      "elapsed_s": 116.6
     },
     {
       "unit": "SSTIController.vul3",
@@ -297,7 +291,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 48.4
+      "elapsed_s": 161.9
     },
     {
       "unit": "SsrfController.safe",
@@ -306,7 +300,7 @@
       "flagged": false,
       "stage": "protected",
       "detail": "Scenario=ssrf=HIT, PropertyCheck=PRESENT（采样不一致）",
-      "elapsed_s": 31.5
+      "elapsed_s": 40.9
     },
     {
       "unit": "HibernateController.vul1",
@@ -315,7 +309,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=sqli=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 21.8
+      "elapsed_s": 19.1
     },
     {
       "unit": "HibernateController.safe",
@@ -324,7 +318,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 10.6
+      "elapsed_s": 13.6
     },
     {
       "unit": "HibernateController.vul2",
@@ -333,16 +327,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=sqli=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 23.1
-    },
-    {
-      "unit": "JdbcController.safe5",
-      "category": "sqli",
-      "real_vuln": false,
-      "flagged": true,
-      "stage": "missing_property",
-      "detail": "Scenario=sqli=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 69.3
+      "elapsed_s": 18.7
     },
     {
       "unit": "JPAController.safe",
@@ -351,7 +336,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 19.9
+      "elapsed_s": 6.8
     },
     {
       "unit": "JPAController.vul1",
@@ -360,7 +345,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=sqli=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 26.6
+      "elapsed_s": 20.0
     },
     {
       "unit": "JPAController.vul2",
@@ -369,7 +354,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=sqli=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 36.2
+      "elapsed_s": 23.5
     },
     {
       "unit": "CodeController.safeGroovy",
@@ -378,7 +363,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 10.5
+      "elapsed_s": 10.2
     },
     {
       "unit": "CommandController.safe",
@@ -387,7 +372,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 17.8
+      "elapsed_s": 36.7
     },
     {
       "unit": "UrlRedirectController.vul5",
@@ -396,7 +381,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=redir=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 20.5
+      "elapsed_s": 37.5
     },
     {
       "unit": "UrlRedirectController.UrlRedirectSafe",
@@ -405,7 +390,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 11.9
+      "elapsed_s": 11.1
     },
     {
       "unit": "UrlRedirectController.UrlRedirectVul",
@@ -414,7 +399,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 20.5
+      "elapsed_s": 45.1
     },
     {
       "unit": "DirTraversalController.safe2",
@@ -423,16 +408,16 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=pathtraver=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 42.0
+      "elapsed_s": 50.7
     },
     {
       "unit": "DirTraversalController.safe1",
       "category": "pathtraver",
       "real_vuln": false,
-      "flagged": false,
-      "stage": "protected",
-      "detail": "Scenario=pathtraver=HIT, PropertyCheck=PRESENT（采样不一致）",
-      "elapsed_s": 209.2
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "Scenario=pathtraver=HIT, PropertyCheck=MISSING（采样不一致）",
+      "elapsed_s": 156.9
     },
     {
       "unit": "DeleteController.safe",
@@ -441,7 +426,7 @@
       "flagged": false,
       "stage": "protected",
       "detail": "Scenario=pathtraver=HIT, PropertyCheck=PRESENT（采样不一致）",
-      "elapsed_s": 47.8
+      "elapsed_s": 70.3
     },
     {
       "unit": "ReadController.safe",
@@ -450,7 +435,7 @@
       "flagged": false,
       "stage": "protected",
       "detail": "Scenario=pathtraver=HIT, PropertyCheck=PRESENT（采样不一致）",
-      "elapsed_s": 29.4
+      "elapsed_s": 27.6
     },
     {
       "unit": "UploadController.safe",
@@ -459,7 +444,7 @@
       "flagged": false,
       "stage": "protected",
       "detail": "Scenario=pathtraver=HIT, PropertyCheck=PRESENT（采样不一致）",
-      "elapsed_s": 146.1
+      "elapsed_s": 139.0
     },
     {
       "unit": "XMLDecoderController.safe",
@@ -468,7 +453,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 13.7
+      "elapsed_s": 15.5
     }
   ]
 }

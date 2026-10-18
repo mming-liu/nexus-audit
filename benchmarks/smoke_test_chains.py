@@ -364,15 +364,21 @@ check("Pattern.matches 白名单 → safe", _verdict("sqli", _SQLI_PATTERN_MATCH
 _SQLI_TRIVIAL = _SQLI_PATTERN_MATCHES.replace('"^[a-zA-Z0-9]+$"', '".*"')
 check("matches(\".*\") 不算白名单 → vuln", _verdict("sqli", _SQLI_TRIVIAL), True)
 
-# (c) 拼接的操作数是"我们没见过的清洗函数"时，是"不确定"而不是"有把握"。
-#     兜底判 True 会把正确防护冤枉成漏洞（ESAPI.encodeForSQL 就是）。
+# (c) 拼接的操作数是"已知 SQL 编码函数"且拼接点在引号内 → safe（见 [34]）；
+#     是"我们没见过的清洗函数"时，仍是"不确定"而不是"有把握"。
+#     兜底判 True 会把正确防护冤枉成漏洞。
 _SQLI_ESAPI = '''public String safe3(String id) {
     Statement st = conn.createStatement();
     String sql = "select * from users where id = '" + ESAPI.encoder().encodeForSQL(codec, id) + "'";
     st.executeQuery(sql);
 }'''
+check("已知编码函数 + 引号内拼接 → safe",
+      _verdict("sqli", _SQLI_ESAPI), False)
+# 真正的未知清洗函数：语义完全靠猜 → 仍退模型
+_SQLI_UNKNOWN_FN = _SQLI_ESAPI.replace(
+    "ESAPI.encoder().encodeForSQL(codec, id)", "SqlCleaner.wash(id)")
 check("未知清洗函数参与拼接 → None（交模型）",
-      _verdict("sqli", _SQLI_ESAPI), None)
+      _verdict("sqli", _SQLI_UNKNOWN_FN), None)
 _SQLI_BARE = '''public String vul(String id) {
     Statement st = conn.createStatement();
     String sql = "select * from users where id = '" + id + "'";
@@ -796,14 +802,21 @@ print("\n[21] sqli 拼接判据的范围（JavaSecLab 暴露的污染）")
 
 # 结果拼接拖累 SQL 拼接：safe5 里有 `"查询成功，用户名：" + user + " 密码：" + pass`，
 # 两个裸变量让"SQL 操作数全是清洗函数"这个事实被否掉 → 误报。
+# ESAPI 现已是已知编码函数（[34]），此样本升级为确定性 safe；
+# "结果拼接不被扫进 SQL 判据"这一点由同一段 `_sql_rhs_iter` 保证。
 _SQLI_RESULT_CONCAT = '''public R safe5(@RequestParam String id) {
     Statement stmt = conn.createStatement();
     String sql = "select * from sqli where id = '" + ESAPI.encoder().encodeForSQL(oracleCodec, id) + "'";
     ResultSet rs = stmt.executeQuery(sql);
     return R.ok("查询成功，用户名：" + user + " 密码：" + pass);
 }'''
-check("结果拼接里的裸变量不污染 SQL 拼接判定 → 退回模型（清洗函数不确定）",
-      _verdict("sqli", _SQLI_RESULT_CONCAT), None)
+check("结果拼接里的裸变量不污染 SQL 拼接判定 → safe（ESAPI 已知编码）",
+      _verdict("sqli", _SQLI_RESULT_CONCAT), False)
+# 同形态换未知清洗函数 → 仍应退模型（污染防护没有被放宽）
+_SQLI_RESULT_CONCAT_UNK = _SQLI_RESULT_CONCAT.replace(
+    "ESAPI.encoder().encodeForSQL(oracleCodec, id)", "SqlCleaner.wash(id)")
+check("结果拼接不污染 + 未知清洗函数 → 退回模型",
+      _verdict("sqli", _SQLI_RESULT_CONCAT_UNK), None)
 
 # 局部变量已转整型：safe4 形参是 String，但 `Integer userId = Integer.valueOf(id)`
 # 之后拼进 SQL 的是 Integer。只认形参声明会把这条判成误报。
@@ -1174,6 +1187,51 @@ check("用 find() 而非 matches() → 不认",
       _verdict("cmdi", _entry + "\n" + _CMD_CHARSET.replace(
           '.matches()', '.find()')),
       None)
+
+print("\n[34] sqli SQL 编码函数：拼接点必须在单引号内")
+# Hello-Java-Sec JDBC.safe3 / JavaSecLab JdbcController.safe5 同形态。
+# encodeForSQL 与 escapeSql 都只中和 `'`，只在**字符串位置**有效；
+# 无引号拼接（数字注入位）里 `1 OR 1=1` 原样穿过 —— 判据绑定引号上下文。
+_SQL_ENC_OK = '''public String safe(String id) throws Exception {
+    Statement stmt = conn.createStatement();
+    String sql = "select * from users where id = '"
+            + ESAPI.encoder().encodeForSQL(oracleCodec, id) + "'";
+    ResultSet rs = stmt.executeQuery(sql);
+    return "";
+}'''
+check("encodeForSQL + 引号内拼接 → safe", _verdict("sqli", _SQL_ENC_OK), False)
+_SQL_ENC_NUM = '''public String bad(String id) throws Exception {
+    Statement stmt = conn.createStatement();
+    String sql = "SELECT * FROM users WHERE id = "
+            + ESAPI.encoder().encodeForSQL(new OracleCodec(), id);
+    ResultSet rs = stmt.executeQuery(sql);
+    return "";
+}'''
+check("encodeForSQL 但无引号（数字注入位）→ 退模型",
+      _verdict("sqli", _SQL_ENC_NUM), None)
+_SQL_ESC_OK = '''public String ok(String id) throws Exception {
+    Statement stmt = conn.createStatement();
+    String sql = "SELECT * FROM users WHERE id = '"
+            + StringEscapeUtils.escapeSql(id) + "'";
+    ResultSet rs = stmt.executeQuery(sql);
+    return "";
+}'''
+check("escapeSql + 引号内拼接 → safe", _verdict("sqli", _SQL_ESC_OK), False)
+_SQL_ESC_NUM = '''public String bad2(String id) throws Exception {
+    Statement stmt = conn.createStatement();
+    String sql = "SELECT * FROM users WHERE id = "
+            + StringEscapeUtils.escapeSql(id);
+    ResultSet rs = stmt.executeQuery(sql);
+    return "";
+}'''
+check("escapeSql 但无引号 → 退模型", _verdict("sqli", _SQL_ESC_NUM), None)
+_SQL_BARE = '''public String vul(String id) throws Exception {
+    Statement stmt = conn.createStatement();
+    String sql = "select * from users where id = '" + id + "'";
+    ResultSet rs = stmt.executeQuery(sql);
+    return "";
+}'''
+check("裸变量拼接 → 真漏洞", _verdict("sqli", _SQL_BARE), True)
 
 print()
 if FAILS:

@@ -7,9 +7,9 @@
     "route": 6,
     "apiop": 59
   },
-  "rule_decided": 58,
-  "rule_correct": 57,
-  "rule_none": 7,
+  "rule_decided": 59,
+  "rule_correct": 58,
+  "rule_none": 6,
   "disputed_truth": [
     {
       "unit": "XMLDecoderVul.safe",
@@ -57,8 +57,8 @@
     },
     "sqli": {
       "n": 16,
-      "decided": 15,
-      "correct": 15
+      "decided": 16,
+      "correct": 16
     },
     "xss": {
       "n": 8,
@@ -103,12 +103,6 @@
       "category": "cmdi",
       "real_vuln": false,
       "route": "/safe"
-    },
-    {
-      "unit": "JDBC.safe3",
-      "category": "sqli",
-      "real_vuln": false,
-      "route": "/safe3"
     },
     {
       "unit": "XXE.handleCustomer",

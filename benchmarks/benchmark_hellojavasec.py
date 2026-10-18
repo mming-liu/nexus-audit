@@ -99,6 +99,11 @@ DISPUTED_TRUTH = {
     "XMLDecoderVul.safe":
         "同一 API（ObjectInputStream.readUnshared）在 Deserialization.readUnshared "
         "中标为 vul、此处标为 safe，两处矛盾，真值不可采信",
+    "Traversal.safe2":
+        "唯一防护是 Paths.get(filePath).normalize()，只做词法规范化、无基目录"
+        "包含校验（无 startsWith/toRealPath 对照），logs/../../etc/passwd 照样"
+        "逃出基目录。语义上是漏洞，靶场标 safe 属作者口径问题（把缓解当修复），"
+        "与本类目口径（是否限制在基目录内）不一致",
 }
 
 
