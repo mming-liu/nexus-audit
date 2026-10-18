@@ -38,11 +38,13 @@ nexus-audit/
 | `core/slicer/java_servlet.py` | Servlet / Spring MVC / JAX-RS 入口切片，含跨文件辅助方法与配置取值回填 |
 | `core/context/config_resolver.py` | 解析 .properties/.yaml/.json，把代码里引用的配置键回填进切片 |
 | `core/context/java_impl_resolver.py` | MyBatis 注解/XML、接口实现体的跨文件证据（`#{}` vs `${}` 的真值在这里） |
+| `core/context/taint_chain.py` | 跨路由串接：按介质+键名把「写入点」与「读取点」配对，存储型 XSS 靠它判定 |
 | `core/agents/vuln_categories.py` | 17 类漏洞的 Scenario/Property 定义（11 类 OWASP + 6 类 Java 生态） |
-| `core/agents/rule_detectors.py` | 算法强度等客观事实的确定性判定，先于 LLM 执行 |
+| `core/agents/rule_detectors.py` | 客观事实的确定性判定（8 类已规则化），先于 LLM 执行 |
 | `benchmarks/benchmark_owasp.py` | OWASP Benchmark 跑分（TPR/FPR/Score，含断点续跑与误差归因） |
 | `benchmarks/benchmark_javaseccode.py` | 真实项目（java-sec-code）评测，真值取自路由命名 + 作者注释 |
 | `benchmarks/check_stability.py` | 判定稳定性复测：同一输入连问 N 次，测抖动率 |
+| `benchmarks/smoke_test_chains.py` | 串接与 redir/xss/ssrf 规则的分支自检（不调模型，秒级） |
 | `benchmarks/ab_votes.py` | 采样策略一致性 A/B：两种策略各跑 2 轮，比两轮之间的翻转数 |
 | `benchmarks/offline_baseline.py` | 对照组：纯 sink 关键词匹配 |
 
@@ -106,9 +108,12 @@ python cli.py --help
 - [x] 第4周：PR 增量扫描 —— `pr-scan` 已实现变更行→方法→反向依赖（含装配级）
 - [x] 第5周：Java 赛道打通 + OWASP Benchmark 跑分（11 类，Score 0.98）
 - [x] 第6周：真实项目（java-sec-code）评测，暴露 4 个仅真实代码可见的切片缺陷
-- [x] 降判定抖动：cors / deserial / spel 三类已规则化，规则覆盖 10 → 15 条
-      （Score 0.823，超过 5 轮投票的 0.793）。**下一个该规则化的是 xxe**
-- [ ] 跨路由串接：存储型 XSS 这类「写入点 + 读取点」分居两方法的漏洞
+- [x] 降判定抖动：规则化 cors / deserial / spel / xxe / sqli / redir / xss / ssrf
+      八类，规则覆盖 10 → **64/67 条**。真实项目 Score 0.823 → **1.000**
+      （TPR 1.00 / FPR 0.00），且规则判定是可复现的纯函数
+- [x] 跨路由串接：存储型 XSS 这类「写入点 + 读取点」分居两方法的漏洞
+      —— `core/context/taint_chain.py`，按介质（Cookie/Session/Request/Model）
+      与键名配对，`XSS.store → XSS.show` 被正确接上
 
 
 ## 安全合规

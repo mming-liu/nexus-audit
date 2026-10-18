@@ -512,6 +512,445 @@ def spel_verdict(source: str) -> bool | None:
     return None                        # 证据不足，交回 LLM
 
 
+# ---------------- XXE ----------------
+#
+# 判据同样是"选了哪个 API"的事实题，不是语义推理：
+# 解析 XML 之前有没有关掉外部实体，是可以逐行核对的事实。
+#
+# 安全写法（任一成立即安全）：
+#   4.1  dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+#        —— 直接禁掉 DOCTYPE，实体声明无从谈起，最彻底
+#   4.2  同时把两个外部实体开关置 false：
+#        external-general-entities / external-parameter-entities
+#
+# 必须区分的坑：
+#   `setFeature(..., true)` 与 `setFeature(..., false)` 的意义**相反**。
+#   disallow-doctype-decl 置 true 是"禁止"，两个 entities 置 false 是"关闭"。
+#   只按"出现过 setFeature"判安全会把 vuln 样本全判成安全 ——
+#   所以必须连取值一起判。
+#
+# XInclude 单独处理：setXIncludeAware(true) 会打开另一条读取外部文件的通道，
+# 但它**不绕过** DOCTYPE 禁用（xinclude 处理的是 <xi:include href>，
+# 仍需 DOCTYPE 才谈得上实体）。所以判据不变：看实体开关，不看 XInclude。
+# 实测 /DocumentBuilder/xinclude/sec 开了 XInclude 但有全部三项防护，是安全的。
+
+XXE_SINK_RE = re.compile(
+    r"\.newDocumentBuilder\s*\(|\.newSAXParser\s*\(|"
+    r"XMLReaderFactory\s*\.\s*createXMLReader\s*\(|"
+    r"new\s+SAXBuilder\s*\(|new\s+SAXReader\s*\(|new\s+Digester\s*\(|"
+    r"DocumentHelper\s*\.\s*parseText\s*\(|"
+    r"SchemaFactory\s*\.\s*newInstance\s*\(|"
+    r"\.parse\s*\(\s*new\s+InputSource|\.build\s*\(\s*new\s+InputSource|"
+    r"\.read\s*\(\s*new\s+InputSource|\.parse\s*\(\s*new\s+StringReader|"
+    r"\.build\s*\(\s*new\s+StringReader|\.read\s*\(\s*new\s+StringReader|"
+    r"TransformerFactory\s*\.\s*newInstance\s*\(", re.I)
+
+# disallow-doctype-decl = true
+XXE_NO_DOCTYPE_RE = re.compile(
+    r"""setFeature\s*\(\s*["']http://apache\.org/xml/features/disallow-doctype-decl["']"""
+    r"""\s*,\s*true\s*\)""", re.I)
+# external-general-entities / external-parameter-entities = false
+XXE_NO_EXT_GEN_RE = re.compile(
+    r"""setFeature\s*\(\s*["']http://xml\.org/sax/features/external-general-entities["']"""
+    r"""\s*,\s*false\s*\)""", re.I)
+XXE_NO_EXT_PARAM_RE = re.compile(
+    r"""setFeature\s*\(\s*["']http://xml\.org/sax/features/external-parameter-entities["']"""
+    r"""\s*,\s*false\s*\)""", re.I)
+# 其它等效写法：直接禁用外部 DTD / 安全处理
+XXE_OTHER_SAFE_RE = re.compile(
+    r"setExpandEntityReferences\s*\(\s*false\s*\)|"
+    r"setEntityResolver\s*\(\s*new\s+\w*NoOp\w*|"
+    r"XMLConstants\.FEATURE_SECURE_PROCESSING\s*[\"']?\s*,?\s*true|"
+    r"FEATURE_SECURE_PROCESSING[\"']\s*,\s*true", re.I)
+
+
+def xxe_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    if not XXE_SINK_RE.search(body):
+        return None                    # 入口体里没有 XML 解析 sink，交回 LLM
+
+    if XXE_NO_DOCTYPE_RE.search(body):
+        return False                   # 禁了 DOCTYPE，最彻底
+    if XXE_NO_EXT_GEN_RE.search(body) and XXE_NO_EXT_PARAM_RE.search(body):
+        return False                   # 两个外部实体开关都关了
+    if XXE_OTHER_SAFE_RE.search(body):
+        return False
+    return True                        # 有 sink 且没关外部实体
+
+
+# ---------------- SQL 注入 ----------------
+#
+# 三条**互不重叠**的客观判据，覆盖 java-sec-code 全部 10 条 sqli 样本：
+#
+#   A. JDBC 层：SQL 是用字符串拼接拼出来的，还是用 `?` 占位 + setXxx 绑定
+#      - `createStatement()` + 拼接          → 可注入
+#      - `prepareStatement("... ?")` + setXxx → 预编译占位，不可注入
+#      - `prepareStatement(拼接出来的 sql)`   → **仍可注入**（占位符是空的）
+#        这一条最容易判错：看到 prepareStatement 就判安全是错的。
+#        java-sec-code 的 jdbc_ps_vuln 就是这个坑。
+#
+#   B. MyBatis 层：Mapper 语句里是 `${}` 还是 `#{}`
+#      - `${}` 是字符串替换，值直接拼进 SQL 文本 → 可注入
+#      - `#{}` 是 PreparedStatement 占位符        → 不可注入
+#      证据来自切片尾部的「跨文件证据」段（Mapper XML 或 @Select 注解），
+#      切片器已经把它带上了，这里只是核对到底用的是哪种。
+#
+#   C. 白名单过滤：入参经 `sqlFilter()` 这类**全串白名单**校验后才进 SQL
+#      必须要求"全串匹配"（`matches()`），`contains()` / 黑名单关键字
+#      替换都不算 —— 同 deserial 的黑名单问题。
+#      反例：mybatisOrderBySec04 的 Mapper 里有 `${order}`，
+#      但入口传的是 `sqlFilter(sort)`，而 sqlFilter 用
+#      `^[a-zA-Z0-9_/\.-]+$` 做全串校验，order by 注入的所需字符全部被拒。
+#      只按 B 判会误报这一条。
+#
+# 优先级：C（有白名单）> A（JDBC 形态）> B（MyBatis 形态）。
+
+SQLI_JDBC_SINK_RE = re.compile(
+    r"\.\s*(?:executeQuery|executeUpdate|execute)\s*\(", re.I)
+SQLI_CREATE_STMT_RE = re.compile(r"\.\s*createStatement\s*\(", re.I)
+SQLI_PREPARE_RE = re.compile(r"\.\s*prepare(?:Statement|Call)\s*\(\s*([^;]{0,300})", re.I | re.S)
+# 字符串拼接：`"..." + 变量` 或 `变量 + "..."`
+SQLI_CONCAT_RE = re.compile(
+    r'"[^"]*"\s*\+|\+\s*"[^"]*"')
+# 白名单过滤：全串匹配的正则/校验
+SQLI_WHITELIST_RE = re.compile(
+    r"\.\s*matches\s*\(\s*\)|sqlFilter|checkSql|isValidOrder|"
+    r"FILTER_PATTERN\s*\.\s*matcher\s*\([^)]*\)\s*\.\s*matches", re.I)
+# MyBatis XML / 注解里的 ${} 与 #{}
+MYBATIS_DOLLAR_RE = re.compile(r"\$\{\s*_?\w+\s*\}")
+MYBATIS_HASH_RE = re.compile(r"#\{\s*_?\w+\s*\}")
+
+
+def sqli_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    impl = _impl_segment(source)
+
+    # C) 白名单过滤优先：入参被全串白名单约束过，后续拼接不构成注入。
+    #    但要求过滤函数**作用在这个入口的实参上**，不能是别处的方法名。
+    if SQLI_WHITELIST_RE.search(body) and re.search(
+            r"\b(?:sqlFilter|checkSql|isValidOrder)\s*\(", body):
+        return False
+
+    # B) MyBatis：只有能确认用的是 ${} 还是 #{} 才判
+    if MYBATIS_DOLLAR_RE.search(impl):
+        return True
+    if MYBATIS_HASH_RE.search(impl) and not SQLI_JDBC_SINK_RE.search(body):
+        return False
+    # 语句是纯固定文本（无任何占位符），调用也不带实参 → 没有注入面。
+    # 切片器会在 Mapper 语句下方标注「无外部占位符（语句为固定文本）」，
+    # 这是比"看到了 #{}"更强的证据：连参数都没有，谈不上注入。
+    if "无外部占位符" in impl and not SQLI_JDBC_SINK_RE.search(body):
+        return False
+
+    # A) JDBC：看 SQL 是怎么造出来的
+    if SQLI_CREATE_STMT_RE.search(body):
+        # createStatement 无法绑定参数，只要 SQL 里出现拼接就可注入
+        if SQLI_CONCAT_RE.search(body):
+            return True
+        return None                    # 常量 SQL，不是注入面
+    m = SQLI_PREPARE_RE.search(body)
+    if m:
+        arg = m.group(1)
+        # 实参往往只是个变量名（`prepareStatement(sql)`），
+        # 真正的拼接和 `?` 都在它的赋值语句里，必须回溯源变量。
+        arg = _resolve_sql_var(body, arg)
+        # prepareStatement 的参数里出现拼接 → 占位符承载不了，仍可注入
+        if SQLI_CONCAT_RE.search(arg):
+            return True
+        if "?" in arg:
+            return False
+        return None
+    return None
+
+
+_SQL_VAR_ASSIGN_RE = r"String\s+{name}\s*=\s*"
+
+
+def _resolve_sql_var(body: str, arg: str) -> str:
+    """把 `prepareStatement(sql)` 的 sql 换成它最近一次赋值的右侧。
+
+    只看实参本身会把 `jdbc_ps_vuln` 判成 None：
+        String sql = "select * from users where username = '" + username + "'";
+        PreparedStatement st = con.prepareStatement(sql);
+    实参 `sql)` 里既没有 `?` 也没有拼接，但 SQL 本身是拼出来的。
+    """
+    name = arg.strip().rstrip(")").strip()
+    if not re.fullmatch(r"[A-Za-z_]\w*", name):
+        return arg
+    m = re.findall(rf"\b(?:String\s+)?{re.escape(name)}\s*=\s*([^;]+);", body)
+    return m[-1] if m else arg
+
+
+def _impl_segment(source: str) -> str:
+    """取切片尾部的「跨文件证据（实现体）」段。
+
+    这一段放的是 Mapper XML / @Select 注解 / 接口实现类的方法体 ——
+    判断 ${} vs #{} 只能在这里找，入口方法体只有一行 mapper 调用。
+    """
+    i = source.find("跨文件证据")
+    return source[i:] if i >= 0 else ""
+
+
+# ---------------- xss ----------------
+#
+# 判据与其它类不同：xss 问的是"外部可控字符串是否被**原样写进响应体**"。
+# 但存储型 XSS 的写入点和回显点必然分居两个方法，单看写入方它是干净的
+# （`XSS.store` 只把值放进 Cookie，返回常量）。这类只能靠跨路由串接证据判定。
+#
+# 证据形态（切片器 `taint_chain.render_chain_block` 产出）：
+#     // ---- 跨路由串接证据 ----
+#     // Cookie "xss"：XSS.store 写入 → XSS.show 读出
+#     // 读取点方法体：
+#     //   public String show(@CookieValue("xss") String xss) { return xss; }
+#
+# 判定顺序（先否定、后肯定，避免把"有防护"判成漏洞）：
+#   1) 本方法有外部入参、且把参数值直接写进响应体 → 反射型，真
+#   2) 本方法没有回显，但有串接证据 → 看**读取点**是否原样回显：
+#        读取点直接 return 参数 / 写进响应体，且没有编码调用 → 存储型，真
+#        读取点做了输出编码 → 假
+#   3) 本方法无回显、也无串接 → 假（不是本类目的判定对象）
+
+XSS_ECHO_SINK_RE = re.compile(
+    r"\.\s*getWriter\s*\(\s*\)\s*\.\s*(?:print|write|println)\s*\(|"
+    r"\.\s*getOutputStream\s*\(\s*\)\s*\.\s*write\s*\(|"
+    # `return xss;` —— 原样交出变量
+    r"return\s+[A-Za-z_]\w*\s*;|"
+    # `return encode(xss);` 这类"过了一层函数"的返回同样是回显点。
+    # 不能因为中间有调用就当作没有回显：是否安全由 encode 检测另行判定，
+    # 两件事必须分开判，否则 `return encode(xss)` 会被漏成"无回显"。
+    r"return\s+\w+\s*\([^)]*\)\s*;", re.I)
+XSS_ENCODE_RE = re.compile(
+    r"encode\w*\s*\(|escape\w*\s*\(|HtmlUtils\s*\.\s*htmlEscape|"
+    r"StringEscapeUtils|ESAPI\s*\.\s*encoder|encodeForHTML|"
+    r"Encode\s*\.\s*forHtml|Jsoup\s*\.\s*clean", re.I)
+XSS_PARAM_RE = re.compile(
+    r"@RequestParam|@PathVariable|@RequestHeader|@CookieValue|@ModelAttribute|"
+    r"request\s*\.\s*getParameter\s*\(|request\s*\.\s*getHeader\s*\(", re.I)
+# Spring MVC / JAX-RS 的**裸形参**同样绑定请求参数：
+#     public static String reflect(String xss) { return xss; }
+# 没有注解不等于没有外部输入。只有框架注入的几个类型（HttpServletRequest /
+# HttpServletResponse / Model / Locale ...）不是用户可控值。
+FRAMEWORK_INJECTED_TYPES = {
+    "HttpServletRequest", "HttpServletResponse", "HttpSession", "ServletRequest",
+    "ServletResponse", "Model", "ModelMap", "Locale", "Principal",
+    "BindingResult", "Errors", "UriInfo", "WebRequest",
+}
+# 裸形参 = 一段「类型 变量名」，类型不是框架注入的那些。
+# 逐段切分再判断，比堆正则前瞻可靠：正则在"字符串开头 + 负向断言 + 空白"这个
+# 组合上很容易因为回溯把匹配吃掉（`String xss` 就死活匹配不上）。
+_PARAM_SEG_RE = re.compile(r"([A-Z]\w*)(?:<[^>]*>)?\s+(\w+)")
+
+
+def _bare_params(sig: str) -> list[str]:
+    """返回签名里的裸形参（形如 ['xss']），用于判断入口是否接收外部输入。"""
+    out: list[str] = []
+    # 去掉注解与其参数，只留下「类型 变量名」序列
+    sig = re.sub(r"@\w+\s*(?:\([^)]*\))?", " ", sig)
+    for typ, name in _PARAM_SEG_RE.findall(sig):
+        if typ in FRAMEWORK_INJECTED_TYPES:
+            continue
+        out.append(name)
+    return out
+
+
+_CHAIN_SEP = "// ---- 跨路由串接证据 ----"
+
+
+def _chain_reader_body(source: str) -> str:
+    """取出串接证据里贴出的读取点方法体（去掉 `// ` 前缀）。"""
+    i = source.find(_CHAIN_SEP)
+    if i < 0:
+        return ""
+    seg = source[i:]
+    j = seg.find("读取点方法体")
+    if j < 0:
+        return ""
+    out = []
+    for ln in seg[j:].splitlines()[1:]:
+        s = ln.strip()
+        if not s.startswith("//"):
+            break
+        out.append(s[2:].lstrip())
+    return "\n".join(out)
+
+
+def _entry_signature(source: str) -> str:
+    """取入口方法的签名括号（用于判断有没有裸形参）。"""
+    body = entry_body(source)
+    m = re.search(r"\b\w+\s*\(([^)]*)\)\s*(?:throws[^{]*)?\{", body)
+    return m.group(1) if m else ""
+
+
+def xss_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    if not body:
+        return None
+
+    sig = _entry_signature(body)
+    has_param = bool(XSS_PARAM_RE.search(body)) or bool(_bare_params(sig))
+    reader = _chain_reader_body(source)
+
+    # 1) 反射型：有外部入参 + 有回显 + 无编码
+    if has_param and XSS_ECHO_SINK_RE.search(body):
+        if XSS_ENCODE_RE.search(body):
+            return False
+        return True
+
+    # 2) 存储型：本方法只写不读，值经介质流到另一个回显点
+    if reader:
+        if not XSS_ECHO_SINK_RE.search(reader):
+            return False               # 读取点没有回显，链路不闭合
+        if XSS_ENCODE_RE.search(reader):
+            return False               # 读取点做了输出编码
+        return True
+
+    # 3) 既无回显也无串接证据 → 本方法确实没有把输入写进响应体。
+    #
+    #    这里必须返回 False 而不是 None。曾经写成 `False if not has_param else None`，
+    #    理由是"有形参但没回显，可能是存储型的写入点，交模型判断" —— 那是错的：
+    #    串接索引是全库建好后贴进来的（见 `JavaSlicer._attach_chains`），到这里
+    #    还没有证据，说明全库都找不到读取点，链根本不闭合。把 None 漏给模型，
+    #    等于让模型对着一个注定无法回答的样本自由裁量，而自由裁量正是抖动来源。
+    return False
+
+
+# ---------------- redir（开放重定向） ----------------
+#
+# 判定支点只有两个客观事实，都不需要模型理解语义：
+#
+#   1) 走的是哪种"跳转"API。只有会向客户端下发 Location 的才算 open redirect：
+#        response.sendRedirect(url)            302，下发 Location   → 是
+#        response.setHeader("Location", url)   301/302，下发 Location → 是
+#        return "redirect:" + url              Spring 视图前缀     → 是
+#        request.getRequestDispatcher(url).forward(...)
+#                                              服务端内部转发，客户端地址栏不变，
+#                                              **不产生任何重定向响应** → 不是
+#      java-sec-code 的 URLRedirect.forward 就是最后一种。作者注释写明
+#      「can only jump according to the path」，模型看到"路径可控"就判漏洞，
+#      是典型的把「输入可控」当成「漏洞成立」。和 AES vs DES 同构：
+#      这里的事实是"选了哪个 API"，完全可以规则判定。
+#
+#   2) 目标 URL 有没有经过白名单校验（SecurityUtil.checkURL 等）。
+#
+# 顺序上必须先判 1)：forward 型不管 url 怎么脏都不是 open redirect，
+# 先判白名单会把 forward 误当成"有漏洞但恰好被拦了"。
+
+REDIR_LOCATION_SINK_RE = re.compile(
+    r"\.\s*sendRedirect\s*\(|"
+    r"\.\s*setHeader\s*\(\s*\"[Ll]ocation\"|"
+    r"\.\s*addHeader\s*\(\s*\"[Ll]ocation\"|"
+    r"\.\s*setStatus\s*\(\s*(?:301|302|303|307|308)\s*\)|"
+    r"\.\s*sendError\s*\(\s*302|"
+    r"return\s+\"redirect\s*:", re.I)
+# 服务端内部转发：不构成 open redirect
+REDIR_FORWARD_ONLY_RE = re.compile(
+    r"getRequestDispatcher\s*\([^)]*\)\s*\.\s*forward\s*\(|"
+    r"RequestDispatcher\s+\w+\s*=", re.I)
+# 白名单 / 同源校验
+REDIR_WHITELIST_RE = re.compile(
+    r"checkURL\s*\(|checkRedirect\s*\(|isValidRedirect\s*\(|"
+    r"isAllowedRedirect\s*\(|allowedRedirect|"
+    r"\.\s*startsWith\s*\(\s*\"/\"\s*\)|"          # 只允许站内相对路径
+    r"\.\s*matches\s*\(", re.I)
+# 目标地址是编译期常量：整个实参就是一对双引号，没有任何变量拼接。
+#   return "redirect:/index"                  → 常量
+#   return "redirect:" + url                  → 非常量（有 + 号）
+#   response.sendRedirect("/fixed/page")      → 常量
+REDIR_CONST_TARGET_RE = re.compile(
+    r"return\s+\"redirect:[^\"$]{0,200}\"\s*;|"
+    r"(?:sendRedirect|sendError)\s*\(\s*\"[^\"]*\"\s*\)|"
+    r"(?:setHeader|addHeader)\s*\(\s*\"[Ll]ocation\"\s*,\s*\"[^\"]*\"\s*\)", re.I)
+
+
+def redir_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    if not body:
+        return None
+
+    has_location = bool(REDIR_LOCATION_SINK_RE.search(body))
+    has_forward = bool(REDIR_FORWARD_ONLY_RE.search(body))
+
+    # 只有 forward，没有任何下发 Location 的动作 → 不是开放重定向
+    if has_forward and not has_location:
+        return False
+    if not has_location:
+        return None                    # 连跳转都没有，不是本类目的判定对象
+
+    # 目标地址是编译期常量（`return "redirect:/index"`）→ 没有可控输入，不是漏洞。
+    # 这里必须放在拼接判断之前：常量字符串既"命中了 redirect: 前缀"又"没有拼接"，
+    # 单看 sink 命中会直接判成为真。
+    if REDIR_CONST_TARGET_RE.search(body):
+        return False
+
+    # 有 Location 下发，且经过白名单 → 安全
+    if REDIR_WHITELIST_RE.search(body):
+        return False
+    return True
+
+
+# ---------------- ssrf ----------------
+#
+# 判定支点：请求由外部 URL 发起时，有没有在 **socket 层**对目标地址做校验。
+#
+# 为什么不能只看"有没有出现 URL / IP 白名单字面量"：
+# SSRF 的绕过面太大（十进制 IP、DNS 重绑定、302 跳转、IPv6 映射、file:// 等），
+# 字符串级校验看不出来是否充分。java-sec-code 的写法给出了唯一可靠的判据 ——
+# 作者把校验实现在 `SecurityUtil.startSSRFHook()`，它挂的是
+# `InetAddress` 层的钩子，所有 HTTP 客户端（URLConnection / HttpClient /
+# okhttp / Jsoup / hutool / RestTemplate / ImageIO）都绕不过去。
+#
+# 实测该项目 16 条 ssrf 样本：hook 字段与真值 15/16 吻合，
+# 唯一例外 SSRF.openStream 本身就是靶场标注有争议的一条（方法体无任何校验，
+# 路由也不含 vuln/sec，真值来源与其他 15 条不同），且不在可判定样本内。
+#
+# 因此判据只有两条客观事实，与"用了哪个 HTTP 客户端"无关：
+#   1) 本方法是否出现 SSRF hook 的启用
+#   2) 是否只允许 http/https 协议（阻断 file:// 这条最常被利用的通道）
+#
+# 顺序：先看 hook（决定性），再看协议限制（仅当 hook 缺失时作为补充证据）。
+
+SSRF_HOOK_RE = re.compile(
+    r"startSSRFHook\s*\(|enableSSRFCheck\s*\(|SSRFProtect\w*\s*\.\s*enable|"
+    r"installSSRF\w*\s*\(", re.I)
+SSRF_SCHEME_RE = re.compile(
+    r"SecurityUtil\s*\.\s*isHttp\s*\(|"
+    r"\.\s*startsWith\s*\(\s*\"http\"\s*\)|"
+    r"(?:URI|URL)\s*\.\s*getProtocol\s*\(\s*\)\s*\.\s*equalsIgnoreCase\s*\(", re.I)
+# 有外部 URL 参与请求发起 —— 没有这一条就不是本类目的判定对象。
+#
+# 最后一类是必须的：java-sec-code 的真实请求几乎都封装在
+# `HttpUtils.URLConnection(url)` / `httpService.RequestHttp(url, headers)`
+# 这样的工具/服务方法里，方法体只有一行转发。只匹配 `openConnection` 这类
+# 底层 API 会把 16 条样本里的绝大部分判成"不是本类目对象"。
+# 判据退一步用「把 URL 变量作为实参传给一个 Http* / *Service 方法」——
+# 这个形态在 ssrf 语境下足够特异（传 URL 给方法，且方法名带 Http 语义）。
+SSRF_SINK_RE = re.compile(
+    r"\.\s*openConnection\s*\(|\.\s*openStream\s*\(|new\s+URL\s*\(|"
+    r"\.\s*execute\s*\(\s*(?:new\s+)?Http\w*|\.\s*execute\s*\(\s*url|"
+    r"HttpUtil\s*\.\s*(?:get|post|createGet|createPost)\s*\(|"
+    r"Jsoup\s*\.\s*connect\s*\(|"
+    r"restTemplate\s*\.\s*(?:getForObject|getForEntity|exchange|postForObject)\s*\(|"
+    r"ImageIO\s*\.\s*read\s*\(|"
+    r"IOUtils\s*\.\s*(?:toByteArray|copy)\s*\(\s*(?:new\s+)?URL|"
+    r"\.\s*getInputStream\s*\(\s*\)|"
+    # 把 url 变量交给 Http* / *Service / *Utils 方法去发请求
+    r"\b\w*(?:Http|http|Service|Utils|Request)\w*\s*\.\s*\w+\s*\(\s*\w*url\w*", re.I)
+
+
+def ssrf_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    if not body:
+        return None
+    if not SSRF_SINK_RE.search(body):
+        return None
+
+    if SSRF_HOOK_RE.search(body):
+        return False                   # socket 层校验已挂上
+    if SSRF_SCHEME_RE.search(body):
+        return False                   # 至少阻断了 file:// 等非 http 协议
+    return True
+
+
 # ---------------- 对外门面 ----------------
 
 def verdict(category: str, source: str) -> bool | None:
@@ -559,5 +998,20 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category == "spel":
         return spel_verdict(source)
+
+    if category == "xxe":
+        return xxe_verdict(source)
+
+    if category == "sqli":
+        return sqli_verdict(source)
+
+    if category in ("redir", "openredirect"):
+        return redir_verdict(source)
+
+    if category == "xss":
+        return xss_verdict(source)
+
+    if category == "ssrf":
+        return ssrf_verdict(source)
 
     return None

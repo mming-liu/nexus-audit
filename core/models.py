@@ -21,6 +21,10 @@ class CodeUnit:
     decorators_or_modifiers: list[str] = field(default_factory=list)
     called_symbols: list[str] = field(default_factory=list)  # 供第2层按需展开
     source_code: str = ""                # 带行号的源码切片
+    own_body: str = ""                   # 仅本方法体（不含同文件辅助方法与各类证据）
+    # own_body 存在的原因：source_code 为便于模型推理，拼进了同文件辅助方法，
+    # 而"辅助方法"里会混入同类的其它路由方法。跨路由串接需要判断"当前方法
+    # 自己写了什么"，用 source_code 会把它类方法的写入也算进来。
 
 
 @dataclass

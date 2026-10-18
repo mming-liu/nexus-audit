@@ -225,8 +225,16 @@ class JavaSlicer:
             if name in local:
                 continue
             a = args.strip()
-            # 无参 / 纯字面量调用不可能是数据汇聚点，跳过省 token
-            if not a or not re.search(r"[A-Za-z_]\w*", a):
+            # 无参 / 纯字面量调用一般不可能是数据汇聚点，跳过省 token。
+            # **但 Mapper / Repository 调用必须例外**：`userMapper.OrderByUsername()`
+            # 零参，可它的语句在 Mapper XML 里 —— 那才是判定注入的面。
+            # 按"无参不可能有漏洞"跳过，等于让模型对着 `return x();` 猜。
+            zero_arg_ok = bool(re.search(
+                r"(?i)(mapper|repository|dao|daoimpl)$", var)) or \
+                bool(re.search(r"(?i)(Mapper|Repository|Dao)$", name))
+            if not a and not zero_arg_ok:
+                continue
+            if a and not re.search(r"[A-Za-z_]\w*", a) and not zero_arg_ok:
                 continue
             seen.add(name)
             for h in r.lookup(name, limit=1):
@@ -445,7 +453,48 @@ class JavaSlicer:
             if not text:
                 continue
             units.extend(self._slice_file(java, text))
+        self._attach_chains(units)
         return units
+
+    def _attach_chains(self, units: List[CodeUnit]) -> None:
+        """为每个入口补「跨路由串接证据」：本方法写进介质的键，被谁读走了。
+
+        必须放在整库切片**之后**做，不能放进 `_slice_file` —— 存储型漏洞的
+        读取点常在另一个文件里，单文件视角看不到。
+
+        证据只贴在**写入方**上。理由是判定语义：写入方是"输入的来源入口"，
+        读取方本身没有外部参数，单看它无从谈起污点；而写入方缺的恰恰是
+        "我写出去的值最终会原样出现在别处的响应里"这个事实。
+
+        失败必须静默降级：串接是增强项，索引出错不能拖垮整个切片流程。
+        """
+        if not units:
+            return
+        try:
+            from core.context.taint_chain import build_chains, render_chain_block
+            # 不传 entries_only：build_chains 默认优先读 CodeUnit.own_body，
+            # 那里存的正是未追加辅助方法的入口方法体。
+            chains = build_chains(units)
+        except Exception:                       # noqa: BLE001 —— 增强项，宁可没有
+            return
+        if not chains.links:
+            return
+
+        by_name = {u.unit_name: u for u in units}
+        for u in units:
+            links = chains.links_of_writer(u.unit_name)
+            if not links:
+                continue
+            # 读取点方法体：只贴方法本体，不贴它的跨文件证据（避免切片膨胀）
+            reader_bodies = []
+            for l in links:
+                reader = by_name.get(l.reader.unit_name) or l.reader
+                body = reader.source_code or ""
+                sep = body.find("// ----")
+                reader_bodies.append(body[:sep].strip() if sep > 0 else body.strip())
+            block = render_chain_block(links, "\n\n".join(reader_bodies))
+            if block:
+                u.source_code += block
 
     @staticmethod
     def _iter_under(root: Path):
@@ -581,6 +630,7 @@ class JavaSlicer:
                 decorators_or_modifiers=decorators,
                 called_symbols=self._called_symbols(src),
                 source_code=source,
+                own_body=src,
             ))
         return units
 
