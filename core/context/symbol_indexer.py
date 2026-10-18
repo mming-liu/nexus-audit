@@ -139,6 +139,11 @@ class SymbolIndexer:
         except OSError:
             return None
         source = "\n".join(lines[sym["start"] - 1: sym["end"]])
+        # 裁剪尾部误入的空行/下一个符号的装饰器（第1周收尾项）
+        src_lines = source.splitlines()
+        while src_lines and (not src_lines[-1].strip() or src_lines[-1].lstrip().startswith("@")):
+            src_lines.pop()
+        source = "\n".join(src_lines)
         return {"name": sym.get("name", ""), "file_path": sym["file"],
                 "start_line": sym["start"], "end_line": sym["end"],
                 "decorators": sym["decorators"], "source": source}
