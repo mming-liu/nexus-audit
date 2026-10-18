@@ -27,6 +27,9 @@ class VulnCategory:
     # 注意：weakrand / hash / crypto / securecookie 这类"配置型缺陷"，
     # 缺陷出在 API 选择本身，与外部输入是否可达无关。若强行要求污点可达，
     # 模型会因为"没看到用户输入流入"而一律答 No，导致整类漏报。
+    owasp: bool = True         # 是否属 OWASP Benchmark 的 11 类（决定默认跑分范围）
+    # 注意：Java 生态特有的类目（ssrf / xxe / spel / deserial / redir）
+    # 在 OWASP Benchmark 里没有对应样本，只在真实项目评测中启用。
 
 
 CATEGORIES: dict[str, VulnCategory] = {
@@ -109,9 +112,67 @@ CATEGORIES: dict[str, VulnCategory] = {
         sink_question="函数是否把外部可控字符串拼进 XPath 表达式，并交给 XPathExpression.evaluate 执行？",
         property="XPath 表达式是否对入参做了转义（ESAPI.encoder().encodeForXPath）或使用变量绑定？",
     ),
+
+    # ---------------- 以下为 Java 生态特有类目（非 OWASP Benchmark 类别） ----------------
+    # 引入动机：java-sec-code 这类真实项目里，SSRF / XXE / SpEL / 反序列化 / 开放重定向
+    # 才是主力漏洞面，只跑 OWASP 那 11 类等于把真实项目大半入口丢掉。
+    "ssrf": VulnCategory(
+        key="ssrf", display="服务端请求伪造", cwe="CWE-918", owasp=False,
+        sink_question=("函数是否把外部可控的 URL 字符串直接交给出站请求 API"
+                       "（如 new URL(url).openStream()/getContent()、URLConnection.connect、"
+                       "HttpClient.execute、OkHttp newCall、Jsoup.connect、IOUtils.toByteArray(url)）？"),
+        property=("发起出站请求前是否校验目标 URL 的协议与主机"
+                  "（协议限定 http/https + 解析域名后校验 IP/白名单）？"
+                  "有效防护包括：① 请求前先判断协议；② 在 socket 层拦截域名解析并校验 IP"
+                  "（如 startSSRFHook / 自定义 socket 工厂 / SocketHook 之类的钩子机制）；"
+                  "③ 对域名做白名单校验。"
+                  "仅仅「不判断 URL 前缀、不解析域名」的字符串校验不构成防护。"),
+    ),
+    "xxe": VulnCategory(
+        key="xxe", display="XML 外部实体注入", cwe="CWE-611", owasp=False,
+        sink_question=("函数是否把外部可控的 XML 内容交给 XML 解析器"
+                       "（如 DocumentBuilder.parse、SAXReader.read、SAXBuilder.build、"
+                       "SAXParser.parse、XMLReader.parse、Digester.parse、"
+                       "TransformerFactory/XMLInputFactory/Unmarshaller 等）？"),
+        property=("解析前是否禁用了外部实体与 DTD"
+                  "（如 setFeature(disallow-doctype-decl, true)、"
+                  "setFeature(load-external-dtd, false)、setExpandEntityReferences(false)、"
+                  "setEntityResolver 返回空实现、setXIncludeAware(false)）？"),
+    ),
+    "spel": VulnCategory(
+        key="spel", display="表达式注入", cwe="CWE-94", owasp=False,
+        sink_question=("函数是否把外部可控字符串交给脚本/表达式引擎求值"
+                       "（如 SpelExpressionParser.parseExpression、"
+                       "ScriptEngine.eval、GroovyShell.evaluate、"
+                       "Jakarta EL 的 ExpressionFactory.createExpression）？"),
+        property=("求值是否使用受限上下文"
+                  "（如 SimpleEvaluationContext 且非 forReadWriteDataBinding，"
+                  "或脚本引擎的沙箱/类白名单）？"
+                  "使用 StandardEvaluationContext 或未指定上下文，属未防护。"),
+    ),
+    "deserial": VulnCategory(
+        key="deserial", display="不安全反序列化", cwe="CWE-502", owasp=False,
+        sink_question=("函数是否把外部可控数据交给反序列化 API"
+                       "（如 ObjectInputStream.readObject、"
+                       "XStream.fromXML、readValue(...enableDefaultTyping)、"
+                       "fastjson parseObject 等）？"),
+        property=("反序列化前是否限制了可还原的类"
+                  "（如 ObjectInputFilter 类白名单、"
+                  "setBlacklist/setWhiteList、"
+                  "关闭 enableDefaultTyping、fastjson 开启 safeMode）？"),
+    ),
+    "redir": VulnCategory(
+        key="redir", display="开放重定向", cwe="CWE-601", owasp=False,
+        sink_question=("函数是否把外部可控字符串作为跳转目标传给 "
+                       "sendRedirect、ModelAndView(redirect:...)、"
+                       "RedirectView、response.setHeader(\"Location\", ...)？"),
+        property=("跳转前是否把目标限制为站内相对路径或白名单域名"
+                  "（如校验以 / 开头且不含 ://，或域名白名单校验）？"),
+    ),
 }
 
 ALL_KEYS = list(CATEGORIES.keys())
+OWASP_KEYS = [k for k, v in CATEGORIES.items() if v.owasp]
 
 
 def get(key: str) -> VulnCategory | None:

@@ -32,17 +32,52 @@ SPRING_ROUTE_RE = re.compile(r"@(RequestMapping|GetMapping|PostMapping|PutMappin
 JAXRS_ROUTE_RE = re.compile(r"@(GET|POST|PUT|DELETE|PATCH)\b")
 JAXRS_PATH_RE = re.compile(r"@Path\s*\(\s*\"([^\"]*)\"\s*\)")
 
-# 方法声明（含返回类型、方法名、参数列表），排除 if/for/while/catch 等关键字误匹配。
-# 注意：不要在这里用 ^ 锚定匹配注解行 —— 方法体的缩进会漂移，^[ \t]* 对嵌套代码块失效。
-# 注解与声明分开扫描，见 _slice_file。
+# 方法声明（含返回类型、方法名、参数列表）。
+# 不用「前面必须是 行首/;/{/}」这类锚点：真实代码里方法前面通常紧跟注解行，
+# 注解以 ")" 结尾，锚点会直接失效（java-sec-code 的 SQLI.java 11 个路由只切出 1 个）。
+# 改为不锚定 + 由调用方做上下文校验（必须是类体内、有访问修饰符或返回类型合法）。
+# 返回类型：禁止嵌套量词。原写法 `(?:[\w.]+(?:<[^>]*>)?(\[\])*\s*)+?` 在匹配失败时
+# 会产生灾难性回溯（java-sec-code 的 SQLI.java 直接卡死），改为单层字符类：
+# 允许 标识符/点/泛型尖括号/数组方括号/逗号/空格/问号，整体不限量但无嵌套。
 METHOD_RE = re.compile(
-    r"(?:^|(?<=[\n;{}]))[ \t]*"                              # 行首或紧跟 ; { } 之后
-    r"(?:public|protected|private)\s+"                       # Java 方法必有访问修饰符
-    r"(?:static\s+)?(?:final\s+)?(?:synchronized\s+)?"
-    r"([\w<>\[\],\.\s\?]+?)\s+"                              # 返回类型
-    r"([A-Za-z_]\w*)\s*\(([^)]*)\)\s*(?:throws\s+[\w\s,\.]+)?\s*\{",
+    r"[ \t]*"
+    r"(?:public|protected|private)\s+"
+    r"(?:(?:static|final|synchronized|abstract|native|default)\s+)*"
+    r"([\w\.\<\>\[\]\,\?\s]+?)\s+"                          # 返回类型（单层字符类，无回溯风险）
+    r"([A-Za-z_]\w*)\s*"                                     # 方法名
+    r"\(",                                                   # 左括号（参数列表用配平解析）
     re.M,
 )
+
+
+def _match_paren(text: str, open_idx: int) -> int:
+    """从 '(' 起做圆括号配平，返回匹配的 ')' 下标。
+
+    必须配平：Spring 参数上常带注解，如
+    `foo(@RequestParam("username") String username)`，
+    用 `\\([^)]*\\)` 会在注解的内层 ')' 处提前收尾，导致整个方法无法识别。
+    """
+    depth = 0
+    in_str = None
+    i = open_idx
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if in_str:
+            if ch == "\\":
+                i += 1
+            elif ch == in_str:
+                in_str = None
+        elif ch in "\"'":
+            in_str = ch
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return i
+        i += 1
+    return -1
 # 注解行：单独扫描，用于给方法挂 @Override / @GetMapping 等
 ANNOTATION_RE = re.compile(r"^[ \t]*@([A-Za-z_]\w*)(?:\(([^)]*)\))?", re.M)
 
@@ -117,6 +152,7 @@ class JavaSlicer:
         root = Path(config_root) if config_root else self._guess_project_root(self.repo_path)
         self.config_root = root
         self._cfg = None
+        self._impls = None
 
     @staticmethod
     def _guess_project_root(p: Path) -> Path:
@@ -131,6 +167,89 @@ class JavaSlicer:
                 break
             cur = cur.parent
         return p.resolve()
+
+    # ---------- 跨文件实现体证据（MyBatis / 接口实现） ----------
+
+    MAX_IMPL_HITS = 3
+
+    def _impl_resolver(self):
+        """懒加载跨文件实现体索引（MyBatis Mapper / 接口实现 / @Select）。"""
+        if self._impls is None:
+            from core.context.java_impl_resolver import JavaImplResolver
+            self._impls = JavaImplResolver(self.config_root)
+        return self._impls
+
+    def _impl_block(self, source: str) -> str:
+        """为「真正传了外部入参的调用」补实现体，再为「防护类静态调用」补工具类实现。
+
+        为什么必须按实参过滤：`userMapper.findByUserName(username)` 与
+        `userMapper.findByUserNameVuln01(username)` 的方法体完全同构，
+        唯一差别在 Mapper 里是 `#{}` 还是 `${}`。若只按方法名索引而不核对实参，
+        就会把同类其它路由的漏洞语句注入当前样本（审 sec 却看到 vuln 的 SQL）。
+
+        为什么要单独补「无参静态调用」：java-sec-code 的 SSRF 防护思路是
+        `SecurityUtil.startSSRFHook()` 开启 socket 层域名解析校验。这是一个
+        **零参数**调用，按「有没有外部入参」过滤会被整体丢掉，模型只看到
+        "没有 IP 校验" 就判成漏洞 —— 实测 8 条 SSRF 误报全部源于此。
+        防护类调用恰恰常常不带参数，所以按方法名再补一轮。
+        """
+        from core.context.java_impl_resolver import _entry_only, _iter_methods as _im
+
+        r = self._impl_resolver()
+        r.build()
+        body = _entry_only(source)
+        local = {n for n, _b, _i in _im(body)}
+        picked: list = []
+        seen: set[str] = set()
+
+        for m in self.DATA_CALL_RE.finditer(body):
+            var, name, args = m.group(1), m.group(2), m.group(3)
+            if name in seen or len(name) < 3 or var in ("this", "super"):
+                continue
+            if name in local:
+                continue
+            a = args.strip()
+            # 无参 / 纯字面量调用不可能是数据汇聚点，跳过省 token
+            if not a or not re.search(r"[A-Za-z_]\w*", a):
+                continue
+            seen.add(name)
+            for h in r.lookup(name, limit=1):
+                if h.kind == "java_interface":
+                    continue
+                picked.append(h)
+
+        # 第二轮：防护语义的无参静态调用（startXxxHook / checkXxx / isHttp ...）
+        for name in {m.group(2) for m in self.DATA_CALL_RE.finditer(body)}:
+            if name in seen or name in local or len(name) < 4:
+                continue
+            if not self._GUARD_NAME.search(name):
+                continue
+            seen.add(name)
+            for h in r.lookup(name, limit=1):
+                if h.kind == "java_interface":
+                    continue
+                picked.append(h)
+
+        if not picked:
+            return ""
+        order = {"mybatis_anno": 0, "mybatis_xml": 0, "java_impl": 1}
+        picked.sort(key=lambda h: order.get(h.kind, 2))
+        picked = picked[: self.MAX_IMPL_HITS]
+        head = ("\n\n// ---- 跨文件证据：以下为实现体，"
+                "判定汇聚点实际行为时以此为准确认 ----\n")
+        return head + "\n".join(h.render() for h in picked)
+
+    # 调用点：`obj.method(args)`，实参用括号配平无法用正则表达，
+    # 这里只取到第一个 `(` 之后的一段，够用于「是否带标识符实参」的判断
+    DATA_CALL_RE = re.compile(
+        r"\b([A-Za-z_]\w*)\s*\.\s*([A-Za-z_]\w*)\s*\(([^()]{0,120})", re.S
+    )
+
+    # 防护语义命名：这类方法往往零参数（如 startSSRFHook()），但正是判定的关键
+    _GUARD_NAME = re.compile(
+        r"^(?:start|stop|check|is|has|verify|validate|sanitize|filter|escape|"
+        r"encode|block|allow|deny|prevent|assert)\w*$", re.I
+    )
 
     def _config_block(self, source: str) -> str:
         from core.context.config_resolver import ConfigResolver
@@ -243,6 +362,44 @@ class JavaSlicer:
         self._midx = idx
         return idx
 
+    @staticmethod
+    def _collect_annotations_upward(text: str, line_start: int) -> tuple[int, list[str]]:
+        """从方法声明行向上回溯，收集连续的注解行（允许中间有空行）。
+
+        真实 Spring 代码里注解与签名之间常有空行、Javadoc、或者注解带多参数换行，
+        只判断"紧邻上一行"会全部漏掉 —— java-sec-code 上入口提取为 0 就是这个原因。
+        返回 (声明起始下标, 注解文本列表)。
+        """
+        decl_idx = line_start
+        anns: list[str] = []
+        cur = line_start
+        blank_seen = 0
+        while cur > 0:
+            prev_end = cur - 1
+            prev_start = text.rfind("\n", 0, prev_end) + 1
+            prev_line = text[prev_start:prev_end].strip()
+            if not prev_line:
+                blank_seen += 1
+                if blank_seen > 1:      # 连续两个空行视为注解块结束
+                    break
+                cur = prev_start
+                continue
+            blank_seen = 0
+            if prev_line.startswith("@"):
+                anns.insert(0, prev_line)
+                decl_idx = prev_start
+                cur = prev_start
+                continue
+            # 注解参数跨行：上一行是参数续行（以 "," 结尾或未闭合括号）
+            if anns and (prev_line.endswith(",") or prev_line.endswith("(")
+                         or (prev_line.count("(") > prev_line.count(")"))):
+                anns[0] = prev_line + " " + anns[0]
+                decl_idx = prev_start
+                cur = prev_start
+                continue
+            break
+        return decl_idx, anns
+
     def _iter_java_files(self) -> Iterable[Path]:
         for p in self.repo_path.rglob("*.java"):
             if any(part in IGNORE_DIRS for part in p.parts):
@@ -275,52 +432,67 @@ class JavaSlicer:
             return []
         cls_name = cls_m.group(1)
 
-        # 收集本文件所有方法：name -> (start, end, source)
-        methods: dict[str, tuple[int, int, str]] = {}
+        # 类级路由前缀：Spring 的 @RequestMapping("/sqli") 加在类上
+        class_prefix = ""
+        head = text[:cls_m.start()]
+        cp = SPRING_ROUTE_RE.search(head)
+        if cp:
+            class_prefix = self._first_string_literal(cp.group(2))
+        elif JAXRS_PATH_RE.search(head):
+            class_prefix = JAXRS_PATH_RE.search(head).group(1)
+
+        # 收集本文件所有方法：name -> (start, end, source, annotations)
+        # 先用正则粗扫，再用「不落在其他方法体内」过滤掉嵌套误匹配
+        methods: dict[str, tuple[int, int, str, list[str]]] = {}
+        occupied: list[tuple[int, int]] = []      # 已确认方法体区间
+        cands = []
         for m in METHOD_RE.finditer(text):
-            ret_type, name, params = m.group(1).strip(), m.group(2), m.group(3)
+            ret_type, name = m.group(1).strip(), m.group(2)
             if name in {"if", "for", "while", "switch", "catch", "return", "new"}:
                 continue
             if ret_type in {"else", "try", "do"}:
                 continue
-            # 声明起点回退到方法名所在行首（去掉匹配到的前导空白/大括号）
-            line_start = text.rfind("\n", 0, m.start(2)) + 1
-            open_idx = text.find("{", m.end() - 1)
-            if open_idx == -1:
+            # 参数列表配平：跳过 annotation 里的内层括号
+            paren_open = m.end() - 1
+            paren_close = _match_paren(text, paren_open)
+            if paren_close == -1:
                 continue
+            # 参数之后应当是 throws 子句或方法体 '{'
+            after = text[paren_close + 1: paren_close + 400]
+            body_off = re.match(r"\s*(?:throws\s+[\w\s,\.]+?)?\s*\{", after)
+            if not body_off:
+                continue
+            open_idx = paren_close + 1 + body_off.end() - 1
             close_idx = _brace_match(text, open_idx)
             if close_idx == -1:
                 continue
-            # 把紧邻的注解行（@Override / @GetMapping(...)）并入方法源码：
-            # 从方法名行首向上逐行回溯，只要上一行是注解行就继续上移
-            decl_idx = line_start
-            while decl_idx > 0:
-                prev_line_end = decl_idx - 1
-                prev_line_start = text.rfind("\n", 0, prev_line_end) + 1
-                prev_line = text[prev_line_start:prev_line_end].strip()
-                if prev_line.startswith("@"):
-                    decl_idx = prev_line_start
-                else:
-                    break
+            cands.append((m, ret_type, name, open_idx, close_idx))
+
+        # 外层优先（方法体更长的先占位），内层误匹配被剔除
+        cands.sort(key=lambda c: c[4] - c[3], reverse=True)
+        for m, ret_type, name, open_idx, close_idx in cands:
+            if any(a <= m.start(2) <= b for a, b in occupied):
+                continue            # 落在已确认的方法体内，是嵌套代码而非方法声明
+            occupied.append((open_idx, close_idx))
+            line_start = text.rfind("\n", 0, m.start(2)) + 1
+            decl_idx, anns = self._collect_annotations_upward(text, line_start)
             start_line = _line_of(text, decl_idx)
             end_line = _line_of(text, close_idx)
-            methods.setdefault(name, (start_line, end_line, text[decl_idx:close_idx + 1]))
+            methods.setdefault(name, (start_line, end_line,
+                                      text[decl_idx:close_idx + 1], anns))
 
         if not methods:
             return []
 
         wl = WEBSERVLET_RE.search(text)
-        spring_routes = {mm.group(1): mm.group(2) for mm in SPRING_ROUTE_RE.finditer(text)}
-        jaxrs_verbs = {mm.group(1) for mm in JAXRS_ROUTE_RE.finditer(text)}
-        jaxrs_path = JAXRS_PATH_RE.search(text)
 
         units: List[CodeUnit] = []
         # 辅助方法 = 非入口方法。注意不能用 startswith("do") 判断：
         # OWASP Benchmark 的清洗辅助方法就叫 doSomething(request, param)。
-        helper_src = "\n\n".join(src for n, (_, _, src) in methods.items()
+        helper_src = "\n\n".join(src for n, (_, _, src, _a) in methods.items()
                                  if n not in SERVLET_METHODS)
 
-        for name, (start, end, src) in methods.items():
+        for name, (start, end, src, anns) in methods.items():
             decorators: List[str] = []
             route_path = ""
 
@@ -332,16 +504,24 @@ class JavaSlicer:
                 if verb:
                     decorators.append(f"@{verb}")
 
-            # Spring：方法名 + 注解
-            if name in spring_routes:
-                decorators.append(f"@{name}({spring_routes[name].strip()})")
-                route_path = route_path or self._first_string_literal(spring_routes[name])
+            # Spring：方法级映射注解（@RequestMapping/@GetMapping/...）
+            for ann in anns:
+                m = SPRING_ROUTE_RE.match(ann)
+                if not m:
+                    continue
+                decorators.append(ann)
+                sub = self._first_string_literal(m.group(2))
+                route_path = route_path or (class_prefix.rstrip("/") + "/" + sub.lstrip("/")).rstrip("/")
 
-            # JAX-RS：@Path + @GET/@POST（HTTP 动词用方法名近似）
-            if jaxrs_path and (name.upper() in jaxrs_verbs or
-                               any(v in name.upper() for v in ("GET", "POST", "PUT", "DELETE"))):
-                decorators.append(f"@Path({jaxrs_path.group(1)})")
-                route_path = route_path or jaxrs_path.group(1)
+            # JAX-RS：@Path + @GET/@POST（方法级注解）
+            jax_verb = next((a[1:].split("(")[0] for a in anns
+                             if re.match(r"@(GET|POST|PUT|DELETE|PATCH)\b", a)), None)
+            jax_path = next((a for a in anns if a.startswith("@Path")), None)
+            if jax_verb and (jax_path or class_prefix):
+                decorators.append(jax_path or f"@{jax_verb}")
+                if jax_path:
+                    sub = self._first_string_literal(jax_path)
+                    route_path = class_prefix.rstrip("/") + "/" + sub.lstrip("/")
 
             if not decorators:
                 continue
@@ -352,6 +532,8 @@ class JavaSlicer:
             source += self._config_block(source)
             # 跨文件辅助方法：工厂方法里的真实算法是关键证据
             source += self._resolve_cross_file_helpers(source)
+            # 跨文件实现体：MyBatis Mapper 的 #{} / ${} 决定 SQL 注入真值
+            source += self._impl_block(source)
 
             units.append(CodeUnit(
                 file_path=str(path),

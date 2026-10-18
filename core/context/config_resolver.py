@@ -33,6 +33,7 @@ class ConfigResolver:
         self.repo_root = Path(repo_root)
         self.max_entries = max_entries
         self._cache: dict[str, str] | None = None
+        self._hints: list[str] | None = None
 
     # ---------- 索引 ----------
 
@@ -125,6 +126,19 @@ class ConfigResolver:
 
     # ---------- 回填 ----------
 
+    SECURITY_HINTS = ("alg", "hash", "crypt", "cipher", "key", "random", "secret", "mode")
+
+    def _hint_lines(self) -> list[str]:
+        """安全强相关的配置行（惰性算一次并缓存）。
+
+        原实现在每个切片里都遍历全表 + `list(table.items())[:500]` 反复拷贝，
+        2740 个用例下占了 65% 的总耗时。
+        """
+        if getattr(self, "_hints", None) is None:
+            self._hints = [f"{k} = {v}" for k, v in self.load().items()
+                           if any(h in k.lower() for h in self.SECURITY_HINTS)][: self.max_entries]
+        return self._hints
+
     def resolve_for(self, source: str) -> str:
         """从源码中找出被引用的配置键，返回可拼进切片的「配置取值」文本块。"""
         table = self.load()
@@ -139,12 +153,7 @@ class ConfigResolver:
         lines = [f"{k} = {table[k]}" for k in keys if k in table]
         # 没找到引用键时，回填少量与安全强相关的键（算法/随机数/密钥类）
         if not lines:
-            hints = ("alg", "hash", "crypt", "cipher", "key", "random", "secret", "mode")
-            for k, v in list(table.items())[:500]:
-                if any(h in k.lower() for h in hints):
-                    lines.append(f"{k} = {v}")
-                if len(lines) >= self.max_entries:
-                    break
+            lines = self._hint_lines()
         if not lines:
             return ""
         body = "\n".join(lines[: self.max_entries])

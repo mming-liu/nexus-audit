@@ -115,11 +115,13 @@ def cmd_scan(args):
 
 def cmd_scan_java(args, repo: Path):
     """Java Web 赛道：Servlet/Spring 入口切片 + 按漏洞类目两步法。"""
-    from core.agents.vuln_categories import ALL_KEYS
+    from core.agents.vuln_categories import OWASP_KEYS
     from core.agents.scenario_matcher import ScenarioMatcher
     from core.slicer.java_servlet import JavaSlicer
 
-    categories = [c.strip() for c in args.categories.split(",")] if args.categories else ALL_KEYS
+    # 默认只跑 OWASP 的 11 类，避免对每个入口 × 全部类目做 N×M 次模型调用；
+    # 真实项目需覆盖 SSRF/XXE/表达式注入等，用 --categories 显式指定。
+    categories = [c.strip() for c in args.categories.split(",")] if args.categories else OWASP_KEYS
 
     print(f"[1/4] Java 入口切片 ...")
     units = JavaSlicer(repo).extract_entry_units()
