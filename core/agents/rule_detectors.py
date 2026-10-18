@@ -818,6 +818,40 @@ _STR_LIT_RE = re.compile(r'"(?:\\.|[^"\\])*"')
 # 数字类型的参数声明（入口形参或 Mapper 接口声明）
 _NUMERIC_TYPES = r"(?:int|Integer|long|Long|short|Short|byte|Byte|BigDecimal|BigInteger)"
 
+# 只保留"看起来是 SQL 语句"的拼接 RHS。
+#
+# 不加这一步，`_concat_only_sanitized()` / `_concat_params_all_numeric()`
+# 会被**无关的拼接**污染：JavaSecLab 的 `JdbcController.safe5` 里有两处拼接
+#
+#     String sql = "select * from sqli where id = '" + ESAPI.encodeForSQL(codec, id) + "'";
+#     return "查询成功，用户名：" + user + " 密码：" + pass;
+#
+# 第二条是返回给前端的结果拼接，跟 SQL 毫无关系，但它含两个裸变量
+# `user` / `pass` → `_concat_only_sanitized` 见到裸变量就 return False，
+# 于是"操作数全是清洗函数"这个事实被另一条语句否掉了，判成误报。
+# 这与 memory 第 11 条（切片污染）是同一类错误：判据扫了不该扫的范围。
+_SQL_STMT_HINT_RE = re.compile(
+    r"\b(?:select|insert|update|delete|from|where|order\s+by|group\s+by|"
+    r"values|set|join|limit|union)\b", re.I)
+
+
+def _sql_rhs_iter(body: str):
+    """遍历"看起来是 SQL"的赋值语句右值（含拼接）。
+
+    注意判据要用**字面量内部**的关键字：`"select * from t where id = " + x`
+    里的 `select`/`from` 都在字符串里，剥掉字面量再判就会一个都看不到
+    （第一版写成 `_STR_LIT_RE.sub(" ", rhs)`，结果 count=0，白改一场）。
+    """
+    for m in _ASSIGN_RHS_RE.finditer(body):
+        rhs = m.group(1)
+        if '"' not in rhs or "+" not in rhs:
+            continue
+        # 只看**字符串字面量**里有没有 SQL 关键字 —— 这才是 SQL 语句的特征
+        for lit in _STR_LIT_RE.findall(rhs):
+            if _SQL_STMT_HINT_RE.search(lit):
+                yield rhs
+                break
+
 
 def _concat_only_sanitized(body: str) -> bool:
     """SQL 拼接的操作数是否**全部**是函数调用（没有任何裸变量参与）。
@@ -829,12 +863,12 @@ def _concat_only_sanitized(body: str) -> bool:
     实现上按赋值语句拆操作数，而不是用一条大正则去套调用形态 ——
     `ESAPI.encoder().encodeForSQL(a, b)` 这种链式调用，正则很容易写成只认
     单层调用（我第一版就是这样，结果漏掉了 safe3）。
+
+    **只看像 SQL 的赋值语句**，见 `_sql_rhs_iter()`：否则"查询成功：" + user
+    这种结果拼接里的裸变量会把结论推翻。
     """
     found_call = False
-    for m in _ASSIGN_RHS_RE.finditer(body):
-        rhs = m.group(1)
-        if '"' not in rhs or "+" not in rhs:
-            continue
+    for rhs in _sql_rhs_iter(body):
         bare = _STR_LIT_RE.sub('""', rhs)
         for part in bare.split("+"):
             p = part.strip()
@@ -860,7 +894,7 @@ def _dollar_params_all_numeric(body: str, impl: str) -> bool:
 
 
 def _concat_params_all_numeric(body: str) -> bool:
-    """JDBC 拼接里出现的裸变量是否**全部**是数字类型形参。
+    """JDBC 拼接里出现的裸变量是否**全部**是数字类型。
 
         safe4(Integer id)  →  "select ... id = " + id   ⇒ 不可注入
         vul1(String id)    →  "select ... id = '" + id + "'"  ⇒ 可注入
@@ -868,19 +902,29 @@ def _concat_params_all_numeric(body: str) -> bool:
     为什么这是确定性事实而不是语义推断：入参声明成 `Integer` 之后，
     Spring 在参数绑定阶段就把它解析成数字，`1 OR 1=1` 连绑定都过不了。
     规则只需要核对"形参声明"这一行，不需要理解 SQL 语义。
+
+    **局部变量也算**：JavaSecLab 的 `JdbcController.safe4` 形参是 String，
+    但中间做了 `Integer userId = Integer.valueOf(id);`，随后拼进 SQL 的是
+    `userId`（Integer 类型）。只认形参声明会把这条判成误报。
+    判据同样是可核对的事实：`<类型> <变量> = Integer.valueOf(...)` 这一行
+    就在源码里，变量类型一眼可见。
     """
     bare: list[str] = []
-    for m in _ASSIGN_RHS_RE.finditer(body):
-        rhs = m.group(1)
-        if '"' not in rhs or "+" not in rhs:
-            continue
+    for rhs in _sql_rhs_iter(body):
         for part in _STR_LIT_RE.sub('""', rhs).split("+"):
             p = part.strip()
             if re.fullmatch(r"[A-Za-z_]\w*", p or ""):
                 bare.append(p)
     if not bare:
         return False
-    return all(re.search(rf"\b{_NUMERIC_TYPES}\s+{re.escape(n)}\b", body) for n in bare)
+    for n in bare:
+        if re.search(rf"\b{_NUMERIC_TYPES}\s+{re.escape(n)}\b", body):
+            continue                       # 形参或局部变量声明为数字类型
+        # 局部变量：`Integer x = Integer.valueOf(...)` / `int x = ...`
+        if re.search(rf"\b{_NUMERIC_TYPES}\s+{re.escape(n)}\s*=", body):
+            continue
+        return False
+    return True
 
 
 _SQL_VAR_ASSIGN_RE = r"String\s+{name}\s*=\s*"
@@ -1451,9 +1495,30 @@ def _first_arg(call: str) -> str:
     直接 `call[call.find("(") + 1:]` 会把后面的 `));\\n return;\\n}` 一起带上，
     导致"实参里有没有字母"的判定被返回值/后续语句污染。
     """
-    i = call.find("(")
+    args = _all_args(call)
+    return args[0] if args else ""
+
+
+def _all_args(call: str) -> list[str]:
+    """从 `名字(...)` 里取出**全部**顶层实参（括号平衡、逗号分割）。
+
+    为什么不能只用第一个：`method.invoke(null, new String[]{payload}, ...)`、
+    `ProcessBuilder(Arrays.asList("sh","-c", cmd))` 这类调用，污点在第 2 个
+    实参甚至嵌套数组里。只看第一个会把 `null` 当成"实参是常量"，
+    于是反序列化/反射执行这条真漏洞被判成安全（JavaSecLab 的 vul3 实测）。
+
+    起点必须是**最后一个** `名字` 后面的 `(`，因为正则可能从链式调用的
+    开头开始匹配：`Runtime.getRuntime().exec("/bin/ping")` 的第一个 `(` 属于
+    `getRuntime()`，从那里切会把整个调用当成空实参。
+    """
+    # 取最后一个 `标识符(` 的位置
+    last = None
+    for m in re.finditer(r"([A-Za-z_]\w*)\s*\(", call):
+        last = m
+    i = last.end() - 1 if last else call.find("(")
     if i < 0:
-        return ""
+        return []
+    out: list[str] = []
     depth, start = 1, i + 1
     for j in range(start, len(call)):
         ch = call[j]
@@ -1462,10 +1527,13 @@ def _first_arg(call: str) -> str:
         elif ch in ")]}":
             depth -= 1
             if depth == 0:
-                return call[start:j]
+                out.append(call[start:j])
+                return [a for a in out if a.strip()]
         elif ch == "," and depth == 1:
-            return call[start:j]
-    return call[start:start + 120]
+            out.append(call[start:j])
+            start = j + 1
+    out.append(call[start:start + 200])
+    return [a for a in out if a.strip()]
 
 
 def _args_all_numeric(args: str, types: dict[str, str]) -> bool:
@@ -1506,16 +1574,31 @@ def cmdi_verdict(source: str) -> bool | None:
         return None
 
     # 1) 数字类型形参：exec(n) / load(id) 都没有注入面
+    #    看**全部**实参而不是第一个 —— `method.invoke(null, new String[]{payload})`
+    #    的污点在第 2 个实参上，只看第一个会把 `null` 当成"实参是常量"。
     types = _param_types(_entry_signature(body))
-    call = body[m.start(): m.start() + 200]
-    arg_text = _first_arg(call)
-    if _args_all_numeric(arg_text, types) and \
+    call = body[m.start(): m.start() + 400]
+    arg_list = _all_args(call)
+    arg_text = ",".join(arg_list)
+    if arg_list and all(_args_all_numeric(a, types) for a in arg_list) and \
             not re.search(r"\"[^\"]*\"\s*\+", arg_text):
         return False
 
-    # 2) 实参是纯常量（没有 + 拼接、没有变量）→ 命令固定，不是注入
-    if not _CONCAT_HINT_RE.search(call) and not re.search(
-            r"exec\s*\(\s*[A-Za-z_]\w*\s*\)", body):
+    # 2) 实参是纯常量（没有 + 拼接、没有任何变量）→ 命令固定，不是注入
+    #    判"有没有变量"必须先剥掉字符串字面量：`"/bin/ping -c1 127.0.0.1"`
+    #    里面的 `bin`/`ping`/`c1` 会被 `[A-Za-z_]\w*` 当成三个变量，
+    #    于是常量命令判不出安全（实测把冒烟 [19] 的"常量命令"打回 True）。
+    def _has_var_arg(a: str) -> bool:
+        stripped = _STR_LIT_RE.sub(" ", a)
+        for tok in re.findall(r"[A-Za-z_]\w*", stripped):
+            if tok in ("null", "true", "false"):
+                continue
+            return True
+        return False
+
+    if arg_list and not any(_has_var_arg(a) for a in arg_list) \
+            and not _CONCAT_HINT_RE.search(call) and not re.search(
+                r"exec\s*\(\s*[A-Za-z_]\w*\s*\)", body):
         if re.search(r"exec\s*\(\s*\"[^\"]*\"\s*\)|"
                      r"load\s*\(\s*\"[^\"]*\"\s*\)", body):
             return False
@@ -1552,10 +1635,15 @@ def cmdi_verdict(source: str) -> bool | None:
 # 这种黑名单循环判成白名单（实测：checkOs 被误判）。所以：
 #   黑名单判据优先（`contains("字面量")` / 遍历黑名单数组）
 #   白名单判据要求接收者看起来是容器名（list/set/map/白名单…）或显式枚举
+#
+# `switch(x)` 曾经也算白名单证据 —— **删掉了**。它只要出现在文件任何地方
+# 就命中，而同文件里往往并排放着别的路由方法（`switch(actionCode)` 之类），
+# 于是"当前入口调的命令执行"被判成"有白名单"。这类污染产出的是 False，
+# 也就是把真漏洞静默放过，比误报危险。要认 switch 就必须确认它包着
+# **被校验的那个变量**，而那需要类型推断，规则手里没有。
 _HELPER_ALLOW_RE = re.compile(
     r"\b\w*(?:white|allow|permit|legal|valid|safe|list|set|map|pool|range|"
-    r"commands?|allowed)\w*\s*\.\s*(?:contains|indexOf)\s*\(\s*\w+\s*\)|"
-    r"\bswitch\s*\(\s*\w+\s*\)|\bcase\s*\"", re.I)
+    r"commands?|allowed)\w*\s*\.\s*(?:contains|indexOf)\s*\(\s*\w+\s*\)", re.I)
 # 出现这些 → 拦截的是"字符/片段"（黑名单），天然可绕
 _HELPER_DENY_RE = re.compile(
     r"\.\s*contains\s*\(\s*\"|"                       # content.contains("|")

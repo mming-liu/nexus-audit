@@ -792,6 +792,68 @@ check("`${field}` 判据能看到（不被拼接截断掩掉）",
 check("两个方法名都解析正确",
       sorted(n for n in _names if n) == ["byNameConcat", "orderByUnsafe"], True)
 
+print("\n[21] sqli 拼接判据的范围（JavaSecLab 暴露的污染）")
+
+# 结果拼接拖累 SQL 拼接：safe5 里有 `"查询成功，用户名：" + user + " 密码：" + pass`，
+# 两个裸变量让"SQL 操作数全是清洗函数"这个事实被否掉 → 误报。
+_SQLI_RESULT_CONCAT = '''public R safe5(@RequestParam String id) {
+    Statement stmt = conn.createStatement();
+    String sql = "select * from sqli where id = '" + ESAPI.encoder().encodeForSQL(oracleCodec, id) + "'";
+    ResultSet rs = stmt.executeQuery(sql);
+    return R.ok("查询成功，用户名：" + user + " 密码：" + pass);
+}'''
+check("结果拼接里的裸变量不污染 SQL 拼接判定 → 退回模型（清洗函数不确定）",
+      _verdict("sqli", _SQLI_RESULT_CONCAT), None)
+
+# 局部变量已转整型：safe4 形参是 String，但 `Integer userId = Integer.valueOf(id)`
+# 之后拼进 SQL 的是 Integer。只认形参声明会把这条判成误报。
+_SQLI_LOCAL_NUMERIC = '''public R safe4(@RequestParam String id) {
+    Integer userId;
+    try {
+        userId = Integer.valueOf(id);
+    } catch (NumberFormatException e) {
+        return R.error("必须为整数");
+    }
+    Statement stmt = conn.createStatement();
+    String sql = "SELECT * FROM sqli WHERE id = " + userId;
+    ResultSet rs = stmt.executeQuery(sql);
+    return R.ok("查询成功，用户名：" + user + " 密码：" + pass);
+}'''
+check("局部变量经 Integer.valueOf 收窄 → safe",
+      _verdict("sqli", _SQLI_LOCAL_NUMERIC), False)
+
+print("\n[22] 反射执行：污点不在第一个实参")
+
+# JavaSecLab CommandController.vul3：method.invoke(null, new String[]{payload}, ...)
+# 只看第一个实参（null）会把这条真漏洞判成"实参是常量"。
+_CMDI_REFLECT = '''public R vul3(String payload) throws Exception {
+    Class<?> clazz = Class.forName("java.lang.ProcessImpl");
+    Method method = clazz.getDeclaredMethod("start", String[].class, Map.class);
+    method.setAccessible(true);
+    Process process = (Process) method.invoke(null, new String[]{payload}, null, null, null, false);
+    return R.ok(process.toString());
+}'''
+check("method.invoke(null, ...) 的污点在第 2 个实参 → vuln",
+      _verdict("cmdi", _CMDI_REFLECT), True)
+
+# switch 不能当白名单证据：同文件别的路由方法里有 switch(actionCode)，
+# 曾把这条真漏洞静默判成 safe（比误报危险）。
+_CMDI_SWITCH_ELSEWHERE = '''public R vul3(String payload) throws Exception {
+    Method m = Class.forName("java.lang.ProcessImpl").getDeclaredMethod("start", String[].class);
+    m.invoke(null, new String[]{payload});
+    return R.ok("");
+}
+
+// ---- 跨文件辅助方法实现 ----
+public void unrelated(String actionCode) {
+    switch (actionCode) {
+        case "a": break;
+        case "b": break;
+    }
+}'''
+check("同文件无关的 switch 不算白名单 → 不判 safe（退回模型）",
+      _verdict("cmdi", _CMDI_SWITCH_ELSEWHERE), None)
+
 
 
 print()

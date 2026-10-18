@@ -1,0 +1,212 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\JavaSecLab-main",
+  "total_units": 227,
+  "with_truth": 59,
+  "rule_covered": 35,
+  "rule_coverage": 0.5932,
+  "rule_correct": 31,
+  "rule_accuracy": 0.9118,
+  "per_category": {
+    "xxe": {
+      "n": 5,
+      "safe_n": 0,
+      "decided": 3,
+      "correct": 3
+    },
+    "xss": {
+      "n": 7,
+      "safe_n": 1,
+      "decided": 6,
+      "correct": 3
+    },
+    "spel": {
+      "n": 7,
+      "safe_n": 1,
+      "decided": 3,
+      "correct": 3
+    },
+    "ssrf": {
+      "n": 2,
+      "safe_n": 0,
+      "decided": 1,
+      "correct": 1
+    },
+    "sqli": {
+      "n": 9,
+      "safe_n": 2,
+      "decided": 2,
+      "correct": 2
+    },
+    "cmdi": {
+      "n": 4,
+      "safe_n": 0,
+      "decided": 3,
+      "correct": 3
+    },
+    "redir": {
+      "n": 10,
+      "safe_n": 2,
+      "decided": 7,
+      "correct": 7
+    },
+    "pathtraver": {
+      "n": 11,
+      "safe_n": 1,
+      "decided": 6,
+      "correct": 6
+    },
+    "deserial": {
+      "n": 4,
+      "safe_n": 1,
+      "decided": 3,
+      "correct": 3
+    }
+  },
+  "fallback": [
+    {
+      "unit": "XXEController.xxeSafe",
+      "category": "xxe",
+      "real_vuln": false,
+      "route": "/safe"
+    },
+    {
+      "unit": "XXEController.xxeVul",
+      "category": "xxe",
+      "real_vuln": true,
+      "route": "/vul"
+    },
+    {
+      "unit": "SSTIController.safe1",
+      "category": "spel",
+      "real_vuln": false,
+      "route": "/safe1"
+    },
+    {
+      "unit": "SSTIController.vul1",
+      "category": "spel",
+      "real_vuln": true,
+      "route": "/vul1"
+    },
+    {
+      "unit": "SSTIController.vul3",
+      "category": "spel",
+      "real_vuln": true,
+      "route": "/vul3"
+    },
+    {
+      "unit": "SsrfController.safe",
+      "category": "ssrf",
+      "real_vuln": false,
+      "route": "/safe"
+    },
+    {
+      "unit": "HibernateController.vul1",
+      "category": "sqli",
+      "real_vuln": true,
+      "route": "/vul1"
+    },
+    {
+      "unit": "HibernateController.safe",
+      "category": "sqli",
+      "real_vuln": false,
+      "route": "/safe"
+    },
+    {
+      "unit": "HibernateController.vul2",
+      "category": "sqli",
+      "real_vuln": true,
+      "route": "/vul2"
+    },
+    {
+      "unit": "JdbcController.safe5",
+      "category": "sqli",
+      "real_vuln": false,
+      "route": "/safe5"
+    },
+    {
+      "unit": "JPAController.safe",
+      "category": "sqli",
+      "real_vuln": false,
+      "route": "/safe"
+    },
+    {
+      "unit": "JPAController.vul1",
+      "category": "sqli",
+      "real_vuln": true,
+      "route": "/vul1"
+    },
+    {
+      "unit": "JPAController.vul2",
+      "category": "sqli",
+      "real_vuln": true,
+      "route": "/vul2"
+    },
+    {
+      "unit": "CodeController.safeGroovy",
+      "category": "spel",
+      "real_vuln": false,
+      "route": "/safeGroovy"
+    },
+    {
+      "unit": "CommandController.safe",
+      "category": "cmdi",
+      "real_vuln": false,
+      "route": "/safe"
+    },
+    {
+      "unit": "UrlRedirectController.vul5",
+      "category": "redir",
+      "real_vuln": true,
+      "route": "/vul5"
+    },
+    {
+      "unit": "UrlRedirectController.UrlRedirectSafe",
+      "category": "redir",
+      "real_vuln": false,
+      "route": "/safe"
+    },
+    {
+      "unit": "UrlRedirectController.UrlRedirectVul",
+      "category": "redir",
+      "real_vuln": true,
+      "route": "/vul"
+    },
+    {
+      "unit": "DirTraversalController.safe2",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "route": "/safe2"
+    },
+    {
+      "unit": "DirTraversalController.safe1",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "route": "/safe1"
+    },
+    {
+      "unit": "DeleteController.safe",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "route": "/safe"
+    },
+    {
+      "unit": "ReadController.safe",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "route": "/safe"
+    },
+    {
+      "unit": "UploadController.safe",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "route": "/safe"
+    },
+    {
+      "unit": "XMLDecoderController.safe",
+      "category": "deserial",
+      "real_vuln": false,
+      "route": "/safe"
+    }
+  ],
+  "model": []
+}
