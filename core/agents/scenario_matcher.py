@@ -18,6 +18,7 @@ prompt_single_yes_no_question），把"找漏洞"拆成客观判断题：
 from __future__ import annotations
 
 import asyncio
+import inspect
 from typing import Callable, Sequence
 
 from core.agents import vuln_categories as VC
@@ -145,25 +146,65 @@ def _is_yes(text: str, field: str) -> bool:
 
 
 class ScenarioMatcher:
-    """两步法初筛器（运行在 Tier-1 模型上）。"""
+    """两步法初筛器（运行在 Tier-1 模型上）。
+
+    `scenario_votes` / `property_votes` 控制每个问题问几次取多数（默认 1）。
+
+    为什么默认 1 而不是 3：曾经假设「多次采样取多数能降抖动」，实测证伪了。
+    同一份代码、同一个 prompt、temperature=0 连问三次，12 条样本里 5 条不一致
+    （抖动率 41.7%）。但把投票接进完整评测做 A/B（每种策略各跑 2 轮 66 样本）后：
+
+      votes=1：两轮翻转 9/66（13.6%）
+      votes=3：两轮翻转 9/66（13.6%）  ← 抖动一点没降，成本 ×3
+
+    原因是抖动是 *采样级* 的：3 次里有 2 次错，多数票就稳定地错，投票只把
+    噪声从「每轮不同」变成「每轮同一个错误」。所以投票不能当降抖动手段，
+    默认关掉；`votes` 字段仅作为审计线索保留（1:2 分歧说明模型在该样本上犹豫，
+    confidence 也据此从 0.7 降到 0.45）。真正的确定性只能来自规则与代码事实。
+    """
 
     def __init__(self, router: TwoTierRouter | None = None,
                  llm: Callable[[list[dict]], str] | None = None,
                  code_language: str = "java_web",
-                 max_concurrency: int = 6):
+                 max_concurrency: int = 6,
+                 scenario_votes: int = 1, property_votes: int = 1):
         self.router = router
         self._llm = llm
         self.code_language = code_language
         self.max_concurrency = max_concurrency
+        self.scenario_votes = max(1, scenario_votes)
+        self.property_votes = max(1, property_votes)
 
     async def _ask(self, prompt: str) -> str:
         messages = [{"role": "system", "content": SYSTEM_MESSAGE},
                     {"role": "user", "content": prompt}]
         if self._llm is not None:
-            return self._llm(messages)
+            # llm 既可能是同步函数（mock / 本地模型），也可能是 async（网关客户端）
+            r = self._llm(messages)
+            return await r if inspect.isawaitable(r) else r
         if self.router is None:
             raise RuntimeError("需要注入 router 或 llm")
         return await self.router.screen(messages)
+
+    async def _vote(self, prompt: str, field: str, n: int) -> tuple[bool, tuple[bool, ...]]:
+        """问 n 次，多数票为结论。
+
+        并发发出而不是串行：n=3 时串行等于把延迟乘 3，并发只多占一点配额。
+        奇数票才不会平局；偶数票平局时按「不判定通过」处理（保守，避免误报）。
+        """
+        if n <= 1:
+            return _is_yes(await self._ask(prompt), field), ()
+        results = await asyncio.gather(
+            *(self._ask(prompt) for _ in range(n)), return_exceptions=True)
+        votes: list[bool] = []
+        for r in results:
+            if isinstance(r, Exception):
+                continue
+            votes.append(_is_yes(r, field))
+        if not votes:
+            raise RuntimeError("多次采样全部失败")
+        yes = sum(votes)
+        return yes * 2 > len(votes), tuple(votes)
 
     # ---------- 新接口：按类目做两步法 ----------
 
@@ -179,31 +220,45 @@ class ScenarioMatcher:
             # Step 1: Scenario（配置型缺陷走不要求污点可达的模板）
             tmpl = SCENARIO_PROMPT_TMPL if cat.needs_taint else CONFIG_SCENARIO_PROMPT_TMPL
             try:
-                s1 = await self._ask(tmpl.format(
-                    lang=lang, question=cat.sink_question, code=unit.source_code))
+                hit, s_votes = await self._vote(
+                    tmpl.format(lang=lang, question=cat.sink_question,
+                                code=unit.source_code),
+                    "hit", self.scenario_votes)
             except Exception as e:
                 out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=False,
                                           property_missing="",
                                           reasoning_summary=f"LLM 调用失败：{e}"))
                 continue
-            if not _is_yes(s1, "hit"):
+            if not hit:
                 continue
             # Step 2: Property
             try:
-                s2 = await self._ask(PROPERTY_PROMPT_TMPL.format(
-                    property=cat.property, lang=lang, code=unit.source_code))
+                protected, p_votes = await self._vote(
+                    PROPERTY_PROMPT_TMPL.format(
+                        property=cat.property, lang=lang, code=unit.source_code),
+                    "protected", self.property_votes)
             except Exception as e:
                 out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=True,
                                           property_missing="",
                                           reasoning_summary=f"LLM 调用失败：{e}"))
                 continue
-            protected = _is_yes(s2, "protected")
+            all_votes = s_votes + p_votes
+            unanimous = bool(all_votes) and len(set(all_votes)) == 1
+            # 有一轮说"不安全"才判漏洞，但票数越悬殊置信度越低：
+            # 3:0 给 0.7，2:1 给 0.45 —— 后者应当优先送人工复核而不是直接采信。
+            if protected:
+                conf = 0.3 if unanimous else 0.2
+            else:
+                miss = sum(1 for v in p_votes if not v)
+                conf = 0.7 if miss == len(p_votes) else 0.45
             out.append(VulnHypothesis(
                 unit=unit, vuln_type=key, scenario_hit=True,
                 property_missing="" if protected else cat.property,
                 reasoning_summary=(f"Scenario={key}=HIT, PropertyCheck="
-                                   f"{'PRESENT' if protected else 'MISSING'}"),
-                confidence=0.3 if protected else 0.7,
+                                   f"{'PRESENT' if protected else 'MISSING'}"
+                                   f"{'' if unanimous else '（采样不一致）'}"),
+                confidence=conf,
+                votes=all_votes,
             ))
         return out
 

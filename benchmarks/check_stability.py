@@ -50,7 +50,9 @@ async def run(args):
 
     matcher = ScenarioMatcher(
         router=TwoTierRouter(tier1=OpenAICompatClient(model=args.model, timeout=180)),
-        max_concurrency=args.concurrency, code_language="java_web")
+        max_concurrency=args.concurrency, code_language="java_web",
+        # 这里必须单次采样：本脚本测的就是"单次判定有多不稳"
+        scenario_votes=1, property_votes=1)
 
     print(f"稳定性复测：{len(targets)} 条 × {args.repeat} 次，模型 {args.model}\n")
     flaky = 0

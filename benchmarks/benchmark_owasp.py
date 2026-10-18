@@ -136,7 +136,8 @@ async def run(args) -> None:
     router = None if args.offline else TwoTierRouter(
         tier1=OpenAICompatClient(model=args.model, timeout=args.timeout))
     matcher = ScenarioMatcher(router=router, max_concurrency=args.concurrency,
-                              code_language="java_web")
+                              code_language="java_web",
+                              scenario_votes=args.votes, property_votes=args.votes)
 
     if args.offline:
         # 离线基线：纯 sink 关键词匹配，用来对比 LLM 的增益
@@ -338,6 +339,8 @@ def main():
     ap.add_argument("--resume", action="store_true", help="从已有 jsonl 断点续跑")
     ap.add_argument("--categories", default=None,
                     help="只跑指定类目，逗号分隔，如 weakrand,crypto")
+    ap.add_argument("--votes", type=int, default=1,
+                    help="每个问题问几次取多数（默认 1；实测 3 票不降抖动只增成本，见 REAL_PROJECT_REPORT.md）")
     ap.add_argument("--no-rules", action="store_true",
                     help="关闭确定性规则前置，全部交给 LLM（用于对比规则增益）")
     args = ap.parse_args()

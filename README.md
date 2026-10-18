@@ -43,6 +43,7 @@ nexus-audit/
 | `benchmarks/benchmark_owasp.py` | OWASP Benchmark 跑分（TPR/FPR/Score，含断点续跑与误差归因） |
 | `benchmarks/benchmark_javaseccode.py` | 真实项目（java-sec-code）评测，真值取自路由命名 + 作者注释 |
 | `benchmarks/check_stability.py` | 判定稳定性复测：同一输入连问 N 次，测抖动率 |
+| `benchmarks/ab_votes.py` | 采样策略一致性 A/B：两种策略各跑 2 轮，比两轮之间的翻转数 |
 | `benchmarks/offline_baseline.py` | 对照组：纯 sink 关键词匹配 |
 
 ## OWASP Benchmark 跑分
@@ -75,6 +76,10 @@ python benchmarks/check_stability.py
 12 条样本里 5 条结果不一致（41.7%）。单轮 TPR/FPR 因此不具备可复现性，
 详见 [`REAL_PROJECT_REPORT.md`](REAL_PROJECT_REPORT.md)。
 
+采样级补救已经试过并失效：`--votes 3`（三次取多数）在两轮 A/B 里翻转率仍是
+9/66 = 13.6%，与 `--votes 1` 完全相同，成本却是 3 倍。所以 `--votes` 默认 1，
+`VulnHypothesis.votes` 只作为「模型是否犹豫」的审计线索保留。
+
 
 ```bash
 pip install -r requirements.txt
@@ -99,7 +104,8 @@ python cli.py --help
 - [ ] 第4周：PR 增量扫描的调用链过滤（`cmd_pr_scan` 仍是 TODO）
 - [x] 第5周：Java 赛道打通 + OWASP Benchmark 跑分（11 类，Score 0.98）
 - [x] 第6周：真实项目（java-sec-code）评测，暴露 4 个仅真实代码可见的切片缺陷
-- [ ] 降判定抖动：同 unit 多次采样取多数（当前抖动率 41.7%，是最大阻碍）
+- [ ] 降判定抖动：采样级手段已排除（3 票投票 A/B 实测翻转率不变，
+      见 `REAL_PROJECT_REPORT.md` 第四节）；下一个候选是 prompt 级证据指认
 - [ ] 跨路由串接：存储型 XSS 这类「写入点 + 读取点」分居两方法的漏洞
 
 

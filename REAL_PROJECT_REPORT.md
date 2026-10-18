@@ -136,6 +136,40 @@ Benchmark 的用例同质化极高：同一类目下 100 个样本的代码结�
 **这是本轮最重要的产出：Benchmark 分数高 ≠ 引擎可用。**
 一个 FPR 0.02 的跑分，掩盖了一个 41.7% 抖动率的判定器。
 
+### 试过的第一个解法：三次采样取多数 —— 失败
+
+发现抖动后第一反应是"多问几次取多数"，这是最自然的补救。我把它做了出来
+（`ScenarioMatcher._vote`，并发发出 3 次请求，2 票以上为结论），然后做了 A/B 对照。
+
+对照的**方法**很重要 —— 我第一次就搞错了：我拿 `votes=1` 和 `votes=3` 的
+**总体 TPR/FPR** 去比（0.639 vs 0.667），得出"投票没用"。但那不是抖动指标。
+抖动测的是"**同一批样本再跑一遍，结论变不变**"，不是"这一批里错了几条"。
+投票改的是*一致性*，不是*准确率*。重写成 `benchmarks/ab_votes.py`，每种策略各跑
+2 轮完整 66 样本评测，比较两轮之间的翻转数：
+
+| 策略 | 轮次 | TPR | FPR | Score | 两轮翻转 | 成本 |
+|---|---|---|---|---|---|---|
+| `--votes 1` | run1 | 0.84 | 0.20 | 0.639 | **9/66 = 13.6%** | 1× |
+| `--votes 1` | run2 | 0.90 | 0.23 | 0.675 | | |
+| `--votes 3` | run1 | 0.84 | 0.17 | 0.667 | **9/66 = 13.6%** | 3× |
+| `--votes 3` | run2 | 0.81 | 0.11 | 0.692 | | |
+
+**投票没有降低抖动，一条都没有。** 66 条样本里同样是 9 条在两轮之间翻转，
+成本翻了三倍。
+
+原因不难理解：抖动是**采样级**的。如果模型对某个样本 3 次里有 2 次答错，
+多数票就**稳定地答错** —— 投票只是把噪声从"每轮不一样"变成"每轮犯同一个错"。
+它把一个随机判错的引擎变成了一个稳定判错的引擎。
+
+结论：**投票不是降抖动的手段，默认关掉（`--votes` 默认改回 1）**。
+唯一保留的用处是审计线索 —— `VulnHypothesis.votes` 记录原始票型，
+1:2 分歧说明模型在这个样本上犹豫，`confidence` 相应从 0.7 降到 0.45，
+下游可以据此把样本优先送人工复核。犹豫**可见了**，但判定**没有稳定**。
+
+这也反过来强化了本项目的核心判断：**能确定的必须靠规则和代码事实，不能靠采样**。
+采样级手段在这里全部失效，剩下能试的只有 prompt 级确定性
+（例如强制模型先引用决定性的那一行代码再作答）。
+
 ## 五、逐类目结果（v3，最终一轮）
 
 | 类目 | n | TP | FN | FP | TN | TPR | FPR |
@@ -188,14 +222,24 @@ Benchmark 的用例同质化极高：同一类目下 100 个样本的代码结�
 - 不能说"误报率 11%"。4 条误报里有 1 条疑似真值标错，1 条是静态分析原理上就看不到的
   运行时装配。
 
+**方法学教训**：我第一次评估投票时用了错误的指标 —— 比较两种策略的**总体 TPR/FPR**，
+得出"投票无用"或"投票有用"都无从谈起，因为它测的根本不是抖动。
+正确的问法是"同一批样本再跑一遍，结论变不变"。指标选错，
+实验做得再干净也是废的；这次是靠 `ab_votes.py` 的 docstring 写清口径才没把错误结论写进报告。
+
 **下一步优先级**（按投入产出比）：
 
-1. **降抖动**：同一 unit 三次采样取多数（成本 ×3），或对 `_is_yes` 的原始输出做置信度
-   加权。这是当前唯一能把指标从"不可复现"变成"可复现"的手段，优先级高于任何 prompt 调优。
+1. **prompt 级确定性**：采样级手段已实测失效（见第四节），下一个可试的是
+   强制模型在作答前**先引用决定性的那一行代码**（`{"line": "...", "hit": "..."}`），
+   把"凭整体印象判断"压成"指认具体证据"。这是唯一还没被排除的方向；
+   如果也失败，就该承认在当前模型上 LLM 判定层不可能稳定，把资源全部转向规则。
 2. **跨路由串接**：`XSS.store → XSS.show` 这种「写入点 + 读取点」分布在两个方法里的
    存储型漏洞，单方法切片结构上就抓不到，需要引入轻量方法间数据流。
 3. **可信真值**：`URLRedirect.forward` 这类作者的标注本身可疑，
    继续扩样本前应人工复核一遍真值，否则指标在拟合错误的标签。
+
+**已排除的方向**（避免重复劳动）：
+- ~~多次采样取多数降抖动~~：A/B 实测翻转率 13.6% → 13.6%，成本 ×3。见第四节。
 
 ## 八、复现方式
 
@@ -205,6 +249,15 @@ python benchmarks/benchmark_javaseccode.py --concurrency 4
 
 # 稳定性复测（同一输入连问 N 次）
 python benchmarks/check_stability.py
+
+# 采样策略一致性 A/B：每种策略跑 2 轮，再比两轮之间的翻转数
+python benchmarks/benchmark_javaseccode.py --votes 1 --output benchmarks/results/ab_votes1a.jsonl
+python benchmarks/benchmark_javaseccode.py --votes 1 --output benchmarks/results/ab_votes1b.jsonl
+python benchmarks/ab_votes.py ab_votes1a ab_votes1b      # → 13.6%
+python benchmarks/benchmark_javaseccode.py --votes 3 --output benchmarks/results/ab_votes3a.jsonl
+python benchmarks/benchmark_javaseccode.py --votes 3 --output benchmarks/results/ab_votes3b.jsonl
+python benchmarks/ab_votes.py ab_votes3a ab_votes3b      # → 13.6%，成本 ×3
 ```
 
-结果：`benchmarks/results/javaseccode_v3.jsonl`、`benchmarks/results/stability.log`
+结果：`benchmarks/results/javaseccode_v3.jsonl`、`benchmarks/results/stability.log`、
+`benchmarks/results/ab_votes{1,3}.jsonl`（与 `v1_run2` / `v3_run2` 构成两轮对照）

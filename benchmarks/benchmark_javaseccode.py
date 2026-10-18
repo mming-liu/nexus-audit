@@ -195,10 +195,21 @@ async def run(args):
         load_dotenv(ROOT / ".env")
     router = None if args.offline else TwoTierRouter(
         tier1=OpenAICompatClient(model=args.model, timeout=180))
-    matcher = ScenarioMatcher(router=router, max_concurrency=args.concurrency,
-                              code_language="java_web")
+    if args.offline:
+        # 离线基线：不做静态判定（那属于 LLM 层的能力），只保留确定性规则，
+        # 用来度量「规则前置」本身贡献了多少判定，以及链路是否还跑得通。
+        # 不能用 ScenarioMatcher —— 它在调用失败时会返回 scenario_hit=False 的
+        # 假设对象而不抛异常，会被当成"正常判定为无漏洞"，静默污染指标。
+        matcher = None
+    else:
+        matcher = ScenarioMatcher(router=router, max_concurrency=args.concurrency,
+                                  code_language="java_web",
+                                  scenario_votes=args.votes, property_votes=args.votes)
 
-    print(f"[3/4] 判定中（并发 {args.concurrency}，模型 {args.model}）...", flush=True)
+    print(f"[3/4] 判定中（并发 {args.concurrency}，"
+          + ("离线规则基线，不调用模型"
+             if args.offline else f"模型 {args.model}，每问 {args.votes} 票") + "）...",
+          flush=True)
     out_jsonl = Path(args.output).with_suffix(".jsonl")
     out_jsonl.parent.mkdir(parents=True, exist_ok=True)
     out_jsonl.write_text("", encoding="utf-8")
@@ -210,6 +221,18 @@ async def run(args):
         u = c["unit"]
         t = time.time()
         rv = None if args.no_rules else rule_verdict(c["category"], u.source_code)
+        if rv is None and matcher is None:
+            # 离线且规则未覆盖：没有判定手段，标 not_judged，不算"调用失败"也不算漏报
+            rec = {"unit": u.unit_name, "route": _route_of(u)[:60],
+                   "category": c["category"], "real_vuln": c["real_vuln"],
+                   "truth_src": c["src"], "flagged": None, "stage": "not_judged",
+                   "detail": "规则未覆盖（离线模式）",
+                   "elapsed_s": round(time.time() - t, 1)}
+            async with lock:
+                with out_jsonl.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                done += 1
+            return rec
         if rv is not None:
             flagged, stage, detail = rv, "rule", "deterministic"
         else:
@@ -251,10 +274,14 @@ async def run(args):
 
     recs = [r for r in await asyncio.gather(*(one(c) for c in cases)) if r]
     scored = [r for r in recs if r["flagged"] is not None]
-    errors = len(recs) - len(scored)
+    errors = sum(1 for r in recs if r["stage"] == "error")
+    not_judged = sum(1 for r in recs if r["stage"] == "not_judged")
     if errors:
         print(f"      ⚠ 剔除调用失败 {errors} 条（不计入指标，"
               f"否则会把限流伪装成低误报率）", flush=True)
+    if not_judged:
+        print(f"      ⚠ 规则未覆盖 {not_judged} 条（离线模式无 LLM 兜底，不计入指标）",
+              flush=True)
 
     report(scored, out_jsonl)
 
@@ -312,6 +339,8 @@ def main():
     ap.add_argument("--output", default=str(ROOT / "benchmarks/results/javaseccode.jsonl"))
     ap.add_argument("--offline", action="store_true")
     ap.add_argument("--no-rules", action="store_true")
+    ap.add_argument("--votes", type=int, default=1,
+                    help="每个问题问几次取多数（默认 1；实测 3 票不降抖动只增成本，见 REAL_PROJECT_REPORT.md）")
     args = ap.parse_args()
     asyncio.run(run(args))
 

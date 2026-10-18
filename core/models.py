@@ -42,6 +42,9 @@ class VulnHypothesis:
     reasoning_summary: str = ""
     confidence: float = 0.0
     skeptic_rejected: bool = False       # 反方挑刺 Agent 是否推翻
+    # 多次采样时记录每一轮结论，便于事后审计模型有多犹豫。
+    # 一致性（全票通过）比结论本身更能说明可信度：3 轮 2:1 的结论应当降权。
+    votes: tuple[bool, ...] = ()
 
 
 @dataclass
