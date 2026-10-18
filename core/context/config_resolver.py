@@ -21,6 +21,20 @@ from pathlib import Path
 CONFIG_SUFFIXES = {".properties", ".yaml", ".yml", ".json"}
 IGNORE_DIRS = {".git", "target", "build", "node_modules", "test", "tests"}
 
+# 凭据类键名：取值必须脱敏后才允许进入切片。
+#
+# 这是实测出来的问题，不是预防性设计：java-sec-code 的 application.properties
+# 里有阿里云 accessKey 的 id/secret，而 `_hint_lines` 的回填条件里恰好有 "key"，
+# 于是**132 个入口的切片里全部带上了这组真实凭据**，并且原样发给远端模型。
+# 切片会进报告、进日志、进前端展示，等于把密钥一路扩散出去。
+# 判定算法强度（crypto/hash）从来不需要看到 secret 的原文，只需要看到长度/形态，
+# 所以掩码不会损失任何判定能力。
+SECRET_KEY_RE = re.compile(
+    r"(?i)(secret|passw(or)?d|pwd|token|access[_.-]?key|private[_.-]?key|"
+    r"api[_.-]?key|credential|session[_.-]?key|signing[_.-]?key)")
+# 形如 ${DB_PASSWORD} 的占位符不含真实值，保留原文（对判定无害且有信息量）
+PLACEHOLDER_RE = re.compile(r"^\$\{[^}]*\}$|^\{\{[^}]*\}\}$")
+
 # 代码里以字符串字面量引用的配置键：getProperty("xxx" / getValue("xxx" / os.getenv("xxx")
 KEY_REF_RE = re.compile(r"""(?:getProperty|getPropertyOr|getValue|get|env|getenv)\s*\(\s*
                             (?:"([^"]+)"|'([^']+)')""", re.X)
@@ -128,6 +142,22 @@ class ConfigResolver:
 
     SECURITY_HINTS = ("alg", "hash", "crypt", "cipher", "key", "random", "secret", "mode")
 
+    @staticmethod
+    def mask_secret(key: str, value: str) -> str:
+        """凭据脱敏：保留长度与形态，抹掉原文。
+
+        不脱敏的键（算法/模式/随机数等）原样返回 —— 那才是判定需要的证据。
+        """
+        if not SECRET_KEY_RE.search(key):
+            return value
+        v = (value or "").strip()
+        if not v or PLACEHOLDER_RE.match(v):
+            return value
+        if len(v) < 8:
+            # 短值多半是 "true"/"none"/"1" 这类开关，不是真凭据
+            return value
+        return f"<已脱敏 len={len(v)}>"
+
     def _hint_lines(self) -> list[str]:
         """安全强相关的配置行（惰性算一次并缓存）。
 
@@ -135,7 +165,8 @@ class ConfigResolver:
         2740 个用例下占了 65% 的总耗时。
         """
         if getattr(self, "_hints", None) is None:
-            self._hints = [f"{k} = {v}" for k, v in self.load().items()
+            self._hints = [f"{k} = {self.mask_secret(k, v)}"
+                           for k, v in self.load().items()
                            if any(h in k.lower() for h in self.SECURITY_HINTS)][: self.max_entries]
         return self._hints
 
@@ -150,7 +181,7 @@ class ConfigResolver:
             if key and key not in keys:
                 keys.append(key)
 
-        lines = [f"{k} = {table[k]}" for k in keys if k in table]
+        lines = [f"{k} = {self.mask_secret(k, table[k])}" for k in keys if k in table]
         # 没找到引用键时，回填少量与安全强相关的键（算法/随机数/密钥类）
         if not lines:
             lines = self._hint_lines()
