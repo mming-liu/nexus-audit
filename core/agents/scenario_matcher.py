@@ -24,6 +24,8 @@ from typing import Callable, Sequence
 
 from core.agents import vuln_categories as VC
 from core.agents.router import TwoTierRouter, extract_json
+# 只借一个事实判定函数（入口有没有外部输入），无反向依赖
+from core.agents.rule_detectors import has_external_input
 from core.models import CodeUnit, VulnHypothesis
 
 SYSTEM_MESSAGE = (
@@ -56,29 +58,50 @@ WEB_SCENARIOS = [
     },
 ]
 
-SCENARIO_PROMPT_TMPL = """You are performing static code analysis on {lang} code.
-Decide whether the code below exhibits the described insecure condition.
+SCENARIO_PROMPT_TMPL = """You are performing static data-flow analysis on {lang} code.
+Decide whether the described insecure condition holds.
 
 Question:
 {question}
 
-Answer with JSON only, and you MUST cite the line you judged from:
-{{"hit": "Yes", "evidence_line": "<verbatim copy of ONE executable line>"}}
-or {{"hit": "No", "evidence_line": "<verbatim copy of ONE executable line>"}}.
+This is a TAINT check. It holds only if BOTH are true:
+  (1) the dangerous operation exists in the executable statements, AND
+  (2) a value that originates OUTSIDE this function flows into it.
+If the operation only receives constant, literal, class-field or hard-coded
+values, answer "No" — even when the API itself is a dangerous one.
+{source_hint}
+Output JSON only.
+If the answer is "Yes", you MUST quote TWO DIFFERENT lines:
+{{"hit": "Yes",
+  "source_line": "<verbatim: the line where external input enters this function>",
+  "sink_line": "<verbatim: the line that performs the dangerous operation>"}}
+If the answer is "No", quote the one line that made you conclude so:
+{{"hit": "No", "evidence_line": "<verbatim copy of ONE executable line>"}}
 
-"evidence_line" must be copied character-for-character from the Code block below.
+Rules for source_line: it must show input actually being received — a parameter
+bound by an annotation, a read from the request object, or a cross-route read.
+It must NOT be the sink line itself, must NOT be a routing annotation line
+(@GetMapping / @RequestMapping ...), and must NOT merely declare a constant.
+
+All quoted lines must be copied character-for-character from the Code block below.
 Do not paraphrase, do not shorten with "...", do not quote a comment line.
-An answer whose evidence_line is not literally present in the code is discarded.
-
-Answer "Yes" only if BOTH hold: (1) the described dangerous operation or insecure
-configuration actually exists in the executable statements, and
-(2) a value that originates from outside the function (request parameter, cookie,
-header) flows into it. If the operation only receives constant/literal values, answer "No".
+An answer whose quoted lines are not literally present in the code is discarded.
 
 Code:
 ```{lang}
 {code}
 ```"""
+
+# 无外部输入时给模型的一句事实提示。
+# 注意这里只**告知事实**，不替它下结论 —— 直接判 False 会漏报：
+# Hello-Java-Sec 的 XMLDecoderVul.vul 与 .safe 都不接收输入、读同一个常量
+# 文件，真值却一个 True 一个 False，硬短路会把那条真漏洞一起判掉。
+_NO_SOURCE_HINT = """
+NOTE: the entry method below takes no external parameter and reads nothing from
+the request object. Condition (2) can therefore hold only if you can point to a
+concrete source_line inside the executable statements. If you cannot, answer "No".
+"""
+_HAS_SOURCE_HINT = ""
 
 # 配置型缺陷（weakrand / hash / crypto / securecookie）：
 # 缺陷在 API/算法选择本身，与外部输入是否可达无关，不能套用污点可达的判据。
@@ -335,21 +358,29 @@ class ScenarioMatcher:
         return await self.router.screen(messages)
 
     async def _vote(self, prompt: str, field: str, n: int,
-                    code: str = "") -> tuple[bool, tuple[bool, ...]]:
+                    code: str = "", taint: bool = False) -> tuple[bool, tuple[bool, ...]]:
         """问 n 次，多数票为结论。
 
         并发发出而不是串行：n=3 时串行等于把延迟乘 3，并发只多占一点配额。
         奇数票才不会平局；偶数票平局时按「不判定通过」处理（保守，避免误报）。
 
-        `code` 非空时启用 Cite-Before-Verdict：每轮采样必须先给出
-        `evidence_line`，且该行必须真实存在于 `code` 中、不是注释行。
+        `code` 非空时启用 Cite-Before-Verdict：每轮采样必须先给出引用行，
+        且该行必须真实存在于 `code` 中、不是注释行。
+
+        `taint=True` 时对 **Yes** 的票额外要求 `source_line` + `sink_line` 两行。
+        只引一行是这套机制最早的一个洞：模型看到 sink 就把它填进 evidence_line，
+        核验当然通过（那行真实存在、非注释），但"外部输入是否流入"这个条件
+        从没被检查过。`XMLDecoderVul.safe` 上两个模型一致误报就是这么来的 ——
+        它引用 `new XMLDecoder(...)` 完全合规，而方法根本没有入参。
+        强制它分别贴出两行，找不到 source_line 时它只能答 No。
+
         核验不过的那一票**直接作废**（不进票箱），而不是记成 No ——
         "证据编造"和"判定为安全"是两件完全不同的事，混在一起会让
         置信度被虚假拉高。全部作废时抛异常，由调用方记为判定失败。
         """
         if n <= 1:
             raw = await self._ask(prompt)
-            ok, why = self._check_evidence(raw, code)
+            ok, why = self._check_evidence(raw, code, taint)
             if not ok:
                 raise RuntimeError(f"证据核验失败：{why}")
             return _is_yes(raw, field), ()
@@ -360,7 +391,7 @@ class ScenarioMatcher:
         for r in results:
             if isinstance(r, Exception):
                 continue
-            ok, _why = self._check_evidence(r, code)
+            ok, _why = self._check_evidence(r, code, taint)
             if not ok:
                 discarded += 1
                 continue
@@ -372,16 +403,32 @@ class ScenarioMatcher:
         return yes * 2 > len(votes), tuple(votes)
 
     @staticmethod
-    def _check_evidence(raw: str, code: str) -> tuple[bool, str]:
-        """提取 evidence_line 并核验。`code` 为空时不做核验（兼容旧调用）。"""
+    def _check_evidence(raw: str, code: str, taint: bool = False) -> tuple[bool, str]:
+        """提取引用行并核验。`code` 为空时不做核验（兼容旧调用）。"""
         if not code:
             return True, ""
         try:
             data = extract_json(raw)
         except Exception:
-            return False, "输出不是合法 JSON，无法提取 evidence_line"
+            return False, "输出不是合法 JSON，无法提取引用行"
         if not isinstance(data, dict):
             return False, "输出不是 JSON 对象"
+
+        is_yes = str(data.get("hit", "")).strip().lower().startswith("y")
+        if taint and is_yes:
+            src = str(data.get("source_line", ""))
+            snk = str(data.get("sink_line", ""))
+            for name, ev in (("source_line", src), ("sink_line", snk)):
+                ok, why = verify_evidence(code, ev)
+                if not ok:
+                    return False, f"{name}: {why}"
+            if _normalize_line(src) == _normalize_line(snk):
+                # 两行相同等于只引了一行，条件 (2) 仍然没被证明
+                return False, "source_line 与 sink_line 相同，未证明输入流入"
+            if re.match(r"^\s*@(?:Get|Post|Put|Delete|Patch|Request)Mapping\b", src.strip()):
+                # 路由注解只说明"这个 URL 映射到本方法"，不说明"哪里接收输入"
+                return False, "source_line 引用的是路由注解行，不是输入接收行"
+            return True, ""
         return verify_evidence(code, str(data.get("evidence_line", "")))
 
     # ---------- 新接口：按类目做两步法 ----------
@@ -397,16 +444,32 @@ class ScenarioMatcher:
                 continue
             # Step 1: Scenario（配置型缺陷走不要求污点可达的模板）
             tmpl = SCENARIO_PROMPT_TMPL if cat.needs_taint else CONFIG_SCENARIO_PROMPT_TMPL
-            try:
-                hit, s_votes = await self._vote(
-                    tmpl.format(lang=lang, question=cat.sink_question,
-                                code=unit.source_code),
-                    "hit", self.scenario_votes, code=unit.source_code)
-            except Exception as e:
-                out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=False,
-                                          property_missing="",
-                                          reasoning_summary=f"LLM 调用失败：{e}"))
-                continue
+            if cat.needs_taint:
+                # 把"入口有没有外部输入"这个事实告诉模型，但不替它下结论。
+                # 直接短路判 False 会漏报（见 _NO_SOURCE_HINT 的注释）。
+                hint = _HAS_SOURCE_HINT if has_external_input(unit.source_code) \
+                    else _NO_SOURCE_HINT
+                try:
+                    hit, s_votes = await self._vote(
+                        tmpl.format(lang=lang, question=cat.sink_question,
+                                    code=unit.source_code, source_hint=hint),
+                        "hit", self.scenario_votes, code=unit.source_code, taint=True)
+                except Exception as e:
+                    out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=False,
+                                              property_missing="",
+                                              reasoning_summary=f"LLM 调用失败：{e}"))
+                    continue
+            else:
+                try:
+                    hit, s_votes = await self._vote(
+                        tmpl.format(lang=lang, question=cat.sink_question,
+                                    code=unit.source_code),
+                        "hit", self.scenario_votes, code=unit.source_code)
+                except Exception as e:
+                    out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=False,
+                                              property_missing="",
+                                              reasoning_summary=f"LLM 调用失败：{e}"))
+                    continue
             if not hit:
                 continue
             # Step 2: Property

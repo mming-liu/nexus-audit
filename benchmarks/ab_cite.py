@@ -99,17 +99,21 @@ async def ask(unit, key: str, model: str, use_cite: bool):
     else:
         tmpl = OLD_TAINT if cat.needs_taint else OLD_CONFIG
     matcher = sm.ScenarioMatcher(router=TwoTierRouter(tier1=OpenAICompatClient(model=model)))
-    prompt = tmpl.format(lang="java", question=cat.sink_question, code=unit.source_code)
+    prompt = tmpl.format(lang="java", question=cat.sink_question,
+                         code=unit.source_code, source_hint="")
     try:
-        data = extract_json(await matcher._ask(prompt))
+        raw = await matcher._ask(prompt)
+        data = extract_json(raw)
     except Exception:
         return False, None, ""
     verdict = str(data.get("hit", "")).strip().lower().startswith("y")
     if not use_cite:
         return True, verdict, ""
-    evidence = str(data.get("evidence_line", ""))
-    ok, _why = sm.verify_evidence(unit.source_code, evidence)
-    return ok, (verdict if ok else None), evidence
+    # 新 prompt 对 needs_taint 的 Yes 要求 source_line + sink_line 双引证，
+    # 所以核验必须走 ScenarioMatcher 的同一条路径，不能再只看 evidence_line。
+    ok, _why = matcher._check_evidence(raw, unit.source_code, taint=cat.needs_taint)
+    ev = " / ".join(str(data.get(k, "")) for k in ("source_line", "sink_line", "evidence_line"))
+    return ok, (verdict if ok else None), ev
 
 
 async def run(model: str, limit: int, rate_only: bool):

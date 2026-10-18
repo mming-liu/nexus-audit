@@ -1,0 +1,247 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\Hello-Java-Sec-master",
+  "model": "longcat-2.5-preview-free",
+  "old_prompt": false,
+  "with_truth": 65,
+  "rule_decided": 42,
+  "rule_correct": 41,
+  "fallback": 23,
+  "tp": 7,
+  "fn": 4,
+  "fp": 2,
+  "tn": 9,
+  "errors": 1,
+  "end_to_end": 0.8769,
+  "detail": [
+    {
+      "unit": "SSRF.HTTPURLConnection",
+      "category": "ssrf",
+      "real_vuln": false,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "protected",
+      "detail": "",
+      "elapsed_s": 65.3
+    },
+    {
+      "unit": "SSRF.URLConnection2",
+      "category": "ssrf",
+      "real_vuln": true,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "protected",
+      "detail": "",
+      "elapsed_s": 103.8
+    },
+    {
+      "unit": "SSRF.URLConnection3",
+      "category": "ssrf",
+      "real_vuln": false,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "protected",
+      "detail": "",
+      "elapsed_s": 118.0
+    },
+    {
+      "unit": "Traversal.download",
+      "category": "pathtraver",
+      "real_vuln": true,
+      "src": "apiop",
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "",
+      "elapsed_s": 46.6
+    },
+    {
+      "unit": "Traversal.fileList",
+      "category": "pathtraver",
+      "real_vuln": true,
+      "src": "apiop",
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "",
+      "elapsed_s": 74.6
+    },
+    {
+      "unit": "Traversal.safe2",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "protected",
+      "detail": "",
+      "elapsed_s": 27.8
+    },
+    {
+      "unit": "Traversal.safe",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "no_sink",
+      "detail": "",
+      "elapsed_s": 13.6
+    },
+    {
+      "unit": "ProcessBuilderVul.processbuilderSafe",
+      "category": "cmdi",
+      "real_vuln": false,
+      "src": "apiop",
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "",
+      "elapsed_s": 39.2
+    },
+    {
+      "unit": "ProcessBuilderVul.processbuilderVul",
+      "category": "cmdi",
+      "real_vuln": true,
+      "src": "apiop",
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "",
+      "elapsed_s": 22.2
+    },
+    {
+      "unit": "ProcessImplVul.vul",
+      "category": "cmdi",
+      "real_vuln": true,
+      "src": "apiop",
+      "flagged": null,
+      "stage": "error",
+      "detail": "LLM 调用失败：证据核验失败：输出不是 JSON 对象",
+      "elapsed_s": 15.5
+    },
+    {
+      "unit": "RuntimeVul.safe",
+      "category": "cmdi",
+      "real_vuln": false,
+      "src": "apiop",
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "",
+      "elapsed_s": 93.6
+    },
+    {
+      "unit": "RuntimeVul.vul",
+      "category": "cmdi",
+      "real_vuln": true,
+      "src": "apiop",
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "",
+      "elapsed_s": 25.6
+    },
+    {
+      "unit": "RuntimeVul.vul2",
+      "category": "cmdi",
+      "real_vuln": true,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "no_sink",
+      "detail": "",
+      "elapsed_s": 11.9
+    },
+    {
+      "unit": "JDBC.safe3",
+      "category": "sqli",
+      "real_vuln": false,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "no_sink",
+      "detail": "",
+      "elapsed_s": 38.5
+    },
+    {
+      "unit": "MyBatis.orderBy2",
+      "category": "sqli",
+      "real_vuln": true,
+      "src": "apiop",
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "",
+      "elapsed_s": 33.1
+    },
+    {
+      "unit": "MyBatis.orderBy",
+      "category": "sqli",
+      "real_vuln": true,
+      "src": "apiop",
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "",
+      "elapsed_s": 72.9
+    },
+    {
+      "unit": "MyBatis.searchVul",
+      "category": "sqli",
+      "real_vuln": true,
+      "src": "apiop",
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "",
+      "elapsed_s": 32.8
+    },
+    {
+      "unit": "MyBatis.orderBySafe",
+      "category": "sqli",
+      "real_vuln": false,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "no_sink",
+      "detail": "",
+      "elapsed_s": 30.2
+    },
+    {
+      "unit": "MyBatis.searchSafe",
+      "category": "sqli",
+      "real_vuln": false,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "no_sink",
+      "detail": "",
+      "elapsed_s": 17.7
+    },
+    {
+      "unit": "MyBatis.list",
+      "category": "sqli",
+      "real_vuln": false,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "no_sink",
+      "detail": "",
+      "elapsed_s": 8.6
+    },
+    {
+      "unit": "XSS.save",
+      "category": "xss",
+      "real_vuln": true,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "no_sink",
+      "detail": "",
+      "elapsed_s": 15.4
+    },
+    {
+      "unit": "XXE.handleCustomer",
+      "category": "xxe",
+      "real_vuln": true,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "no_sink",
+      "detail": "",
+      "elapsed_s": 12.2
+    },
+    {
+      "unit": "XXE.check",
+      "category": "xxe",
+      "real_vuln": false,
+      "src": "apiop",
+      "flagged": false,
+      "stage": "no_sink",
+      "detail": "",
+      "elapsed_s": 14.6
+    }
+  ]
+}

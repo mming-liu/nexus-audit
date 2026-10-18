@@ -451,7 +451,111 @@ check("无 GITHUB_ACTIONS 时不输出 annotation",
 check("无 GITHUB_STEP_SUMMARY 时返回 False",
       emit_step_summary(Path(__file__)), False)
 
-# ---------------- 汇总 ----------------
+# ---------------- 双引证 + 输入白名单 + 无源提示 ----------------
+# 这三项都来自"异源项目上模型一致误报"的两条样本（XMLDecoderVul.safe /
+# GroovyVul.safe）。它们的共同点是：**规则和提示词各漏了一块拼图**，
+# 而模型只是严格照办。逐项钉住，防止后续重构把它们悄悄弄回去。
+print("\n[18] 双引证 / 输入白名单 / 外部输入判定")
+
+# (a) needs_taint 的 Yes 必须同时给 source_line 与 sink_line。
+#     只引一行时，模型可以直接引用 sink 行（真实存在、核验通过），
+#     而"外部输入是否流入"这个条件从头到尾没被检查 —— XMLDecoderVul.safe
+#     上两个模型一致误报就是这么来的。
+_TAINT_C = '''@GetMapping("/safe")
+public void safe() {
+    ObjectInputStream ois = new ObjectInputStream(bis);
+    Object obj = ois.readUnshared();
+}'''
+_SINK_ONLY = '{"hit": "Yes", "evidence_line": "Object obj = ois.readUnshared();"}'
+check("taint 模式：只引一行 → 拒绝",
+      _SM._check_evidence(_SINK_ONLY, _TAINT_C, taint=True)[0], False)
+_DUAL = ('{"hit": "Yes", "source_line": "public void safe(String payload) {", '
+         '"sink_line": "Object obj = ois.readUnshared();"}')
+_TAINT_C2 = _TAINT_C.replace("public void safe() {", "public void safe(String payload) {")
+check("taint 模式：双行齐全 → 通过",
+      _SM._check_evidence(_DUAL, _TAINT_C2, taint=True)[0], True)
+_SAME = ('{"hit": "Yes", "source_line": "Object obj = ois.readUnshared();", '
+         '"sink_line": "Object obj = ois.readUnshared();"}')
+check("source_line 与 sink_line 相同 → 拒绝（等于只引一行）",
+      _SM._check_evidence(_SAME, _TAINT_C, taint=True)[0], False)
+_ROUTE_AS_SOURCE = ('{"hit": "Yes", "source_line": "@GetMapping(\\"/safe\\")", '
+                    '"sink_line": "Object obj = ois.readUnshared();"}')
+check("source_line 引用路由注解行 → 拒绝（不说明哪里接收输入）",
+      _SM._check_evidence(_ROUTE_AS_SOURCE, _TAINT_C, taint=True)[0], False)
+# No 的票仍按单行核验，否则模型在"确实没有漏洞"时无处可引。
+_NO_ONE_LINE = '{"hit": "No", "evidence_line": "Object obj = ois.readUnshared();"}'
+check("taint 模式：No 只需一行", _SM._check_evidence(_NO_ONE_LINE, _TAINT_C, taint=True)[0], True)
+
+# (b) 输入白名单与受限 Context 是两类互不替代的事实。
+_SPEL_WL = '''public void safe(String cmd) {
+    List<String> safeCodeList = Arrays.asList("id", "whoami");
+    if (!safeCodeList.contains(cmd)) {
+        throw new RuntimeException("unsafe");
+    }
+    new GroovyShell().evaluate(cmd);
+}'''
+check("输入白名单 + 阻断 → safe", _verdict("spel", _SPEL_WL), False)
+_SPEL_WL_NOBLOCK = '''public void safe(String cmd) {
+    List<String> safeCodeList = Arrays.asList("id");
+    if (!safeCodeList.contains(cmd)) {
+        log.warn("unsafe code");
+    }
+    new GroovyShell().evaluate(cmd);
+}'''
+check("白名单只记日志不阻断 → 不算防护（vuln）",
+      _verdict("spel", _SPEL_WL_NOBLOCK), True)
+_SPEL_BLACKLIST = '''public String vul2(String ex) {
+    String[] black_list = {"java.+lang", "Runtime", "exec.*\\\\("};
+    for (String s : black_list) {
+        if (Pattern.compile(s).matcher(ex).find()) { return "黑名单过滤"; }
+    }
+    Expression exp = new SpelExpressionParser().parseExpression(ex);
+    return exp.getValue().toString();
+}'''
+check("黑名单过滤不算防护（spel → vuln）", _verdict("spel", _SPEL_BLACKLIST), True)
+_SPEL_BARE = '''public void vul(String cmd) {
+    GroovyShell shell = new GroovyShell();
+    shell.evaluate(cmd);
+}'''
+check("裸 evaluate 无任何防护 → vuln（不再退回模型）",
+      _verdict("spel", _SPEL_BARE), True)
+
+# (c) 无外部输入**不能**当硬短路判 False。这条是最容易"修得更好看、错得更严重"
+#     的地方：XMLDecoderVul.vul 与 .safe 都不接收输入、读同一个常量文件，
+#     真值却相反 —— 差异在 API 选择，不在输入侧。任何"无输入 ⇒ 安全"的
+#     短路都会把那种真漏洞一起判掉。
+_NOARG_SINK = '''@GetMapping("/vul")
+public void vul() {
+    File file = new File(path);
+    new XMLDecoder(new BufferedInputStream(new FileInputStream(file))).readObject();
+}'''
+from core.agents.rule_detectors import has_external_input as _ext
+check("无参方法 has_external_input=False", _ext(_NOARG_SINK), False)
+check("无参 XMLDecoder 仍判 vuln（不得因无输入而短路）",
+      _verdict("deserial", _NOARG_SINK), True)
+check("有形参 → has_external_input=True",
+      _ext('public void vul(String cmd) { new GroovyShell().evaluate(cmd); }'), True)
+check("框架注入类型不算外部输入",
+      _ext('public void f(HttpServletResponse response) { return; }'), False)
+check("request.getParameter 算外部输入",
+      _ext('public void f(HttpServletRequest request) { '
+           'String x = request.getParameter("x"); }'), True)
+
+# (d) sink 枚举漏项会伪装成"证据不足"。三种都真实踩过。
+check("ModelAndView 视图跳转算 redir sink",
+      _verdict("redir", 'public ModelAndView v(String url) { '
+                        'return new ModelAndView("redirect://" + url); }'), True)
+check("无任何跳转 API → redir safe",
+      _verdict("redir", 'public String s(String url) { '
+                        'return "安全域名：" + url; }'), False)
+check("ObjectInputStream.readUnshared 算 deserial sink",
+      _verdict("deserial", 'public String r(String b) { '
+                           'new java.io.ObjectInputStream(stream).readUnshared(); }'), True)
+check("JAXB unmarshal 算 xxe sink",
+      _verdict("xxe", 'public Object u(String c) { '
+                      'return unmarshaller.unmarshal(new StringReader(c)); }'), True)
+
+
 
 print()
 if FAILS:

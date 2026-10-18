@@ -735,6 +735,11 @@ List<User> queryByIdAsInterger(@Param("id") Integer id);   // 作者判 safe
 
 ### 9.5 模型侧：规则退回的 32 条
 
+> **本小节的归因有误，请以第十节为准。** 下文把两次双模型一致误报判成
+> "模型真错"，逐条核对判据与引证机制后，实际是"判据写窄 + 单引证只要求
+> 一行证据"。数字本身仍然成立（样本集与口径没变），错的是结论的归因，
+> 而错误归因会把优化引向"换模型/加投票"，方向完全相反。见 10.5。
+
 两个免费模型各跑一遍（`ScenarioMatcher`，带 `evidence_line` 核验，
 不投票、不接 Skeptic，只为看基线）：
 
@@ -796,3 +801,222 @@ python benchmarks/benchmark_hellojavasec.py --model longcat-2.5-preview-free --c
 
 结果：`benchmarks/results/hellojavasec.json`（规则侧）、
 `hellojavasec_<model>.json`（模型侧）
+
+---
+
+## 十、把"退回的 50%"拆开：规则缺口、切片缺口、真值口径各占多少
+
+第九节留下的问题是：**退回给模型的 32 条，FPR 57%~83%，为什么？**
+
+这一节的答案是：**那个数字里大部分不是"模型误报爆炸"，而是别的东西。**
+做法是把每一条退回样本逐条归因，而不是笼统统计。
+
+### 10.1 先归因，再改代码
+
+`benchmarks/diagnose_fallback.py` 对每条退回样本打印入口签名、入口体、
+证据段清单。32 条逐条看完，归因如下：
+
+| 归因 | 条数 | 明细 | 该谁修 |
+|---|---|---|---|
+| **类目根本没有规则** | 10 | cmdi 6、pathtraver 4 | 规则层 |
+| **切片缺实现体** | 6 | MyBatis 的 `${}` 在 Mapper XML/注解里，没进切片 | 切片层 |
+| **类目判据写窄** | 4 | spel 只认受限 Context，不认输入白名单 | 判据 |
+| **sink 枚举漏项** | 3 | `readUnshared`、`ModelAndView("redirect:")`、`unmarshal` | 规则层 |
+| **无 sink 却退回** | 1 | `Redirect.safe` 压根没有跳转调用 | 规则层 |
+| **未知防护（正确退回）** | 3 | ssrf 的 `isHttp` / `isIntranet` 组合 | 该留模型 |
+| **漏洞在框架/介质内** | 2 | `xxe.handleCustomer`（xmlbeam 库）、`xss.save`（写库） | 不可判 |
+| **真值存疑** | 1 | `XMLDecoderVul.safe` | 标注 |
+
+**32 条里只有 5 条是"判据/机制缺陷导致模型照办"，
+10 条是"这个类目我们压根没写规则"，6 条是"证据没进切片"。**
+
+这条结论直接改变了优化方向：在补规则之前就去调 prompt，
+等于让模型背规则的锅。
+
+### 10.2 三项改动与收益
+
+**① 输入白名单是独立的防护形态（spel）**
+
+`GroovyVul.safe` 的写法是：
+
+```java
+List<String> safeCodeList = Arrays.asList("\"id\".execute()", "\"whoami\".execute()");
+if (!safeCodeList.contains(cmd)) {
+    throw new RuntimeException("unsafe code detected: " + cmd);
+}
+new GroovyShell().evaluate(cmd);
+```
+
+旧的 `spel.property` 只认"受限 Context / 沙箱 / 类白名单"，**没有写"对输入本身做精确比对"**。
+两个模型于是严格执行判据：没看到 `SimpleEvaluationContext` → 判 `protected: No`。
+
+这不是模型笨。判据里确实没有这一条，它只是照办。**判据写窄导致的一致误判，
+改 prompt 措辞是修不好的，只能改判据。**
+
+现在 `spel.property` 与 `deserial.property` 都补上了这一类，
+并且要求"白名单必须阻断执行（throw/return），只记日志不算"；
+规则侧同步加了 `EXPR_INPUT_WHITELIST_RE` + `_guard_blocks()`。
+
+**② sink 枚举必须来自真实样本反查**
+
+漏过的三个：
+
+| 样本 | 漏掉的 API | 后果 |
+|---|---|---|
+| `Deserialization.readUnshared` | `ObjectInputStream.readUnshared()` | 有 sink 判成"无 sink" |
+| `Redirect.vul2` | `new ModelAndView("redirect:" + url)` | 同上 |
+| `XXE.Unmarshaller` | `Unmarshaller.unmarshal(...)` | 同上 |
+
+顺带修了一个真 bug：`deserial_verdict` 的 sink 检查**自己抄了一份枚举**，
+和 `DESERIAL_SINK_RE` 各写各的 —— 补 `readUnshared` 时只补进了常量那份，
+判定用的那份没动。现在统一复用常量。
+
+**③ 无 sink 就该判安全，而不是退回**
+
+`Redirect.safe` 只返回 `"安全域名：" + url`，没有任何 `sendRedirect` /
+`setHeader("Location")` / `return "redirect:"`。原逻辑"连跳转都没有 → 退回模型"，
+是错的：**没有下发 Location 的 API，就不是开放重定向**。
+
+新判据加了一道保险：如果方法体里出现了 `redirect|location|forward|dispatch`
+字样的标识符（跳转可能封装在 helper 里），仍然退回模型 —— 沉默不等于确认没有跳转。
+
+### 10.3 用户建议的 Source Gate，实测后没有做成硬短路
+
+原始建议是：`needs_taint=True` 的类目，入口既无外部形参也无 request 读取时，
+**直接确定性返回 False**（"连外部输入都没有，绝不可能构成污点型漏洞"）。
+
+语义上这是对的。但靶场里有一对反例：
+
+```java
+// XMLDecoderVul.java，同一个类，相邻两个方法
+@GetMapping("/vul")                       @GetMapping("/safe")
+public void vul() {                       public void safe() {
+    File file = new File(path);               File file = new File(path);
+    ... new XMLDecoder(bis).readObject();     ... new ObjectInputStream(bis).readUnshared();
+}                                         }
+// 真值 True                              // 真值 False
+```
+
+`path` 是类常量，**两个方法都不接收任何输入**，读的是同一个文件。
+差异不在输入侧，在 API 选择。实测 `has_external_input()` 对这两条都返回 False：
+
+```
+XMLDecoderVul.vul    deserial  真值=True   规则=True    has_external_input=False
+XMLDecoderVul.safe   deserial  真值=False  规则=True    has_external_input=False
+```
+
+**硬短路会把那条真漏洞一起判掉，一条判对一条判错，净收益为零。**
+
+所以改成两件事：
+
+1. `has_external_input()` 作为**事实**保留，`xss_verdict` 这类本来就要求
+   `has_param` 的类目直接用它；
+2. 在 prompt 里把事实告诉模型（"本入口没有外部形参、也不读请求对象"），
+   但**不替它下结论**。双引证机制会因为找不到 `source_line` 自己判 No。
+
+这条记在这里，因为它是最容易"改得更好看、错得更严重"的地方：
+把无输入当安全，在靶场上看起来分数更高，在真实项目里就是批量漏报。
+
+### 10.4 双引证 A/B：同一批 23 条，只差一个变量
+
+`XMLDecoderVul.safe` 误判的机制成因是：**单引证只要求一行**。
+模型看到 `new XMLDecoder(...)` 就把它填进 `evidence_line` —— 真实存在、
+非注释、核验 100% 通过，但"外部输入是否流入"这个条件从头到尾没被检查过。
+
+改成 `needs_taint` 的 Yes 必须同时给 `source_line` + `sink_line` 后，
+A/B 对照（同一批 23 条退回样本，longcat-2.5-preview-free，只改 Step1 模板）：
+
+| | 旧（单引证） | 新（双引证） |
+|---|---|---|
+| 有效样本 | 23 | 22（1 条输出非 JSON 已剔除） |
+| TP / FN / FP / TN | 8 / 4 / 3 / 8 | 7 / 4 / 2 / 9 |
+| **TPR** | 66.7%（8/12） | **63.6%**（7/11） |
+| **FPR** | 27.3%（3/11） | **18.2%**（2/11） |
+| **端到端** | (41+16)/65 = **87.7%** | (41+16)/65 = **87.7%** |
+
+**FPR 降了 9.1 个百分点，TPR 也降了 3.1 个百分点，端到端一分没动。**
+
+这就是双引证的真实代价，必须一起报：它是一个**保守偏置**，不是免费的过滤器。
+它降低误报的方式是让模型在找不到明确 `source_line` 时答 No ——
+而"这个漏洞的输入确实藏在别处"的样本会被一起判掉。
+
+值得注意的是**旧 prompt 在同一批样本上 FPR 只有 27.3%，不是第九节报的 57%~83%**。
+两个数字都对，但样本集不同：第九节的 32 条里有 14 条 safe，现在只剩 11 条，
+因为 6 条 safe 已经被新规则判掉了（`GroovyVul.safe`、`Redirect.safe`、
+`XMLDecoderVul.safe` 等）。
+
+**所以"模型侧 FPR 爆炸"里有一多半其实是规则覆盖不足的副产品：
+本该规则判的样本落到了模型手里。** 这是本轮最有用的一个修正。
+
+### 10.5 上一节的归因错了两处
+
+第九节 9.5 把两次双模型一致误报都写成"模型真错"。逐条核对源码后，这个定性是错的：
+
+| 样本 | 第九节的说法 | 实际 |
+|---|---|---|
+| `GroovyVul.safe` | 模型漏看白名单 | **判据里没写这类防护**，模型严格照办 |
+| `XMLDecoderVul.safe` | 模型违反了自己的判据 | **机制只要求一行证据**，输入可达从未被检查；且该样本真值与同靶场另一条自相矛盾 |
+
+这个差别不是措辞问题：如果把它当成"模型能力不足"，接下来就会去换模型、
+加投票、调温度，全部无效。真正的修法在判据和引证机制里。
+
+真值存疑一条现在单列，不进正确率分母，理由写在 `DISPUTED_TRUTH` 里：
+
+```java
+// Deserialization.java
+@ApiOperation("vul：readUnshared反序列化")
+public String readUnshared(String base64) { ... in.readUnshared(); }
+
+// XMLDecoderVul.java
+@GetMapping("/safe")
+public void safe() { ... new ObjectInputStream(bis).readUnshared(); }
+```
+
+同一个 API，同一作者，一处标 vul 一处标 safe。`readUnshared` 只影响引用共享，
+不做任何类型过滤，安全性质与 `readObject` 相同 —— 两个标注不可能同时成立。
+
+### 10.6 这些数字的置信区间（必须一起看）
+
+| 指标 | 点估计 | 95% Wilson 区间 |
+|---|---|---|
+| 规则覆盖率 | 64.6%（42/65） | [52%, 75%] |
+| 规则正确率 | 100%（41/41，含 1 条真值存疑单列） | [91%, 100%] |
+| 模型 FPR（新） | 18.2%（2/11） | **[5%, 48%]** |
+| 模型 TPR（新） | 63.6%（7/11） | **[35%, 85%]** |
+
+**FPR 的分母只有 11。** 上一节报的 4/7 与 5/6，区间是 [25%,84%] 与 [44%,97%] ——
+两者大幅重叠，说明"longcat 57% vs beam-free 83%"这个差别在统计上根本不成立，
+它只是同一个数（大概六到七成）的两次抽样。
+
+"压到 20% 以内"这个目标，用 2/11 声称达成是没有意义的。
+要让它有意义，分母得先到 30 以上 —— 而扩大分母的办法不是多跑几轮，
+是换更大的靶场（JavaSecLab / WebGoat）。
+
+### 10.7 剩下的错误逐条（不掩盖）
+
+模型侧还剩 6 条错（22 条有效里）：
+
+| 样本 | 真值 | 模型 | 性质 |
+|---|---|---|---|
+| `RuntimeVul.vul2` | True | False(no_sink) | `rt.load(file)` 加载动态库，**cmdi 判据原来没写这个 sink**，已补 |
+| `XSS.save` | True | False(no_sink) | 存储型：判据要求"另有路由回显"，但切片里没有 `list()` 的读取点 |
+| `XXE.handleCustomer` | True | False(no_sink) | 漏洞在 xmlbeam 库的绑定层，方法体里没有任何解析代码，**静态不可判** |
+| `SSRF.URLConnection2` | True | False(protected) | 有 `isHttp`+`isIntranet`，但实现有绕过面；要读实现体才能判 |
+| `ProcessBuilderVul.processbuilderSafe` | False | True | `Security.checkOs` 是黑名单 —— **真值争议**，按我们判据它不安全 |
+| `RuntimeVul.safe` | False | True | `commands.contains(command)` 白名单，**模型真错**（spel 那条同理的判据已修，cmdi 还没规则化） |
+
+6 条里 1 条不可判、1 条真值争议、2 条判据/切片缺口、1 条要跨文件实现、
+**只有 1 条是模型自身判断错误**。
+
+### 10.8 下一步：先补规则，别再挤模型
+
+按归因表排优先级，收益最大的都不是 prompt 相关：
+
+1. **cmdi / pathtraver 规则化**（10 条退回，最大单一来源）。判据同样是客观事实：
+   `exec(常量)` vs `exec(拼接)`、`Paths.get(...).normalize()` + `startsWith(base)`。
+   这两类补完，退回率能从 35% 降到 20% 以下，模型暴露面减半。
+2. **MyBatis 切片补 Mapper 实现体**（6 条）。`java_impl_resolver` 已经能解析
+   `add()` 的注解语句，说明路径是通的，缺的是 XML `<select>` 与接口方法的关联。
+3. **换更大的异源靶场**（JavaSecLab / WebGoat）。当前 FPR 分母 11，
+   任何结论都撑不住。这一条比前两条更重要 —— **没有分母，优化就是在拟合噪声**。
+

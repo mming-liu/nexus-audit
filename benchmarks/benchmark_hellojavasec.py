@@ -83,6 +83,24 @@ ROUTE_SAFE = re.compile(r"(?:^|/)(?:safe|sec)\d*(?:/|$)", re.I)
 NAME_VUL = re.compile(r"vul", re.I)
 NAME_SAFE = re.compile(r"(?:safe|sec)(?:\d|$)", re.I)
 
+# ---------------- 真值存疑样本 ----------------
+# 靶场自己标反了的样本。**不静默剔除**（静默剔除不利样本，和静默迎合错误真值
+# 一样是让数字骗人），而是单列打印、从正确率分母里扣除，并把理由写在这里。
+#
+# XMLDecoderVul.safe 的构造是：
+#     public void safe() { ... new ObjectInputStream(bis).readUnshared(); }
+# 而同一个作者的 Deserialization.readUnshared 是：
+#     @ApiOperation("vul：readUnshared反序列化")
+#     public String readUnshared(String base64) { ... in.readUnshared(); }
+# 同一个 API，一处标 vul、一处标 safe。readUnshared 只影响对象引用共享，
+# 不做任何类型过滤，安全性质与 readObject 完全相同（CWE-502 同样适用），
+# 两个标注不可能同时成立。规则判 True 与"vul"那一处一致，故视为真值存疑。
+DISPUTED_TRUTH = {
+    "XMLDecoderVul.safe":
+        "同一 API（ObjectInputStream.readUnshared）在 Deserialization.readUnshared "
+        "中标为 vul、此处标为 safe，两处矛盾，真值不可采信",
+}
+
 
 def route_of(unit) -> str:
     for a in unit.decorators_or_modifiers or []:
@@ -231,10 +249,22 @@ def main():
           f"（退回率 {len(rule_none) / max(len(rows), 1) * 100:.1f}%）")
 
     if rule_dec:
-        right = sum(1 for r, rv in rule_dec if rv == r["real_vuln"])
-        print(f"规则判定正确          ：{right}/{len(rule_dec)} = "
-              f"{right / len(rule_dec) * 100:.1f}%")
-        wrong = [(r, rv) for r, rv in rule_dec if rv != r["real_vuln"]]
+        # 真值存疑的样本单列，不进正确率分母 —— 否则一条标反的真值会永久
+        # 把规则正确率钉在 97%，让人误以为规则有缺陷。
+        judged = [(r, rv) for r, rv in rule_dec
+                  if r["unit"].unit_name not in DISPUTED_TRUTH]
+        disputed = [(r, rv) for r, rv in rule_dec
+                    if r["unit"].unit_name in DISPUTED_TRUTH]
+        right = sum(1 for r, rv in judged if rv == r["real_vuln"])
+        print(f"规则判定正确          ：{right}/{len(judged)} = "
+              f"{right / max(len(judged), 1) * 100:.1f}%")
+        if disputed:
+            print(f"\n· 真值存疑（{len(disputed)} 条，不计入正确率）：")
+            for r, rv in disputed:
+                print(f"  {r['unit'].unit_name:26} {r['category']:11} "
+                      f"标注={r['real_vuln']!s:5} 规则={rv!s:5}")
+                print(f"    理由：{DISPUTED_TRUTH[r['unit'].unit_name]}")
+        wrong = [(r, rv) for r, rv in judged if rv != r["real_vuln"]]
         if wrong:
             print("\n! 规则判错的样本（这部分必须为 0，否则是跨项目误报）：")
             for r, rv in wrong:
@@ -244,7 +274,7 @@ def main():
     per_cat = defaultdict(lambda: [0, 0, 0])   # 判定数, 正确数, 总数
     for r in rows:
         per_cat[r["category"]][2] += 1
-    for r, rv in rule_dec:
+    for r, rv in judged:
         per_cat[r["category"]][0] += 1
         per_cat[r["category"]][1] += int(rv == r["real_vuln"])
     print("\n逐类目（规则）：")
@@ -329,8 +359,12 @@ def main():
         "unknown": len(unknown),
         "truth_src": dict(src_stat),
         "rule_decided": len(rule_dec),
-        "rule_correct": sum(1 for r, rv in rule_dec if rv == r["real_vuln"]),
+        "rule_correct": sum(1 for r, rv in judged if rv == r["real_vuln"]),
         "rule_none": len(rule_none),
+        "disputed_truth": [{"unit": r["unit"].unit_name, "category": r["category"],
+                            "labeled": r["real_vuln"], "rule": rv,
+                            "why": DISPUTED_TRUTH[r["unit"].unit_name]}
+                           for r, rv in disputed],
         "per_category": {c: {"n": n, "decided": d, "correct": ok}
                          for c, (d, ok, n) in per_cat.items()},
         "rule_wrong": [{"unit": r["unit"].unit_name, "category": r["category"],

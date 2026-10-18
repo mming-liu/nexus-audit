@@ -472,7 +472,8 @@ def cors_verdict(source: str) -> bool | None:
 # 5 轮里 2 轮判成 protected），所以也交给规则。
 
 DESERIAL_SINK_RE = re.compile(
-    r"\.readObject\s*\(|new\s+(?:[A-Za-z_][\w.]*\.)?(?:ObjectInputStream|XStream)\b|"
+    r"\.readObject\s*\(|\.readUnshared\s*\(|"
+    r"new\s+(?:[A-Za-z_][\w.]*\.)?(?:ObjectInputStream|XStream)\b|"
     r"\.fromXML\s*\(|enableDefaultTyping|readValue\s*\(|"
     r"new\s+(?:[A-Za-z_][\w.]*\.)?Yaml\s*\(|\.load\s*\(", re.I)
 # 白名单式防护
@@ -489,8 +490,11 @@ def deserial_verdict(source: str) -> bool | None:
     body = entry_body(source)
     # 只有当**入口体自己**把外部数据交给反序列化 API 时才判；
     # 体里没有 sink 就说明反序列化发生在别处（helper），交给 LLM。
-    if not re.search(r"readObject\s*\(|fromXML\s*\(|\.load\s*\(|readValue\s*\(|"
-                     r"enableDefaultTyping", body, re.I):
+    #
+    # 这里复用 DESERIAL_SINK_RE，不再单独写一份枚举 —— 两份枚举必然漂移，
+    # 事实上就漂过一次：`readUnshared` 只补进了常量那份，判定用的这份漏了，
+    # 于是 `in.readUnshared()` 的样本被判"没有 sink"退回模型。
+    if not DESERIAL_SINK_RE.search(body):
         return None
     if DESERIAL_SAFE_RE.search(body):
         return False
@@ -513,11 +517,75 @@ EXPR_STANDARD_CTX_RE = re.compile(r"new\s+StandardEvaluationContext\s*\(", re.I)
 EXPR_SIMPLE_CTX_RE = re.compile(r"SimpleEvaluationContext|"
                                 r"forReadOnlyDataBinding|forPropertyAccessors", re.I)
 
+# 输入本身的精确白名单 —— 与"受限上下文"是**两类不同的事实**：
+#   受限 Context  限的是"表达式能访问什么"（属性？任意类？）
+#   输入白名单    限的是"能传进来的表达式是哪几条"（枚举/精确比对）
+# 两者互不替代。旧判据只认前者，于是 GroovyVul.safe 这种
+#     List<String> safeCodeList = Arrays.asList("\"id\".execute()", ...);
+#     if (!safeCodeList.contains(cmd)) throw new RuntimeException(...);
+#     shell.evaluate(cmd);
+# 被两个模型**一致**判成"没有受限 Context ⇒ 未防护"。这不是模型笨：
+# 判据里确实没写这一条，它只是严格照办。判据写窄导致的一致误判，
+# 修 Prompt 是没用的，必须修判据本身。
+#
+# 匹配必须带 `!` 或 `== false`：只认出"拒绝路径"，因为只有拒绝路径才
+# 意味着"通过了校验的值必然在名单内"。`if (safe.contains(x)) { ... }`
+# 是允许路径，后面的代码不必然受它保护。
+EXPR_INPUT_WHITELIST_RE = re.compile(
+    r"if\s*\(\s*!\s*[\w.]*(?:white|safe|allow|permit|legal|valid)\w*\s*\.\s*"
+    r"(?:contains|equals|equalsIgnoreCase)\s*\(|"
+    r"if\s*\(\s*[\w.]*(?:white|safe|allow|permit|legal|valid)\w*\s*\.\s*"
+    r"(?:contains|equals|equalsIgnoreCase)\s*\([^)]*\)\s*==\s*false",
+    re.I)
+# 校验失败的处置动作。没有阻断就等于"记了个日志继续执行"，不构成防护。
+_BLOCK_STMT_RE = re.compile(r"\b(?:throw|return|continue|break)\b")
+# 对表达式实参的未知校验：认得名字的（白名单）已在上一步排除，
+# 剩下的校验调用性质不明，退回模型而不是武断判漏洞。
+_EXPR_UNKNOWN_GUARD_RE = re.compile(
+    r"if\s*\(\s*[^)]*\b(?:cmd|code|expr|script|content|input|param|payload|ex|"
+    r"template|el|value)\w*\b[^)]*\)", re.I)
+
+
+def _guard_blocks(body: str, guard_re: re.Pattern[str]) -> bool:
+    """guard 条件成立时，其分支内是否有阻断语句（throw/return/...）。"""
+    for m in guard_re.finditer(body):
+        seg = body[m.end(): m.end() + 400]
+        # 只看条件块内部：截到与之配对的 `}`（这里做近似：取第一段
+        # 括号平衡的内容，足够覆盖靶场与真实项目里的常见写法）
+        depth, end = 1, len(seg)
+        for i, ch in enumerate(seg):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+        if _BLOCK_STMT_RE.search(seg[:end]):
+            return True
+    return False
+
+
+def _has_unknown_expr_guard(body: str) -> bool:
+    """存在对表达式实参的校验，但我们判断不了它是否构成防护。"""
+    for m in _EXPR_UNKNOWN_GUARD_RE.finditer(body):
+        # 已经认出是白名单形态的，不归这里管：它"没阻断"这件事在上一步
+        # 已经判过了（没有阻断 = 不构成防护 = 判漏洞），再当成未知防护退回模型，
+        # 等于让模型重新猜一个规则已经知道答案的问题。
+        if EXPR_INPUT_WHITELIST_RE.search(m.group(0)):
+            continue
+        return True
+    return False
+
 
 def spel_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not EXPR_SINK_RE.search(body):
         return None
+    # 优先看输入白名单：即使配了 StandardEvaluationContext，
+    # 只要表达式本身被枚举限死，攻击面也已关闭。
+    if _guard_blocks(body, EXPR_INPUT_WHITELIST_RE):
+        return False
     if EXPR_SIMPLE_CTX_RE.search(body):
         return False                   # 受限 Context，只允许属性读写
     if EXPR_STANDARD_CTX_RE.search(body):
@@ -529,7 +597,13 @@ def spel_verdict(source: str) -> bool | None:
     if re.search(r"new\s+TemplateParserContext\s*\(", body) and \
             not EXPR_SIMPLE_CTX_RE.search(body):
         return True
-    return None                        # 证据不足，交回 LLM
+    # 裸 evaluate(cmd) / parseExpression(ex) 后接中间变量：既没有受限 Context，
+    # 也没有输入白名单 —— 两类防护都已排除，这是可核对的事实，判漏洞。
+    # 只有当存在**我们叫不出名字**的校验调用时，才退回模型（见下）。
+    # 只有当存在**我们叫不出名字**的校验调用时，才退回模型（见下）。
+    if _has_unknown_expr_guard(body):
+        return None
+    return True
 
 
 # ---------------- XXE ----------------
@@ -563,6 +637,8 @@ XXE_SINK_RE = re.compile(
     r"\.parse\s*\(\s*new\s+InputSource|\.build\s*\(\s*new\s+InputSource|"
     r"\.read\s*\(\s*new\s+InputSource|\.parse\s*\(\s*new\s+StringReader|"
     r"\.build\s*\(\s*new\s+StringReader|\.read\s*\(\s*new\s+StringReader|"
+    # JAXB：Unmarshaller.unmarshal(XMLStreamReader/InputStream/Reader)
+    r"\.unmarshal\s*\(|"
     r"TransformerFactory\s*\.\s*newInstance\s*\(", re.I)
 
 # disallow-doctype-decl = true
@@ -905,13 +981,68 @@ def _entry_signature(source: str) -> str:
     return m.group(1) if m else ""
 
 
+# ---------------- 外部输入来源（Source Gate） ----------------
+#
+# 污点型类目（needs_taint=True）的定义是"外部可控值流到汇聚点"。
+# 若一个入口方法**根本没有外部输入**，它在语义上不可能构成污点型漏洞 ——
+# 这不是启发式，是定义。
+#
+# 但这条闸门有个明确的适用边界，踩过才发现：
+#   **它只能用来"降低置信度"，不能直接判 False。**
+# 因为靶场里存在真值为 vuln、却故意不接收任何外部输入的样本：
+#     @GetMapping("/vul")
+#     public void vul() {                    // 无参
+#         File file = new File(path);        // path 是类常量
+#         new XMLDecoder(new BufferedInputStream(
+#             new FileInputStream(file))).readObject();
+#     }
+# 作者标它为 vuln 的语义是"用了不安全的 API"，不是"外部输入可达"。
+# Hello-Java-Sec 的 XMLDecoderVul 一对样本正好相反地证明了这一点：
+# vul() 与 safe() **都不接收输入、读同一个常量文件**，真值却一个 True 一个
+# False —— 差异不在输入侧，而在 `new XMLDecoder` vs `ObjectInputStream`。
+# 所以任何"无外部输入 ⇒ 安全"的硬短路都会把这条真漏洞一起判掉。
+#
+# 因此本函数只暴露事实，由调用方决定怎么用：
+#   - `scenario_hit` 层面：无输入 ⇒ 交模型之前先记账（VulnHypothesis 里体现）
+#   - `xss_verdict` 这类本来就要求 has_param 的类目：直接用它
+# 不要把它当成 verdict() 的全局短路闸门。
+
+# 除形参与注解之外，request 对象本身还有一批读取入口。
+# XSS_PARAM_RE 只覆盖了最常用的两个，这里补齐其余通道。
+_REQUEST_READ_RE = re.compile(
+    r"request\s*\.\s*(?:getParameter|getParameterValues|getParameterMap|"
+    r"getHeader|getHeaders|getHeaderNames|getCookies|getInputStream|getReader|"
+    r"getQueryString|getPathInfo|getRequestURI|getRemoteUser)\s*\(",
+    re.I)
+
+
+def has_external_input(source: str) -> bool:
+    """入口方法是否存在外部可控输入（形参 / 请求读取 / 跨路由串接）。
+
+    只看**入口方法自己的体**：切片里拼进来的辅助方法与兄弟路由的参数
+    不属于当前入口的输入面（同 `entry_body` 的理由）。
+
+    保守方向：拿不准时返回 True（当作有输入），因为 False 会让调用方
+    倾向于判"安全"，而漏报比多退回模型更难发现。
+    """
+    body = entry_body(source)
+    if not body:
+        return True                    # 截不出入口体，不在此处下结论
+    if XSS_PARAM_RE.search(body) or _REQUEST_READ_RE.search(body):
+        return True                    # 注解绑定或 request 读取
+    if _bare_params(_entry_signature(body)):
+        return True                    # Spring/JAX-RS 裸形参（框架注入类型已排除）
+    if _chain_reader_body(source):
+        return True                    # 本方法写的值经介质被另一路由读取
+    return False
+
+
 def xss_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not body:
         return None
 
-    sig = _entry_signature(body)
-    has_param = bool(XSS_PARAM_RE.search(body)) or bool(_bare_params(sig))
+    has_param = has_external_input(source)
     reader = _chain_reader_body(source)
 
     # 1) 反射型：有外部入参 + 有回显 + 无编码
@@ -984,6 +1115,12 @@ REDIR_LOCATION_SINK_RE = re.compile(
     r"\.\s*addHeader\s*\(\s*\"[Ll]ocation\"|"
     r"\.\s*setStatus\s*\(\s*(?:301|302|303|307|308)\s*\)|"
     r"\.\s*sendError\s*\(\s*302|"
+    # Spring MVC 的两种视图型跳转：`new ModelAndView("redirect:" + url)` 与
+    # `new RedirectView(url)` 都会向客户端下发 302，与 sendRedirect 等价。
+    # 只认 `return "redirect:` 字面量会漏掉它们（Hello-Java-Sec 的
+    # Redirect.vul2 就是 `return new ModelAndView("redirect://" + url)`）。
+    r"new\s+(?:[\w.]*\.)?ModelAndView\s*\(\s*\"redirect\s*:|"
+    r"new\s+(?:[\w.]*\.)?RedirectView\s*\(|"
     r"return\s+\"redirect\s*:", re.I)
 # 服务端内部转发：不构成 open redirect
 REDIR_FORWARD_ONLY_RE = re.compile(
@@ -1017,7 +1154,16 @@ def redir_verdict(source: str) -> bool | None:
     if has_forward and not has_location:
         return False
     if not has_location:
-        return None                    # 连跳转都没有，不是本类目的判定对象
+        # 入口体里既没有下发 Location 的 API，也没有任何**名字像跳转**的调用
+        # （redirect / location / forward / dispatch 都没出现），
+        # 那它就不是本类目的判定对象，判"无此漏洞"。
+        #
+        # 为什么要额外查名字：跳转可能被封装进 helper（`RedirectUtil.go(url)`），
+        # 此时方法体里看不到 sink。只要出现了疑似跳转的标识符，就退回模型 ——
+        # 沉默（看不到 sink）不等于确认（没有跳转），这条和框架装配同源。
+        if re.search(r"(?:redirect|location|forward|dispatch)", body, re.I):
+            return None
+        return False
 
     # 目标地址是编译期常量（`return "redirect:/index"`）→ 没有可控输入，不是漏洞。
     # 这里必须放在拼接判断之前：常量字符串既"命中了 redirect: 前缀"又"没有拼接"，

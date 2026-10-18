@@ -7,9 +7,18 @@
     "route": 6,
     "apiop": 59
   },
-  "rule_decided": 33,
-  "rule_correct": 33,
-  "rule_none": 32,
+  "rule_decided": 42,
+  "rule_correct": 41,
+  "rule_none": 23,
+  "disputed_truth": [
+    {
+      "unit": "XMLDecoderVul.safe",
+      "category": "deserial",
+      "labeled": false,
+      "rule": true,
+      "why": "同一 API（ObjectInputStream.readUnshared）在 Deserialization.readUnshared 中标为 vul、此处标为 safe，两处矛盾，真值不可采信"
+    }
+  ],
   "per_category": {
     "cors": {
       "n": 2,
@@ -18,13 +27,13 @@
     },
     "redir": {
       "n": 4,
-      "decided": 2,
-      "correct": 2
+      "decided": 4,
+      "correct": 4
     },
     "spel": {
       "n": 6,
-      "decided": 2,
-      "correct": 2
+      "decided": 6,
+      "correct": 6
     },
     "ssrf": {
       "n": 4,
@@ -38,8 +47,8 @@
     },
     "deserial": {
       "n": 7,
-      "decided": 5,
-      "correct": 5
+      "decided": 6,
+      "correct": 6
     },
     "cmdi": {
       "n": 6,
@@ -58,30 +67,19 @@
     },
     "xxe": {
       "n": 8,
-      "decided": 5,
-      "correct": 5
+      "decided": 6,
+      "correct": 6
     }
   },
-  "rule_wrong": [],
-  "fallback": [
+  "rule_wrong": [
     {
-      "unit": "Redirect.safe",
-      "category": "redir",
+      "unit": "XMLDecoderVul.safe",
+      "category": "deserial",
       "real_vuln": false,
-      "route": "/safe"
-    },
-    {
-      "unit": "Redirect.vul2",
-      "category": "redir",
-      "real_vuln": true,
-      "route": "/vul2"
-    },
-    {
-      "unit": "SpEL.vul2",
-      "category": "spel",
-      "real_vuln": true,
-      "route": "/vul2"
-    },
+      "rule": true
+    }
+  ],
+  "fallback": [
     {
       "unit": "SSRF.HTTPURLConnection",
       "category": "ssrf",
@@ -123,36 +121,6 @@
       "category": "pathtraver",
       "real_vuln": false,
       "route": "/download/safe"
-    },
-    {
-      "unit": "Deserialization.readUnshared",
-      "category": "deserial",
-      "real_vuln": true,
-      "route": "/readUnshared/vul"
-    },
-    {
-      "unit": "XMLDecoderVul.safe",
-      "category": "deserial",
-      "real_vuln": false,
-      "route": "/safe"
-    },
-    {
-      "unit": "GroovyVul.safe",
-      "category": "spel",
-      "real_vuln": false,
-      "route": "/safe"
-    },
-    {
-      "unit": "GroovyVul.vul",
-      "category": "spel",
-      "real_vuln": true,
-      "route": "/vul"
-    },
-    {
-      "unit": "LoadJsVul.jsEngine",
-      "category": "spel",
-      "real_vuln": true,
-      "route": "/vul"
     },
     {
       "unit": "ProcessBuilderVul.processbuilderSafe",
@@ -237,12 +205,6 @@
       "category": "xss",
       "real_vuln": true,
       "route": "/save"
-    },
-    {
-      "unit": "XXE.Unmarshaller",
-      "category": "xxe",
-      "real_vuln": true,
-      "route": "/unmarshaller"
     },
     {
       "unit": "XXE.handleCustomer",

@@ -51,10 +51,24 @@ CATEGORIES: dict[str, VulnCategory] = {
     ),
     "cmdi": VulnCategory(
         key="cmdi", display="命令注入", cwe="CWE-78",
-        sink_question=("函数是否把外部可控字符串传入 "
-                       "Runtime.getRuntime().exec(...) 或 ProcessBuilder 的命令参数？"),
+        # sink 不能只列 exec。Hello-Java-Sec 有两条真漏洞走的是别的入口：
+        #   RuntimeVul.vul2        → rt.load(file)          （加载本地动态库）
+        #   ProcessImplVul.vul     → 反射 Method.invoke 到 ProcessImpl.start
+        # 判据里没写这两种，模型严格照字面只能答 No —— 表现为"模型漏报"，
+        # 实际是判据漏项。凡"这一类 API 有哪些写法"，枚举必须来自真实样本
+        # 反查，不能凭想当然。
+        sink_question=("函数是否把外部可控字符串传入会导致命令/代码执行的 API？包括："
+                       "① Runtime.getRuntime().exec(...)；"
+                       "② new ProcessBuilder(...) 的命令参数、或 .command(...)；"
+                       "③ Runtime.getRuntime().load(...) / loadLibrary(...)"
+                       "（加载本地动态库，同样能执行本地代码）；"
+                       "④ 通过反射触达的进程启动入口"
+                       "（如 Class.forName(\"java.lang.ProcessImpl\") 后 Method.invoke）；"
+                       "⑤ ScriptEngine/GroovyShell 之外的系统命令封装（如 commons-exec）。"),
         property=("传给命令执行 API 的内容是否为固定常量命令（不含外部输入），"
-                  "或入参已通过白名单/转义处理？"),
+                  "或入参已通过白名单/转义处理？"
+                  "注意：黑名单过滤（如过滤 | & ; 等特殊字符）**不算防护** —— "
+                  "换行、$()、反引号等写法可绕过，看到黑名单仍应判定防护缺失。"),
     ),
     "xss": VulnCategory(
         key="xss", display="跨站脚本", cwe="CWE-79",
@@ -157,10 +171,21 @@ CATEGORIES: dict[str, VulnCategory] = {
                        "（如 SpelExpressionParser.parseExpression、"
                        "ScriptEngine.eval、GroovyShell.evaluate、"
                        "Jakarta EL 的 ExpressionFactory.createExpression）？"),
+        # 防护有两类互不替代的形态，判据必须都写出来：
+        #   ① 限"表达式能访问什么" —— 受限 Context / 沙箱 / 类白名单
+        #   ② 限"能传进来哪几条表达式" —— 对输入本身做枚举或精确比对
+        # 只写 ① 的时候，GroovyVul.safe（safeCodeList.contains(cmd) + throw）
+        # 会被一致判成"未防护"：模型严格照判据办，判据里确实没有 ②。
+        # 这类漏必须在判据里补，改 prompt 措辞是没用的。
         property=("求值是否使用受限上下文"
                   "（如 SimpleEvaluationContext 且非 forReadWriteDataBinding，"
-                  "或脚本引擎的沙箱/类白名单）？"
-                  "使用 StandardEvaluationContext 或未指定上下文，属未防护。"),
+                  "或脚本引擎的沙箱/类白名单），"
+                  "**或**对传入的表达式/脚本内容本身做了精确白名单比对"
+                  "（如 `if (!whiteList.contains(expr)) throw ...`、"
+                  "枚举映射、只接受固定几个字面量）？"
+                  "注意两点：① 白名单必须**阻断执行**（throw/return），只记日志不算；"
+                  "② 黑名单（如 Pattern 正则过滤 Runtime/exec）不算防护，天然可绕。"
+                  "使用 StandardEvaluationContext 或未指定上下文且无上述白名单，属未防护。"),
     ),
     "deserial": VulnCategory(
         key="deserial", display="不安全反序列化", cwe="CWE-502", owasp=False,
@@ -176,10 +201,15 @@ CATEGORIES: dict[str, VulnCategory] = {
         # 或彻底关闭多态（SafeConstructor / safeMode / 关闭 DefaultTyping）。
         property=("反序列化前是否用**白名单**限定可还原的类（ObjectInputFilter 白名单、"
                   "SafeConstructor、fastjson safeMode、关闭 enableDefaultTyping），"
+                  "**或**对反序列化的**输入内容本身**做了白名单/精确比对后才会进入"
+                  "反序列化（如 `if (!allowList.contains(payload)) throw ...`），"
                   "或根本不做多态反序列化？"
                   "注意：黑名单/deny-list（如 resolveClass 里 startsWith 判断若干包名、"
-                  "setBlacklist）**不算防护** —— 黑名单天然可被未列举的 gadget 绕过，"
-                  "看到黑名单仍应判定防护缺失。"),
+                  "setBlacklist、Pattern 过滤 gadget 关键字）**不算防护** —— "
+                  "黑名单天然可被未列举的 gadget 绕过，看到黑名单仍应判定防护缺失。"
+                  "另外，把 XMLDecoder 换成 ObjectInputStream.readUnshared() 并不构成防护："
+                  "readUnshared 只影响引用共享，不做任何类型过滤，同样是任意字节流的"
+                  "多态反序列化。"),
     ),
     "redir": VulnCategory(
         key="redir", display="开放重定向", cwe="CWE-601", owasp=False,
