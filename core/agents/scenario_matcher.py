@@ -1,18 +1,26 @@
-"""GPTScan 式两步法推理（第2周实现）：Scenario 场景匹配 + Property 属性核对。
+"""GPTScan 式两步法推理（第2周实现，第5周扩展为多语言 / 多类目）。
 
 复刻 GPTScan 的 query_template 设计（prompt_multiple_choice_scenarios /
 prompt_single_yes_no_question），把"找漏洞"拆成客观判断题：
 
-  Step 1 — Scenario（JSON 多选）: 该函数是否命中某类漏洞触发场景？
-  Step 2 — Property（Yes/No）  : 命中场景下，关键校验属性是否缺失？
+  Step 1 — Scenario（Yes/No）: 代码中是否存在该类漏洞对应的危险汇聚点，且入参可达？
+  Step 2 — Property（Yes/No）: 汇聚点之前是否已经做了对应防护？
 
-输出 VulnHypothesis 列表。合规：全部使用防御合规视角措辞。
-LLM 可注入（LLMClient 协议），支持 mock 测试。
+输出 VulnHypothesis 列表（仅保留 property 缺失的）。
+合规：全部使用防御合规视角措辞。LLM 可注入（LLMClient 协议），支持 mock 测试。
+
+第5周变更：
+  - 由固定 3 个 Web 场景改为按 `core.agents.vuln_categories` 注册表驱动，
+    支持 OWASP Benchmark 的 11 个真实类别（sqli/cmdi/xss/...）
+  - 新增 code_language 参数，Java 切片渲染为 java 代码块
+  - audit_many() 并发初筛（受 max_concurrency 约束），支撑 2700+ 用例跑分
 """
 from __future__ import annotations
 
-from typing import Callable
+import asyncio
+from typing import Callable, Sequence
 
+from core.agents import vuln_categories as VC
 from core.agents.router import TwoTierRouter, extract_json
 from core.models import CodeUnit, VulnHypothesis
 
@@ -22,7 +30,7 @@ SYSTEM_MESSAGE = (
     "beyond the format."
 )
 
-# 场景定义（Web 赛道：IDOR 优先；Web3 赛道后续在第2周后半段扩展）
+# 兼容旧接口：默认 Web 赛道场景（IDOR / 越权 / RCE）
 WEB_SCENARIOS = [
     {
         "id": "idor",
@@ -46,7 +54,62 @@ WEB_SCENARIOS = [
     },
 ]
 
-SCENARIO_PROMPT_TMPL = """Given the following code, answer the questions below and organize the result in a JSON format like {{"idor": "Yes" or "No", "authz_bypass": "Yes" or "No", "rce": "Yes" or "No"}}.
+SCENARIO_PROMPT_TMPL = """You are performing static code analysis on {lang} code.
+Decide whether the code below exhibits the described insecure condition.
+
+Question:
+{question}
+
+Answer with JSON only: {{"hit": "Yes"}} or {{"hit": "No"}}.
+
+Answer "Yes" only if BOTH hold: (1) the described dangerous operation or insecure
+configuration actually exists in the executable statements, and
+(2) a value that originates from outside the function (request parameter, cookie,
+header) flows into it. If the operation only receives constant/literal values, answer "No".
+
+Code:
+```{lang}
+{code}
+```"""
+
+# 配置型缺陷（weakrand / hash / crypto / securecookie）：
+# 缺陷在 API/算法选择本身，与外部输入是否可达无关，不能套用污点可达的判据。
+CONFIG_SCENARIO_PROMPT_TMPL = """You are performing static code analysis on {lang} code.
+Decide whether the code below exhibits the described insecure condition.
+
+Question:
+{question}
+
+Answer with JSON only: {{"hit": "Yes"}} or {{"hit": "No"}}.
+
+This is a configuration-strength check: it does NOT require external input to reach the
+call. Answer "Yes" if the insecure API or weak algorithm/configuration described above
+is actually used in the executable statements. Commented-out code and doc comments
+do not count.
+
+Code:
+```{lang}
+{code}
+```"""
+
+PROPERTY_PROMPT_TMPL = """You are auditing whether one specific protective property is PRESENT in the code below.
+
+Property:
+{property}
+
+Answer with JSON only: {{"protected": "Yes"}} or {{"protected": "No"}}.
+Judge ONLY on executable statements that actually run on the audited path.
+Comments, string literals, log/error messages, and example URLs in comments are NOT
+evidence — they frequently describe the unsafe alternative that this code avoided.
+If the protective measure is not present in the executed statements, answer "No".
+
+Code:
+```{lang}
+{code}
+```"""
+
+# 旧版模板（保留给 Python Web 赛道与既有测试）
+SCENARIO_PROMPT_TMPL_V1 = """Given the following code, answer the questions below and organize the result in a JSON format like {{"idor": "Yes" or "No", "authz_bypass": "Yes" or "No", "rce": "Yes" or "No"}}.
 
 {questions}
 
@@ -55,7 +118,7 @@ Code:
 {code}
 ```"""
 
-PROPERTY_PROMPT_TMPL = """Does the following code satisfy this property (answer the property being PRESENT)?
+PROPERTY_PROMPT_TMPL_V1 = """Does the following code satisfy this property (answer the property being PRESENT)?
 "{property}"
 Answer ONLY "Yes" or "No".
 
@@ -64,15 +127,34 @@ Code:
 {code}
 ```"""
 
+LANG_TAG = {"python_web": "python", "java_web": "java", "solidity_web3": "solidity"}
+
+
+def _is_yes(text: str, field: str) -> bool:
+    """从模型输出里判定 Yes/No，兼容 JSON 与裸文本。"""
+    try:
+        data = extract_json(text)
+        if isinstance(data, dict) and field in data:
+            return str(data[field]).strip().lower().startswith("y")
+    except Exception:
+        pass
+    low = text.lower()
+    if "no" in low and "yes" not in low:
+        return False
+    return "yes" in low
+
 
 class ScenarioMatcher:
     """两步法初筛器（运行在 Tier-1 模型上）。"""
 
     def __init__(self, router: TwoTierRouter | None = None,
-                 llm: Callable[[list[dict]], str] | None = None):
+                 llm: Callable[[list[dict]], str] | None = None,
+                 code_language: str = "java_web",
+                 max_concurrency: int = 6):
         self.router = router
-        # llm: 兜底注入点（mock/离线测试），接收 messages 返回文本
         self._llm = llm
+        self.code_language = code_language
+        self.max_concurrency = max_concurrency
 
     async def _ask(self, prompt: str) -> str:
         messages = [{"role": "system", "content": SYSTEM_MESSAGE},
@@ -83,26 +165,78 @@ class ScenarioMatcher:
             raise RuntimeError("需要注入 router 或 llm")
         return await self.router.screen(messages)
 
+    # ---------- 新接口：按类目做两步法 ----------
+
+    async def audit_unit_for(self, unit: CodeUnit, category_keys: Sequence[str],
+                             language: str | None = None) -> list[VulnHypothesis]:
+        """对单个 unit 按给定类目列表逐一执行 Scenario + Property。"""
+        lang = LANG_TAG.get(language or self.code_language, "java")
+        out: list[VulnHypothesis] = []
+        for key in category_keys:
+            cat = VC.get(key)
+            if cat is None:
+                continue
+            # Step 1: Scenario（配置型缺陷走不要求污点可达的模板）
+            tmpl = SCENARIO_PROMPT_TMPL if cat.needs_taint else CONFIG_SCENARIO_PROMPT_TMPL
+            try:
+                s1 = await self._ask(tmpl.format(
+                    lang=lang, question=cat.sink_question, code=unit.source_code))
+            except Exception as e:
+                out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=False,
+                                          property_missing="",
+                                          reasoning_summary=f"LLM 调用失败：{e}"))
+                continue
+            if not _is_yes(s1, "hit"):
+                continue
+            # Step 2: Property
+            try:
+                s2 = await self._ask(PROPERTY_PROMPT_TMPL.format(
+                    property=cat.property, lang=lang, code=unit.source_code))
+            except Exception as e:
+                out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=True,
+                                          property_missing="",
+                                          reasoning_summary=f"LLM 调用失败：{e}"))
+                continue
+            protected = _is_yes(s2, "protected")
+            out.append(VulnHypothesis(
+                unit=unit, vuln_type=key, scenario_hit=True,
+                property_missing="" if protected else cat.property,
+                reasoning_summary=(f"Scenario={key}=HIT, PropertyCheck="
+                                   f"{'PRESENT' if protected else 'MISSING'}"),
+                confidence=0.3 if protected else 0.7,
+            ))
+        return out
+
+    async def audit_many(self, jobs: Sequence[tuple[CodeUnit, Sequence[str]]],
+                         language: str | None = None) -> list[list[VulnHypothesis]]:
+        """并发初筛：jobs 为 (unit, category_keys) 列表，返回与 jobs 对齐的结果。"""
+        sem = asyncio.Semaphore(max(1, self.max_concurrency))
+
+        async def _one(unit, keys):
+            async with sem:
+                return await self.audit_unit_for(unit, keys, language)
+
+        return list(await asyncio.gather(*(_one(u, k) for u, k in jobs)))
+
+    # ---------- 旧接口（Python Web 赛道，保持向后兼容） ----------
+
     async def audit_unit(self, unit: CodeUnit) -> list[VulnHypothesis]:
-        """对单个 CodeUnit 执行两步法，返回漏洞假设列表。"""
-        # ---- Step 1: Scenario（JSON 多选）----
+        """对单个 CodeUnit 执行旧版场景两步法。"""
         questions = "\n".join(f'"{s["id"]}": Does the code hit this scenario? "{s["question"]}"'
                               for s in WEB_SCENARIOS)
-        s1 = await self._ask(SCENARIO_PROMPT_TMPL.format(questions=questions, code=unit.source_code))
+        s1 = await self._ask(SCENARIO_PROMPT_TMPL_V1.format(questions=questions,
+                                                            code=unit.source_code))
         verdicts = extract_json(s1)
 
         hypotheses: list[VulnHypothesis] = []
-        # ---- Step 2: Property（仅对命中的场景）----
         for scenario in WEB_SCENARIOS:
             if str(verdicts.get(scenario["id"], "No")).lower() != "yes":
                 continue
-            p = await self._ask(PROPERTY_PROMPT_TMPL.format(property=scenario["property"],
-                                                            code=unit.source_code))
-            missing = "no" in p.lower()          # 属性缺失 => 假设成立
+            p = await self._ask(PROPERTY_PROMPT_TMPL_V1.format(property=scenario["property"],
+                                                               code=unit.source_code))
+            missing = "no" in p.lower()
             hypotheses.append(VulnHypothesis(
-                unit=unit,
-                vuln_type=scenario["id"],
-                scenario_hit=True,
+                unit=unit, vuln_type=scenario["id"], scenario_hit=True,
                 property_missing=(scenario["property"] if missing else ""),
                 reasoning_summary=f"Scenario={scenario['id']}, PropertyCheck={'MISSING' if missing else 'present'}",
                 confidence=0.6 if missing else 0.1,
@@ -110,8 +244,8 @@ class ScenarioMatcher:
         return hypotheses
 
     async def audit_repo(self, units: list[CodeUnit]) -> list[VulnHypothesis]:
-        """漏斗主体：全部 unit 走 Tier-1，仅 property_missing 的进入 Tier-2 队列。"""
+        """旧漏斗：全部 unit 走 Tier-1，仅 property_missing 的进入 Tier-2 队列。"""
         all_h: list[VulnHypothesis] = []
         for unit in units:
             all_h.extend(await self.audit_unit(unit))
-        return [h for h in all_h if h.property_missing]   # 传给 Skeptic / Tier-2
+        return [h for h in all_h if h.property_missing]

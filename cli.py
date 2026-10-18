@@ -50,6 +50,10 @@ def cmd_scan(args):
     if args.web3:
         return cmd_scan_web3(args, repo)
 
+    # Java 赛道：按类目做两步法（Web 赛道的 IDOR/越权场景不适用于 Servlet 用例）
+    if args.java:
+        return cmd_scan_java(args, repo)
+
     print(f"[1/5] 切片：提取路由入口 ...")
     units = WebTreeSitterSlicer(repo).extract_entry_units(repo)
     print(f"      共 {len(units)} 个路由入口")
@@ -107,6 +111,55 @@ def cmd_scan(args):
     out.write_text(report, encoding="utf-8")
     print(f"\n完成：报告已写入 {out}")
     print(f"确认漏洞 {sum(1 for r in results if r.verified)}/{len(results)}")
+
+
+def cmd_scan_java(args, repo: Path):
+    """Java Web 赛道：Servlet/Spring 入口切片 + 按漏洞类目两步法。"""
+    from core.agents.vuln_categories import ALL_KEYS
+    from core.agents.scenario_matcher import ScenarioMatcher
+    from core.slicer.java_servlet import JavaSlicer
+
+    categories = [c.strip() for c in args.categories.split(",")] if args.categories else ALL_KEYS
+
+    print(f"[1/4] Java 入口切片 ...")
+    units = JavaSlicer(repo).extract_entry_units()
+    # 同一用例的 doGet 只是转发，保留 doPost 即可，避免重复计费
+    units = [u for u in units if not u.unit_name.endswith(".doGet")]
+    print(f"      共 {len(units)} 个入口")
+    if not units:
+        print("      未发现 Java Web 入口（需 @WebServlet / @GetMapping 等注解）")
+        return
+
+    print(f"[2/4] 类目选择：{', '.join(categories)}")
+    print(f"[3/4] 两步法初筛（并发 {args.concurrency}）...")
+    if args.offline:
+        from benchmarks.offline_baseline import offline_predict
+        flagged = [(u, c) for u in units for c in categories if offline_predict(u.source_code, c)]
+    else:
+        from core.agents.model_selector import auto_select_and_print
+        from core.agents.router import OpenAICompatClient, TwoTierRouter
+        model = args.model or auto_select_and_print(tier=1)
+        matcher = ScenarioMatcher(
+            router=TwoTierRouter(tier1=OpenAICompatClient(model=model)),
+            max_concurrency=args.concurrency, code_language="java_web")
+        results = asyncio.run(matcher.audit_many([(u, categories) for u in units], "java_web"))
+        flagged = [(u, h.vuln_type) for u, hs in zip(units, results)
+                   for h in hs if h.property_missing]
+
+    print(f"      命中 {len(flagged)} 处")
+
+    print(f"[4/4] 写报告 ...")
+    lines = [f"# nexus-audit Java 扫描报告", "",
+             f"- 目标仓库：`{repo}`",
+             f"- 审计入口：{len(units)}",
+             f"- 命中：{len(flagged)}", ""]
+    for u, cat in flagged:
+        lines += [f"## [{cat.upper()}] {u.unit_name}",
+                  f"- 位置：`{u.file_path}:{u.start_line}`",
+                  f"- 路由：{', '.join(u.decorators_or_modifiers)}", ""]
+    out = Path(args.output or "report_java.md")
+    out.write_text("\n".join(lines), encoding="utf-8")
+    print(f"\n完成：报告已写入 {out}")
 
 
 def cmd_scan_web3(args, repo: Path):
@@ -173,6 +226,11 @@ def main():
     p_scan.add_argument("repo_path")
     p_scan.add_argument("--offline", action="store_true", help="离线演示模式（不调用 LLM API）")
     p_scan.add_argument("--web3", action="store_true", help="Web3 赛道（Solidity 精度/逻辑缺陷检测）")
+    p_scan.add_argument("--java", action="store_true", help="Java 赛道（Servlet/Spring 入口切片）")
+    p_scan.add_argument("--categories", default=None,
+                        help="Java 赛道指定漏洞类目，逗号分隔（默认全部 11 类）")
+    p_scan.add_argument("--model", default=None, help="指定模型名（跳过免费模型探测）")
+    p_scan.add_argument("--concurrency", type=int, default=6, help="LLM 并发数")
     p_scan.add_argument("--output", default=None, help="报告输出路径")
     p_scan.add_argument("--python", default=None, help="PoC 执行使用的 Python 解释器")
     p_pr = sub.add_parser("pr-scan", help="PR 增量扫描（仅 git diff 影响的调用链）")

@@ -33,7 +33,31 @@ nexus-audit/
 └── reference_repos/                 # 标杆开源项目参考（vulnhuntr / GPTScan 等，见 README）
 ```
 
-## 快速开始
+| 文件 | 职责 |
+|---|---|
+| `core/slicer/java_servlet.py` | Servlet / Spring MVC / JAX-RS 入口切片，含跨文件辅助方法与配置取值回填 |
+| `core/context/config_resolver.py` | 解析 .properties/.yaml/.json，把代码里引用的配置键回填进切片 |
+| `core/agents/vuln_categories.py` | 11 类漏洞的 Scenario/Property 定义，`needs_taint` 区分污点型与配置型 |
+| `core/agents/rule_detectors.py` | 算法强度等客观事实的确定性判定，先于 LLM 执行 |
+| `benchmarks/benchmark_owasp.py` | OWASP Benchmark 跑分（TPR/FPR/Score，含断点续跑与误差归因） |
+| `benchmarks/offline_baseline.py` | 对照组：纯 sink 关键词匹配 |
+
+## OWASP Benchmark 跑分
+
+```bash
+# 全量 11 类，每类采样 40 条（真/假各半）
+python benchmarks/benchmark_owasp.py --per-category 40 --concurrency 6
+
+# 对照组（不调 LLM）
+python benchmarks/benchmark_owasp.py --offline --per-category 40
+
+# 只看某几类，或关闭确定性规则对比 LLM 真实能力
+python benchmarks/benchmark_owasp.py --categories sqli,xss --no-rules
+```
+
+口径：`Score = TPR − FPR`（OWASP 官方）。调用失败的样本会被标记并剔除，
+不计入分数 —— 否则限流会被伪装成极低的误报率。
+
 
 ```bash
 pip install -r requirements.txt
@@ -49,6 +73,15 @@ python cli.py --help
 2. **第2周**：web3_slither + scenario_matcher，大小模型漏斗路由
 3. **第3周**：sandbox 层，Docker/Foundry 验证器 + 3 轮编译报错自愈
 4. **第4周**：cli.py PR 增量扫描与 GitHub Action 集成
+
+## 开发路线（进度）
+
+- [x] 第1周：slicer + context 层
+- [x] 第2周：web3_slither + scenario_matcher，大小模型漏斗路由
+- [x] 第3周：sandbox 层，Docker/Foundry 验证器
+- [ ] 第4周：PR 增量扫描的调用链过滤（`cmd_pr_scan` 仍是 TODO）
+- [x] 第5周：Java 赛道打通 + OWASP Benchmark 跑分（11 类）
+
 
 ## 安全合规
 
