@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import os
+import time
 from datetime import datetime, timezone
 
 try:
@@ -36,20 +37,45 @@ def _headers() -> dict[str, str]:
     }
 
 
-def probe_model(model: str, timeout: float = 60.0) -> bool:
-    """小请求探测模型是否真实可用（协议兼容 + 上游在线）。"""
+def probe_model(model: str, timeout: float = 60.0, attempts: int = 3) -> bool:
+    """小请求探测模型是否真实可用（协议兼容 + 上游在线）。
+
+    必须重试，且要区分「确定性失败」和「瞬时失败」：
+
+    - 401/403：key 或权限问题，重试一万次也一样，立即判否
+    - 404：模型名不存在，同上
+    - 5xx / 429 / 连接错误 / 超时：**瞬时**，重试可能就通了
+
+    为什么单独强调这一点：曾经因为一次 `502 upstream connect failed`
+    就断定"免费模型全不可用"，实际上几分钟后全部正常。上游 5xx 和连接被拒
+    在这类聚合网关上非常常见，一次探测就下结论会让整个引擎平白降级到付费
+    模型，或者直接抛"无可用模型"——故障率被放大成可用性问题。
+    """
     if httpx is None:
         return False
-    try:
-        with httpx.Client(timeout=timeout) as client:
-            r = client.post(f"{BASE_URL}/chat/completions", headers=_headers(),
-                            json={"model": model, "messages": PROBE_MESSAGES, "max_tokens": 2000})
-            if r.status_code != 200:
-                return False
-            data = r.json()
-            return bool(data.get("choices"))
-    except Exception:
-        return False
+    last = ""
+    for i in range(max(1, attempts)):
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                r = client.post(f"{BASE_URL}/chat/completions", headers=_headers(),
+                                json={"model": model, "messages": PROBE_MESSAGES,
+                                      "max_tokens": 2000})
+                if r.status_code == 200:
+                    return bool(r.json().get("choices"))
+                if r.status_code in (400, 401, 403, 404):
+                    # 确定性失败，重试没有意义。
+                    # 400 也归这一类：探测用的请求体是固定的、对其他模型都返回 200，
+                    # 所以 400 只可能是模型名/参数不被接受。实测不存在的模型名
+                    # 返回的是 400 而不是 404，不归进来会白等 3 轮退避（22 秒）。
+                    return False
+                last = f"HTTP {r.status_code}"
+        except Exception as e:                      # 连接错误/超时/JSON 错乱
+            last = str(e)[:120]
+        if i + 1 < attempts:
+            time.sleep(min(8.0, 1.5 * (2 ** i)))
+    if last:
+        print(f"      [探测] {model} 连续 {attempts} 次不可用（末次：{last}）")
+    return False
 
 
 def pick_model(tier: int = 1, force_paid: bool = False) -> str:
