@@ -127,9 +127,19 @@ def _truth_from_text(text: str) -> bool | None:
     但只认「注释行本身就是在给这个方法定性」的形态：
       * Vuln Code. / Vul Code. / safe Code. / security code.
     而 "Fix method: ..." 这类描述修复手段的句子不算标注。
+
+    另有一种作者写法**描述的是防护手段，等于承认这个方法本身不安全**：
+      `Check deserialize class using black list.`（Deserialize.rememberMeBlackClassCheck）
+    路由是 /rememberMe/security，不含 vuln 字样；注释里也没有 "Vuln Code."。
+    如果按字面把 "security" 当安全标注，会把一个真的反序列化漏洞标成安全 ——
+    这种"防护手段描述"必须先认，否则真值就反了。
     """
     if not text:
         return None
+    # 先认「描述防护手段」= 承认不安全
+    if re.search(r"^\s*\*?\s*(check(ing)?|use|using|filter|validate)\b.*\b(black\s*list|"
+                 r"blacklist|white\s*list|whitelist|deny|filter)\b", text, re.I | re.M):
+        return True
     v = bool(re.search(r"^\s*\*?\s*(vuln|vul|unsafe|insecure)\s+code\b", text, re.I | re.M))
     s = bool(re.search(r"^\s*\*?\s*(safe|security|secure|fixed)\s+code\b", text, re.I | re.M))
     if v and not s:

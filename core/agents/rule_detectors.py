@@ -235,6 +235,41 @@ def deserial_verdict(source: str) -> bool | None:
     return True                        # 含黑名单也算"未防护"
 
 
+# ---------------- SpEL / 表达式注入 ----------------
+#
+# 判据是纯客观的"用了哪个 Context 类"，与输入是否可达无关：
+#   StandardEvaluationContext / 不带 context 的 getValue()  → 可实例化任意类 → 不安全
+#   SimpleEvaluationContext（forReadOnlyDataBinding / forPropertyAccessors）→ 安全
+# 模型在这条上会摇摆（SpEL.spel_sec 5 轮里 1 轮判成有漏洞），
+# 而它本质和 AES vs DES 一样是"选了哪个 API"的事实题，不该交给概率模型。
+
+EXPR_SINK_RE = re.compile(
+    r"parseExpression\s*\(|SpelExpressionParser|ExpressionParser|"
+    r"\.getValue\s*\(|\.evaluate\s*\(|GroovyShell|"
+    r"ScriptEngine.*\.eval\s*\(|engine\s*\.\s*eval\s*\(", re.I)
+EXPR_STANDARD_CTX_RE = re.compile(r"new\s+StandardEvaluationContext\s*\(", re.I)
+EXPR_SIMPLE_CTX_RE = re.compile(r"SimpleEvaluationContext|"
+                                r"forReadOnlyDataBinding|forPropertyAccessors", re.I)
+
+
+def spel_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    if not EXPR_SINK_RE.search(body):
+        return None
+    if EXPR_SIMPLE_CTX_RE.search(body):
+        return False                   # 受限 Context，只允许属性读写
+    if EXPR_STANDARD_CTX_RE.search(body):
+        return True                    # 完整 Context，T() 可实例化任意类
+    # 不带 context 的 parseExpression(x).getValue()：用的是默认 StandardEvaluationContext
+    if re.search(r"parseExpression\s*\([^)]*\)\s*\.\s*getValue\s*\(\s*\)", body):
+        return True
+    # TemplateParserContext 只影响占位符语法，不构成沙箱
+    if re.search(r"new\s+TemplateParserContext\s*\(", body) and \
+            not EXPR_SIMPLE_CTX_RE.search(body):
+        return True
+    return None                        # 证据不足，交回 LLM
+
+
 # ---------------- 对外门面 ----------------
 
 def verdict(category: str, source: str) -> bool | None:
@@ -279,5 +314,8 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category == "deserial":
         return deserial_verdict(source)
+
+    if category == "spel":
+        return spel_verdict(source)
 
     return None
