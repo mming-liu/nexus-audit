@@ -1259,6 +1259,124 @@ check("JavaSecLab 清单来自登记簿",
       set(for_target("JavaSecLab")) >= {"ReflectController.safe2"}, True)
 
 
+print("\n[36] 值来源闸门：sqli / pathtraver 也认『常量顶掉脏值』")
+# 这三种机制此前只写在 xss 里，且只认变量名 bar、只扫入口体。OWASP 把同一套
+# 模板复用到了 sqli/pathtraver，只是把代码放进了同文件的 private class Test —
+# 于是规则看见「bar 拼进 SQL」就判 True，真值却是 safe。
+_SQL_HEAD = '''public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    String param = request.getParameter("p");
+'''
+_SQL_TAIL = '''    java.sql.Connection conn = org.owasp.benchmark.helpers.DatabaseHelper.getSqlConnection();
+    java.sql.Statement stmt = conn.createStatement();
+    java.sql.ResultSet rs = stmt.executeQuery(sql);
+}'''
+_PATH_TAIL = '''    java.nio.file.Path path = java.nio.file.Paths.get(fileName);
+    java.io.InputStream is = java.nio.file.Files.newInputStream(path);
+}'''
+_SEP = "\n// ---- 同文件辅助方法 ----\n"
+_SQL_SINK = '''    String sql = "SELECT * from USERS where USERNAME='foo' and PASSWORD='" + bar + "'";
+'''
+_SQL_VUL = _SQL_HEAD + '''    String bar = param;
+    String sql = "SELECT * from USERS where USERNAME='foo' and PASSWORD='" + bar + "'";
+''' + _SQL_TAIL
+check("SQL 拼接操作数是裸形参 → 真漏洞", _verdict("sqli", _SQL_VUL), True)
+
+_SQL_IF = _SQL_HEAD + '''    String bar = new Test().doSomething(request, param);
+''' + _SQL_SINK + _SQL_TAIL + _SEP + '''
+private class Test {
+    public String doSomething(HttpServletRequest request, String param) {
+        String bar;
+        int num = 86;
+        if ((7 * 42) - num > 200) bar = "This_should_always_happen";
+        else bar = param;
+        return bar;
+    }
+}'''
+check("helper 里恒真分支赋字面量 → 安全", _verdict("sqli", _SQL_IF), False)
+
+_SQL_TRI = _SQL_HEAD + '''    String bar = doSomething(request, param);
+''' + _SQL_SINK + _SQL_TAIL + _SEP + '''
+private static String doSomething(HttpServletRequest request, String param) {
+    String bar;
+    int num = 106;
+    bar = (7 * 18) + num > 200 ? "This_should_always_happen" : param;
+    return bar;
+}'''
+check("helper 里恒真三元赋字面量 → 安全", _verdict("sqli", _SQL_TRI), False)
+
+_SQL_CONST_ARG = _SQL_HEAD + '''    String g = "barbarians_at_the_gate";
+    String bar = thing.doSomething(g);
+''' + _SQL_SINK + _SQL_TAIL
+check("调用点只喂常量（helper 不可见）→ 安全", _verdict("sqli", _SQL_CONST_ARG), False)
+
+_SQL_TAINT_ARG = _SQL_HEAD + '''    String g = request.getParameter("q");
+    String bar = thing.doSomething(g);
+''' + _SQL_SINK + _SQL_TAIL
+check("实参本身来自请求 → 维持真漏洞", _verdict("sqli", _SQL_TAINT_ARG), True)
+
+# 反例：switch 的选中分支赋 param，不能因为"结构复杂"就放行
+_SQL_SWITCH = _SQL_HEAD + '''    String bar = new Test().doSomething(request, param);
+''' + _SQL_SINK + _SQL_TAIL + _SEP + '''
+private class Test {
+    public String doSomething(HttpServletRequest request, String param) {
+        String bar;
+        String guess = "ABC";
+        char switchTarget = guess.charAt(2);
+        switch (switchTarget) {
+            case 'A': bar = param; break;
+            case 'C': case 'D': bar = param; break;
+            default: bar = "bobs_your_uncle"; break;
+        }
+        return bar;
+    }
+}'''
+check("switch 选中分支赋 param → 维持真漏洞", _verdict("sqli", _SQL_SWITCH), True)
+
+_PATH_MAP = _SQL_HEAD + '''    String bar = new Test().doSomething(request, param);
+    String fileName = org.owasp.benchmark.helpers.Utils.TESTFILES_DIR + bar;
+''' + _PATH_TAIL + _SEP + '''
+private class Test {
+    public String doSomething(HttpServletRequest request, String param) {
+        String bar = "safe!";
+        java.util.HashMap<String, Object> m = new java.util.HashMap<String, Object>();
+        m.put("keyA-1", "a_Value");
+        m.put("keyB-1", param);
+        bar = (String) m.get("keyB-1");
+        bar = (String) m.get("keyA-1");
+        return bar;
+    }
+}'''
+check("路径拼接的操作数是容器常量 → 安全", _verdict("pathtraver", _PATH_MAP), False)
+
+_PATH_VUL = _SQL_HEAD + '''    String bar = param;
+    String fileName = org.owasp.benchmark.helpers.Utils.TESTFILES_DIR + bar;
+''' + _PATH_TAIL
+check("路径拼接的操作数是裸形参 → 真漏洞", _verdict("pathtraver", _PATH_VUL), True)
+
+# 行内赋值（`if (c) param = values[0];`）`_ASSIGN_RE` 是看不见的。只看行首赋值
+# 会取到开头的 `String param = "";`，把外部输入当常量 —— 那是**漏报**。
+# OWASP 02272 就是这么从 True 掉成 False 的。
+_SQL_INLINE_IF = _SQL_HEAD.replace('    String param = request.getParameter("p");\n', '''    String param = "";
+    java.util.Map<String, String[]> map = request.getParameterMap();
+    if (!map.isEmpty()) param = map.get("p")[0];
+''') + '''    String bar = doSomething(request, param);
+''' + _SQL_SINK + _SQL_TAIL + _SEP + '''
+private static String doSomething(HttpServletRequest request, String param) {
+    String bar;
+    int num = 196;
+    if ((500 / 42) + num > 200) bar = param;
+    else bar = "This should never happen";
+    return bar;
+}'''
+check("行内 if 赋值不能被当成常量（防漏报）",
+      _verdict("sqli", _SQL_INLINE_IF), True)
+
+_PATH_FIELD_WRITTEN = _SQL_HEAD + '''    this.TESTFILES_DIR = param;
+    String fileName = org.owasp.benchmark.helpers.Utils.TESTFILES_DIR + "x";
+''' + _PATH_TAIL
+check("字段前缀被本方法写过 → 不放行", _verdict("pathtraver", _PATH_FIELD_WRITTEN), True)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

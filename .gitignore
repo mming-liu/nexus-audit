@@ -17,3 +17,6 @@ reference_repos/*
 
 # 本地工作区配置（记忆/会话数据）
 .workbuddy/
+
+# 切片缓存（42MB，可重建）
+benchmarks/results/.owasp_units.pkl

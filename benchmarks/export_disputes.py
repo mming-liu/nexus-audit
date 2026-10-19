@@ -29,7 +29,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from benchmarks.disputed_truth import (          # noqa: E402
-    KIND_LABEL, all_disputes, dump_json, render_markdown, verify_evidence,
+    KIND_LABEL, all_disputes, dump_issues, dump_json, render_markdown,
+    verify_evidence,
 )
 
 
@@ -42,6 +43,8 @@ def main() -> int:
     ap.add_argument("--out", help="写入文件（默认 stdout）")
     ap.add_argument("--check", action="store_true",
                     help="只核对证据能否逐字对上，不输出清单")
+    ap.add_argument("--issues", metavar="DIR",
+                    help="每个靶场生成一份 issue 草稿（写到 DIR）")
     ap.add_argument("--skip-check", action="store_true",
                     help="跳过证据核对（仅用于靶场未克隆的环境）")
     args = ap.parse_args()
@@ -58,6 +61,17 @@ def main() -> int:
             return 1
         n = len(all_disputes())
         print(f"✔ 证据核对通过：{n} 条争议，全部能逐字对上源码")
+        return 0
+
+    if args.issues:
+        written = dump_issues(args.issues)
+        for p in written:
+            print(f"已写入 {p}", file=sys.stderr)
+        if problems:
+            print(f"\n⚠ 证据核对有 {len(problems)} 处问题：", file=sys.stderr)
+            for p in problems:
+                print(f"  - {p}", file=sys.stderr)
+            return 1
         return 0
 
     if args.json:

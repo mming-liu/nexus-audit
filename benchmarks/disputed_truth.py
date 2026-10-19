@@ -45,6 +45,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Literal
@@ -198,6 +199,50 @@ REGISTRY: list[Dispute] = [
             Evidence(file="src/main/java/com/best/hello/controller/Traversal.java",
                      line=84,
                      text='String filePathSafe = Paths.get(filePath).normalize().toString();'),
+        ],
+    ),
+    Dispute(
+        target="OWASP",
+        unit="BenchmarkTest01807",
+        category="sqli",
+        labeled=False,
+        our_verdict=True,
+        kind="self_contradiction",
+        decided_by="rule",
+        summary="charAt(2) 恒为 'C'，case 'C' 落进 bar = param，却标 safe",
+        detail=(
+            "`guess` 是字面量 \"ABC\"，`charAt(2)` 在编译期就是 `'C'`；"
+            "switch 的 `case 'C': case 'D':` 直接落进 `bar = param;`，"
+            "随后 `bar` 被拼进 "
+            "\"SELECT * from USERS where USERNAME='foo' and PASSWORD='\" + bar + \"'\"，"
+            "注入面成立。"
+            "同模板的 BenchmarkTest01806 用 `charAt(1)`（'B' → `bar = \"bob\"`）标 safe，"
+            "并在注释里写明「condition 'B', which is safe」—— 说明作者清楚这条判据"
+            "取决于选中哪个 case；01807 换到 'C' 却没有同步改标注。"
+            "**本条不参与跑分剔除**：OWASP 的 FPR 仍按 5/15 计，登记它是为了让复核者"
+            "看到「这 1 条误报不是检测器的错」。"
+        ),
+        evidence=[
+            Evidence(
+                file="src/main/java/org/owasp/benchmark/testcode/BenchmarkTest01807.java",
+                line=75,
+                text="char switchTarget = guess.charAt(2);",
+            ),
+            Evidence(
+                file="src/main/java/org/owasp/benchmark/testcode/BenchmarkTest01807.java",
+                line=85,
+                text="case 'C':",
+            ),
+            Evidence(
+                file="src/main/java/org/owasp/benchmark/testcode/BenchmarkTest01807.java",
+                line=87,
+                text="bar = param;",
+            ),
+            Evidence(
+                file="src/main/java/org/owasp/benchmark/testcode/BenchmarkTest01806.java",
+                line=75,
+                text="char switchTarget = guess.charAt(1); // condition 'B', which is safe",
+            ),
         ],
     ),
 ]
@@ -363,6 +408,103 @@ _KIND_ADVICE = {
         "而本项目按「代码事实」判定（有没有可达注入面）。两者都有道理，"
         "但用于评测时需要统一。",
 }
+
+
+# ---------------- 单个靶场的 issue 草稿 ----------------
+#
+# 一份 issue 只讲**一个仓库**：维护者打开自己的 issue 列表时才不会看到
+# 别人的问题混在里面。仓库内仍按 kind 分组 —— 同一种口径问题的三条样本
+# 摆在一次讨论里，比拆成三个 issue 更容易一次谈定。
+
+_TARGET_REPO = {
+    "Hello-Java-Sec": "j3ers3/Hello-Java-Sec",
+    "JavaSecLab": "whgojp/JavaSecLab",
+    "OWASP": "OWASP-Benchmark/BenchmarkJava",
+    "java-sec-code": "JoyChou93/java-sec-code",
+}
+
+
+def render_issue(target: str) -> str:
+    """渲染某个靶场的 issue 草稿（标题 + 正文，直接可贴）。"""
+    items = [d for d in REGISTRY if d.target == target]
+    if not items:
+        return ""
+    repo = _TARGET_REPO.get(target, target)
+    kinds: list[str] = []
+    for d in items:
+        if d.kind not in kinds:
+            kinds.append(d.kind)
+
+    lines = [
+        f"# {len(items)} 个样本的真值（expected results）与本机静态分析结论不一致",
+        "",
+        f"仓库：`{repo}`　靶场：`{target}`",
+        "",
+        "在复现 [nexus-audit](https://github.com/mming-liu/nexus-audit) 的"
+        "规则层评测时，以下样本的标注与代码事实不一致。每条都附了**行号级证据**，"
+        "可以直接点进去核对；证据由脚本逐字比对过源码（行号写错会当场报错），"
+        "不是凭印象写的。",
+        "",
+        "| 样本 | 类目 | 靶场标注 | 本项目判定 | 分歧类型 |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for d in items:
+        lines.append(
+            f"| `{d.unit}` | {d.category} | "
+            f"{'vul' if d.labeled else 'safe'} | "
+            f"{'vul' if d.our_verdict else ('safe' if d.our_verdict is False else '不可判')} | "
+            f"{KIND_LABEL[d.kind]} |")
+    lines.append("")
+
+    for kind in kinds:
+        group = [d for d in items if d.kind == kind]
+        lines += [f"## {KIND_LABEL[kind]}", "", _KIND_ADVICE.get(kind, ""), ""]
+        for d in group:
+            lines += [
+                f"### `{d.unit}`",
+                "",
+                f"**结论**：{d.summary}",
+                "",
+                d.detail.strip(),
+                "",
+            ]
+            if d.evidence:
+                lines.append("**源码证据**：")
+                lines.append("")
+                for e in d.evidence:
+                    loc = f"{e.file}:{e.line}" if e.line else e.file
+                    lines.append(f"- `{loc}`　`{e.text}`")
+                lines.append("")
+
+    lines += [
+        "## 我们的口径（供讨论）",
+        "",
+        "判定一律基于**可逐行核对的事实**：某个防护函数到底拦的是什么、"
+        "某个变量最后一次赋值来自常量还是请求参数、某条分支是否恒真。"
+        "凡是没有事实支点的，我们退回「不可判」而不给结论 —— "
+        "所以这里列出的不是「我们猜你错了」，而是「这几行代码与标注对不上」。",
+        "",
+        "如果认为其中某条的标注是对的（例如本类目的口径本就包含缓解措施），"
+        "欢迎指出 —— 我们更愿意改自己的口径说明，而不是改判据去迁就分数。",
+        "",
+    ]
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def dump_issues(out_dir: str | Path) -> list[Path]:
+    """每个靶场一份 issue 草稿，返回写出的文件列表。"""
+    d = Path(out_dir)
+    d.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    for target in dict.fromkeys(x.target for x in REGISTRY):
+        text = render_issue(target)
+        if not text:
+            continue
+        slug = re.sub(r"[^a-z0-9]+", "-", target.lower()).strip("-")
+        p = d / f"issue-{slug}.md"
+        p.write_text(text, encoding="utf-8")
+        written.append(p)
+    return written
 
 
 def dump_json(path: str | Path, targets: list[str] | None = None) -> Path:
