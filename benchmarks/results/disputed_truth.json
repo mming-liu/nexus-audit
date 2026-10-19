@@ -1,0 +1,71 @@
+[
+  {
+    "target": "JavaSecLab",
+    "unit": "ReflectController.safe2",
+    "category": "xss",
+    "labeled": false,
+    "our_verdict": true,
+    "kind": "defense_in_depth",
+    "summary": "打 CSP header 后仍裸回显，CSP 不是输出编码",
+    "detail": "方法设置了 Content-Security-Policy 响应头，但随后 `return payload;` 把请求参数原样交回响应体，没有任何输出编码。CSP 是浏览器侧的纵深防御，可降低脚本执行概率，但它不改变「用户输入原样进入 HTML」这一事实；一旦策略被放宽、被 script-src 'unsafe-inline' 覆盖，或数据被前端 innerHTML 二次渲染，注入即成立。值得注意的是作者自己在 @ApiOperation 的 notes 里写了「不能替代输出编码与安全模板/DOM用法」—— 标注与注释互相矛盾。本项目 xss 类目的口径是「输入是否原样进入响应体」，故判 True。",
+    "evidence": [
+      {
+        "file": "src/main/java/top/whgojp/modules/xss/controller/ReflectController.java",
+        "line": 124,
+        "text": "response.setHeader(\"Content-Security-Policy\", \"default-src 'self'; script-src 'self'\");"
+      },
+      {
+        "file": "src/main/java/top/whgojp/modules/xss/controller/ReflectController.java",
+        "line": 127,
+        "text": "return payload;"
+      }
+    ],
+    "decided_by": "rule"
+  },
+  {
+    "target": "Hello-Java-Sec",
+    "unit": "XMLDecoderVul.safe",
+    "category": "deserial",
+    "labeled": false,
+    "our_verdict": true,
+    "kind": "self_contradiction",
+    "summary": "同一 API（readUnshared）在同靶场另一处标 vul",
+    "detail": "`XMLDecoderVul.safe` 用 `new ObjectInputStream(bis).readUnshared()`；同靶场的 `Deserialization.readUnshared` 用同一个 API，却被标为 vul。readUnshared 只影响对象引用共享（读到重复引用抛异常），**不做任何类型过滤**，安全性质与 readObject 完全相同，CWE-502 同样适用。两处标注不可能同时成立，至少有一处错。本项目与「标 vul 的那一处」一致，故判 True。",
+    "evidence": [
+      {
+        "file": "src/main/java/com/best/hello/controller/Deserialization/XMLDecoderVul.java",
+        "line": 52,
+        "text": "* 替换XMLDecoder类，使用更安全的ObjectInputStream.readUnshared"
+      },
+      {
+        "file": "src/main/java/com/best/hello/controller/Deserialization/XMLDecoderVul.java",
+        "line": 66,
+        "text": "Object obj = ois.readUnshared();"
+      },
+      {
+        "file": "src/main/java/com/best/hello/controller/Deserialization/Deserialization.java",
+        "line": 96,
+        "text": "in.readUnshared();"
+      }
+    ],
+    "decided_by": "rule"
+  },
+  {
+    "target": "Hello-Java-Sec",
+    "unit": "Traversal.safe2",
+    "category": "pathtraver",
+    "labeled": false,
+    "our_verdict": true,
+    "kind": "not_the_property",
+    "summary": "只有 normalize()，没有基目录包含校验",
+    "detail": "唯一防护是 `Paths.get(filePath).normalize().toString()`。normalize 只做**词法**规范化（消解 `.` 与 `..` 段），不判断结果是否仍在基目录内：`logs/../../etc/passwd` 规范化后是`../etc/passwd`，照样逃出 `logs/`。真正构成防护的是「规范化**之后**再校验包含关系」（`getCanonicalPath().startsWith(baseDir)` 或 `toRealPath()` 对照），本样本没有这一步。它拦的不是路径遍历关心的那个性质（是否限制在基目录内），与本类目口径不一致。",
+    "evidence": [
+      {
+        "file": "src/main/java/com/best/hello/controller/Traversal.java",
+        "line": 84,
+        "text": "String filePathSafe = Paths.get(filePath).normalize().toString();"
+      }
+    ],
+    "decided_by": "rule"
+  }
+]

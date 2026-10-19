@@ -47,6 +47,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from benchmarks.disputed_truth import for_target as _for_target  # noqa: E402
+
 from core.agents.rule_detectors import verdict as rule_verdict      # noqa: E402
 from core.slicer.java_servlet import JavaSlicer                      # noqa: E402
 
@@ -122,11 +124,8 @@ ROUTE_SAFE = re.compile(r"(?:^|/)(?:safe|sec)\w*$", re.I)
 # 靶场把它归入 safe 是想演示"CSP 的缓解效果"，而我们的类目口径是
 # "输入是否原样进入响应体" —— 两个口径不同，不是规则判错。
 # 按 vuln_categories 里 xss 的定义，规则判 True 与口径一致。
-DISPUTED_TRUTH = {
-    "ReflectController.safe2":
-        "裸回显 return payload 未做编码；作者的 notes 自述 CSP 不能替代输出编码，"
-        "CSP 属纵深防御而非修复，与本项目 xss 类目口径不一致",
-}
+# 清单集中在 `benchmarks/disputed_truth.py`（结构化证据 + 分歧类型 + 导出）。
+DISPUTED_TRUTH = _for_target("JavaSecLab")
 
 
 def route_of(unit) -> str:

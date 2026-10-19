@@ -1233,6 +1233,32 @@ _SQL_BARE = '''public String vul(String id) throws Exception {
 }'''
 check("裸变量拼接 → 真漏洞", _verdict("sqli", _SQL_BARE), True)
 
+print("\n[35] 真值争议登记簿：证据必须逐字对上源码")
+# 这条断言守的是"报告可信度"而不是检测能力：行号写错的争议清单，
+# 维护者点进去看到无关代码，会连带怀疑整份报告。所以登记的证据
+# 必须能在靶场里逐字找到 —— 与 cite-before-verdict 对模型的要求同一把尺子。
+from benchmarks.disputed_truth import (          # noqa: E402
+    all_disputes, for_target, verify_evidence,
+)
+_ds = all_disputes()
+check("登记簿非空", len(_ds) > 0, True)
+check("每条都有源码证据", all(d.evidence for d in _ds), True)
+check("每条都填了行号", all(e.line > 0 for d in _ds for e in d.evidence), True)
+check("每条都归到已知分歧类型",
+      all(d.kind in ("defense_in_depth", "not_the_property",
+                     "self_contradiction", "demo_convention") for d in _ds), True)
+_problems = verify_evidence(ROOT)
+check("证据逐字核对通过", not _problems, True)
+if _problems:
+    for _p in _problems:
+        print(f"     ! {_p}")
+# 靶场脚本取的清单必须与登记簿一致（防止又出现本地字典各说各话）
+check("Hello-Java-Sec 清单来自登记簿",
+      set(for_target("Hello-Java-Sec")) >= {"XMLDecoderVul.safe", "Traversal.safe2"}, True)
+check("JavaSecLab 清单来自登记簿",
+      set(for_target("JavaSecLab")) >= {"ReflectController.safe2"}, True)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

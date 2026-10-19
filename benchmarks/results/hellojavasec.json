@@ -16,7 +16,7 @@
       "category": "deserial",
       "labeled": false,
       "rule": true,
-      "why": "同一 API（ObjectInputStream.readUnshared）在 Deserialization.readUnshared 中标为 vul、此处标为 safe，两处矛盾，真值不可采信"
+      "why": "`XMLDecoderVul.safe` 用 `new ObjectInputStream(bis).readUnshared()`；同靶场的 `Deserialization.readUnshared` 用同一个 API，却被标为 vul。readUnshared 只影响对象引用共享（读到重复引用抛异常），**不做任何类型过滤**，安全性质与 readObject 完全相同，CWE-502 同样适用。两处标注不可能同时成立，至少有一处错。本项目与「标 vul 的那一处」一致，故判 True。"
     }
   ],
   "per_category": {

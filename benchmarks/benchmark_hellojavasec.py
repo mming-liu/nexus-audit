@@ -95,16 +95,12 @@ NAME_SAFE = re.compile(r"(?:safe|sec)(?:\d|$)", re.I)
 # 同一个 API，一处标 vul、一处标 safe。readUnshared 只影响对象引用共享，
 # 不做任何类型过滤，安全性质与 readObject 完全相同（CWE-502 同样适用），
 # 两个标注不可能同时成立。规则判 True 与"vul"那一处一致，故视为真值存疑。
-DISPUTED_TRUTH = {
-    "XMLDecoderVul.safe":
-        "同一 API（ObjectInputStream.readUnshared）在 Deserialization.readUnshared "
-        "中标为 vul、此处标为 safe，两处矛盾，真值不可采信",
-    "Traversal.safe2":
-        "唯一防护是 Paths.get(filePath).normalize()，只做词法规范化、无基目录"
-        "包含校验（无 startsWith/toRealPath 对照），logs/../../etc/passwd 照样"
-        "逃出基目录。语义上是漏洞，靶场标 safe 属作者口径问题（把缓解当修复），"
-        "与本类目口径（是否限制在基目录内）不一致",
-}
+# 清单已集中到 `benchmarks/disputed_truth.py`（结构化：含行号级源码证据、
+# 分歧类型、给外部的说明），这里只取 {unit: 理由} 兼容旧调用点。
+# 想增删争议样本请改登记簿，不要在靶场脚本里加本地字典 —— 那样三份脚本
+# 会各说各话，也没法导出成给维护者看的报告。
+from benchmarks.disputed_truth import for_target as _for_target   # noqa: E402
+DISPUTED_TRUTH = _for_target("Hello-Java-Sec")
 
 
 def route_of(unit) -> str:

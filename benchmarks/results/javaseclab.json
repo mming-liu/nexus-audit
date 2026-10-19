@@ -228,7 +228,7 @@
       "flagged": false,
       "stage": "protected",
       "detail": "Scenario=xxe=HIT, PropertyCheck=PRESENT（采样不一致）",
-      "elapsed_s": 68.5
+      "elapsed_s": 53.4
     },
     {
       "unit": "XXEController.xxeVul",
@@ -237,7 +237,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 35.8
+      "elapsed_s": 13.6
     },
     {
       "unit": "OtherController.vul1Upload",
@@ -246,7 +246,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 9.8
+      "elapsed_s": 65.3
     },
     {
       "unit": "ReflectController.vul1",
@@ -255,7 +255,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=xss=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 113.5
+      "elapsed_s": 33.6
     },
     {
       "unit": "StoreController.vul",
@@ -264,7 +264,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=xss=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 76.8
+      "elapsed_s": 65.6
     },
     {
       "unit": "SSTIController.safe1",
@@ -273,16 +273,16 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 29.6
+      "elapsed_s": 14.3
     },
     {
       "unit": "SSTIController.vul1",
       "category": "spel",
       "real_vuln": true,
-      "flagged": true,
-      "stage": "missing_property",
-      "detail": "Scenario=spel=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 116.6
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 13.4
     },
     {
       "unit": "SSTIController.vul3",
@@ -291,7 +291,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 161.9
+      "elapsed_s": 16.3
     },
     {
       "unit": "SsrfController.safe",
@@ -300,7 +300,7 @@
       "flagged": false,
       "stage": "protected",
       "detail": "Scenario=ssrf=HIT, PropertyCheck=PRESENT（采样不一致）",
-      "elapsed_s": 40.9
+      "elapsed_s": 56.7
     },
     {
       "unit": "HibernateController.vul1",
@@ -309,7 +309,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=sqli=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 19.1
+      "elapsed_s": 32.9
     },
     {
       "unit": "HibernateController.safe",
@@ -318,7 +318,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 13.6
+      "elapsed_s": 15.5
     },
     {
       "unit": "HibernateController.vul2",
@@ -327,7 +327,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=sqli=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 18.7
+      "elapsed_s": 22.0
     },
     {
       "unit": "JPAController.safe",
@@ -336,7 +336,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 6.8
+      "elapsed_s": 9.7
     },
     {
       "unit": "JPAController.vul1",
@@ -345,7 +345,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=sqli=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 20.0
+      "elapsed_s": 42.7
     },
     {
       "unit": "JPAController.vul2",
@@ -354,7 +354,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=sqli=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 23.5
+      "elapsed_s": 28.8
     },
     {
       "unit": "CodeController.safeGroovy",
@@ -363,7 +363,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 10.2
+      "elapsed_s": 15.1
     },
     {
       "unit": "CommandController.safe",
@@ -372,7 +372,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 36.7
+      "elapsed_s": 10.7
     },
     {
       "unit": "UrlRedirectController.vul5",
@@ -381,7 +381,7 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=redir=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 37.5
+      "elapsed_s": 27.6
     },
     {
       "unit": "UrlRedirectController.UrlRedirectSafe",
@@ -390,7 +390,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 11.1
+      "elapsed_s": 11.4
     },
     {
       "unit": "UrlRedirectController.UrlRedirectVul",
@@ -399,7 +399,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 45.1
+      "elapsed_s": 12.0
     },
     {
       "unit": "DirTraversalController.safe2",
@@ -408,25 +408,25 @@
       "flagged": true,
       "stage": "missing_property",
       "detail": "Scenario=pathtraver=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 50.7
+      "elapsed_s": 80.4
     },
     {
       "unit": "DirTraversalController.safe1",
       "category": "pathtraver",
       "real_vuln": false,
-      "flagged": true,
-      "stage": "missing_property",
-      "detail": "Scenario=pathtraver=HIT, PropertyCheck=MISSING（采样不一致）",
-      "elapsed_s": 156.9
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 41.9
     },
     {
       "unit": "DeleteController.safe",
       "category": "pathtraver",
       "real_vuln": false,
-      "flagged": false,
-      "stage": "protected",
-      "detail": "Scenario=pathtraver=HIT, PropertyCheck=PRESENT（采样不一致）",
-      "elapsed_s": 70.3
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 13.2
     },
     {
       "unit": "ReadController.safe",
@@ -435,7 +435,7 @@
       "flagged": false,
       "stage": "protected",
       "detail": "Scenario=pathtraver=HIT, PropertyCheck=PRESENT（采样不一致）",
-      "elapsed_s": 27.6
+      "elapsed_s": 25.1
     },
     {
       "unit": "UploadController.safe",
@@ -444,7 +444,7 @@
       "flagged": false,
       "stage": "protected",
       "detail": "Scenario=pathtraver=HIT, PropertyCheck=PRESENT（采样不一致）",
-      "elapsed_s": 139.0
+      "elapsed_s": 55.9
     },
     {
       "unit": "XMLDecoderController.safe",
@@ -453,7 +453,7 @@
       "flagged": null,
       "stage": "error",
       "detail": "调用失败",
-      "elapsed_s": 15.5
+      "elapsed_s": 22.9
     }
   ]
 }
