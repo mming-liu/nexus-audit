@@ -1,0 +1,33 @@
+#!/bin/sh
+# commit-msg：强制提交信息带回归段。
+#
+# 为什么：本项目的改动几乎都在碰"把 True 改成 False"的判据，一次改动
+# 能不能合入，取决于"怎么证明没把真漏洞判 safe"。没有回归段的提交等于
+# 宣称"我改的东西不用验证"—— 这正是要拦住的事。
+#
+# 豁免：merge / revert 提交。
+
+msgfile="$1"
+first=$(head -1 "$msgfile")
+
+case "$first" in
+  Merge\ *|Revert\ *) exit 0 ;;
+esac
+
+if ! grep -qi "回归" "$msgfile"; then
+  cat >&2 <<'EOF'
+
+✘ 提交信息缺少回归段。
+
+  请在正文写明本次改动如何验证未打回归，例如：
+
+      feat(rules): xxx
+
+      - 回归段: 三套冒烟全过；HJS 58/59（+1 争议单列）；
+        OWASP 规则层扫描 A/B 方向均无新增
+
+  规则层改动另须跑 benchmarks/regress_owasp_rules.py（不调模型，离线）。
+
+EOF
+  exit 1
+fi

@@ -1598,6 +1598,43 @@ def _last_assignment_untainted(body: str, var: str) -> bool:
     return False
 
 
+def _container_proven_lit(body: str, var: str) -> bool:
+    """互斥控制流下的唯一例外：**所有路径都汇到常量**。
+
+    形态（OWASP 02370/02457 的 helper，xpathi 类目 4 条 FP 里的两条）：
+
+        String bar = "alsosafe";
+        if (param != null) {
+            valuesList.add("safe"); valuesList.add(param); valuesList.add("moresafe");
+            valuesList.remove(0);
+            bar = valuesList.get(1);        // [param, "moresafe"][1] = 常量
+        }
+        return bar;
+
+    `if (param != null)` 不是常量条件，`_ambiguous_control_flow` 会按
+    "取哪个都不对"拦下。这个模板里两条路径确实都汇到常量，但**必须同时**
+    满足①②才敢判 lit：
+
+      ① 最后一次赋值是 `cont.get(...)` 且 `_last_assignment_untainted`
+         推演为真（容器 add/remove 序列回溯出字面量）；
+      ② 进入该 if 之前的旧值（倒数第二次赋值）是字面量 ——
+         guard 为假时 var 保持旧值。缺②的话 `String bar = param;` +
+         容器覆盖会在 guard 为假时泄漏脏值，这条必须有，否则就是
+         记忆第 5 条"兜底分支 return True"的变体。
+    """
+    spans = _assign_spans(body, var)
+    if len(spans) < 2:
+        return False
+    rhs = _last_assign_rhs(body, var)
+    if rhs is None or not re.search(r"\b[A-Za-z_]\w*\s*\.\s*get\s*\(",
+                                    _strip_cast(rhs)):
+        return False
+    if not _last_assignment_untainted(body, var):
+        return False
+    prev_rhs = _strip_line_comment(spans[-2].group(1)).strip().rstrip(";").strip()
+    return _literal_or_none(_strip_cast(prev_rhs)) is not None
+
+
 # ---------------- 值来源解析：sqli / pathtraver 共用的「常量顶掉脏值」闸门 ----------------
 #
 # 为什么要有这一层：容器覆盖、恒真分支、helper 返回常量这三种机制，此前只写在
@@ -1934,6 +1971,11 @@ def _resolve_rhs_origin(rhs: str, body: str, helpers: str, depth: int,
         if expr in params:
             return "tainted"           # helper/入口的形参 = 外部输入
         if _ambiguous_control_flow(body, expr):
+            # 互斥路径一般"取哪个都不对"。唯一可逐行核对的例外：最后一次
+            # 赋值是容器 get 且容器推演为常量、guard 前旧值也是字面量 ——
+            # 两条路径都汇到常量才放行（见 _container_proven_lit）。
+            if _container_proven_lit(body, expr):
+                return "lit"
             return "unknown"
         sub = _const_branch_rhs(body, expr) or _last_assign_rhs(body, expr)
         if sub is None:
@@ -3334,6 +3376,74 @@ def pathtraver_verdict(source: str) -> bool | None:
     return True
 
 
+# ---------------- xpathi ----------------
+#
+# 为什么这个类目到今天才有 verdict：此前 4 条 OWASP FP 全是
+# `missing_property`（模型投票抖动），"规则层一条没错"只是没判错——
+# 没有 verdict 入口时规则只能返回 None，**可证为常量的 safe 样本照样被
+# 送进模型抽签**。2026-10-20 核对了全部 4 条 FP 源码：
+# 00117/01893 是恒真分支赋字面量、02370/02457 是容器顶掉脏值，
+# 全部落在 `_value_origin` 已实现的机制上。
+# 方向照旧写死：只做**否定证据**短路（True→False），判不了的一律 None。
+
+_XPATH_SINK_RE = re.compile(
+    r"\b(?:XPathFactory|XPathExpression|newXPath)\b|\.compile\s*\(|\.evaluate\s*\(")
+
+
+def _xpath_concat_all_constant(body: str, helpers: str) -> bool:
+    """拼进 XPath 表达式的操作数是否**每一个**都能上溯到常量。
+
+    形态：`String expression = "...'" + bar + "']";` → `xp.evaluate(expression, doc)`。
+    只处理纯局部变量拼接（出现函数调用/字段访问就退出，交给别的判据，
+    与 `_sql_concat_all_constant` 同一边界）。
+    """
+    sink_vars = set(re.findall(r"\.(?:compile|evaluate)\s*\(\s*([A-Za-z_]\w*)", body))
+    if not sink_vars:
+        return False
+    seen = False
+    for m in re.finditer(r"\b([A-Za-z_]\w*)\s*=(?!=)\s*([^;]+);", body):
+        var, rhs = m.group(1), m.group(2)
+        if var not in sink_vars or "+" not in rhs:
+            continue
+        vars_ = _operand_vars(rhs)
+        if vars_ is None:
+            return False
+        for v in vars_:
+            seen = True
+            if _value_origin(body, v, helpers) != "lit":
+                return False
+    return seen
+
+
+def xpathi_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    if not body:
+        return None
+    sink_in = body
+    if not _XPATH_SINK_RE.search(body):
+        # 入口体没命中 sink 不直接判安全 —— sink 可能在同文件私有方法里
+        # （与 pathtraver 的 `getImgBase64` 同理），退到全量证据段再看。
+        sink_in = _all_evidence(source)
+        if not _XPATH_SINK_RE.search(sink_in):
+            # 有 XPath 相关名字但没命中 sink 形态 → 交给模型；
+            # 连名字都没有才敢说"这个入口根本不做 XPath"。
+            if re.search(r"\bXPath\b|\bevaluate\s*\(", sink_in):
+                return None
+            return False
+
+    # ① 变量绑定是 XPath 注入的标准修复：$var 由 resolver 绑值，不进表达式串
+    if re.search(r"XPathVariableResolver", sink_in):
+        return False
+    # ② ESAPI 转义后拼进表达式
+    if re.search(r"encodeForXPath\s*\(", sink_in):
+        return False
+    # ③ 拼进表达式的操作数全部上溯到常量
+    #   （恒真分支 / 容器顶掉 / helper 返回字面量 —— 4 条 FP 的全部机制）
+    if _xpath_concat_all_constant(body, _sibling_methods(source)):
+        return False
+    return None
+
+
 # "看起来像在做文件操作"的名字（含变量名、方法名），只用来把"完全没有文件面"
 # 与"有文件面但没命中 sink 形态"分开。前者可确定性判安全，后者必须交模型。
 _FILE_API_NAME_RE = re.compile(
@@ -3452,5 +3562,8 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category == "pathtraver":
         return pathtraver_verdict(source)
+
+    if category == "xpathi":
+        return xpathi_verdict(source)
 
     return None

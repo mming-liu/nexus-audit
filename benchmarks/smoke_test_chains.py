@@ -1377,6 +1377,78 @@ _PATH_FIELD_WRITTEN = _SQL_HEAD + '''    this.TESTFILES_DIR = param;
 check("字段前缀被本方法写过 → 不放行", _verdict("pathtraver", _PATH_FIELD_WRITTEN), True)
 
 
+# ---------------- [37] xpathi：4 条模型侧 FP 的机制锁 ----------------
+#
+# OWASP xpathi 曾有 4 条 FP 全是模型投票抖动（missing_property），根因是
+# 没有 verdict 入口、可证为常量的样本照样送模型抽签。00117/01893 是恒真
+# 分支、02370/02457 是容器顶掉脏值 —— 与 sqli/pathtraver 同机制。
+# 第 4 条断言是方向性护栏：`get(0)` 取的恰是 add 进去的脏值，容器推演
+# 必须判不出 lit，否则就是把真漏洞判 safe（记忆第 5 条的容器变体）。
+
+_XP_SINK = '''    javax.xml.xpath.XPathFactory xpf = javax.xml.xpath.XPathFactory.newInstance();
+    javax.xml.xpath.XPath xp = xpf.newXPath();
+    String expression = "/Employees/Employee[@emplid='" + bar + "']";
+    org.w3c.dom.NodeList nodeList =
+            (org.w3c.dom.NodeList) xp.compile(expression).evaluate(xmlDocument,
+                    javax.xml.xpath.XPathConstants.NODESET);
+'''
+_XP_VUL = _SQL_HEAD + '''    String bar = param;
+''' + _XP_SINK + _SQL_TAIL
+check("xpathi 裸形参拼进表达式 → 真漏洞(交模型)", _verdict("xpathi", _XP_VUL), None)
+
+_XP_CONST_IF = _SQL_HEAD + '''    String bar;
+    int num = 86;
+    if ((7 * 42) - num > 200) bar = "This_should_always_happen";
+    else bar = param;
+''' + _XP_SINK + _SQL_TAIL
+check("xpathi 恒真分支赋字面量 → 安全(00117)", _verdict("xpathi", _XP_CONST_IF), False)
+
+_XP_CONST_HELPER = _SQL_HEAD + '''    String bar = doSomething(request, param);
+''' + _XP_SINK + _SQL_TAIL + _SEP + '''
+private static String doSomething(HttpServletRequest request, String param)
+        throws ServletException, IOException {
+    String bar;
+    int num = 86;
+    if ((7 * 42) - num > 200) bar = "This_should_always_happen";
+    else bar = param;
+    return bar;
+}'''
+check("xpathi 恒真分支经 helper → 安全(01893)", _verdict("xpathi", _XP_CONST_HELPER), False)
+
+_XP_CONTAINER = _SQL_HEAD + '''    String bar = doSomething(request, param);
+''' + _XP_SINK + _SQL_TAIL + _SEP + '''
+private static String doSomething(HttpServletRequest request, String param)
+        throws ServletException, IOException {
+    String bar = "alsosafe";
+    if (param != null) {
+        java.util.List<String> valuesList = new java.util.ArrayList<String>();
+        valuesList.add("safe");
+        valuesList.add(param);
+        valuesList.add("moresafe");
+        valuesList.remove(0);
+        bar = valuesList.get(1);
+    }
+    return bar;
+}'''
+check("xpathi 容器顶掉脏值 → 安全(02370/02457)", _verdict("xpathi", _XP_CONTAINER), False)
+
+_XP_CONTAINER_LEAK = _SQL_HEAD + '''    String bar = doSomething(request, param);
+''' + _XP_SINK + _SQL_TAIL + _SEP + '''
+private static String doSomething(HttpServletRequest request, String param)
+        throws ServletException, IOException {
+    String bar = param;
+    if (param != null) {
+        java.util.List<String> valuesList = new java.util.ArrayList<String>();
+        valuesList.add("safe");
+        valuesList.add("moresafe");
+        valuesList.remove(0);
+        bar = valuesList.get(1);
+    }
+    return bar;
+}'''
+check("xpathi guard 前旧值是脏值 → 不许放行(方向护栏)", _verdict("xpathi", _XP_CONTAINER_LEAK), None)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
