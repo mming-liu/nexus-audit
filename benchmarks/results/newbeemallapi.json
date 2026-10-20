@@ -1,0 +1,67 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-api-master",
+  "slice": {
+    "entries": 62,
+    "service_entries": 59,
+    "service_penetrated": 59,
+    "impl_hops": 62,
+    "mapper_xml": 52
+  },
+  "slice_matches_baseline": true,
+  "subject_param_blocks": 56,
+  "subject_cmp_missing": [],
+  "authz": {
+    "truth_n": 28,
+    "decided": 23,
+    "correct": 23,
+    "fp": [],
+    "fn": [],
+    "fallback": [
+      "NewBeeMallGoodsCategoryAPI.getCategories",
+      "NewBeeMallGoodsAPI.goodsDetail",
+      "NewBeeMallIndexAPI.indexInfo",
+      "NewBeeMallGoodsAPI.search",
+      "NewBeeMallPersonalAPI.getUserDetail"
+    ],
+    "orphan": []
+  },
+  "sqli_false_positive": [],
+  "sqli_safe_decided": 15,
+  "distribution": {
+    "authz": {
+      "true": 1,
+      "false": 22,
+      "none": 39
+    },
+    "sqli": {
+      "true": 0,
+      "false": 15,
+      "none": 47
+    },
+    "xss": {
+      "true": 1,
+      "false": 5,
+      "none": 56
+    },
+    "pathtraver": {
+      "true": 0,
+      "false": 62,
+      "none": 0
+    },
+    "cmdi": {
+      "true": 0,
+      "false": 0,
+      "none": 62
+    },
+    "ssrf": {
+      "true": 0,
+      "false": 0,
+      "none": 62
+    },
+    "deserial": {
+      "true": 0,
+      "false": 0,
+      "none": 62
+    }
+  }
+}

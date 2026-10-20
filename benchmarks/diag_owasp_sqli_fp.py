@@ -55,6 +55,9 @@ def _slicer_fingerprint() -> str:
              # 依赖组件版本块也进切片：新增/改动它同样会让旧缓存失效。
              # 漏掉这一行的后果与上次一模一样 —— 回归"通过"用的还是旧切片。
              os.path.join(ROOT, "core", "context", "dependency_versions.py"),
+             # 形参主体注解块也进切片：仓库里有没有 HandlerMethodArgumentResolver
+             # 直接决定切片里多不多那几行注释。
+             os.path.join(ROOT, "core", "context", "argument_resolvers.py"),
              # CodeUnit 的字段变了（route_path），切片文本随之变化
              os.path.join(ROOT, "core", "models.py"),
              os.path.join(ROOT, "core", "text_utils.py"),

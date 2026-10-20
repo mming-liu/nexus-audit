@@ -263,8 +263,44 @@ def parse_config_block(source: str) -> dict[str, str]:
     return out
 
 
-# ---------------- CORS ----------------
+# ---------------- 形参主体注解 ----------------
 #
+# 前后端分离项目里主体在**签名**上，方法体里没有任何 `session.getAttribute`：
+#
+#     public Result orders(@TokenToMallUser MallUser loginMallUser, ...) {
+#         ... orderService.getMyOrders(p, loginMallUser.getUserId()) ...
+#
+# 切片器会把「哪个注解注入主体」写进注释块（来源是仓库里的
+# `implements HandlerMethodArgumentResolver`，见 core/context/argument_resolvers.py）：
+#
+#     // ---- 形参主体注解（判定"当前用户从哪来"以此为准）----
+#     // @TokenToMallUser -> 形参 loginMallUser   由 TokenToMallUserMethodArgumentResolver 注入
+#
+# 规则读回它，只是把 `loginMallUser` 加入"主体变量"集合 —— **不**因此认为
+# 已经做过校验。是否算校验仍由「主体 id 是否作资源键」决定（2b/2b-2/2c）。
+# 这个区分很关键：注解形参只说明"知道当前用户是谁"，不说明"检查了资源归属"。
+_SUBJECT_PARAM_RE = re.compile(r"^//\s*@(\w+)\s*->\s*形参\s+(\w+)")
+
+
+def parse_subject_params(source: str) -> dict[str, str]:
+    """读回切片里的「主体注解 → 形参名」。没有该块时返回空 dict。"""
+    out: dict[str, str] = {}
+    in_block = False
+    for line in source.splitlines():
+        s = line.strip()
+        if "形参主体注解" in s and s.startswith("//"):
+            in_block = True
+            continue
+        if in_block:
+            if not s.startswith("//"):
+                break
+            m = _SUBJECT_PARAM_RE.match(s)
+            if m:
+                out[m.group(1)] = m.group(2)
+    return out
+
+
+# ---------------- CORS ----------------
 # 为什么 CORS 必须用规则而不是问模型：Java 里 CORS 防护的写法极度分散，
 # 同一个仓库里四种写法（@CrossOrigin 注解 / WebMvcConfigurer / Spring Security
 # CorsConfiguration / Filter），模型每次都在"这段代码有没有设置 ACAO"和
@@ -4449,6 +4485,36 @@ _AUTHZ_GLOBAL_GUARD_RE = re.compile(
     r'addPathPatterns\(\s*"\s*/(?!\*\*)[\w-]+/\*\*\s*"\s*\)')
 
 
+# 除 `_AUTHZ_DENY_RE` 之外的终止写法：返回失败结果对象。
+# 只在"已经比对了资源归属"的前提下使用（见 2e），不单独构成校验证据。
+_AUTHZ_ABORT_EXTRA_RE = re.compile(
+    r"\w*Result\w*\s*\.\s*gen\w*(?:[Ff]ail|[Ee]rror)\w*\s*\("
+    r"|\breturn\s+\w+\s*\.\s*(?:fail|error)\w*\s*\("
+    r"|\bthrow\s+new\s+\w+", re.I)
+
+
+def _ownership_compared(body: str, subject: str) -> bool:
+    """主体 id 是否在 `if (` 里与**另一个对象**的 id 做过比较。
+
+    三件事实：① 条件里出现 `subject.getXxxId()`；② 条件里还出现**另一个变量**
+    的 id 取值（`user.getUserId().equals(user.getUserId())` 自比不算校验，
+    `!user.getUserId().equals(addr.getUserId())` 才算）；③ 位置在 `if` 条件内。
+
+    用「取 if 条件体再查」而不是一条长正则：长度正则写不对就会漏掉
+    `Objects.equals(a, b)` 这种非 `equals` 调用形态，而漏掉的表现是
+    「规则退回 None」—— 静默、不报错。
+    """
+    k = rf"\b{re.escape(subject)}\s*\.\s*get\w*[Ii]d\s*\(\s*\)"
+    for m in re.finditer(r"\bif\s*\(", body):
+        cond = _balanced_cond(body, m.end())
+        if not cond or not re.search(k, cond):
+            continue
+        others = set(re.findall(r"([A-Za-z_]\w*)\s*\.\s*get\w*[Ii]d\s*\(\s*\)", cond))
+        if others - {subject}:
+            return True
+    return False
+
+
 def _container_flows_to_service(body: str, holder: str) -> bool:
     """容器（或其包装对象）是否**真作为实参**进了 Service/Mapper 调用。
 
@@ -4489,6 +4555,13 @@ def authz_verdict(source: str) -> bool | None:
     if has_subject and _AUTHZ_DENY_RE.search(body):
         return False
 
+    # 形参注入的主体：`@TokenToMallUser MallUser loginMallUser`。
+    # 它只证明"知道当前用户是谁"，**不构成任何校验** —— 所以只并进
+    # "主体变量"集合，供下面三条"主体参与资源选择"的判据使用。
+    ann_params = parse_subject_params(source)
+    subject_vars = set(_AUTHZ_SUBJECT_VAR_RE.findall(body)) | set(ann_params.values())
+    has_any_subject = has_subject or bool(ann_params)
+
     # 2b) 主体标识被当作**资源定位条件** —— 校验下沉到 Service/Mapper 的
     #     `where user_id = ?` 里，控制器侧没有 if/throw：
     #
@@ -4497,8 +4570,8 @@ def authz_verdict(source: str) -> bool | None:
     #
     #     这是可逐行核对的事实（主体值参与了资源选择），比"有没有拒绝分支"
     #     更贴近真实写法。newbee-mall 的订单详情 / 取消 / 购物车增改都是这一形态。
-    if has_subject:
-        for var in set(_AUTHZ_SUBJECT_VAR_RE.findall(body)):
+    if has_any_subject:
+        for var in subject_vars:
             key = rf"\b{var}\s*\.\s*get\w*[Ii]d\s*\(\s*\)"
             if re.search(rf"\b\w*(?:Service|Mapper|Dao|DAO)\s*\.\s*\w+\s*\("
                          rf"[^;]{{0,240}}?{key}", body):
@@ -4514,8 +4587,8 @@ def authz_verdict(source: str) -> bool | None:
     #     主体并没有参与资源选择）。右式必须是**会话/Principal 主体变量**，
     #     严禁认 `@RequestBody Order order` 自带的 `order.getUserId()` ——
     #     那是客户端可控值，把它当主体就是把越权当校验。
-    if has_subject:
-        for var in set(_AUTHZ_SUBJECT_VAR_RE.findall(body)):
+    if has_any_subject:
+        for var in subject_vars:
             key = rf"\b{var}\s*\.\s*get\w*[Ii]d\s*\(\s*\)"
             for sm in re.finditer(rf"\b(?<!this\.)([A-Za-z_]\w*)\s*\.\s*set\w*[Ii]d\s*"
                                   rf"\(\s*{key}\s*\)", body):
@@ -4533,13 +4606,38 @@ def authz_verdict(source: str) -> bool | None:
     #     两个事实缺一不可：① 主体 id 被放进某个容器；② 该容器（或包了它的
     #     那个对象）确实作为实参进了 Service/Mapper 调用 —— 只放不传说明不了
     #     任何查询范围。newbee-mall 的 `/orders` 是标准形态。
-    if has_subject:
-        for var in set(_AUTHZ_SUBJECT_VAR_RE.findall(body)):
+    if has_any_subject:
+        for var in subject_vars:
             key = rf"\b{var}\s*\.\s*get\w*[Ii]d\s*\(\s*\)"
             for pm in re.finditer(
                     rf"\b(\w+)\s*\.\s*(?:put|putAll|add)\s*\("
                     rf"\s*\"[^\"]*\"\s*,\s*{key}\s*\)", body):
                 if _container_flows_to_service(body, pm.group(1)):
+                    return False
+
+    # 2e) 主体 id 与**查回来的资源**的归属字段做相等比较，且比对为真时终止请求：
+    #
+    #         MallUserAddress addr = service.getMallUserAddressById(addressId);
+    #         if (!loginMallUser.getUserId().equals(addr.getUserId())) {
+    #             return ResultGenerator.genFailResult(...);   // 或 throw
+    #         }
+    #
+    #     这是水平越权最标准的防护写法，却正好落在前面几条的缝里：
+    #     资源查询的实参里没有主体 id（2b 落空）、没有 setter（2b-2 落空）、
+    #     没有容器（2c 落空），而拒绝动作常写成 `genFailResult`，
+    #     不在 `_AUTHZ_DENY_RE` 认的那几种里。newbee-mall-api 的
+    #     deleteAddress / getMallUserAddress 两条就这么被判成"证据不足"。
+    #
+    #     三件可核对的事实缺一不可：
+    #       ① 比较的一侧是主体变量的 getXxxId()
+    #       ② 另一侧是**另一个对象**的取值（自己跟自己比不构成任何校验）
+    #       ③ 比较在 `if (` 条件里，且方法内存在终止动作（只比对只打日志不算）
+    if has_any_subject:
+        abort = (_AUTHZ_DENY_RE.search(body) is not None
+                 or _AUTHZ_ABORT_EXTRA_RE.search(body) is not None)
+        if abort:
+            for var in subject_vars:
+                if _ownership_compared(body, var):
                     return False
 
     # 2d) 主体由**被调方**获取：控制器把 `HttpSession` / `HttpServletRequest`
@@ -4548,14 +4646,14 @@ def authz_verdict(source: str) -> bool | None:
     #     方法体内没有主体变量可查，但**也没有把入参当资源键**——证据不足，退回 None。
     #     注意不能据此判 False：`paySuccess(orderNo, payType)` 这种既不取主体、
     #     也不传会话的才是真越权，它不会命中这一条。
-    if not has_subject and re.search(
+    if not has_any_subject and re.search(
             r"\b\w*(?:Service|Mapper|Dao|DAO)\s*\.\s*\w+\s*\([^;]{0,160}?"
             r"\b\w*[Ss]ession\b", body):
         return None
 
     # 3) 角色常量比对：`if ("admin".equals(currentUsername))`
     #    这是垂直越权安全样本的写法（JavaSecLab VerticalController.safe）。
-    if has_subject and re.search(
+    if has_any_subject and re.search(
             r"\"(?:admin|ADMIN|ROLE_\w+)\"\s*\.\s*equals\s*\(", body):
         return False
 
@@ -4565,7 +4663,7 @@ def authz_verdict(source: str) -> bool | None:
     #      b) 方法内没有从可信上下文取主体的语句
     #      c) 该路由没有被前缀级鉴权拦截器整体覆盖（后台 `/admin/**`）
     params = _bare_params(_entry_signature(source))
-    if params and not has_subject and _AUTHZ_RESOURCE_RE.search(body) \
+    if params and not has_any_subject and _AUTHZ_RESOURCE_RE.search(body) \
             and not _AUTHZ_GLOBAL_GUARD_RE.search(source):
         for m in _AUTHZ_RESOURCE_RE.finditer(body):
             args = _balanced_cond(body, m.end())

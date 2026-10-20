@@ -2234,6 +2234,76 @@ check("显式 setSafeMode(true) → 版本再低也判安全",
       verdict("deserial", _FJ_SAFEMODE), False)
 
 
+# ---------------- [52] 形参主体注解：只在"真被 resolver 注入"时才算主体 ----------------
+#
+# 前后端分离项目的主体在签名上：`@TokenToMallUser MallUser loginMallUser`。
+# 判定层读切片里的注释块（来源是 implements HandlerMethodArgumentResolver 的
+# supportsParameter）。三条断言分别锁：认了要能用、认了不等于校验过、
+# **没被 resolver 证实时不许按注解名猜**。
+print("\n[52] authz：形参主体注解")
+
+_SUBJ_MARK = ("\n// ---- 形参主体注解（测试夹具）----\n"
+              "// @TokenToMallUser -> 形参 loginMallUser   由 XxxResolver 注入\n")
+
+_SUBJ_KEY = '''@PostMapping("/order")
+public Result list(@TokenToMallUser MallUser loginMallUser) {
+    return Result.ok(orderService.getMyOrders(loginMallUser.getUserId()));
+}''' + _SUBJ_MARK
+check("注解形参的主体 id 作资源键 → 判安全",
+      verdict("authz", _SUBJ_KEY), False)
+
+_SUBJ_NOUSE = '''@PostMapping("/order")
+public Result list(@TokenToMallUser MallUser loginMallUser) {
+    log.info("who = {}", loginMallUser.getUserId());
+    return Result.ok(orderService.listAll());
+}''' + _SUBJ_MARK
+check("注解形参只是打日志、没参与资源选择 → 不许判安全",
+      verdict("authz", _SUBJ_NOUSE), None)
+
+# 同一个方法，去掉证据块 = 仓库里没有任何 resolver 声明支持该注解。
+# 此时注解名再像主体也不认：名字启发式会把 `@CurrentTenant` / `@UserAgent`
+# 一起认成主体，而这里更危险 —— 认错了就会把"入参直查资源"判成安全。
+_SUBJ_BARE = '''@PostMapping("/item")
+public Result detail(@TokenToMallUser MallUser loginMallUser) {
+    return Result.ok(itemService.getById(loginMallUser));
+}'''
+check("没有 resolver 证据 → 注解名再像主体也不认，裸形参直查仍判漏洞",
+      verdict("authz", _SUBJ_BARE), True)
+check("有了 resolver 证据 → 视为已知主体，但只凭主体存在仍不判安全",
+      verdict("authz", _SUBJ_BARE + _SUBJ_MARK), None)
+
+
+# ---------------- [53] authz：显式归属比对（先查资源、再比 userId） ----------------
+#
+# 这是水平越权最标准的写法，却正好落在 2b/2b-2/2c 的缝里：资源查询的实参里
+# 没有主体 id、没有 setter、没有容器。判据要求"比对了**另一个对象**的 id"
+# 且"方法内存在终止动作"。
+print("\n[53] authz：显式归属比对")
+
+_OWN_OK = '''@DeleteMapping("/addr/{id}")
+public Result delete(@PathVariable Long id, @TokenToMallUser MallUser loginMallUser) {
+    Address addr = addressService.getById(id);
+    if (!loginMallUser.getUserId().equals(addr.getUserId())) {
+        return ResultGenerator.genFailResult("forbidden");
+    }
+    return Result.ok(addressService.deleteById(id));
+}''' + _SUBJ_MARK
+check("主体 id 与查回资源的 userId 比对 + 拒绝 → 判安全",
+      verdict("authz", _OWN_OK), False)
+
+_OWN_LOGONLY = _OWN_OK.replace(
+    'return ResultGenerator.genFailResult("forbidden");',
+    'log.warn("owner mismatch: {}", addr.getUserId());')
+check("只比对、没有终止动作 → 不许判安全",
+      verdict("authz", _OWN_LOGONLY), None)
+
+_OWN_SELF = _OWN_OK.replace(
+    "!loginMallUser.getUserId().equals(addr.getUserId())",
+    "!loginMallUser.getUserId().equals(loginMallUser.getUserId())")
+check("拿主体跟自己比 → 不构成任何归属校验",
+      verdict("authz", _OWN_SELF), None)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

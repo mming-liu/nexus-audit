@@ -33,3 +33,12 @@ if [ -d reference_repos/newbee-mall-master ]; then
   "$PY" benchmarks/benchmark_newbeemall.py --strict > /dev/null
   echo "pre-push: newbee-mall 基线通过 ✔"
 fi
+
+# 第 6 靶场：同一套业务的前后端分离 API 版。主体在**签名**上
+# （`@TokenToMallUser MallUser user`），方法体里没有任何 session 取值，
+# 是唯一能验证"主体识别不靠方法体"的样本。
+if [ -d reference_repos/newbee-mall-api-master ]; then
+  echo "pre-push: newbee-mall-api 基线 ..."
+  "$PY" benchmarks/benchmark_newbeemallapi.py --strict > /dev/null
+  echo "pre-push: newbee-mall-api 基线通过 ✔"
+fi

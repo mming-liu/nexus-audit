@@ -165,6 +165,7 @@ class JavaSlicer:
         self._impls = None
         self._wiring = None
         self._deps = None
+        self._subjects = None
 
     @staticmethod
     def _guess_project_root(p: Path) -> Path:
@@ -217,6 +218,20 @@ class JavaSlicer:
             from core.context.dependency_versions import DependencyVersionResolver
             self._deps = DependencyVersionResolver(self.config_root)
         return self._deps
+
+    def _subject_resolver(self):
+        """懒加载「哪个形参注解注入的是当前用户」。
+
+        前后端分离项目的主体在**签名**上（`@TokenToMallUser MallUser user`），
+        方法体里一行 `session.getAttribute` 都没有，判定层便把它当成"不取主体
+        → 入参直查资源"，newbee-mall-api 实测 17 条如此误报。
+        索引来自 `implements HandlerMethodArgumentResolver` 的 `supportsParameter`，
+        不按注解名猜。
+        """
+        if self._subjects is None:
+            from core.context.argument_resolvers import SubjectParamResolver
+            self._subjects = SubjectParamResolver(self.repo_path)
+        return self._subjects
 
     def _impl_block(self, source: str) -> str:
         """为「真正传了外部入参的调用」补实现体，再为「防护类静态调用」补工具类实现。
@@ -1051,6 +1066,12 @@ class JavaSlicer:
 
             # 入口方法 + 同文件私有辅助方法（污点清洗常发生在辅助方法里）
             source += src if not helper_src else f"{src}\n\n// ---- 同文件辅助方法 ----\n{helper_src}"
+            # 形参主体注解：主体在签名上而不在方法体里时，判定层唯一的线索。
+            # 放在辅助方法段之后、配置块之前，`entry_body()` 到第一个 `// ----`
+            # 就截断，方法体不受影响。
+            _subj = self._subject_resolver().describe(src)
+            if _subj:
+                source += "\n" + _subj
             # 回填配置实际取值：算法名/参数常来自配置文件，缺了它模型只能猜
             source += self._config_block(source)
             # 视图模板：`model.addAttribute("k", v)` + `return "view"` 的渲染点
