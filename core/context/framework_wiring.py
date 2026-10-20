@@ -51,6 +51,13 @@ class Wiring:
     body: str = ""               # 方法体或配置片段（作为证据注入切片）
     source: str = ""             # 文件相对路径，便于人工核对
     note: str = ""
+    # 前缀级排除路径：`addPathPatterns("/admin/**").excludePathPatterns("/admin/login")`。
+    #
+    # 不记这一项会把"被排除的路由"也算成受保护 —— newbee-mall 的
+    # `/admin/login`、`/admin/dist/**`、`/admin/plugins/**` 全在 exclude 里，
+    # 报告却写着"该路由受 /admin/** 拦截器保护"，方向正好相反。
+    # 对 authz 是致命错误：一条**不受鉴权保护**的后台路由会被当成受保护而退回。
+    exclude_patterns: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -74,6 +81,8 @@ ADD_PATTERNS_RE = re.compile(r"addUrlPatterns|setUrlPatterns")
 # Interceptor 注册
 INTERCEPTOR_RE = re.compile(r"registry\s*\.\s*addInterceptor\s*\(([^)]*)\)(.*?);", re.S)
 PATH_PATTERNS_RE = re.compile(r"addPathPatterns\s*\(([^)]*)\)", re.S)
+# 前缀级排除：`addPathPatterns("/admin/**").excludePathPatterns("/admin/login", ...)`
+EXCLUDE_PATTERNS_RE = re.compile(r"excludePathPatterns\s*\(([^)]*)\)", re.S)
 
 
 def _split_patterns(raw: str) -> list[str]:
@@ -328,10 +337,14 @@ class FrameworkWiringResolver:
                 pm = PATH_PATTERNS_RE.search(m.group(2))
                 pats = _split_patterns(pm.group(1)) if pm else []
                 iname = re.search(r"new\s+(\w+)", m.group(1))
+                ex_pats: list[str] = []
+                for em in EXCLUDE_PATTERNS_RE.finditer(m.group(2)):
+                    ex_pats += _split_patterns(em.group(1))
                 wirings.append(Wiring(kind="interceptor",
                                       name=iname.group(1) if iname else "interceptor",
                                       url_patterns=pats or ["/**"],
-                                      body=m.group(0).strip(), source=rel))
+                                      body=m.group(0).strip(), source=rel,
+                                      exclude_patterns=ex_pats))
 
             # --- CorsConfigurationSource：registerCorsConfiguration 带的是
             #     明确的 ant 路径，可以精确映射到 URL，不该丢进 unparsed。
@@ -406,11 +419,21 @@ class FrameworkWiringResolver:
     # ---------- 查询 ----------
 
     def for_url(self, url: str) -> WiringReport:
-        """返回作用于该 URL 的全部全局组件。"""
+        """返回作用于该 URL 的全部全局组件。
+
+        `excludePathPatterns` 必须参与判断：Spring 的拦截器语义是
+        "先匹配 addPathPatterns，再被 excludePathPatterns 减掉"。
+        少了减法，`/admin/login` 会被报告成"受 /admin/** 拦截器保护" ——
+        而它恰恰是登录入口，本来就不该被拦。这条错法会让鉴权判定把
+        **无保护的路由当成受保护**，方向性错误。
+        """
         rep = WiringReport()
         for w in self.wiring:
-            if any(_ant_match(p, url) for p in w.url_patterns):
-                rep.applied.append(w)
+            if not any(_ant_match(p, url) for p in w.url_patterns):
+                continue
+            if any(_ant_match(p, url) for p in w.exclude_patterns):
+                continue
+            rep.applied.append(w)
         rep.unparsed = list(self.unparsed)
         return rep
 
@@ -421,7 +444,8 @@ class FrameworkWiringResolver:
             return ""
         lines = ["", "// ---- 框架装配证据：以下全局组件会作用于本路由 ----"]
         for w in rep.applied:
-            lines.append(f"// [{w.kind}] {w.name}  urlPatterns={w.url_patterns}"
+            ex = f"  exclude={w.exclude_patterns}" if w.exclude_patterns else ""
+            lines.append(f"// [{w.kind}] {w.name}  urlPatterns={w.url_patterns}{ex}"
                          f"  来源 {w.source}{('  ' + w.note) if w.note else ''}")
             for ln in w.body.strip().splitlines()[:40]:
                 lines.append(f"//   {ln.strip()}")

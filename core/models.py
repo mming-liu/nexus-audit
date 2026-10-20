@@ -22,6 +22,16 @@ class CodeUnit:
     called_symbols: list[str] = field(default_factory=list)  # 供第2层按需展开
     source_code: str = ""                # 带行号的源码切片
     own_body: str = ""                   # 仅本方法体（不含同文件辅助方法与各类证据）
+    # 完整路由路径，已拼上类级前缀：`@RequestMapping("/admin")` + `@GetMapping("/list")`
+    # → `/admin/goods/list`。
+    #
+    # 为什么必须**记在单元里**而不是只用来查装配索引：真实项目的鉴权几乎全挂在
+    # 前缀拦截器上（`addPathPatterns("/admin/**")` + `excludePathPatterns("/admin/login")`），
+    # 判定"这条路由归不归拦截器管"只能拿完整 URL 去比，拿方法级的 "/list" 必错。
+    # newbee-mall 实测：没有类级前缀时后台 20 余条路由只能靠"切片里出现了
+    # /admin/** 这个字符串"间接退回 None，而 /admin/login（被 exclude 掉）也被
+    # 一起当成"受保护" —— 方向错了。
+    route_path: str = ""
     # own_body 存在的原因：source_code 为便于模型推理，拼进了同文件辅助方法，
     # 而"辅助方法"里会混入同类的其它路由方法。跨路由串接需要判断"当前方法
     # 自己写了什么"，用 source_code 会把它类方法的写入也算进来。

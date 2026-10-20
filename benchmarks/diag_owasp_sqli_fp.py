@@ -48,6 +48,12 @@ def _slicer_fingerprint() -> str:
     files = [os.path.join(ROOT, "core", "slicer", "java_servlet.py"),
              os.path.join(ROOT, "core", "context", "java_impl_resolver.py"),
              os.path.join(ROOT, "core", "context", "taint_chain.py"),
+             # 装配证据也进切片：改 excludePathPatterns 的解析同样会让
+             # 旧缓存失效。指纹漏一个"影响切片内容"的文件，就等于留一条
+             # "改了但回归说你没改"的后门 —— 这次差点又漏掉它。
+             os.path.join(ROOT, "core", "context", "framework_wiring.py"),
+             # CodeUnit 的字段变了（route_path），切片文本随之变化
+             os.path.join(ROOT, "core", "models.py"),
              os.path.join(ROOT, "core", "text_utils.py"),
              os.path.abspath(__file__)]
     for p in files:

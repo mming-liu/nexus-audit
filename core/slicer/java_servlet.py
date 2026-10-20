@@ -782,8 +782,10 @@ class JavaSlicer:
         读取方本身没有外部参数，单看它无从谈起污点；而写入方缺的恰恰是
         "我写出去的值最终会原样出现在别处的响应里"这个事实。
 
-        例外是 db 介质：同一仓储字段上的"调用"分不出写和读（`xssMapper.add`
-        与 `xssMapper.list()` 形态相同），所以两侧都贴 —— 谁写谁读交给判定层。
+        db 介质以前是例外（写读两侧都贴，方向交给判定层），现在不再是：
+        `build_chains` 按方法名动词锁定了「写内容 → 读内容」这一个方向，
+        所以「写入方」是确定的一侧。只读路由不会再被贴上串接段 ——
+        那是 newbee-mall 切片 26% 噪声的来源。
 
         失败必须静默降级：串接是增强项，索引出错不能拖垮整个切片流程。
         """
@@ -837,9 +839,16 @@ class JavaSlicer:
         cls_name = cls_m.group(1)
 
         # 类级路由前缀：Spring 的 @RequestMapping("/sqli") 加在类上
+        #
+        # 取**紧邻类声明之前的那一个**，不是文件里第一个。一个 .java 里两个类
+        # 的情况真实存在（controller 里塞内部类 / 同文件放个 DTO），取第一个会把
+        # 前一个类的 `@RequestMapping("/admin")` 扣到后一个类头上 —— 于是
+        # 一个前台路由被算成 `/admin/...`，鉴权判定直接翻向 "受全局拦截器保护"。
         class_prefix = ""
         head = text[:cls_m.start()]
-        cp = SPRING_ROUTE_RE.search(head)
+        cp = None
+        for _cand in SPRING_ROUTE_RE.finditer(head):
+            cp = _cand
         if cp:
             class_prefix = self._first_string_literal(cp.group(2))
         elif JAXRS_PATH_RE.search(head):
@@ -957,8 +966,18 @@ class JavaSlicer:
             if not decorators:
                 continue
 
+            # 完整路由写进切片的**第一行**：判定层（authz / 装配）和模型都需要
+            # "这条路由到底叫什么"，而方法级注解只给出后缀 `/list`。
+            # 放在最前面而不是塞进证据段，是因为 `entry_body()` 会剥掉注释、
+            # `_impl_segment()` 从 `// ----` 起截 —— 两个消费方都不受影响，
+            # 但 `_strip_comments` 之后仍留在正文里的**方法签名**不受污染。
+            if route_path:
+                source = f"// Full-Route: {route_path}\n"
+            else:
+                source = ""
+
             # 入口方法 + 同文件私有辅助方法（污点清洗常发生在辅助方法里）
-            source = src if not helper_src else f"{src}\n\n// ---- 同文件辅助方法 ----\n{helper_src}"
+            source += src if not helper_src else f"{src}\n\n// ---- 同文件辅助方法 ----\n{helper_src}"
             # 回填配置实际取值：算法名/参数常来自配置文件，缺了它模型只能猜
             source += self._config_block(source)
             # 视图模板：`model.addAttribute("k", v)` + `return "view"` 的渲染点
@@ -986,6 +1005,7 @@ class JavaSlicer:
                 called_symbols=self._called_symbols(src),
                 source_code=source,
                 own_body=src,
+                route_path=route_path,
             ))
         return units
 

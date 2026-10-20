@@ -69,11 +69,15 @@ XSS 形态（写入路由 `insert`、列表路由 `select` 后回显）。
 方法名语义，`xssService.insertOne(...)` / `xssService.page(...)` /
 `xssService.listByCondition(...)` 各有各的命名习惯，靠词根枚举必然漏；
 而"是不是同一个仓储对象"是**结构事实** —— 两个路由调了同一个字段，
-无论它叫 insertOne 还是 addFeed，写读关系都成立。代价是同一字段上的
-`deleteById` 也会被标成"写"，但那只是多一条证据，判定仍看读取点是否
-把值原样回显（删除不影响这个结论）。
+无论它叫 insertOne 还是 addFeed，写读关系都成立。
 
-真正的边界在**判定层**：字段背后是不是真的落库，要看 Mapper 接口声明
+但**方向**必须单独判，而且只判一件事：这一侧往库里塞内容，还是从库里
+取内容。早期版本对 db 用对称配对（"同一字段被两个路由调用就连一条"），
+理由是"多一条证据不影响结论"——那在 4 个路由的靶场里成立，在 70 个入口的
+真实电商项目里产出 422 条连接、占切片 26% 行数，且把只读路由标成写入方。
+现在按方法名动词锁方向，见 `_db_direction`。
+
+真正的边界仍在**判定层**：字段背后是不是真的落库，要看 Mapper 接口声明
 或 Service 实现体。所以这里只产出证据，是否成立由上层判。
 """
 from __future__ import annotations
@@ -223,6 +227,66 @@ def _repo_handles(source: str) -> set[str]:
     return {m.group(1) for m in _REPO_FIELD_RE.finditer(source)}
 
 
+# ---------------- db 介质：读写方向判定 ----------------
+#
+# 旧实现对 db 是**对称配对**：同一字段被两个不同路由调用，就连一条连接，
+# 谁写谁读交给判定层（下方 docstring 里那句"多一条证据不影响结论"）。
+# 在靶场里成立 —— 一个 Controller 只有 2~4 个路由，人眼能核。
+# 在真实项目里必然爆，实测 newbee-mall 70 个入口产出 **422 条** db 连接：
+#
+#   数据库持久层 "adminUserService"：AdminController.login 写入 → AdminController.profile 读出
+#   数据库持久层 "newBeeMallGoodsService"：GoodsController.searchPage 写入 → NewBeeMallCarouselController.delete 读出
+#
+# `login` 不写任何东西、`searchPage` 只读，`delete` 也不写内容。
+# 串接段占整份切片 26% 的行数（3206/12442），全是无关笛卡尔积 ——
+# 更糟的是它们被**当成"写入方"贴在只读路由上**，而只读路由本来没有外部输入，
+# 于是每一条都长得像"存储型 XSS 候选"，判定层只能靠猜。
+#
+# 方向其实是**可逐行核对的事实**，不需要读懂业务：方法名里的动词决定了它
+# 往库里塞内容还是从库里取内容。
+#
+# 边界必须写清楚：
+#   ① 只认"内容进/出"的动词。`deleteById` / `removeById` / `cancelOrder`
+#      属于状态变更，既不是内容写也不是内容读 → 不表态（返回 None）。
+#      把它们算成"写"正是"删除路由被标成写入方"的来源。
+#   ② 认不出动词的一律 None，**不猜**。少了连接顶多漏一条证据，
+#      猜错方向会把无关路由贴成写入方 —— 比漏更贵。
+_DB_WRITE_PREFIX = ("insert", "save", "add", "create", "update", "modify",
+                    "put", "store", "persist", "batchinsert", "batchsave",
+                    "batchupdate")
+_DB_READ_PREFIX = ("get", "select", "find", "query", "list", "search", "page",
+                   "load", "fetch", "read")
+# camel 段中间的动词：`safeSave` / `batchUpdateSellStatus` / `adminInsertOne`
+_DB_WRITE_SEG_RE = re.compile(
+    r"[a-z0-9](?:Insert|Save|Add|Create|Update|Modify|Persist)")
+
+
+def _db_direction(method: str) -> str | None:
+    """方法名 → 'w'(写内容) / 'r'(读内容) / None(不表态)。
+
+    先判读前缀再判写：`getSavedList` / `getInsertLog` 这类"读一个叫 save 的东西"
+    的命名真实存在，顺序反了会被判成写入方。
+    """
+    low = method.lower()
+    if low.startswith(_DB_READ_PREFIX):
+        return "r"
+    if low.startswith(_DB_WRITE_PREFIX):
+        return "w"
+    if _DB_WRITE_SEG_RE.search(method):
+        return "w"
+    return None
+
+
+def _db_directions(text: str, handle: str) -> set[str]:
+    """这个字段在这段代码里被用来做什么：{'w'} / {'r'} / {'w','r'}。"""
+    out: set[str] = set()
+    for m in re.finditer(rf"\b{re.escape(handle)}\s*\.\s*([A-Za-z_]\w*)\s*\(", text):
+        d = _db_direction(m.group(1))
+        if d:
+            out.add(d)
+    return out
+
+
 def _resolve_repo_traces(body: str, repo_root, depth: int = 1) -> str:
     """把入口调用的方法解析到定义文件，返回这些方法体的拼接（供扫仓储字段）。
 
@@ -365,9 +429,9 @@ def build_chains(units: list[CodeUnit],
     # 先各自建索引，避免 O(n^2) 反复扫源码
     writers: dict[tuple[str, str], list[CodeUnit]] = {}
     readers: dict[tuple[str, str], list[CodeUnit]] = {}
-    # db 介质单独记"经哪条方法链接触到该字段"，用于证据里写清楚
-    via_w: dict[tuple[str, str], tuple[str, ...]] = {}
-    via_r: dict[tuple[str, str], tuple[str, ...]] = {}
+    # db 介质单独记"经哪条方法链接触到该字段"，用于证据里写清楚。
+    # 键是单元名（同一入口可能接触多个字段，但方法链只有一条，无需按字段拆）
+    via_chain: dict[str, tuple[str, ...]] = {}
     # 每个入口实际"接触"到的仓储字段集合。db 配对必须用它，不能靠回查
     # `own_body`：单测里构造的 CodeUnit 往往只填了 source_code。
     handles_of: dict[str, set[str]] = {}
@@ -394,48 +458,61 @@ def build_chains(units: list[CodeUnit],
                     continue          # 同方法内读写，不算跨路由
                 res.links.append(Link(medium=medium, key=key, writer=w, reader=r))
 
-    # ---- db 介质：对称配对 ----
+    # ---- db 介质：方向锁 ----
     #
-    # 同一仓储字段上的"调用"既可能是写也可能是读，单看一侧区分不了
-    # （`xssMapper.add(...)` 与 `xssMapper.list()` 长得一样）。所以这里
-    # 不区分方向：同一字段被两个不同路由调用，就产出一条连接，两侧都贴证据
-    # —— 真正判定"谁是写入方、读取点有没有回显"是上层的事。
+    # 只连 **写内容 → 读内容** 这一个方向。理由见 `_db_direction` 上方：
+    # 对称配对在真实项目里会产出大量反向连接（只读路由被标成写入方），
+    # 而串接证据只贴在写入方上，于是每条反向连接都变成一份"凭空多出来的
+    # 存储型漏洞候选"，同时把切片撑大数倍。
+    #
+    # 方向判定只用方法名动词，是**事实**而不是语义推断；认不出的动词不表态，
+    # 该路由就既不写作也不读，宁可少连。
     db_touch: dict[tuple[str, str], list[CodeUnit]] = {}
+    db_dir: dict[tuple[str, str], set[str]] = {}      # (handle, unit) -> {'w'/'r'}
     for u in units:
         src = body_of.get(u.unit_name) or u.own_body or u.source_code or ""
         if not src:
             continue
         direct = _repo_handles(src)
-        if direct:
-            handles_of[u.unit_name] = set(direct)
-            for h in direct:
-                db_touch.setdefault(("db", h), []).append(u)
-        elif repo_root is not None:
+        trace = ""
+        if not direct and repo_root is not None:
             trace = _resolve_repo_traces(src, repo_root)
-            found = _repo_handles(trace)
-            if found:
-                handles_of[u.unit_name] = set(found)
-                # 记录方法链，便于证据里点明"经 Service 才落库"
-                chain = tuple(sorted({n for n in re.findall(
-                    r"\.\s*([A-Za-z_]\w*)\s*\(", src) if len(n) >= 3}))[:3]
-                for h in found:
-                    db_touch.setdefault(("db", h), []).append(u)
-                    via_w.setdefault(("db", h, u.unit_name), chain)
+        found = direct or _repo_handles(trace)
+        if not found:
+            continue
+        # 动词要从**同一段文本**里取：走 trace 分支时调用写在 Service 实现里，
+        # 只看入口体拿不到任何动词，方向会全部落空。
+        text = src if direct else f"{src}\n{trace}"
+        handles_of[u.unit_name] = set(found)
+        if trace:
+            # 记录方法链，便于证据里点明"经 Service 才落库"
+            via_chain[u.unit_name] = tuple(sorted({n for n in re.findall(
+                r"\.\s*([A-Za-z_]\w*)\s*\(", src) if len(n) >= 3}))[:3]
+        for h in found:
+            dirs = _db_directions(text, h)
+            if dirs:
+                db_dir[(h, u.unit_name)] = dirs
+                db_touch.setdefault(("db", h), []).append(u)
 
     for (_medium, handle), ulist in db_touch.items():
         uniq: list[CodeUnit] = []
         for u in ulist:
             if all(u.unit_name != x.unit_name for x in uniq):
                 uniq.append(u)
-        for i, a in enumerate(uniq):
-            for b in uniq[i + 1:]:
-                # 双向各产一条：a 写 b 读 / b 写 a 读。上层按"写入方文档里
-                # 有没有读写两侧都贴证据"来判，方向不确定时两侧都该看到。
-                for w, r in ((a, b), (b, a)):
-                    res.links.append(Link(
-                        medium="db", key=handle, writer=w, reader=r,
-                        writer_via=via_w.get(("db", handle, w.unit_name), ()),
-                        reader_via=via_w.get(("db", handle, r.unit_name), ())))
+        for w in uniq:
+            dw = db_dir.get((handle, w.unit_name), set())
+            if "w" not in dw:
+                continue                    # 这一侧不写内容，不能当写入方
+            for r in uniq:
+                if w.unit_name == r.unit_name:
+                    continue
+                dr = db_dir.get((handle, r.unit_name), set())
+                if "r" not in dr:
+                    continue                # 这一侧不读内容，不构成"写出去又被读回"
+                res.links.append(Link(
+                    medium="db", key=handle, writer=w, reader=r,
+                    writer_via=via_chain.get(w.unit_name, ()),
+                    reader_via=via_chain.get(r.unit_name, ())))
 
     # 稳定排序，保证切片文本可复现（同输入必须产出同一切片，否则又引入抖动）
     res.links.sort(key=lambda l: (l.writer.unit_name, l.reader.unit_name,

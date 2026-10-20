@@ -3414,11 +3414,39 @@ SSRF_SINK_RE = re.compile(
     r"HttpUtil\s*\.\s*(?:get|post|createGet|createPost)\s*\(|"
     r"Jsoup\s*\.\s*connect\s*\(|"
     r"restTemplate\s*\.\s*(?:getForObject|getForEntity|exchange|postForObject)\s*\(|"
-    r"ImageIO\s*\.\s*read\s*\(|"
     r"IOUtils\s*\.\s*(?:toByteArray|copy)\s*\(\s*(?:new\s+)?URL|"
-    r"\.\s*getInputStream\s*\(\s*\)|"
     # 把 url 变量交给 Http* / *Service / *Utils 方法去发请求
     r"\b\w*(?:Http|http|Service|Utils|Request)\w*\s*\.\s*\w+\s*\(\s*\w*url\w*", re.I)
+
+# ---------------- 弱 sink：同一个方法名在不同上下文里含义相反 ----------------
+#
+#   ImageIO.read(x)   —— x 是 URL 才是 SSRF；x 是 File / InputStream 就是本地读图
+#   .getInputStream() —— 接在 openConnection()/URL 后面才是网络请求；
+#                        接在 MultipartFile 后面是读上传的文件
+#
+# 旧版把这两个直接写进 `SSRF_SINK_RE`（为 java-sec-code 的
+# `URL u = new URL(url); ImageIO.read(u);` 加的），于是**任何文件上传接口**
+# 都会被判成 SSRF。newbee-mall 实测：`/admin/upload/file` 与 `/admin/upload/files`
+# 两条完全本地的图片上传被判 True —— 这是真实项目上才暴露的跨项目误报，
+# 靶场永远测不出来（靶场里没人写上传）。
+#
+# 修法不是删 sink，而是要求"弱 sink 必须带 URL 旁证"：方法体里出现过
+# `new URL(` / `openConnection()` / `URL` 变量声明，才认为这个 read 是网络读取。
+# 这与记忆里"先看接收者，再看实参"是同一条：`ImageIO.read(...)` 离了 URL
+# 什么都不是。
+SSRF_WEAK_SINK_RE = re.compile(
+    r"ImageIO\s*\.\s*read\s*\(|\.\s*getInputStream\s*\(\s*\)")
+SSRF_URL_EVIDENCE_RE = re.compile(
+    r"new\s+URL\s*\(|\.\s*openConnection\s*\(\s*\)|"
+    r"\b(?:Http)?URLConnection\b|\bURL\s+[A-Za-z_]\w*\s*=")
+
+
+def _ssrf_sink_hit(body: str) -> bool:
+    """本方法体里有没有**够格**的 SSRF sink（弱 sink 需带 URL 旁证）。"""
+    if SSRF_SINK_RE.search(body):
+        return True
+    return bool(SSRF_WEAK_SINK_RE.search(body)
+                and SSRF_URL_EVIDENCE_RE.search(body))
 
 
 # Apache HttpClient 4.x 的**变量形态**：`HttpGet req = new HttpGet(url); client.execute(req);`
@@ -3453,7 +3481,7 @@ def ssrf_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not body:
         return None
-    if not SSRF_SINK_RE.search(body) and not _httpclient_sink_hit(body):
+    if not _ssrf_sink_hit(body) and not _httpclient_sink_hit(body):
         return None
 
     if SSRF_HOOK_RE.search(body):

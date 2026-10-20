@@ -25,3 +25,11 @@ echo "pre-push: 冒烟通过 ✔"
 
 echo "pre-push: 争议登记核对 ..."
 "$PY" benchmarks/export_disputes.py --check
+
+# 第 5 靶场基线：只在仓库已克隆时跑。它锁的是"切片穿透 + authz 真值 +
+# sqli 方向护栏"，不调模型、秒级完成；基线漂移说明切片器动了却没同步。
+if [ -d reference_repos/newbee-mall-master ]; then
+  echo "pre-push: newbee-mall 基线 ..."
+  "$PY" benchmarks/benchmark_newbeemall.py --strict > /dev/null
+  echo "pre-push: newbee-mall 基线通过 ✔"
+fi

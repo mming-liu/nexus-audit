@@ -968,7 +968,9 @@ public List getStored() {
 }'''
 ch_db = build_chains([unit("XSS.save", _DB_WRITE), unit("XSS.getStored", _DB_READ)],
                      repo_root=None)
-check("同字段 → 双向各 1 条连接", len(ch_db.links), 2)
+# 方向锁之后只有 "写内容 → 读内容" 一条。
+# 旧断言是「双向各 1 条」（对称配对），那是 newbee-mall 切片 26% 噪声的来源。
+check("同字段 → 只连 写→读 一条（方向锁）", len(ch_db.links), 1)
 check("介质是 db", {l.medium for l in ch_db.links}, {"db"})
 check("键是字段名", {l.key for l in ch_db.links}, {"xssMapper"})
 
@@ -1900,6 +1902,78 @@ public Result update(@RequestBody NewBeeMallOrder order) {
 //   .addPathPatterns("/admin/**");'''
 check("authz：后台前缀有全局鉴权拦截器 → 不硬判 True(方向护栏)",
       _verdict("authz", _AUTHZ_ADMIN), None)
+
+
+# ---------------- [45] 类级路由前缀 + excludePathPatterns ----------------
+#
+# 两件事必须一起成立，否则 authz 会拿到**方向相反**的事实：
+#   ① 完整路由 = 类级 @RequestMapping + 方法级 @GetMapping
+#   ② 被 excludePathPatterns 排除的路由**不算**受该拦截器保护
+print("\n[45] 路由前缀与拦截器排除")
+from core.context.framework_wiring import FrameworkWiringResolver, Wiring  # noqa: E402
+
+_w = FrameworkWiringResolver(repo_root=ROOT)
+_w._wiring = [Wiring(kind="interceptor", name="adminLoginInterceptor",
+                     url_patterns=["/admin/**"],
+                     exclude_patterns=["/admin/login", "/admin/dist/**"],
+                     body='registry.addInterceptor(x).addPathPatterns("/admin/**")'
+                          '.excludePathPatterns("/admin/login", "/admin/dist/**");')]
+_w._unparsed = []
+check("装配：/admin/goods/list 受 /admin/** 拦截 → 有证据",
+      len(_w.for_url("/admin/goods/list").applied), 1)
+check("装配：/admin/login 被 excludePathPatterns 排除 → 无证据(方向护栏)",
+      len(_w.for_url("/admin/login").applied), 0)
+check("装配：/admin/dist/x 命中前缀通配排除 → 无证据",
+      len(_w.for_url("/admin/dist/x").applied), 0)
+check("装配：/goods/list 不在 /admin/** 下 → 无证据",
+      len(_w.for_url("/goods/list").applied), 0)
+
+# 类级前缀拼接：临时仓库里放一个控制器，直接切
+import tempfile                                                      # noqa: E402
+from core.slicer.java_servlet import JavaSlicer as _Slicer           # noqa: E402
+
+_JAVA = '''package x;
+import org.springframework.web.bind.annotation.*;
+@RestController
+@RequestMapping("/admin")
+public class GoodsCtl {
+    @GetMapping("/goods/list")
+    public String list(@RequestParam("q") String q) { return q; }
+}
+'''
+with tempfile.TemporaryDirectory() as _d:
+    _p = Path(_d) / "GoodsCtl.java"
+    _p.write_text(_JAVA, encoding="utf-8")
+    _u = _Slicer(Path(_d)).extract_entry_units()[0]
+check("路由：类级 /admin + 方法级 /goods/list 拼成完整路由",
+      _u.route_path, "/admin/goods/list")
+check("路由：完整路由写进切片首行（判定层与模型都读得到）",
+      _u.source_code.splitlines()[0], "// Full-Route: /admin/goods/list")
+
+
+# ---------------- [46] db 串接的方向锁 ----------------
+#
+# 对称配对在真实项目里产出大量反向连接（只读路由被标成写入方）。
+# 方向由方法名动词决定，是可逐行核对的事实。
+print("\n[46] db 串接方向锁")
+from core.context.taint_chain import _db_direction                   # noqa: E402
+
+for _m, _want in (("saveNewBeeMallGoods", "w"), ("insertOne", "w"),
+                  ("add", "w"), ("safeSave", "w"), ("batchUpdateSellStatus", "w"),
+                  ("list", "r"), ("getXssList", "r"), ("page", "r"),
+                  ("searchNewBeeMallGoods", "r"), ("getSavedList", "r"),
+                  ("deleteById", None), ("deleteBatch", None),
+                  ("cancelOrder", None), ("login", None), ("paySuccess", None)):
+    check(f"方向：{_m} → {_want}", _db_direction(_m), _want)
+
+_W = unit("Ctl.save", 'public String save(String p){ xssService.saveGoods(p); return "x"; }')
+_R = unit("Ctl.list", "public String list(){ return xssService.listGoods(); }")
+_D = unit("Ctl.del", "public String del(Long id){ xssService.deleteById(id); return \"x\"; }")
+_ch = build_chains([_W, _R])
+check("串接：写→读 连一条", len([l for l in _ch.links if l.medium == "db"]), 1)
+_ch2 = build_chains([_D, _R])
+check("串接：删除路由不得被当成写入方（方向护栏）",
+      len([l for l in _ch2.links if l.medium == "db"]), 0)
 
 
 print()

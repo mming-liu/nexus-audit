@@ -1,0 +1,59 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-master",
+  "slice": {
+    "entries": 70,
+    "service_entries": 53,
+    "service_penetrated": 52,
+    "impl_hops": 56,
+    "mapper_xml": 36
+  },
+  "slice_matches_baseline": true,
+  "authz": {
+    "truth_n": 12,
+    "decided": 11,
+    "correct": 11,
+    "fp": [],
+    "fn": [],
+    "fallback": [
+      "OrderController.orderListPage"
+    ]
+  },
+  "sqli_false_positive": [],
+  "sqli_safe_decided": 13,
+  "distribution": {
+    "authz": {
+      "true": 1,
+      "false": 10,
+      "none": 59
+    },
+    "sqli": {
+      "true": 0,
+      "false": 13,
+      "none": 57
+    },
+    "xss": {
+      "true": 0,
+      "false": 29,
+      "none": 41
+    },
+    "pathtraver": {
+      "true": 2,
+      "false": 57,
+      "none": 11
+    },
+    "cmdi": {
+      "true": 0,
+      "false": 0,
+      "none": 70
+    },
+    "ssrf": {
+      "true": 0,
+      "false": 0,
+      "none": 70
+    }
+  },
+  "disputed": {
+    "UploadController.upload": "pathtraver：写入路径 = 常量目录 + 生成的文件名，用户可控部分只是`fileName.substring(lastIndexOf('.'))`。它能含 `/`，但要逃出基目录需要存在一个名为 `<时间戳><随机数>.` 的中间目录（mkdir 只建常量目录），静态无法证明可利用，也无法证明绝对不可利用 → 不进分母。",
+    "UploadController.uploadV2": "同 upload：同样的文件名后缀拼接与常量目录。"
+  }
+}
