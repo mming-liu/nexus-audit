@@ -41,6 +41,7 @@ sys.path.insert(0, str(ROOT))
 from core.agents.router import OpenAICompatClient, TwoTierRouter   # noqa: E402
 from core.agents.rule_detectors import verdict as rule_verdict      # noqa: E402
 from core.agents.scenario_matcher import ScenarioMatcher             # noqa: E402
+from core.models import base_unit_name                          # noqa: E402
 from core.slicer.java_servlet import JavaSlicer                      # noqa: E402
 
 DEFAULT_TARGET = ROOT / "reference_repos" / "java-sec-code"
@@ -151,7 +152,7 @@ def _truth_from_text(text: str) -> bool | None:
 
 def classify(unit) -> tuple[str, bool | None, str]:
     """返回 (类别, 是否有漏洞或 None, 真值来源)。"""
-    cls, meth = unit.unit_name.split(".", 1)
+    cls, meth = base_unit_name(unit.unit_name).split(".", 1)
     if cls in SKIP_CLASSES:
         return "", None, ""
     cat = METHOD_CATEGORY_OVERRIDE.get((cls, meth)) or CLASS_TO_CATEGORY.get(cls)

@@ -59,13 +59,14 @@ def stats() -> None:
 def diag(names: list[str]) -> None:
     from benchmarks.benchmark_owasp import load_expected
     from core.agents import rule_detectors as RD
+    from core.models import base_unit_name
     from core.slicer.java_servlet import JavaSlicer
 
     expected = load_expected(TARGET)
     units = JavaSlicer(CODE).extract_entry_units()
     by_case = {}
     for u in units:
-        cls, meth = u.unit_name.split(".", 1)
+        cls, meth = base_unit_name(u.unit_name).split(".", 1)
         if meth == "doPost" and cls in expected:
             by_case[cls] = u
 

@@ -46,6 +46,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from core.agents.rule_detectors import verdict as rule_verdict      # noqa: E402
+from core.models import base_unit_name                          # noqa: E402
 from core.slicer.java_servlet import JavaSlicer                      # noqa: E402
 
 DEFAULT_TARGET = ROOT / "reference_repos" / "Hello-Java-Sec-master"
@@ -168,7 +169,7 @@ def _truth(text: str) -> bool | None:
 
 def classify(unit) -> tuple[str, bool | None, str]:
     """返回 (类目, 真值或 None, 真值来源)。"""
-    cls, meth = unit.unit_name.split(".", 1)
+    cls, meth = base_unit_name(unit.unit_name).split(".", 1)
     cat = CLASS_TO_CATEGORY.get(cls)
     if not cat:
         return "", None, ""

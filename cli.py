@@ -21,6 +21,7 @@ from core.agents.router import TwoTierRouter
 from core.agents.scenario_matcher import ScenarioMatcher
 from core.agents.skeptic_reviewer import SkepticReviewer
 from core.context.tool_handlers import run_context_loop
+from core.models import base_unit_name
 from core.sandbox.patch_generator import PatchGenerator
 from core.sandbox.web_docker_verifier import WebDockerVerifier
 from core.slicer.web_treesitter import WebTreeSitterSlicer
@@ -469,7 +470,9 @@ def cmd_pr_scan(args):
             if meths is None:
                 hot.append(u)          # 拿不到方法级信息，退回文件级（宁多不漏）
                 continue
-            if u.unit_name.split(".")[-1] in meths:
+            # 同名重载的 unit_name 带 `#N` 后缀（`update` / `update#2`），
+            # 与 git diff 给的方法名对不上 —— 先剥掉再比。
+            if base_unit_name(u.unit_name).split(".")[-1] in meths:
                 hot.append(u)
             continue
         # 2) 入口调用了变更函数 —— 反向依赖。

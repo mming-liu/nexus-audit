@@ -57,6 +57,7 @@ sys.path.insert(0, str(ROOT))
 from benchmarks.disputed_truth import for_target as _for_target  # noqa: E402
 
 from core.agents.rule_detectors import verdict as rule_verdict      # noqa: E402
+from core.models import base_unit_name                          # noqa: E402
 from core.slicer.java_servlet import JavaSlicer                      # noqa: E402
 
 DEFAULT_TARGET = ROOT / "reference_repos" / "micro_service_seclab-main"
@@ -179,7 +180,8 @@ def main():
         hit = TRUTH.get(key)
         if not hit:
             # 路由拼接可能因注解写法差异而不同，退到「类名 + 方法名」匹配
-            alt = [k for k in TRUTH if k[0] == cls and u.unit_name.endswith("." + k[1].rsplit("/", 1)[-1])]
+            tail = base_unit_name(u.unit_name)
+            alt = [k for k in TRUTH if k[0] == cls and tail.endswith("." + k[1].rsplit("/", 1)[-1])]
             hit = TRUTH[alt[0]] if len(alt) == 1 else None
         if not hit:
             if cls in CLASS_TO_CATEGORY:

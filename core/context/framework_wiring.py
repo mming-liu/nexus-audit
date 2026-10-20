@@ -439,22 +439,62 @@ class FrameworkWiringResolver:
 
     def describe(self, url: str, max_body: int = 1200) -> str:
         """渲染成可直接拼进切片的证据块。"""
-        rep = self.for_url(url)
-        if rep.is_empty():
+        return self.describe_aliases([url], max_body=max_body)
+
+    def describe_aliases(self, urls: list[str], max_body: int = 1200) -> str:
+        """同一条入口有多个别名路径时的证据渲染（`@RequestMapping({"/a","/b"})`）。
+
+        走交集，不走并集：Spring 的类级数组映射会让**每个**路径都可达，
+        而拦截器只挂在其中一部分上时，攻击者永远走没被拦的那条。
+        所以只有"所有别名都被同一个组件覆盖"才算事实，
+        `{"/admin", "/manage"}` + 只给 `/admin/**` 加拦截器的写法必须报"不确定"，
+        不能报"受保护"（方向错了比漏了更危险）。
+
+        注意这里的保守只影响结论强度，不影响证据：交集非空时照旧渲染组件体，
+        交集为空且存在部分覆盖时给一条不带 `addPathPatterns(...)` 原文的提示，
+        否则 `_AUTHZ_GLOBAL_GUARD_RE` 会把它当"本路由受全局拦截"读进去。
+        """
+        urls = [u for u in dict.fromkeys(urls) if u]
+        if not urls:
             return ""
-        lines = ["", "// ---- 框架装配证据：以下全局组件会作用于本路由 ----"]
-        for w in rep.applied:
-            ex = f"  exclude={w.exclude_patterns}" if w.exclude_patterns else ""
-            lines.append(f"// [{w.kind}] {w.name}  urlPatterns={w.url_patterns}{ex}"
-                         f"  来源 {w.source}{('  ' + w.note) if w.note else ''}")
-            for ln in w.body.strip().splitlines()[:40]:
-                lines.append(f"//   {ln.strip()}")
-            if len(w.body) > max_body:
-                lines.append("//   ...（截断）")
+        reps = [self.for_url(u) for u in urls]
+        if len(reps) == 1:
+            common = list(reps[0].applied)
+        else:
+            keep = {id(w) for w in reps[0].applied}
+            for r in reps[1:]:
+                keep &= {id(w) for w in r.applied}
+            common = [w for w in reps[0].applied if id(w) in keep]
+        partial = len(reps) > 1 and not common and any(r.applied for r in reps)
+
+        lines: list[str] = []
+        if common:
+            head = "以下全局组件会作用于本路由"
+            if len(urls) > 1:
+                head += f"（别名 {'、'.join(urls)} 全部命中）"
+            lines += ["", f"// ---- 框架装配证据：{head} ----"]
+            for w in common:
+                ex = f"  exclude={w.exclude_patterns}" if w.exclude_patterns else ""
+                lines.append(f"// [{w.kind}] {w.name}  urlPatterns={w.url_patterns}{ex}"
+                             f"  来源 {w.source}{('  ' + w.note) if w.note else ''}")
+                for ln in w.body.strip().splitlines()[:40]:
+                    lines.append(f"//   {ln.strip()}")
+                if len(w.body) > max_body:
+                    lines.append("//   ...（截断）")
+        elif partial:
+            lines += ["",
+                      "// ---- 框架装配证据：别名路径的全局组件覆盖不一致 ----",
+                      f"// 该类级映射有多个可达路径（{'、'.join(urls)}），"
+                      "只有部分路径被全局组件命中。",
+                      "// **不能**认定本路由受统一保护：任一别名未被覆盖即视为无全局鉴权，"
+                      "请按方法体内的校验判断。"]
+        if not lines:
+            return ""
+
         # 只提与本路由**路径相近**的未解析装配。把全仓库的 registerCorsConfiguration
         # 都塞进来的后果是每个 CORS 切片都会看到别的路由的路径，模型会误以为
         # 那些也是当前路由的防护 —— 这属于证据污染，比信息不足更糟。
-        rel = [u for u in rep.unparsed if _mentions_path(u, url)]
+        rel = [u for u in reps[0].unparsed if _mentions_path(u, urls[0])]
         if rel:
             lines.append("// [注意] 以下装配可能与本路由相关，但无法静态确定生效路径；"
                          "**不代表本路由没有防护**，请结合下方证据判断：")

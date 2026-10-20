@@ -29,11 +29,14 @@ newbee-mall 是标准 4 层生产结构：
 
 ## 已知缺口（写成断言，防止悄悄扩大）
 
-`ShoppingCartController` 的 PUT `/shop-cart` 与 DELETE `/shop-cart/{id}` **同名**
-（都叫 `updateNewBeeMallShoppingCartItem`），而切片器按方法名建索引 →
-DELETE 那条入口被静默丢弃。全仓库共 5 条入口这样丢失（另见 HJS 2 条）。
-本条写进 `KNOWN_MISSING`，跑分会明确打印；修法（按 `(name, start_line)` 建索引）
-属独立一轮，会改变入口分母，不在本脚本里顺手改。
+历史上 `ShoppingCartController` 的 PUT `/shop-cart` 与 DELETE `/shop-cart/{id}`
+同名（都叫 `updateNewBeeMallShoppingCartItem`），而切片器按方法名建索引 →
+DELETE 那条入口被静默丢弃。2026-10-20 已修（按 `(name, 源码顺序)` 建索引，
+重载追加 `#N` 后缀），本次共找回 3 条入口（另两条是 `AdminController.login`
+的 GET 页与 `NewBeeMallGoodsController.edit` 的 GET 页）。
+
+修好之后 `KNOWN_MISSING` 换成反向护栏：`RECOVERED_OVERLOADS` 里每一条都必须
+真的出现在切片里，少一条就报错 —— 免得哪天又退回"按名字去重"而没人发现。
 
 ## 用法
 
@@ -55,6 +58,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from core.agents.rule_detectors import verdict as rule_verdict      # noqa: E402
+from core.models import base_unit_name                               # noqa: E402
 from core.slicer.java_servlet import JavaSlicer                      # noqa: E402
 
 DEFAULT_TARGET = ROOT / "reference_repos" / "newbee-mall-master"
@@ -63,18 +67,22 @@ DEFAULT_TARGET = ROOT / "reference_repos" / "newbee-mall-master"
 # 数字取自 2026-10-20 零改动盲测（commit 3d892d6）之后的实测值。
 # 变化只会来自两处：切片器真改了 / 仓库换了版本。两种都该有人看一眼。
 BASELINE = {
-    "entries": 70,
-    "service_entries": 53,      # 入口体里出现 XxxService.method( 的入口数
-    "service_penetrated": 52,   # 其中切片里真的带进了跨文件实现体
-    "impl_hops": 56,            # 切片里出现 `[Hop N]` 段的入口（ServiceImpl / Mapper 任一）
-    "mapper_xml": 36,           # 含 Mapper XML SQL 的入口
+    "entries": 73,
+    "service_entries": 55,      # 入口体里出现 XxxService.method( 的入口数
+    "service_penetrated": 54,   # 其中切片里真的带进了跨文件实现体
+    "impl_hops": 58,            # 切片里出现 `[Hop N]` 段的入口（ServiceImpl / Mapper 任一）
+    "mapper_xml": 37,           # 含 Mapper XML SQL 的入口
 }
 
-# 已知丢失的入口（同名重载 → 按方法名建索引只保留第一条）。
-# 写在代码里而不是注释里：修好之后这条断言会失败，逼人回来改掉它。
-KNOWN_MISSING = {
-    "ShoppingCartController.updateNewBeeMallShoppingCartItem":
-        "PUT /shop-cart 与 DELETE /shop-cart/{id} 同名，DELETE 那条未入切片",
+# 同名重载修复后**必须存在**的入口（`#N` 后缀 = 源码顺序第 N 个定义）。
+# 反向护栏：这些名字一旦消失，说明切片器又退回"按方法名去重"了。
+RECOVERED_OVERLOADS = {
+    "ShoppingCartController.updateNewBeeMallShoppingCartItem#2":
+        "DELETE /shop-cart/{id}（PUT 那条拿裸名）",
+    "AdminController.login#2":
+        "POST /admin/login（GET 那个登录页拿裸名）",
+    "NewBeeMallGoodsController.edit#2":
+        "POST /admin/goods/edit/{goodsId}（GET 编辑页拿裸名）",
 }
 
 # ---------------- ② authz 真值表 ----------------
@@ -113,6 +121,9 @@ AUTHZ_TRUTH: dict[tuple[str, str], tuple[bool, str]] = {
 }
 
 # 与 AUTHZ_TRUTH 的 "/shop-cart" 共用路由、靠方法名区分的两条。
+# `updateNewBeeMallShoppingCartItem` 对应两个重载（PUT 裸名 / DELETE `#2`），
+# 真值相同：前者 `item.setUserId(user.getUserId())`，后者
+# `deleteById(id, user.getUserId())` —— 主体值都参与资源定位。
 AUTHZ_TRUTH_BY_UNIT: dict[str, tuple[bool, str]] = {
     "ShoppingCartController.cartListPage": (False, "subject-key"),
     "ShoppingCartController.saveNewBeeMallShoppingCartItem": (False, "subject-key"),
@@ -170,12 +181,16 @@ def slice_stats(units) -> dict[str, int]:
 
 
 def _lookup_truth(u):
-    """先按方法名精确匹配，再按 (类, 路由) 匹配。"""
-    hit = AUTHZ_TRUTH_BY_UNIT.get(u.unit_name)
+    """先按方法名精确匹配，再按 (类, 路由) 匹配。
+
+    同名重载带 `#N` 后缀（`updateX` / `updateX#2`），真值表里只登记一份 ——
+    PUT 与 DELETE 都属于「主体值参与资源定位」这一族，剥掉后缀再查。
+    """
+    name = base_unit_name(u.unit_name)
+    hit = AUTHZ_TRUTH_BY_UNIT.get(name)
     if hit:
         return hit
-    cls = u.unit_name.split(".", 1)[0]
-    # 去重后的方法名（同名重载的 #2 后缀）不影响真值：都属同一路由族
+    cls = name.split(".", 1)[0]
     return AUTHZ_TRUTH.get((cls, u.route_path))
 
 
@@ -223,16 +238,21 @@ def main() -> None:
     if not ok:
         print("   ! 与基线不一致：升级切片器就同步改 BASELINE，别让它悄悄漂移")
 
-    # 入口丢失（同名重载）—— 只报警，不算错
-    names = Counter(u.unit_name for u in units)
-    dup = {n: c for n, c in names.items() if c > 1}
-    print(f"\n   同名重载重复单元：{len(dup)} 条")
+    # 同名重载护栏：`#N` 后缀必须还在，且裸名不能被砍掉
+    names = {u.unit_name for u in units}
+    lost = [n for n in RECOVERED_OVERLOADS if n not in names]
+    dup = {n: c for n, c in Counter(base_unit_name(u.unit_name) for u in units).items()
+           if c > 1}
+    print(f"\n   同名重载入口：{len(RECOVERED_OVERLOADS)} 条应在"
+          f"，缺失 {len(lost)} 条")
+    for n, why in RECOVERED_OVERLOADS.items():
+        mark = "✔" if n in names else "✘ 未入切片"
+        print(f"     {mark} {n:<58} {why}")
     if dup:
-        for n, c in dup.items():
-            print(f"     ! {n} × {c} —— unit_name 撞车，跨路由串接会把它当同一个方法")
-    print(f"   已知丢失入口：{len(KNOWN_MISSING)} 条（同名重载只保留第一条）")
-    for n, why in KNOWN_MISSING.items():
-        print(f"     - {n}: {why}")
+        print(f"   同名重载族：{len(dup)} 组（每组裸名 1 条 + `#N` 若干）")
+    if lost:
+        ok = False
+        print("   ! 同名重载入口又丢了：切片器是不是退回按方法名去重了？")
 
     # ---------- ② authz 真值 ----------
     rows = []
@@ -246,7 +266,7 @@ def main() -> None:
           f"  表内共 {len(AUTHZ_TRUTH) + len(AUTHZ_TRUTH_BY_UNIT)} 条")
     missing = (set(AUTHZ_TRUTH_BY_UNIT)
                | {f"{c}.{r}" for (c, r) in AUTHZ_TRUTH})
-    hit_names = {r["unit"].unit_name for r in rows}
+    hit_names = {base_unit_name(r["unit"].unit_name) for r in rows}
     # 路由型真值的 "类.路由" 与 unit_name 不同名，只对方法名型的做缺失检查
     for n in sorted(set(AUTHZ_TRUTH_BY_UNIT) - hit_names):
         print(f"     ! 真值表里的 {n} 没匹配到任何入口")

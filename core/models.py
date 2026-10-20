@@ -1,7 +1,19 @@
 """统一数据契约：CodeUnit, CallEdge, VulnHypothesis, PoCResult"""
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
+
+# 同名重载的序号后缀：`ShoppingCartController.updateX#2`。
+# 切片器给重载方法加 `#N` 以保证 unit_name 全局唯一（否则跨路由串接会把
+# PUT 和 DELETE 当成同一个方法），但**真值表按 `类.方法` 硬编码**、判据按
+# 方法名做正则匹配 —— 凡是"拿 unit_name 去对表"的地方都必须先剥掉它。
+_OVERLOAD_SUFFIX_RE = re.compile(r"#\d+$")
+
+
+def base_unit_name(unit_name: str) -> str:
+    """去掉同名重载的 `#N` 序号后缀，还原「类名.方法名」。"""
+    return _OVERLOAD_SUFFIX_RE.sub("", unit_name)
 
 
 class Language(str, Enum):

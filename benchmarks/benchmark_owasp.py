@@ -38,6 +38,7 @@ sys.path.insert(0, str(ROOT))
 from core.agents import vuln_categories as VC          # noqa: E402
 from core.agents.router import OpenAICompatClient, TwoTierRouter  # noqa: E402
 from core.agents.scenario_matcher import ScenarioMatcher          # noqa: E402
+from core.models import base_unit_name                          # noqa: E402
 from core.slicer.java_servlet import JavaSlicer                   # noqa: E402
 
 DEFAULT_TARGET = ROOT / "reference_repos" / "BenchmarkJava-master"
@@ -103,7 +104,7 @@ async def run(args) -> None:
     # 只保留 doPost 入口（用例类名为 BenchmarkTestNNNNN）
     unit_by_case = {}
     for u in units:
-        cls, meth = u.unit_name.split(".", 1)
+        cls, meth = base_unit_name(u.unit_name).split(".", 1)
         if meth == "doPost" and cls in expected:
             unit_by_case[cls] = u
     print(f"      {len(units)} 个入口 -> {len(unit_by_case)} 个用例可审计（{time.time()-t0:.1f}s）",

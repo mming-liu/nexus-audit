@@ -6,7 +6,9 @@
   - JAX-RS：@Path + @GET/@POST 方法
 
 输出 CodeUnit：
-  - unit_name 取 「类名.methodName」，便于与 expectedresults 中的类名对齐
+  - unit_name 取 「类名.methodName」，便于与 expectedresults 中的类名对齐。
+    同名重载（RESTful 控制器里很常见）追加 `#2`/`#3` 后缀区分，裸名留给
+    源码顺序的第一个 —— 见 `_slice_file` 里的 `occur` 计数。
   - source_code 包含入口方法整体 + 同文件内的私有辅助方法（doSomething 等），
     因为静态可达性判断必须看到辅助方法里对参数的清洗，否则一律误判为漏洞
 
@@ -845,18 +847,35 @@ class JavaSlicer:
         # 前一个类的 `@RequestMapping("/admin")` 扣到后一个类头上 —— 于是
         # 一个前台路由被算成 `/admin/...`，鉴权判定直接翻向 "受全局拦截器保护"。
         class_prefix = ""
+        class_prefixes: list[str] = []
         head = text[:cls_m.start()]
         cp = None
         for _cand in SPRING_ROUTE_RE.finditer(head):
             cp = _cand
         if cp:
-            class_prefix = self._first_string_literal(cp.group(2))
+            # 数组形式 `@RequestMapping({"/v1/api", "/api"})` 的**每一个**字面量
+            # 都是一条真实别名路径。路径本身取第一个（route_path 只能存一个），
+            # 但"这条路由受不受全局拦截器保护"必须对**所有**别名取交集 ——
+            # 攻击者只会走没有被拦的那一个。
+            class_prefixes = self._all_string_literals(cp.group(2))
+            class_prefix = class_prefixes[0] if class_prefixes else ""
         elif JAXRS_PATH_RE.search(head):
             class_prefix = JAXRS_PATH_RE.search(head).group(1)
+            class_prefixes = [class_prefix]
 
-        # 收集本文件所有方法：name -> (start, end, source, annotations)
-        # 先用正则粗扫，再用「不落在其他方法体内」过滤掉嵌套误匹配
-        methods: dict[str, tuple[int, int, str, list[str]]] = {}
+        # 收集本文件所有方法：[(name, start, end, source, annotations)]
+        #
+        # 这里**不能**用 `dict[name]`：RESTful 控制器里同名重载是常态，
+        # `ShoppingCartController` 的 `PUT /shop-cart` 与 `DELETE /shop-cart/{id}`
+        # 都叫 `updateNewBeeMallShoppingCartItem`。按名字去重会让后一条入口
+        # 静默消失 —— 不报错、不进日志、指标上看不出来，只有人工数入口才会发现。
+        # 全仓实测这样丢掉 5 条（newbee 3 个文件 / HJS 的 SSTI 与 MyBatis 各 1）。
+        #
+        # 唯一性由 unit_name 的 `#N` 后缀保证（见下方 occur 计数）：裸名留给
+        # 第一个（源码顺序），后续重载依次 `#2`、`#3`。这样既让每个方法独立
+        # 成单元（跨路由串接、按名索引都不会串味），又不改任何"唯一定义"的
+        # 入口名 —— 五个靶场的真值表都按 `类.方法` 硬编码，改名等于全盘失配。
+        methods: list[tuple[str, int, int, str, list[str]]] = []
         occupied: list[tuple[int, int]] = []      # 已确认方法体区间
         cands = []
         for m in METHOD_RE.finditer(text):
@@ -891,11 +910,15 @@ class JavaSlicer:
             decl_idx, anns = self._collect_annotations_upward(text, line_start)
             start_line = _line_of(text, decl_idx)
             end_line = _line_of(text, close_idx)
-            methods.setdefault(name, (start_line, end_line,
-                                      text[decl_idx:close_idx + 1], anns))
+            methods.append((name, start_line, end_line,
+                            text[decl_idx:close_idx + 1], anns))
 
         if not methods:
             return []
+
+        # 源码顺序：既让输出稳定（原来按方法体长度倒序，纯属排序副作用），
+        # 也让"第一个同名方法"有确定含义 —— 它就是拿到裸 unit_name 的那个。
+        methods.sort(key=lambda t: (t[1], t[2]))
 
         wl = WEBSERVLET_RE.search(text)
 
@@ -912,8 +935,11 @@ class JavaSlicer:
         #
         # 这条对规则层无害（规则用 entry_body() 截断），但走模型的分支
         # （pathtraver / cmdi 等）会直接吃到污染证据。
+        #
+        # 按名字判断（而非逐个重载）：只要某个名字有一条是路由，同名的其他重载
+        # 也不当辅助方法 —— 保守方向，宁可少拼不少拼。
         route_methods: set[str] = set()
-        for _n, (_s, _e, _src, _anns) in methods.items():
+        for _n, _s, _e, _src, _anns in methods:
             if _n in SERVLET_METHODS and wl:
                 route_methods.add(_n)
                 continue
@@ -928,13 +954,27 @@ class JavaSlicer:
         # 辅助方法 = 既非 Servlet 动词、也非路由方法。
         # 注意不能用 startswith("do") 判断：
         # OWASP Benchmark 的清洗辅助方法就叫 doSomething(request, param)。
-        helper_src = "\n\n".join(src for n, (_, _, src, _a) in methods.items()
-                                 if n not in SERVLET_METHODS
-                                 and n not in route_methods)
+        helper_parts: list[str] = []
+        _seen_helper: set[str] = set()
+        for _n, _s, _e, _src, _a in methods:
+            if _n in SERVLET_METHODS or _n in route_methods:
+                continue
+            if _src in _seen_helper:      # 同名重载若方法体逐字相同，只贴一次
+                continue
+            _seen_helper.add(_src)
+            helper_parts.append(_src)
+        helper_src = "\n\n".join(helper_parts)
 
-        for name, (start, end, src, anns) in methods.items():
+        # 同名重载的出现序号：1 → 裸名，2/3… → `#N` 后缀
+        occur: dict[str, int] = {}
+
+        for name, start, end, src, anns in methods:
+            occur[name] = occur.get(name, 0) + 1
+            unit_name = (f"{cls_name}.{name}" if occur[name] == 1
+                         else f"{cls_name}.{name}#{occur[name]}")
             decorators: List[str] = []
             route_path = ""
+            subs: list[str] = []          # 方法级映射的别名后缀
 
             # Servlet：类级 @WebServlet + 方法名决定 HTTP 动词
             if name in SERVLET_METHODS and wl:
@@ -950,7 +990,11 @@ class JavaSlicer:
                 if not m:
                     continue
                 decorators.append(ann)
-                sub = self._first_string_literal(m.group(2))
+                _subs = self._all_string_literals(m.group(2))
+                if not _subs:
+                    _subs = [""]
+                subs = subs or _subs          # 以第一处映射注解为准
+                sub = _subs[0]
                 route_path = route_path or (class_prefix.rstrip("/") + "/" + sub.lstrip("/")).rstrip("/")
 
             # JAX-RS：@Path + @GET/@POST（方法级注解）
@@ -961,10 +1005,24 @@ class JavaSlicer:
                 decorators.append(jax_path or f"@{jax_verb}")
                 if jax_path:
                     sub = self._first_string_literal(jax_path)
+                    subs = subs or [sub]
                     route_path = class_prefix.rstrip("/") + "/" + sub.lstrip("/")
 
             if not decorators:
                 continue
+
+            # 这条单元在 HTTP 上真正可达的**全部**路径（类级别名 × 方法级别名）。
+            # 只有一条时就是 route_path 本身，行为与从前一致。
+            #
+            # Servlet 分支走不到任何 Spring/JAX-RS 映射，`subs`/前缀都是空串，
+            # 拼出来是一个空字符串 —— 必须回落到 `route_path`（@WebServlet 的
+            # 路径），否则 @WebFilter 那类证据会被静默丢掉。
+            prefixes = class_prefixes or [class_prefix]
+            route_aliases = [a for a in dict.fromkeys(
+                (p.rstrip("/") + "/" + s.lstrip("/")).rstrip("/")
+                for p in prefixes for s in (subs or [""])) if a]
+            if not route_aliases and route_path:
+                route_aliases = [route_path]
 
             # 完整路由写进切片的**第一行**：判定层（authz / 装配）和模型都需要
             # "这条路由到底叫什么"，而方法级注解只给出后缀 `/list`。
@@ -973,6 +1031,8 @@ class JavaSlicer:
             # 但 `_strip_comments` 之后仍留在正文里的**方法签名**不受污染。
             if route_path:
                 source = f"// Full-Route: {route_path}\n"
+                if len(route_aliases) > 1:
+                    source += "// Alias-Route: " + ", ".join(route_aliases) + "\n"
             else:
                 source = ""
 
@@ -991,14 +1051,14 @@ class JavaSlicer:
             # 框架装配：CORS 这类的防护在 Filter/Bean 里，方法体里根本看不到。
             # 放在 config 之后单独补一个换行，避免和配置块最后一行粘连。
             if route_path:
-                w = self._wiring_resolver().describe(route_path)
+                w = self._wiring_resolver().describe_aliases(route_aliases or [route_path])
                 if w:
                     source += "\n" + w
 
             units.append(CodeUnit(
                 file_path=str(path),
                 language=self.language,
-                unit_name=f"{cls_name}.{name}",
+                unit_name=unit_name,
                 start_line=start,
                 end_line=end,
                 decorators_or_modifiers=decorators,
@@ -1013,6 +1073,35 @@ class JavaSlicer:
     def _first_string_literal(args: str) -> str:
         m = re.search(r"\"([^\"]*)\"", args)
         return m.group(1) if m else ""
+
+    @staticmethod
+    def _all_string_literals(args: str) -> List[str]:
+        """注解参数里**路径取值**的全部字面量（数组形式 `{"/a", "/b"}`）。
+
+        只取第一个是安全的，取不到才是错的：
+        `@RequestMapping({"/v1/api", "/api"})` 的两个路径都能被访问到，
+        受保护与否必须看"全都被拦"而不是"第一个被拦"。
+
+        但**不能**把参数里所有引号串都当成路径：`@GetMapping(value = "/x",
+        produces = "application/json")` 的第二个字符串是媒体类型，
+        当成别名会造出 `/x/application/json` 这种不存在的路由。
+        所以先定位 `value=` / `path=` 的取值段，再截到顶层逗号为止。
+        """
+        m = re.search(r"\b(?:value|path)\s*=\s*", args)
+        seg = args[m.end():] if m else args
+        depth, end = 0, len(seg)
+        for i, c in enumerate(seg):
+            if c in "{[(":
+                depth += 1
+            elif c in "}])":
+                if depth == 0:
+                    end = i
+                    break
+                depth -= 1
+            elif c == "," and depth == 0:
+                end = i
+                break
+        return [s for s in re.findall(r"\"([^\"]*)\"", seg[:end]) if s]
 
     @staticmethod
     def _called_symbols(source: str) -> List[str]:

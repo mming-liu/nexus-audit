@@ -29,7 +29,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from benchmarks.diag_owasp_sqli_fp import load_units   # noqa: E402
+from benchmarks.diag_owasp_sqli_fp import load_units, pick_unit   # noqa: E402
 from core.agents import rule_detectors as R            # noqa: E402
 
 REPO = os.path.join(ROOT, "reference_repos", "BenchmarkJava-master")
@@ -61,7 +61,16 @@ def main() -> None:
         hit = [k for k in units if name in k]
         if not hit:
             continue
-        src = units[hit[0]]
+        # 同一个用例类里有 doGet + doPost 两个入口，必须**锁定 doPost**：
+        # 真值标注的就是 doPost 那条链路（doGet 通常只是转发/页面壳）。
+        #
+        # 这里原来写 `units[hit[0]]`，靠 dict 的插入顺序偶然拿到 doPost
+        # （旧切片器按方法体长度倒序收集，doPost 更长所以排前面）。切片器
+        # 改成按源码顺序输出后 doGet 排到了前面，A 方向凭空冒出 264 条
+        # "静默放行" —— 全是量错对象造成的**假回归**。
+        # 结论：凡"用 `in` 找入口"的地方都要写清命中的是哪一条（本文件
+        # 第 34 条经验的又一次现形）。
+        src = units[pick_unit(units, name)]
         verdict = R.verdict(cat, src)
         c = per_cat.setdefault(cat, [0, 0, 0, 0])   # [vul_t, vul_none, safe_f, safe_true]
         if is_vul:

@@ -1,14 +1,14 @@
 {
   "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\Hello-Java-Sec-master",
-  "units_total": 128,
-  "with_truth": 65,
+  "units_total": 130,
+  "with_truth": 66,
   "unknown": 3,
   "truth_src": {
     "route": 6,
-    "apiop": 59
+    "apiop": 60
   },
-  "rule_decided": 59,
-  "rule_correct": 58,
+  "rule_decided": 60,
+  "rule_correct": 59,
   "rule_none": 6,
   "disputed_truth": [
     {
@@ -56,9 +56,9 @@
       "correct": 5
     },
     "sqli": {
-      "n": 16,
-      "decided": 16,
-      "correct": 16
+      "n": 17,
+      "decided": 17,
+      "correct": 17
     },
     "xss": {
       "n": 8,
@@ -81,16 +81,16 @@
   ],
   "fallback": [
     {
-      "unit": "SSRF.HTTPURLConnection",
-      "category": "ssrf",
-      "real_vuln": false,
-      "route": "/HTTPURLConnection/safe"
-    },
-    {
       "unit": "SSRF.URLConnection2",
       "category": "ssrf",
       "real_vuln": true,
       "route": "/URLConnection/vul2"
+    },
+    {
+      "unit": "SSRF.HTTPURLConnection",
+      "category": "ssrf",
+      "real_vuln": false,
+      "route": "/HTTPURLConnection/safe"
     },
     {
       "unit": "Traversal.safe2",

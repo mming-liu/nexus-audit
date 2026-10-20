@@ -1976,6 +1976,129 @@ check("串接：删除路由不得被当成写入方（方向护栏）",
       len([l for l in _ch2.links if l.medium == "db"]), 0)
 
 
+# ---------------- [47] 同名重载：入口不许丢，unit_name 不许撞 ----------------
+#
+# `methods: dict[name]` + `setdefault` 会让 RESTful 控制器里同名的 PUT/DELETE
+# 只留第一条 —— 不报错、不进日志，只有人工数入口才发现（newbee-mall 3 条 /
+# Hello-Java-Sec 2 条）。修法：保留全部定义，裸名给源码顺序第一个，
+# 后续重载加 `#N`；真值表一侧用 `base_unit_name()` 剥掉后缀再查。
+print("\n[47] 同名重载入口")
+
+_OVERLOAD_FILES = {
+    "CartController.java": '''package probe;
+@RestController
+@RequestMapping("/shop-cart")
+public class CartController {
+    @PutMapping("/shop-cart")
+    @ResponseBody
+    public Result update(@RequestBody Item item, HttpSession session) {
+        User u = (User) session.getAttribute(KEY);
+        item.setUserId(u.getUserId());
+        return service.update(item);
+    }
+
+    @DeleteMapping("/shop-cart/{id}")
+    @ResponseBody
+    public Result update(@PathVariable("id") Long id, HttpSession session) {
+        User u = (User) session.getAttribute(KEY);
+        return service.delete(id, u.getUserId());
+    }
+
+    @GetMapping("/shop-cart")
+    public String page(HttpSession session) {
+        return "cart";
+    }
+}''',
+}
+
+with _tf.TemporaryDirectory() as _td:
+    _base = _Path(_td) / "src" / "main" / "java" / "probe"
+    _base.mkdir(parents=True)
+    for _n, _c in _OVERLOAD_FILES.items():
+        (_base / _n).write_text(_c, encoding="utf-8")
+    _ov_units = _JS(_Path(_td)).extract_entry_units()
+
+_ov_names = [u.unit_name for u in _ov_units]
+_ov_routes = {u.unit_name: u.route_path for u in _ov_units}
+check("重载：三个 @Mapping 方法都成为入口（不按名字去重）", len(_ov_units), 3)
+check("重载：同名两条都保留", sorted(n for n in _ov_names if n.startswith("CartController.update")),
+      ["CartController.update", "CartController.update#2"])
+check("重载：裸名 = 源码顺序第一个（PUT）",
+      _ov_routes.get("CartController.update", "").endswith("/shop-cart"), True)
+check("重载：`#2` 是后面的 DELETE（路由不同，跨路由串接不许串味）",
+      "{id}" in _ov_routes.get("CartController.update#2", ""), True)
+check("重载：unit_name 全局唯一（否则 by_name 会吞掉一条）",
+      len(set(_ov_names)), len(_ov_names))
+# 真值表按 `类.方法` 硬编码：剥掉后缀必须还原成同一个键
+from core.models import base_unit_name                                # noqa: E402
+check("重载：base_unit_name 剥后缀", base_unit_name("CartController.update#2"),
+      "CartController.update")
+check("重载：无后缀的名字原样返回", base_unit_name("CartController.update"),
+      "CartController.update")
+
+
+# ---------------- [48] 类级 @RequestMapping 的数组形式（别名路径） ----------------
+#
+# `@RequestMapping({"/admin", "/manage"})` 让同一个方法在两条路径上都可达。
+# 只给 `/admin/**` 挂拦截器时，攻击者走 `/manage/...` 就绕过了 ——
+# 所以"受全局保护"必须是**所有**别名都被覆盖，走交集而不是取第一个。
+print("\n[48] 别名路径与全局装配的覆盖交集")
+
+_ALIAS_JAVA = '''package x;
+import org.springframework.web.bind.annotation.*;
+@RestController
+@RequestMapping({"/admin", "/manage"})
+public class AliasCtl {
+    @GetMapping({"/list", "/query"})
+    public String list(@RequestParam("q") String q) { return q; }
+}
+'''
+with tempfile.TemporaryDirectory() as _d:
+    _p = Path(_d) / "AliasCtl.java"
+    _p.write_text(_ALIAS_JAVA, encoding="utf-8")
+    _ua = _Slicer(Path(_d)).extract_entry_units()[0]
+check("别名：类级数组取第一个作 route_path", _ua.route_path, "/admin/list")
+check("别名：全部可达路径都记进切片（类级 × 方法级 2×2）",
+      sorted(_ua.source_code.splitlines()[1].replace("// Alias-Route: ", "").split(", ")),
+      ["/admin/list", "/admin/query", "/manage/list", "/manage/query"])
+
+# 生产式注解读法：`produces = "application/json"` 不是路径，不许当别名
+_PRODUCES_JAVA = '''package x;
+@RestController
+@RequestMapping(value = "/api", produces = "application/json")
+public class ProducesCtl {
+    @GetMapping(value = "/json", produces = "application/json")
+    public String j(@RequestParam("q") String q) { return q; }
+}
+'''
+with tempfile.TemporaryDirectory() as _d:
+    _p = Path(_d) / "ProducesCtl.java"
+    _p.write_text(_PRODUCES_JAVA, encoding="utf-8")
+    _up = _Slicer(Path(_d)).extract_entry_units()[0]
+check("别名：produces 的媒体类型不许被当成路径", _up.route_path, "/api/json")
+check("别名：单一映射不写 Alias-Route 行",
+      any("Alias-Route" in ln for ln in _up.source_code.splitlines()), False)
+
+_wa = FrameworkWiringResolver(repo_root=ROOT)
+_wa._wiring = [Wiring(kind="interceptor", name="adminOnly",
+                      url_patterns=["/admin/**"],
+                      body='registry.addInterceptor(a).addPathPatterns("/admin/**");')]
+_wa._unparsed = []
+_wa_src = _wa.describe_aliases(["/admin/list", "/manage/list"])
+check("别名：只覆盖 /admin/** 时不报『受保护』（方向护栏）",
+      "addPathPatterns" in _wa_src, False)
+check("别名：部分覆盖要明说『不能认定受统一保护』",
+      "不能**认定" in _wa_src or "不能**" in _wa_src, True)
+
+_wb = FrameworkWiringResolver(repo_root=ROOT)
+_wb._wiring = [Wiring(kind="interceptor", name="allApi",
+                      url_patterns=["/**"],
+                      body='registry.addInterceptor(b).addPathPatterns("/**");')]
+_wb._unparsed = []
+check("别名：全部别名都被覆盖 → 才渲染保护证据",
+      "addPathPatterns" in _wb.describe_aliases(["/admin/list", "/manage/list"]), True)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

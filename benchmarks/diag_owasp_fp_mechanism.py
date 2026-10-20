@@ -24,7 +24,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from benchmarks.diag_owasp_sqli_fp import load_units   # noqa: E402
+from benchmarks.diag_owasp_sqli_fp import load_units, pick_unit   # noqa: E402
 from core.agents import rule_detectors as R            # noqa: E402
 
 REPO = os.path.join(ROOT, "reference_repos", "BenchmarkJava-master")
@@ -106,19 +106,19 @@ def main() -> None:
     else:
         names = []
         for name, (cat, is_vul) in sorted(truth.items()):
-            hit = [k for k in units if name in k]
-            if not hit:
+            key = pick_unit(units, name)
+            if not key:
                 continue
-            if not is_vul and R.verdict(cat, units[hit[0]]) is True:
+            if not is_vul and R.verdict(cat, units[key]) is True:
                 names.append(name)
 
     for name in names:
-        hit = [k for k in units if name in k]
-        if not hit:
+        key = pick_unit(units, name)
+        if not key:
             print(f"{name}: 无切片")
             continue
         cat, is_vul = truth.get(name, ("?", False))
-        diag_one(name, cat, units[hit[0]])
+        diag_one(name, cat, units[key])
 
 
 if __name__ == "__main__":

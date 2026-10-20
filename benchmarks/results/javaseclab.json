@@ -70,16 +70,16 @@
   },
   "fallback": [
     {
-      "unit": "XXEController.xxeSafe",
-      "category": "xxe",
-      "real_vuln": false,
-      "route": "/safe"
-    },
-    {
       "unit": "XXEController.xxeVul",
       "category": "xxe",
       "real_vuln": true,
       "route": "/vul"
+    },
+    {
+      "unit": "XXEController.xxeSafe",
+      "category": "xxe",
+      "real_vuln": false,
+      "route": "/safe"
     },
     {
       "unit": "OtherController.vul1Upload",
@@ -100,12 +100,6 @@
       "route": "/vul"
     },
     {
-      "unit": "SSTIController.safe1",
-      "category": "spel",
-      "real_vuln": false,
-      "route": "/safe1"
-    },
-    {
       "unit": "SSTIController.vul1",
       "category": "spel",
       "real_vuln": true,
@@ -116,6 +110,12 @@
       "category": "spel",
       "real_vuln": true,
       "route": "/vul3"
+    },
+    {
+      "unit": "SSTIController.safe1",
+      "category": "spel",
+      "real_vuln": false,
+      "route": "/safe1"
     },
     {
       "unit": "SsrfController.safe",
@@ -136,10 +136,10 @@
       "route": "/safe"
     },
     {
-      "unit": "UrlRedirectController.vul5",
+      "unit": "UrlRedirectController.UrlRedirectVul",
       "category": "redir",
       "real_vuln": true,
-      "route": "/vul5"
+      "route": "/vul"
     },
     {
       "unit": "UrlRedirectController.UrlRedirectSafe",
@@ -148,10 +148,10 @@
       "route": "/safe"
     },
     {
-      "unit": "UrlRedirectController.UrlRedirectVul",
+      "unit": "UrlRedirectController.vul5",
       "category": "redir",
       "real_vuln": true,
-      "route": "/vul"
+      "route": "/vul5"
     },
     {
       "unit": "VerticalController.vul",
@@ -160,16 +160,16 @@
       "route": "/vul"
     },
     {
-      "unit": "DirTraversalController.safe2",
-      "category": "pathtraver",
-      "real_vuln": false,
-      "route": "/safe2"
-    },
-    {
       "unit": "DirTraversalController.safe1",
       "category": "pathtraver",
       "real_vuln": false,
       "route": "/safe1"
+    },
+    {
+      "unit": "DirTraversalController.safe2",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "route": "/safe2"
     },
     {
       "unit": "DeleteController.safe",

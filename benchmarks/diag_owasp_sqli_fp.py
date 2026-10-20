@@ -65,6 +65,18 @@ def _slicer_fingerprint() -> str:
     return h.hexdigest()[:16]
 
 
+def pick_unit(units: dict[str, str], case: str) -> str:
+    """按用例名取**唯一**入口切片，同名多入口时锁 doPost。
+
+    OWASP 的 TestCode 每个类都有 doGet + doPost 两条入口，真值标注的是
+    doPost 那条链路（doGet 通常只做转发或页面壳）。用 `hit[0]` 取第一个，
+    结果取决于切片器的输出顺序 —— 顺序一变，"静默放行"就凭空多出 264 条。
+    """
+    hit = [k for k in units if case in k]
+    post = [k for k in hit if k.endswith(".doPost")]
+    return (post or hit or [""])[0]
+
+
 def load_units(refresh: bool = False) -> dict[str, str]:
     fp = _slicer_fingerprint()
     stamp = CACHE + ".fp"
@@ -91,14 +103,14 @@ def main() -> None:
     for cat, names in CASES.items():
         print(f"########## {cat} ##########")
         for name in names:
-            hit = [k for k in units if name in k]
-            if not hit:
+            key = pick_unit(units, name)
+            if not key:
                 print(f"{name}: 未找到入口")
                 continue
-            src = units[hit[0]]
+            src = units[key]
             body = R.entry_body(src)
             sib = R._sibling_methods(src)
-            print(f"\n--- {hit[0]}")
+            print(f"\n--- {key}")
             print(f"   sqli={R.sqli_verdict(src)}  pathtraver={R.pathtraver_verdict(src)}")
             print(f"   sqli_all_const={R._sql_concat_all_constant(body, sib)}"
                   f"  path_all_const={R._path_concat_all_constant(body, sib)}")

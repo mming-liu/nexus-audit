@@ -4326,7 +4326,35 @@ def authz_verdict(source: str) -> bool | None:
             if re.search(rf"\.\s*set\w*[Ii]d\s*\(\s*{key}\s*\)", body):
                 return False
 
-    # 2c) 主体由**被调方**获取：控制器把 `HttpSession` / `HttpServletRequest`
+    # 2c) 主体值先写进**查询容器**，再整体交给 Service（Map / DTO / PageQueryUtil）：
+    #
+    #         params.put("userId", user.getUserId());
+    #         PageQueryUtil pageUtil = new PageQueryUtil(params);
+    #         orderService.getMyOrders(pageUtil);       // → where user_id = ?
+    #
+    #     与 2b 是同一件事（主体值参与资源选择），只是载体从"实参"换成了
+    #     "容器字段"，2b 的「Service 实参里出现 user.getUserId()」便整条落空。
+    #     两个事实缺一不可：① 主体 id 被放进某个容器；② 该容器（或包了它的
+    #     那个对象）确实作为实参进了 Service/Mapper 调用 —— 只放不传说明不了
+    #     任何查询范围。newbee-mall 的 `/orders` 是标准形态。
+    if has_subject:
+        for var in set(_AUTHZ_SUBJECT_VAR_RE.findall(body)):
+            key = rf"\b{var}\s*\.\s*get\w*[Ii]d\s*\(\s*\)"
+            for pm in re.finditer(
+                    rf"\b(\w+)\s*\.\s*(?:put|putAll|add)\s*\("
+                    rf"\s*\"[^\"]*\"\s*,\s*{key}\s*\)", body):
+                holders = {pm.group(1)}
+                # 容器通常还会被包一层：`new PageQueryUtil(params)`
+                for wm in re.finditer(r"\b(\w+)\s*=\s*new\s+[\w.<>]+\s*\(\s*(\w+)\s*[,)]",
+                                      body):
+                    if wm.group(2) in holders:
+                        holders.add(wm.group(1))
+                alt = "|".join(sorted(map(re.escape, holders)))
+                if re.search(rf"\b\w*(?:Service|Mapper|Dao|DAO)\s*\.\s*\w+\s*\("
+                             rf"[^;]{{0,240}}?\b(?:{alt})\b", body):
+                    return False
+
+    # 2d) 主体由**被调方**获取：控制器把 `HttpSession` / `HttpServletRequest`
     #     原样传给 Service，由 Service 内部 `session.getAttribute(...)` 取当前用户
     #     再按该 userId 查库（newbee-mall `updateUserInfo` 就是这一形态）。
     #     方法体内没有主体变量可查，但**也没有把入参当资源键**——证据不足，退回 None。

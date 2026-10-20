@@ -1,55 +1,53 @@
 {
   "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-master",
   "slice": {
-    "entries": 70,
-    "service_entries": 53,
-    "service_penetrated": 52,
-    "impl_hops": 56,
-    "mapper_xml": 36
+    "entries": 73,
+    "service_entries": 55,
+    "service_penetrated": 54,
+    "impl_hops": 58,
+    "mapper_xml": 37
   },
   "slice_matches_baseline": true,
   "authz": {
-    "truth_n": 12,
-    "decided": 11,
-    "correct": 11,
+    "truth_n": 13,
+    "decided": 13,
+    "correct": 13,
     "fp": [],
     "fn": [],
-    "fallback": [
-      "OrderController.orderListPage"
-    ]
+    "fallback": []
   },
   "sqli_false_positive": [],
   "sqli_safe_decided": 13,
   "distribution": {
     "authz": {
       "true": 1,
-      "false": 10,
-      "none": 59
+      "false": 12,
+      "none": 60
     },
     "sqli": {
       "true": 0,
       "false": 13,
-      "none": 57
+      "none": 60
     },
     "xss": {
       "true": 0,
-      "false": 29,
-      "none": 41
+      "false": 31,
+      "none": 42
     },
     "pathtraver": {
       "true": 2,
-      "false": 57,
-      "none": 11
+      "false": 59,
+      "none": 12
     },
     "cmdi": {
       "true": 0,
       "false": 0,
-      "none": 70
+      "none": 73
     },
     "ssrf": {
       "true": 0,
       "false": 0,
-      "none": 70
+      "none": 73
     }
   },
   "disputed": {

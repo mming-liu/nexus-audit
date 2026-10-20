@@ -20,7 +20,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from benchmarks.diag_owasp_sqli_fp import load_units   # noqa: E402
+from benchmarks.diag_owasp_sqli_fp import load_units, pick_unit   # noqa: E402
 from core.agents import rule_detectors as R            # noqa: E402
 
 REPO = os.path.join(ROOT, "reference_repos", "BenchmarkJava-master")
@@ -44,11 +44,11 @@ def main() -> None:
     v_f, v_t, v_n = [], [], []
     s_f, s_other = [], []
     for name, is_vul in sorted(truth.items()):
-        hit = [k for k in units if name in k]
-        if not hit:
+        key = pick_unit(units, name)
+        if not key:
             print(f"{name}: 未找到入口（跳过）")
             continue
-        src = units[hit[0]]
+        src = units[key]
         verdict = R.xpathi_verdict(src)
         if is_vul:
             {"False": v_f, True: v_t, None: v_n}.get(
