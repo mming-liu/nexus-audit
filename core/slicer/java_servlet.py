@@ -245,8 +245,7 @@ class JavaSlicer:
         picked: list = []
         seen: set[str] = set()
 
-        for m in self.DATA_CALL_RE.finditer(body):
-            var, name, args = m.group(1), m.group(2), m.group(3)
+        for var, name, args in self._iter_data_calls(body):
             if name in seen or len(name) < 3 or var in ("this", "super"):
                 continue
             a = args.strip()
@@ -280,21 +279,19 @@ class JavaSlicer:
             if name in local and var in ("this", "super"):
                 continue
             seen.add(name)
-            for h in r.lookup(name, limit=1):
-                if h.kind == "java_interface":
-                    continue
+            h = self._pick_impl(r.lookup(name, limit=6), var, name)
+            if h is not None and h.kind != "java_interface":
                 picked.append(h)
 
         # 第二轮：防护语义的无参静态调用（startXxxHook / checkXxx / isHttp ...）
-        for name in {m.group(2) for m in self.DATA_CALL_RE.finditer(body)}:
+        for name in {n for _v, n, _a in self._iter_data_calls(body)}:
             if name in seen or name in local or len(name) < 4:
                 continue
             if not self._GUARD_NAME.search(name):
                 continue
             seen.add(name)
-            for h in r.lookup(name, limit=1):
-                if h.kind == "java_interface":
-                    continue
+            h = self._pick_impl(r.lookup(name, limit=6), "", name)
+            if h is not None and h.kind != "java_interface":
                 picked.append(h)
 
         if not picked:
@@ -306,11 +303,89 @@ class JavaSlicer:
                 "判定汇聚点实际行为时以此为准确认 ----\n")
         return head + "\n".join(h.render() for h in picked)
 
-    # 调用点：`obj.method(args)`，实参用括号配平无法用正则表达，
-    # 这里只取到第一个 `(` 之后的一段，够用于「是否带标识符实参」的判断
-    DATA_CALL_RE = re.compile(
-        r"\b([A-Za-z_]\w*)\s*\.\s*([A-Za-z_]\w*)\s*\(([^()]{0,120})", re.S
-    )
+    # 调用点头部：`obj.method(`。**实参不在正则里捕获**，见 `_iter_data_calls`。
+    #
+    # 旧写法把实参一起捕获：`\(([^()]{0,120})`。`[^()]` 遇到内层调用的 `(` 就停，
+    # 但 finditer 从**停止处**继续扫，于是外层实参把内层调用的接收者整段吃掉：
+    #
+    #     request.setAttribute("pageResult", newBeeMallGoodsService.searchNewBeeMallGoods(pageUtil));
+    #     └─ 匹配 setAttribute，实参一路吃到 "...searchNewBeeMallGoods" 的 '('
+    #        下一轮从 '(' 开始扫 → `newBeeMallGoodsService.` 再也不会被匹配
+    #
+    # 真实业务里几乎**所有**服务调用都嵌在 return / setAttribute / Result.success
+    # 里面，内层调用的接收者被外层实参吃掉就再也不会被匹配 —— 不报错，只是
+    # 那几个入口的跨文件实现体永远不展开。newbee-mall 实测：8 个入口、8 个调用点，
+    # 全是分页列表与商品搜索（最可能出 SQLi 的那批）。
+    DATA_CALL_RE = re.compile(r"\b([A-Za-z_]\w*)\s*\.\s*([A-Za-z_]\w*)\s*\(", re.S)
+
+    def _call_args(self, text: str, start: int) -> str:
+        """从 `(` 之后取配平实参，能穿过嵌套调用与字符串里的括号。"""
+        depth, i, n = 1, start, len(text)
+        while i < n and depth:
+            c = text[i]
+            if c == '"':
+                i += 1
+                while i < n and text[i] != '"':
+                    i += 2 if text[i] == "\\" else 1
+            elif c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        return text[start:i]
+
+    def _iter_data_calls(self, text: str):
+        """产出 `(接收者, 方法名, 配平实参)`；嵌套调用各自成为独立一条。"""
+        for m in self.DATA_CALL_RE.finditer(text):
+            yield m.group(1), m.group(2), self._call_args(text, m.end())
+
+    # 零参、只 `return 字段;` / 只 `this.字段 = 参数;` 的读写器。它们**不携带任何
+    # 汇聚点证据**，却会占掉每跳 4 个名额里的一半 —— newbee-mall 实测：searchPage
+    # 的第 2 跳被 `getCategoryId` / `setCurrentCategoryName` 这类访问器占满，
+    # 真正含 SQL 的 `findNewBeeMallGoodsListBySearch` 一个名额都没有。
+    #
+    # 与「返回字面量的方法」要区分开：`return "bob";` 是**常量来源**证据
+    # （OWASP `getTheValue` 那类跨方法常量回溯靠它），不能一起滤掉 —— 这里的
+    # 判据要求返回/赋值两端都是**裸标识符**，字面量与调用都不匹配。
+    _TRIVIAL_ACCESSOR_RE = re.compile(
+        r"^[^{]*\)\s*\{\s*(?:return\s+(?:this\s*\.\s*)?[A-Za-z_]\w*\s*;"
+        r"|(?:this\s*\.\s*)?[A-Za-z_]\w*\s*=\s*[A-Za-z_]\w*\s*;)\s*\}\s*$", re.S)
+
+    # 接收者语义 → 期望的实现体种类。`login` 在 newbee-mall 有 4 处定义
+    # （AdminUserMapper.xml / AdminUserServiceImpl / NewBeeMallUserServiceImpl /
+    # AdminController 自己），`lookup(name, limit=1)` 取到哪个纯看索引顺序。
+    # 实测后果：Mapper 的 SQL 被贴到 Controller 的登录调用上，真正的
+    # ServiceImpl 反倒没进来 —— 证据看起来"有 SQL"，但那不是这条链路的 SQL。
+    #
+    # 接收者变量名本身就是消歧键，和实参消歧（第 38 条）是同一个道理：
+    # `xxxMapper/xxxDao` 期望 XML/注解语句，`xxxService` 期望接口实现类。
+    _SVC_RECV_RE = re.compile(r"(?:Service|Manager|Facade)$", re.I)
+    _MAP_RECV_RE = re.compile(r"(?:Mapper|Repository|Dao|DAO)$", re.I)
+
+    def _pick_impl(self, hits, var: str, name: str):
+        """在多个同名实现体里按「接收者 + 类名前缀」挑一个，挑不出就取最优。"""
+        if not hits:
+            return None
+        want_xml = bool(self._MAP_RECV_RE.search(var)) or \
+            bool(re.search(r"(?:Mapper|Repository|Dao|DAO)$", name))
+        want_java = bool(self._SVC_RECV_RE.search(var))
+
+        def rank(h):
+            is_xml = h.kind in ("mybatis_xml", "mybatis_anno")
+            if want_xml:
+                return 0 if is_xml else 1
+            if is_xml:
+                return 2 if want_java else 1
+            if want_java and h.kind != "java_impl":
+                return 1
+            # 类名与接收者变量同前缀：`adminUserService` ↔ AdminUserServiceImpl
+            stem = Path(h.file).stem.lower()
+            if var and stem.startswith(var.lower()):
+                return 0
+            return 1
+        return sorted(hits, key=rank)[0]
 
     # 防护语义命名：这类方法往往零参数（如 startSSRFHook()），但正是判定的关键
     _GUARD_NAME = re.compile(
@@ -408,8 +483,8 @@ class JavaSlicer:
         local = {name for name, _b, _i in _im(body)}
 
         calls: set[str] = set()
-        for m in self.DATA_CALL_RE.finditer(body):
-            name = m.group(2)
+        call_var: dict[str, str] = {}
+        for var, name, _args in self._iter_data_calls(body):
             if name in local or len(name) < 4:
                 continue
             if name in self.TRACE_EXCLUDE or name in SERVLET_METHODS:
@@ -417,34 +492,79 @@ class JavaSlicer:
             if name in _visited:
                 continue
             calls.add(name)
+            call_var.setdefault(name, var)
         if not calls:
             return ""
 
         index = self._method_index()
+        # MyBatis 的 SQL 只写在 XML / @Select 里，`_method_index` 只收「有方法体的
+        # Java 方法」，天然看不见它们。真实分层项目的第 2~3 跳正是这一层：
+        #
+        #   Controller.searchPage → ServiceImpl.searchNewBeeMallGoods  [Hop 1]
+        #     └ newBeeMallGoodsMapper.findNewBeeMallGoodsListBySearch( ) [Hop 2 = XML]
+        #
+        # 不接这一层，四跳链永远停在 ServiceImpl：模型看到的全是 Java 取值逻辑，
+        # 一条 SQL 都没有，却要它判断有没有注入 —— 只有"没有 SQL 就没有注入"
+        # 这一条路可走，真漏洞被静默放行。
+        try:
+            impl = self._impl_resolver()
+            impl.build()
+        except Exception:                       # noqa: BLE001 —— 增强项，宁可没有
+            impl = None
+
         found: list[str] = []
         ranked = []
         for name in sorted(calls):
             hit = index.get(name)
-            if hit is None:
+            if hit is not None:
+                path, start_line, hb = hit
+                # 同文件的方法体已在切片里，跳过
+                if Path(path).resolve() == getattr(self, "_current_file", None):
+                    continue
+                # 读写器不占名额：它只把字段原样搬运，读它等于没读。
+                if self._TRIVIAL_ACCESSOR_RE.match(hb.strip()):
+                    continue
+                ranked.append((self._security_relevance(name, hb), name, path,
+                               start_line, hb, ""))
                 continue
-            path, start_line, hb = hit
-            # 同文件的方法体已在切片里，跳过
-            if Path(path).resolve() == getattr(self, "_current_file", None):
+            if impl is None:
                 continue
-            ranked.append((self._security_relevance(name, hb), name, path, start_line, hb))
+            # **重名不猜，但可以按接收者消歧**：`selectByPrimaryKey` / `insert`
+            # 这类通用 CRUD 在 9 个 Mapper 里同名，按方法名取第一个会把
+            # CarouselMapper 的 SQL 贴到商品查询的切片里。接收者变量名
+            # `newBeeMallGoodsMapper` 与 Mapper 文件名完全对应 —— 唯一匹配时才注入。
+            var = call_var.get(name, "")
+            xhits = [h for h in impl.lookup(name, limit=8)
+                     if h.kind in ("mybatis_xml", "mybatis_anno")]
+            if len(xhits) != 1:
+                # 后缀匹配而不是全等：真实代码里接收者常被缩写
+                # （`goodsMapper` ↔ NewBeeMallGoodsMapper.xml）。仍要求
+                # **唯一命中**，`mapper` 这种泛化变量名会撞上多个 → 放弃。
+                same = [h for h in xhits
+                        if var and Path(h.file).stem.lower().endswith(var.lower())]
+                xhits = same if len(same) == 1 else []
+            if not xhits:
+                continue
+            h = xhits[0]
+            ranked.append((self._security_relevance(name, h.body), name, h.file,
+                           0, h.body, h.kind))
         ranked.sort(key=lambda x: -x[0])
 
         hop = self.MAX_HOPS - depth + 1
-        for _score, _name, path, start_line, hb in ranked[:max_methods]:
+        for _score, _name, path, start_line, hb, kind in ranked[:max_methods]:
             if _budget[0] <= 0:
                 break
             _visited.add(_name)
             _budget[0] -= 1
-            seg = f"// 来自 {Path(path).name}:{start_line} [Hop {hop}]\n{hb}"
+            if kind:
+                seg = f"// 来自 {Path(path).name} [Hop {hop}] —— {kind}\n{hb}"
+            else:
+                seg = f"// 来自 {Path(path).name}:{start_line} [Hop {hop}]\n{hb}"
             found.append(seg)
             # 递归：把**这一跳的段**当作新的 source 继续往下找。
             # 不能拿整份 source 递归 —— 那会把入口体再扫一遍，每跳都重复注入。
-            if depth > 1:
+            # XML 段没有 Java 调用，不必再展开。
+            if depth > 1 and not kind:
                 deeper = self._resolve_cross_file_helpers(
                     seg, depth - 1, max_methods, _visited, _budget)
                 if deeper:

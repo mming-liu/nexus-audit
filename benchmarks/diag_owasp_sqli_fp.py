@@ -35,15 +35,45 @@ MARKERS = ["This_should_always_happen", "a_Value", "barbarians_at_the_gate",
            "bobs_your_uncle", "safe!"]
 
 
+def _slicer_fingerprint() -> str:
+    """切片器/证据解析器的源码指纹。
+
+    为什么需要：缓存只按文件存在与否判断，**改了 slicer 仍会命中旧切片**，
+    于是"零回归"变成一句假话 —— 2026-10-20 实测：改完 `DATA_CALL_RE` 后直接
+    跑回归，3 秒"通过"，实际用的还是改动前的切片。凡是"重建缓存后一致"的结论，
+    都必须能证明缓存真的重建了。
+    """
+    import hashlib
+    h = hashlib.sha256()
+    files = [os.path.join(ROOT, "core", "slicer", "java_servlet.py"),
+             os.path.join(ROOT, "core", "context", "java_impl_resolver.py"),
+             os.path.join(ROOT, "core", "context", "taint_chain.py"),
+             os.path.join(ROOT, "core", "text_utils.py"),
+             os.path.abspath(__file__)]
+    for p in files:
+        try:
+            st = os.stat(p)
+        except OSError:
+            continue
+        h.update(f"{p}:{st.st_mtime_ns}:{st.st_size}".encode())
+    return h.hexdigest()[:16]
+
+
 def load_units(refresh: bool = False) -> dict[str, str]:
-    if not refresh and os.path.exists(CACHE):
-        with open(CACHE, "rb") as fh:
-            return pickle.load(fh)
+    fp = _slicer_fingerprint()
+    stamp = CACHE + ".fp"
+    if not refresh and os.path.exists(CACHE) and os.path.exists(stamp):
+        with open(stamp, encoding="utf-8") as fh:
+            if fh.read().strip() == fp:
+                with open(CACHE, "rb") as fh:
+                    return pickle.load(fh)
     slicer = JavaSlicer(REPO)
     units = {u.unit_name: u.source_code for u in slicer.extract_entry_units()}
     os.makedirs(os.path.dirname(CACHE), exist_ok=True)
     with open(CACHE, "wb") as fh:
         pickle.dump(units, fh)
+    with open(stamp, "w", encoding="utf-8") as fh:
+        fh.write(fp)
     return units
 
 

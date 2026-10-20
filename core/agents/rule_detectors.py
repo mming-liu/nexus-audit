@@ -806,6 +806,29 @@ def _jpa_derived_query_safe(source: str) -> bool:
     return True
 
 
+def _mybatis_text(source: str) -> str:
+    """所有 MyBatis 语句证据：实现体段 **+** 每跳的 `[Hop N] —— mybatis_xml` 段。
+
+    为什么不能只用 `_impl_segment`：真实分层项目里 Mapper 语句是在第 2~3 跳被
+    切片器按调用链拉进来的，段头是 `// 来自 XxxMapper.xml [Hop 2] —— mybatis_xml`，
+    而 `_impl_segment` 从「跨文件证据：以下为实现体」开始截 —— 那个段**在它后面**。
+    于是切片里有 `#{}`、判据读不到，70/70 全部退回模型（newbee-mall 实测）。
+
+    仍然只取**本路由调用链上的**语句段，不是全仓库扫描：段头由切片器写，
+    只有被调用到的 Mapper 才会出现。
+    """
+    parts: list[str] = []
+    impl = _impl_segment(source)
+    if impl:
+        parts.append(impl)
+    for m in re.finditer(r"(?m)^// 来自 [^\n]*\[Hop \d+\] —— mybatis_(?:xml|anno)$",
+                         source):
+        tail = source[m.end():]
+        nxt = re.search(r"(?m)^// (?:来自 |---- )", tail)
+        parts.append(tail[: nxt.start()] if nxt else tail)
+    return "\n".join(parts)
+
+
 def sqli_verdict(source: str) -> bool | None:
     body = entry_body(source)
     impl = _impl_segment(source)
@@ -828,20 +851,21 @@ def sqli_verdict(source: str) -> bool | None:
         return False
 
     # B) MyBatis：只有能确认用的是 ${} 还是 #{} 才判
-    if MYBATIS_DOLLAR_RE.search(impl):
+    mb = _mybatis_text(source)
+    if MYBATIS_DOLLAR_RE.search(mb):
         # `${}` 是字符串替换，但对**数字类型**的参数无注入面：Spring/MyBatis
         # 已经把入参解析成 int/Integer 了，`1 OR 1=1` 根本绑不上。
         # Hello-Java-Sec 的 queryById（/safe/id/{id}）正是这种，作者注明
         # 「使用${}，但写死Int类型，无法注入」。这是可核对的事实，不是语义推断。
-        if _dollar_params_all_numeric(body, impl):
+        if _dollar_params_all_numeric(body, mb):
             return False
         return True
-    if MYBATIS_HASH_RE.search(impl) and not SQLI_JDBC_SINK_RE.search(body):
+    if MYBATIS_HASH_RE.search(mb) and not SQLI_JDBC_SINK_RE.search(body):
         return False
     # 语句是纯固定文本（无任何占位符），调用也不带实参 → 没有注入面。
     # 切片器会在 Mapper 语句下方标注「无外部占位符（语句为固定文本）」，
     # 这是比"看到了 #{}"更强的证据：连参数都没有，谈不上注入。
-    if "无外部占位符" in impl and not SQLI_JDBC_SINK_RE.search(body):
+    if "无外部占位符" in mb and not SQLI_JDBC_SINK_RE.search(body):
         return False
 
     # A0) 入口体里没有 sink，但**跨文件调用链**里有拼接 SQL + 执行方法。
@@ -4181,9 +4205,26 @@ _AUTHZ_SUBJECT_RE = re.compile(
     r"|getAuthentication\s*\(\s*\)\s*\.\s*(?:getName|getPrincipal)\s*\(\s*\)"
     r"|@AuthenticationPrincipal"
     r"|getSession\s*\(\s*\)\s*\.\s*getAttribute\s*\("
+    # Spring MVC 的另一种主体获取方式：`HttpSession` 作为**方法形参**注入，
+    # 直接 `httpSession.getAttribute(KEY)`。旧判据只认 `request.getSession()`，
+    # 于是真实业务项目里**所有**主体获取都看不见（newbee-mall 实测 6 条误报：
+    # orderDetailPage / cancelOrder / selectPayType / 购物车增改全被判成越权）。
+    r"|\w*[Ss]ession\s*\.\s*getAttribute\s*\("
     r"|@SessionAttribute|@RequestAttribute"
     r"|\bJwtUtils\s*\.|\bjwtUtils\s*\."
     r"|StpUtil\s*\.\s*getLoginId|SecurityUtils\s*\.\s*getSubject", re.I)
+
+# 主体**变量名**：`NewBeeMallUserVO user = (NewBeeMallUserVO) httpSession.getAttribute(KEY);`
+# 只有拿到变量名，才能查"它有没有被当作资源定位条件"。
+_AUTHZ_SUBJECT_VAR_RE = re.compile(
+    r"(\w+)\s*=\s*\(?\s*[A-Z][\w.]*\s*\)?\s*\w*[Ss]ession\s*\.\s*getAttribute\s*\(")
+
+# 认证入口（登录/注册/登出/验证码）。它们本身就是**建立身份**的地方，
+# 不做授权判定 —— 把 `login(loginName, password)` 的入参当成"直查资源"
+# 会稳定误报（旧判据下 newbee-mall 的 /login 与 /register 都判 True）。
+_AUTHZ_AUTHN_ROUTE_RE = re.compile(
+    r"@(?:Request|Get|Post|Put|Delete|Patch)Mapping\s*\(\s*(?:value\s*=\s*)?\{?[^)]{0,200}?"
+    r"\"(?:/?(?:admin/)?(?:login|logout|register|signin|signup|kaptcha|captcha))\"", re.I)
 
 # 声明式角色/权限校验。注解在方法签名上，`entry_body` 里看不到，必须扫 source。
 _AUTHZ_ROLE_RE = re.compile(
@@ -4198,17 +4239,33 @@ _AUTHZ_DENY_RE = re.compile(
     r"(?:error|fail|forbidden|unauthorized)\s*\(|"
     r"return\s+\"redirect:/login|"
     r"throw\s+new\s+\w*(?:AccessDenied|Auth|Permission|Forbidden|Security)\w*Exception|"
+    # 项目自定义的「抛业务异常」写法：`NewBeeMallException.fail(...)` 内部是
+    # `throw new NewBeeMallException(msg)`（newbee-mall 实证），等价于终止请求。
+    # 判据要求方法名是 fail/deny/forbidden 这类**语义明确**的终止动作，
+    # 不认 `xxxException.warn(...)` 之类的软处理。
+    r"\w*(?:Exception|Error)\s*\.\s*(?:fail|deny|forbidden|throw\w*)\s*\(|"
     r"\.\s*sendError\s*\(\s*40[13]", re.I)
 
 # 资源访问：Mapper / Repository / DAO 上的方法调用。
 _AUTHZ_RESOURCE_RE = re.compile(
     r"\b\w*(?:Mapper|Repository|Dao|DAO|Service)\s*\.\s*\w+\s*\(", re.I)
 
+# 前缀级鉴权拦截器：`addPathPatterns("/admin/**")`。它由框架层统一拦，
+# 方法体里看不到任何主体判断 —— 这正是设计上"全局鉴权覆盖 → None"的情形。
+# 必须与 `/**` 的通用拦截器区分：后者多半只做计数/编码，不构成鉴权。
+_AUTHZ_GLOBAL_GUARD_RE = re.compile(
+    r'addPathPatterns\(\s*"\s*/(?!\*\*)[\w-]+/\*\*\s*"\s*\)')
+
 
 def authz_verdict(source: str) -> bool | None:
     """越权/未授权的确定性判定：False(有校验) / True(入参直查且无主体) / None。"""
     body = entry_body(source)
     if not body:
+        return None
+
+    # 0) 认证入口本身不做授权判定。登录接口的"资源"就是凭据库，身份由口令校验
+    #    建立；把 `login(loginName, password)` 的入参当成"直查资源"是口径错误。
+    if _AUTHZ_AUTHN_ROUTE_RE.search(body):
         return None
 
     # 1) 声明式校验：`@PreAuthorize("hasRole('ADMIN')")` 这类。
@@ -4224,6 +4281,34 @@ def authz_verdict(source: str) -> bool | None:
     if has_subject and _AUTHZ_DENY_RE.search(body):
         return False
 
+    # 2b) 主体标识被当作**资源定位条件** —— 校验下沉到 Service/Mapper 的
+    #     `where user_id = ?` 里，控制器侧没有 if/throw：
+    #
+    #         getOrderDetailByOrderNo(orderNo, user.getUserId())
+    #         item.setUserId(user.getUserId());  再落库
+    #
+    #     这是可逐行核对的事实（主体值参与了资源选择），比"有没有拒绝分支"
+    #     更贴近真实写法。newbee-mall 的订单详情 / 取消 / 购物车增改都是这一形态。
+    if has_subject:
+        for var in set(_AUTHZ_SUBJECT_VAR_RE.findall(body)):
+            key = rf"\b{var}\s*\.\s*get\w*[Ii]d\s*\(\s*\)"
+            if re.search(rf"\b\w*(?:Service|Mapper|Dao|DAO)\s*\.\s*\w+\s*\("
+                         rf"[^;]{{0,240}}?{key}", body):
+                return False
+            if re.search(rf"\.\s*set\w*[Ii]d\s*\(\s*{key}\s*\)", body):
+                return False
+
+    # 2c) 主体由**被调方**获取：控制器把 `HttpSession` / `HttpServletRequest`
+    #     原样传给 Service，由 Service 内部 `session.getAttribute(...)` 取当前用户
+    #     再按该 userId 查库（newbee-mall `updateUserInfo` 就是这一形态）。
+    #     方法体内没有主体变量可查，但**也没有把入参当资源键**——证据不足，退回 None。
+    #     注意不能据此判 False：`paySuccess(orderNo, payType)` 这种既不取主体、
+    #     也不传会话的才是真越权，它不会命中这一条。
+    if not has_subject and re.search(
+            r"\b\w*(?:Service|Mapper|Dao|DAO)\s*\.\s*\w+\s*\([^;]{0,160}?"
+            r"\b\w*[Ss]ession\b", body):
+        return None
+
     # 3) 角色常量比对：`if ("admin".equals(currentUsername))`
     #    这是垂直越权安全样本的写法（JavaSecLab VerticalController.safe）。
     if has_subject and re.search(
@@ -4234,8 +4319,10 @@ def authz_verdict(source: str) -> bool | None:
     #    判据要求两个事实同时成立，任一缺失就退回 None：
     #      a) 有 Mapper/Repository/Service 调用，且实参里出现裸形参
     #      b) 方法内没有从可信上下文取主体的语句
+    #      c) 该路由没有被前缀级鉴权拦截器整体覆盖（后台 `/admin/**`）
     params = _bare_params(_entry_signature(source))
-    if params and not has_subject and _AUTHZ_RESOURCE_RE.search(body):
+    if params and not has_subject and _AUTHZ_RESOURCE_RE.search(body) \
+            and not _AUTHZ_GLOBAL_GUARD_RE.search(source):
         for m in _AUTHZ_RESOURCE_RE.finditer(body):
             args = _balanced_cond(body, m.end())
             if args is None:

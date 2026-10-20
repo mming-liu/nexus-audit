@@ -1814,6 +1814,95 @@ for _label, _qbody, _want in _JPA_CASES:
 
 
 print()
+
+# ---------------- [45] 真实分层项目盲测（newbee-mall）暴露的三类机制 ----------------
+#
+# 这三条都不是新类目，而是"同一机制在真实写法下失效"，每一条都有真实样本：
+#   ① 嵌套实参吞调用：`request.setAttribute("x", svc.foo(p))` 里 `svc.` 被外层
+#      实参匹配吃掉 → 70 个入口里 ServiceImpl 命中 0（规则与模型都看不到 SQL）
+#   ② 主体来自注入的 HttpSession：`httpSession.getAttribute(KEY)` 不被认作主体
+#      → 订单详情 / 取消 / 购物车 6 条全判 True（规则层误报）
+#   ③ 认证入口与后台前缀：/login 被判越权、/admin/** 被忽略
+
+from core.slicer.java_servlet import JavaSlicer        # noqa: E402
+
+_sl = JavaSlicer.__new__(JavaSlicer)                    # 只用纯文本方法，不建索引
+
+
+def _calls(text: str) -> list[str]:
+    return [f"{v}.{n}" for v, n, _a in _sl._iter_data_calls(text)]
+
+
+check("切片：嵌套实参里的服务调用必须被发现（方向护栏）",
+      "svc.getDetail" in _calls('return Result.ok(svc.getDetail(orderNo, user.getUserId()));'),
+      True)
+check("切片：外层调用仍被识别（不是靠放弃外层换内层）",
+      "Result.ok" in _calls('return Result.ok(svc.getDetail(orderNo));'), True)
+check("切片：字符串里的括号不打断实参配平",
+      _sl._call_args('foo("a)b", x)', 4), '"a)b", x')
+
+check("切片：零参取值器不占跳数名额（只 return 字段）",
+      bool(_sl._TRIVIAL_ACCESSOR_RE.match("public Long getCategoryId() {\n return categoryId;\n}")),
+      True)
+check("切片：返回字面量的方法**不能**被当成取值器滤掉（方向护栏）",
+      bool(_sl._TRIVIAL_ACCESSOR_RE.match('public String getTheValue() { return "bob"; }')),
+      False)
+
+_AUTHZ_SESSION_ARG = '''@GetMapping("/orders/{orderNo}")
+public String orderDetailPage(@PathVariable("orderNo") String orderNo, HttpSession httpSession) {
+    NewBeeMallUserVO user = (NewBeeMallUserVO) httpSession.getAttribute(Constants.USER_KEY);
+    NewBeeMallOrderDetailVO vo = orderService.getOrderDetailByOrderNo(orderNo, user.getUserId());
+    return "order-detail";
+}'''
+check("authz：主体取自注入的 HttpSession 且作为资源键 → 安全(False)",
+      _verdict("authz", _AUTHZ_SESSION_ARG), False)
+
+_AUTHZ_SESSION_DENY = '''@GetMapping("/selectPayType")
+public String selectPayType(@RequestParam("orderNo") String orderNo, HttpSession httpSession) {
+    NewBeeMallUserVO user = (NewBeeMallUserVO) httpSession.getAttribute(Constants.USER_KEY);
+    NewBeeMallOrder order = orderService.getByOrderNo(orderNo);
+    if (!user.getUserId().equals(order.getUserId())) {
+        NewBeeMallException.fail("无权限");
+    }
+    return "pay-select";
+}'''
+check("authz：会话主体 + 自定义异常终止分支 → 安全(False)",
+      _verdict("authz", _AUTHZ_SESSION_DENY), False)
+
+_AUTHZ_PAY = '''@GetMapping("/paySuccess")
+@ResponseBody
+public Result paySuccess(@RequestParam("orderNo") String orderNo, @RequestParam("payType") int payType) {
+    String r = orderService.paySuccess(orderNo, payType);
+    return Result.success(r);
+}'''
+check("authz：无主体、无会话、单号直改状态 → 越权(True，方向护栏)",
+      _verdict("authz", _AUTHZ_PAY), True)
+
+_AUTHZ_LOGIN = '''@PostMapping("/login")
+@ResponseBody
+public Result login(@RequestParam("loginName") String loginName,
+                    @RequestParam("password") String password, HttpSession session) {
+    MallUser u = userService.login(loginName, password);
+    session.setAttribute(Constants.USER_KEY, u);
+    return Result.success(u);
+}'''
+check("authz：认证入口本身不做授权判定 → None(方向护栏)",
+      _verdict("authz", _AUTHZ_LOGIN), None)
+
+_AUTHZ_ADMIN = '''@RequestMapping(value = "/orders/update", method = RequestMethod.POST)
+@ResponseBody
+public Result update(@RequestBody NewBeeMallOrder order) {
+    return Result.success(orderService.updateOrderInfo(order));
+}
+// ---- 框架装配证据：以下全局组件会作用于本路由 ----
+// [interceptor] urlPatterns=['/admin/**']
+//   registry.addInterceptor(adminLoginInterceptor)
+//   .addPathPatterns("/admin/**");'''
+check("authz：后台前缀有全局鉴权拦截器 → 不硬判 True(方向护栏)",
+      _verdict("authz", _AUTHZ_ADMIN), None)
+
+
+print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
     sys.exit(1)
