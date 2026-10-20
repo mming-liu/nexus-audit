@@ -343,12 +343,33 @@ class JavaSlicer:
         "setMaxAge", "append", "format", "valueOf", "getBytes", "generateSeed",
     }
 
-    def _resolve_cross_file_helpers(self, source: str, depth: int = 1,
-                                    max_methods: int = 4) -> str:
-        """顺着源码里调用的方法名，在其他 Java 文件中找出方法体并附上。
+    # 跨文件调用链的最大跳数。企业项目真实链路是
+    # Controller → Facade → Service(I) → ServiceImpl → Manager/Helper → DAO → Mapper，
+    # 4~6 跳。1 跳只够拿"工厂方法里的算法"，够不到"第 3 跳里的 SQL 拼接"。
+    #
+    # 实测（2026-10-20，`.hop_probe` 四跳探针）：
+    #   Controller.detail → Facade.query → Service.getDetail → Dao.rawQuery → sink
+    #   深度 1 时切片里只有 Facade.query，`SELECT * FROM orders` 完全不在，
+    #   sqli 规则只能返回 None，模型看不到 sink 必然答 No —— **静默漏报**。
+    MAX_HOPS = 4
+
+    # 整条链允许注入的段落总数。跳数放宽后必须同时限总量，否则每跳 4 个方法
+    # 会变成 4^4：既烧 token，也会把不相关的方法体塞进来淹没真证据。
+    MAX_HELPER_SEGMENTS = 10
+
+    def _resolve_cross_file_helpers(self, source: str, depth: int | None = None,
+                                    max_methods: int = 4,
+                                    _visited: set[str] | None = None,
+                                    _budget: list[int] | None = None) -> str:
+        """顺着源码里调用的方法名，在其他 Java 文件中找出方法体并附上（支持多跳）。
 
         动机：`Utils.getCipher()` 这类工厂方法把算法/配置藏在 helper 类里，
         只看入口文件会缺失关键证据（OWASP Benchmark 的 crypto 误报主因）。
+
+        **多跳的理由不是"更全"，而是"没有它就看错方向"**：4 跳链路里
+        SQL 拼接在第 4 跳，切片只到第 1 跳时规则看不到任何 sink，只能返回
+        None；模型同样看不到，于是答"没有 SQL 注入"—— 这不是保守，是把
+        真漏洞判成了安全。
 
         三道防污染闸门（都是真实项目评测里踩出来的）：
           1. 只认数据/工厂类调用 `obj.method(...)`，不认裸调用 `foo(...)`
@@ -358,9 +379,20 @@ class JavaSlicer:
           3. 本文件内已定义的方法体不再重复注入 —— 同文件里往往并排放着
              「安全写法」和「漏洞写法」两个路由，重复注入等于把 vuln 代码
              塞进 sec 样本，模型必然误报（实测 SpEL.spel_sec 与
-             SQLI.mybatisOrderBySec04 两条误报全部源于此）。
+             SQLI.mybatisOrderBySec03 两条误报全部源于此）。
+
+        多跳新增的两道闸门：
+          4. `_visited` 按方法名去重 —— A→B→A 这类环不展开。
+          5. `_budget` 限总段落数 —— 跳数放宽不等于无限展开。
         """
-        if depth <= 0:
+        if depth is None:
+            depth = self.MAX_HOPS
+        top = _visited is None
+        if _visited is None:
+            _visited = set()
+        if _budget is None:
+            _budget = [self.MAX_HELPER_SEGMENTS]
+        if depth <= 0 or _budget[0] <= 0:
             return ""
         # 先掐掉已注入的部分，避免把上一轮附加的代码再扫一遍
         body = source.split("// ---- ", 1)[0]
@@ -373,6 +405,8 @@ class JavaSlicer:
             if name in local or len(name) < 4:
                 continue
             if name in self.TRACE_EXCLUDE or name in SERVLET_METHODS:
+                continue
+            if name in _visited:
                 continue
             calls.add(name)
         if not calls:
@@ -392,13 +426,29 @@ class JavaSlicer:
             ranked.append((self._security_relevance(name, hb), name, path, start_line, hb))
         ranked.sort(key=lambda x: -x[0])
 
+        hop = self.MAX_HOPS - depth + 1
         for _score, _name, path, start_line, hb in ranked[:max_methods]:
-            found.append(f"// 来自 {Path(path).name}:{start_line}\n{hb}")
+            if _budget[0] <= 0:
+                break
+            _visited.add(_name)
+            _budget[0] -= 1
+            seg = f"// 来自 {Path(path).name}:{start_line} [Hop {hop}]\n{hb}"
+            found.append(seg)
+            # 递归：把**这一跳的段**当作新的 source 继续往下找。
+            # 不能拿整份 source 递归 —— 那会把入口体再扫一遍，每跳都重复注入。
+            if depth > 1:
+                deeper = self._resolve_cross_file_helpers(
+                    seg, depth - 1, max_methods, _visited, _budget)
+                if deeper:
+                    found.append(deeper)
 
         if not found:
             return ""
+        joined = "\n\n".join(found)
+        if not top:
+            return joined
         header = ("\n\n// ---- 跨文件辅助方法实现（入口方法调用的外部方法，含真实算法/参数）----\n")
-        return header + "\n\n".join(found)
+        return header + joined
 
     SECURITY_KEYWORDS = (
         "cipher", "algorithm", "getinstance", "messagedigest", "securedrandom",

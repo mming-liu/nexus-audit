@@ -779,6 +779,23 @@ def sqli_verdict(source: str) -> bool | None:
     if "无外部占位符" in impl and not SQLI_JDBC_SINK_RE.search(body):
         return False
 
+    # A0) 入口体里没有 sink，但**跨文件调用链**里有拼接 SQL + 执行方法。
+    #
+    #     切片器已经把 Controller → Facade → Service → Dao 展开到 4 跳
+    #     （`JavaSlicer.MAX_HOPS`），SQL 拼接在第 3~4 跳是常态。此前判据只读
+    #     `entry_body`，于是"证据在切片里、判据看不到"—— 规则返回 None，
+    #     模型同样看不到 sink 就答 No，真漏洞被静默放行。
+    #
+    #     三个条件缺一不可，少一个就会误报：
+    #       ① 有执行方法（execute/query/update/batchUpdate）
+    #       ② 有字符串拼接造 SQL
+    #       ③ 拼接的操作数里有**裸变量**，且该变量在段内被声明为形参
+    #          （`String id` / `Integer id`）。常量与字段不构成注入。
+    if not (SQLI_CREATE_STMT_RE.search(body) or SQLI_JDBCTEMPLATE_RE.search(body)
+            or SQLI_JDBC_SINK_RE.search(body)):
+        if _helper_concat_sql(source):
+            return True
+
     # A) JDBC：看 SQL 是怎么造出来的
     if SQLI_CREATE_STMT_RE.search(body) or SQLI_JDBCTEMPLATE_RE.search(body):
         # createStatement 无法绑定参数，只要 SQL 里出现拼接就可注入。
@@ -1030,6 +1047,41 @@ def _impl_segment(source: str) -> str:
     """
     i = source.find("跨文件证据")
     return source[i:] if i >= 0 else ""
+
+
+_SQL_EXEC_RE = re.compile(
+    r"\.\s*(?:execute|executeQuery|executeUpdate|executeBatch|query|queryForList"
+    r"|queryForObject|update|batchUpdate)\s*\(", re.I)
+
+
+def _helper_concat_sql(source: str) -> bool:
+    """多跳调用链里是否存在「形参拼进 SQL 并执行」。
+
+    只看切片器产出的「跨文件辅助方法实现」段（`[Hop 1..N]`）。三个条件
+    缺一不可，少一个就会误报：
+
+      ① 段内有执行方法（execute / query / update / batchUpdate）
+      ② 段内有字符串拼接造 SQL
+      ③ 拼接的操作数里有**裸变量**，且该变量在段内被声明为形参
+
+    条件 ③ 是防误报的关键：`String sql = "..." + "constant"` 里的操作数
+    是字面量（`_operand_vars` 返回 None），字段拼接也不是形参。
+    """
+    i = source.find("跨文件辅助方法实现")
+    if i < 0:
+        return False
+    seg = source[i:]
+    if not _SQL_EXEC_RE.search(seg):
+        return False
+    for rhs in _sql_rhs_iter(seg):
+        vars_ = _operand_vars(rhs)
+        if not vars_:
+            continue
+        for v in vars_:
+            if re.search(rf"\b(?:String|Integer|int|Long|long|Object|var)\s+"
+                         rf"{re.escape(v)}\b", seg):
+                return True
+    return False
 
 
 # ---------------- xss ----------------

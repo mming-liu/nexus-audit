@@ -1605,6 +1605,74 @@ check("垂直越权视图路由 → 交模型，不硬判 True(方向护栏)",
       _verdict("authz", _AUTHZ_VERTICAL), None)
 
 
+# ---------------- [40] 四跳调用链：切片必须跨到 sink ----------------
+#
+# 企业项目的真实链路是 Controller → Facade → Service → Dao → Mapper，4~6 跳。
+# 2026-10-20 之前 `_resolve_cross_file_helpers` 的深度固定为 1，实测四跳探针：
+#   Controller.detail → Facade.query → Service.getDetail → Dao.rawQuery → sink
+# 切片里**只有 Hop 1**，`SELECT * FROM orders` 完全不在，规则返回 None，
+# 模型看不到 sink 就答 No —— 真漏洞被静默放行。
+#
+# 这三个断言锁的是"证据到没到"，不是"判据聪明不聪明"：
+#   ① Hop 标记 ≥ 3 —— 展开真的递归了
+#   ② sink 文本在切片里 —— 第 3 跳的实现体被拉进来了
+#   ③ 规则判 True —— 端到端通了（证据到了但判据不读，仍然是 None）
+
+from core.slicer.java_servlet import JavaSlicer as _JS          # noqa: E402
+import tempfile as _tf                                          # noqa: E402
+from pathlib import Path as _Path                               # noqa: E402
+
+_HOP_FILES = {
+    "OrderController.java": '''package probe;
+@RestController
+@RequestMapping("/order")
+public class OrderController {
+    private OrderFacade orderFacade;
+    @GetMapping("/detail")
+    public String detail(@RequestParam("id") String id) {
+        return orderFacade.query(id);
+    }
+}''',
+    "OrderFacade.java": '''package probe;
+public class OrderFacade {
+    private OrderService orderService;
+    public String query(String id) {
+        return orderService.getDetail(id);
+    }
+}''',
+    "OrderService.java": '''package probe;
+public class OrderService {
+    private OrderDao orderDao;
+    public String getDetail(String id) {
+        return orderDao.rawQuery(id);
+    }
+}''',
+    "OrderDao.java": '''package probe;
+public class OrderDao {
+    private JdbcTemplate jdbcTemplate;
+    public java.util.List<String> rawQuery(String id) {
+        String sql = "SELECT * FROM orders WHERE id = '" + id + "'";
+        return jdbcTemplate.query(sql, (rs, i) -> rs.getString("id"));
+    }
+}''',
+}
+
+with _tf.TemporaryDirectory() as _td:
+    _base = _Path(_td) / "src" / "main" / "java" / "probe"
+    _base.mkdir(parents=True)
+    for _n, _c in _HOP_FILES.items():
+        (_base / _n).write_text(_c, encoding="utf-8")
+    _hop_units = _JS(_Path(_td)).extract_entry_units()
+
+_hop_src = _hop_units[0].source_code if _hop_units else ""
+check("四跳链：Hop 标记 ≥ 3（展开真的递归了）",
+      len([ln for ln in _hop_src.splitlines() if "[Hop " in ln]) >= 3, True)
+check("四跳链：第 3 跳的 sink 进切片",
+      "SELECT * FROM orders" in _hop_src, True)
+check("四跳链：规则端到端判 True（证据到了判据也要读）",
+      _verdict("sqli", _hop_src), True)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
