@@ -20,8 +20,16 @@ from pathlib import Path
 from typing import Iterable, List
 
 from core.models import CodeUnit, Language
+from core.text_utils import strip_java_comments
 
 IGNORE_DIRS = {".git", "target", "build", "node_modules", "test", "tests"}
+
+# 接口头（含 extends 子句）。`_interface_index()` 靠它拿到「这个方法是框架
+# 派生查询」的唯一依据 —— `extends JpaRepository<Person, String>`。
+# 泛型里可以有逗号和空格，所以 extends 段用 `[^{]+` 一路吃到左花括号。
+INTERFACE_HEAD_RE = re.compile(
+    r"(?m)^[ \t]*(?:(?:public|protected|abstract|static|final)\s+)*"
+    r"interface\s+(\w+)\s*(?:extends\s+[^{]+)?\{")
 
 # 类声明：class Foo extends HttpServlet
 CLASS_RE = re.compile(r"\b(?:public\s+)?(?:final\s+|abstract\s+)?class\s+([A-Za-z_]\w*)")
@@ -442,14 +450,47 @@ class JavaSlicer:
                 if deeper:
                     found.append(deeper)
 
-        if not found:
+        # 方法体跳展开完之后，再补「接口声明」段。
+        #
+        # 为什么不放在上面的 ranked 循环里：接口名不该占用方法体跳的名额
+        # （`max_methods` 是给真正的方法体留的），而且接口声明不带实现，
+        # 不需要递归。只在最外层补一次，避免每跳重复注入同一段。
+        #
+        # 这一段的存在意义是"补上被方法体索引天然丢掉的那一半"：
+        # Spring Data 仓库、MyBatis Mapper 的方法都只有声明。缺了它，
+        # 规则只能看到 `personRepository.findPersonByUsername(name)` 一行 ——
+        # 既看不到 SQL，也看不到"这是框架派生查询"。
+        iface_hits: list[str] = []
+        if top:
+            iidx = self._interface_index()
+            for name in sorted(calls - _visited):
+                hit = iidx.get(name)
+                if hit is None:
+                    continue
+                ipath, idecl = hit
+                if Path(ipath).resolve() == getattr(self, "_current_file", None):
+                    continue
+                iface_hits.append(f"// 来自 {Path(ipath).name}\n{idecl}")
+                if len(iface_hits) >= 3:
+                    break
+
+        if not found and not iface_hits:
             return ""
         joined = "\n\n".join(found)
+        iface_block = ""
+        if iface_hits:
+            iface_block = (
+                "\n\n// ---- 跨文件证据：被调方法的接口声明"
+                "（方法无方法体，实现由框架/子类提供）----\n"
+                + "\n\n".join(iface_hits))
         if not top:
-            return joined
-        header = ("\n\n// ---- 跨文件辅助方法实现（入口方法调用的外部方法，含真实算法/参数）----\n")
-        return header + joined
-
+            return joined + iface_block
+        # 段头只在真有方法体跳时输出。此前写成无条件拼接，`found` 为空、
+        # 只有接口声明时会在切片里留一个**空段头**——模型看到"跨文件辅助方法
+        # 实现"却没有任何内容，会以为证据被截断了。
+        header = ("\n\n// ---- 跨文件辅助方法实现（入口方法调用的外部方法，含真实算法/参数）----\n"
+                  if found else "")
+        return header + joined + iface_block
     SECURITY_KEYWORDS = (
         "cipher", "algorithm", "getinstance", "messagedigest", "securedrandom",
         "securerandom", "random", "digest", "encrypt", "decrypt", "key",
@@ -495,6 +536,64 @@ class JavaSlicer:
                 idx[name] = (str(java), _line_of(text, decl_start),
                              text[decl_start:close_idx + 1])
         self._midx = idx
+        return idx
+
+    def _interface_index(self) -> dict[str, tuple[str, str]]:
+        """「方法名 -> (文件, 接口头 + 该方法声明)」索引。
+
+        为什么需要它：`_method_index()` 只收**有方法体**的方法（`METHOD_RE`
+        要求后面有 `{`），而 Spring Data 仓库的方法天生没有方法体 ——
+            public List<Person> findPersonByUsername(String username);
+        于是 `personRepository.findPersonByUsername(name)` 在索引里查不到，
+        切片器既不补实现体、也不补声明，规则与模型都只看到一行调用。
+
+        索引内容必须包含**接口头**（`extends JpaRepository<Person, String>`），
+        因为"这个方法是框架派生/参数绑定"这一事实的唯一依据就在 extends 子句里。
+        只贴方法声明等于把证据又切掉了。
+
+        实测样本（micro_service_seclab `/sqlinjection/jpaone`）：
+        补上之前规则返回 None，模型只能按"看到了 personRepository 调用"猜；
+        补上之后 `extends JpaRepository` 是逐行可核对的事实。
+        """
+        if getattr(self, "_iidx", None) is not None:
+            return self._iidx
+        root = self.config_root if self.config_root != self.repo_path else self.repo_path
+        idx: dict[str, tuple[str, str]] = {}
+        for java in root.rglob("*.java"):
+            if any(part in IGNORE_DIRS for part in java.parts):
+                continue
+            from core.context.java_impl_resolver import _read_cached
+            text = _read_cached(java)
+            if not text or "interface " not in text:
+                continue
+            for hm in INTERFACE_HEAD_RE.finditer(text):
+                open_idx = hm.end() - 1
+                close_idx = _brace_match(text, open_idx)
+                if close_idx == -1:
+                    continue
+                head = text[hm.start():open_idx + 1]
+                body = text[open_idx + 1:close_idx]
+                # 按 `;` 切成员声明。注解里的字符串可能含 `;`（罕见），
+                # 切成碎段只会让那一条方法查不到，不会串到别的方法上。
+                for seg in body.split(";"):
+                    seg = seg.strip()
+                    if not seg:
+                        continue
+                    # **必须剥注释**。java-sec-code 的 `UserMapper.findByUserName`
+                    # 上方那行 Javadoc 写着「If using ${username}, application will
+                    # send a error」—— 注释里出现 `${}`，规则读到就判成
+                    # MyBatis 字符串替换 → 把 `#{username}` 安全样本判成注入
+                    # （实测这一条让 java-sec-code 从 1.000 掉到 0.971）。
+                    # 与 memory 第 10 条同型：不许模型被误导的东西，规则也不许读到。
+                    seg = strip_java_comments(seg, keep_lines=False).strip()
+                    if not seg:
+                        continue
+                    mm = re.search(r"(\w+)\s*\([^()]*(?:\([^()]*\)[^()]*)*\)\s*$",
+                                   seg, re.S)
+                    if not mm:
+                        continue
+                    idx.setdefault(mm.group(1), (str(java), head + "\n" + seg + ";\n}"))
+        self._iidx = idx
         return idx
 
     @staticmethod

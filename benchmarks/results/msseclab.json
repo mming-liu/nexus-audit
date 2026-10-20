@@ -1,0 +1,51 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\micro_service_seclab-main",
+  "total_units": 20,
+  "with_truth": 20,
+  "rule_covered": 19,
+  "rule_coverage": 0.95,
+  "rule_correct": 19,
+  "rule_accuracy": 1.0,
+  "per_category": {
+    "deserial": {
+      "n": 1,
+      "safe_n": 0,
+      "decided": 0,
+      "correct": 0
+    },
+    "sqli": {
+      "n": 11,
+      "safe_n": 4,
+      "decided": 11,
+      "correct": 11
+    },
+    "cmdi": {
+      "n": 2,
+      "safe_n": 0,
+      "decided": 2,
+      "correct": 2
+    },
+    "ssrf": {
+      "n": 5,
+      "safe_n": 0,
+      "decided": 5,
+      "correct": 5
+    },
+    "xxe": {
+      "n": 1,
+      "safe_n": 0,
+      "decided": 1,
+      "correct": 1
+    }
+  },
+  "fallback": [
+    {
+      "unit": "FastJsonController.createActivity",
+      "category": "deserial",
+      "real_vuln": true,
+      "route": "/fastjson/create",
+      "truth_src": "readme"
+    }
+  ],
+  "model": []
+}

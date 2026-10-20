@@ -1673,6 +1673,146 @@ check("四跳链：规则端到端判 True（证据到了判据也要读）",
       _verdict("sqli", _hop_src), True)
 
 
+# ---------------- [41] 值域判据：类型能不能承载 `'` ----------------
+#
+# micro_service_seclab 把 sqli 的唯一正确答案放在了一行类型声明里：
+#   in(List<String>)  与 longin(List<Long>)  **逐字同构**，连 Joiner 都一样，
+#   差别只有泛型实参。作者在 longin 上方写着「这并不是一个注入……是误报问题」。
+#
+# 检出方式是"不看拼接像不像，只看拼进去的值能不能是引号"。这条判据
+# 一旦写反，方向错误比误报危险：把 `List<String>` 判成 safe 是静默放行。
+# 所以三个断言里两个是方向护栏。
+
+_MS_SEQ = [
+    # (标签, 形参声明, 期望)
+    ("List<String> 拼进 IN 子句 → 真漏洞",
+     "public List<Student> q(@RequestBody List<String> name_list) {\n"
+     '        String sql = "select * from students where username in (\'"'
+     '+ Joiner.on("\',\'").join(name_list)+"\')\'";\n'
+     "        return jdbcTemplate.query(sql, ROW_MAPPER);\n    }", True),
+    ("List<Long> 同构代码 → 安全（值域锁死）",
+     "public List<Student> q(@RequestBody List<Long> name_list) {\n"
+     '        String sql = "select * from students where username in (\'"'
+     '+ Joiner.on("\',\'").join(name_list)+"\')\'";\n'
+     "        return jdbcTemplate.query(sql, ROW_MAPPER);\n    }", False),
+    ("Integer 形参 + String.valueOf → 安全",
+     "public List<Student> q(Integer id) {\n"
+     '        String sql = "select * from students where id = \'" + String.valueOf(id) + "\'";\n'
+     "        return jdbcTemplate.query(sql, ROW_MAPPER);\n    }", False),
+    ("Optional<String>.get() 解包 → 真漏洞（方向护栏）",
+     "public List<Student> q(Optional<String> username) {\n"
+     '        String sql = "select * from students where username like \'%" + username.get() + "%\'";\n'
+     "        return jdbcTemplate.query(sql, ROW_MAPPER);\n    }", True),
+]
+for _label, _qbody, _want in _MS_SEQ:
+    _src = ("    @RequestMapping(\"/x\")\n    public Object x() {\n"
+            "        return svc.call(p);\n    }\n\n"
+            "// ---- 跨文件辅助方法实现（入口方法调用的外部方法，含真实算法/参数）----\n"
+            "// 来自 Db.java:1 [Hop 1]\n    " + _qbody)
+    check(f"值域判据：{_label}", _verdict("sqli", _src), _want)
+
+
+# ---------------- [42] 接口声明段：没有方法体的仓库/映射器 ----------------
+#
+# Spring Data 仓库的方法只有声明，`_method_index()` 只收有方法体的方法，
+# 于是切片里只剩一行 `personRepository.findPersonByUsername(name)`。
+# 补上接口声明（含 extends 子句）之后，"框架派生查询 ⇒ 参数化"才成为事实。
+
+_IFACE_FILES = {
+    "JpaController.java": '''package probe;
+@RestController
+public class JpaController {
+    private PersonRepository personRepository;
+    @RequestMapping("/jpa")
+    public Object jpa(@RequestParam("name") String name) {
+        return personRepository.findPersonByUsername(name);
+    }
+}''',
+    "PersonRepository.java": '''package probe;
+public interface PersonRepository extends JpaRepository<Person, String> {
+    public List<Person> findPersonByUsername(String username);
+}''',
+    "MyMapper.java": '''package probe;
+public interface MyMapper {
+    /**
+     * If using ${username}, application will send a error.
+     */
+    @Select("select * from users where username = #{username}")
+    User findByUserName(@Param("username") String username);
+}''',
+    "MapperController.java": '''package probe;
+@RestController
+public class MapperController {
+    private MyMapper userMapper;
+    @RequestMapping("/mybatis")
+    public Object q(@RequestParam("username") String username) {
+        return userMapper.findByUserName(username);
+    }
+}''',
+}
+
+with _tf.TemporaryDirectory() as _td:
+    _base = _Path(_td) / "src" / "main" / "java" / "probe"
+    _base.mkdir(parents=True)
+    for _n, _c in _IFACE_FILES.items():
+        (_base / _n).write_text(_c, encoding="utf-8")
+    _iface_units = {u.unit_name: u.source_code for u in _JS(_Path(_td)).extract_entry_units()}
+
+_jpa_src = _iface_units.get("JpaController.jpa", "")
+check("接口声明段：extends JpaRepository 被带进切片",
+      "extends JpaRepository" in _jpa_src, True)
+check("接口声明段：JPA 派生查询判安全（框架生成参数化 SQL）",
+      _verdict("sqli", _jpa_src), False)
+# 方向护栏：Javadoc 里的 `${username}` 是**注释**。规则读到它就会把
+# `#{username}` 安全样本判成注入 —— java-sec-code 实测从 1.000 掉到 0.971。
+_myb_src = _iface_units.get("MapperController.q", "")
+check("接口声明段：Javadoc 里的 ${} 不许被当成 MyBatis 替换符（方向护栏）",
+      _verdict("sqli", _myb_src), False)
+
+
+# ---------------- [43] Apache HttpClient 的变量形态 SSRF ----------------
+#
+# `client.execute(new HttpGet(url))` 早就能认，但真实代码几乎都先声明变量：
+#   HttpGet get = new HttpGet(imageUrl); client.execute(get);
+# 实参是小写变量名，`execute\(\s*(?:new\s+)?Http\w*` 一个字符都对不上。
+
+_SSRF_VAR = '''    @RequestMapping("/four")
+    public String four(@RequestParam(value = "url") String imageUrl) {
+        DefaultHttpClient client = new DefaultHttpClient();
+        HttpGet get = new HttpGet(imageUrl);
+        HttpResponse response = client.execute(get);
+        return response.toString();
+    }'''
+check("HttpClient 变量形态 new HttpGet(url) + execute → 真漏洞",
+      _verdict("ssrf", _SSRF_VAR), True)
+check("HttpClient 目标写死 new HttpGet(常量) → 不是本类目对象",
+      _verdict("ssrf", _SSRF_VAR.replace("new HttpGet(imageUrl)",
+                                         'new HttpGet("http://fixed/x")')), None)
+
+
+# ---------------- [44] JPA createQuery：JPQL 世界的 prepareStatement ----------------
+#
+# JavaSecLab `JPAController` 三个对照样本，此前全部退回模型。
+# 判据与 prepareStatement 完全同构：先回溯源变量，再看文本里有没有拼接。
+
+_JPA_CASES = [
+    ("jpql 字符串拼接 → 真漏洞",
+     'String jpql = "SELECT s FROM Sqli s WHERE s.username = \'" + username + "\'";\n'
+     "        Query q = entityManager.createQuery(jpql);", True),
+    ("jpql 命名参数 + setParameter → 安全",
+     'String jpql = "SELECT s FROM Sqli s WHERE s.username = :username";\n'
+     '        Query q = entityManager.createQuery(jpql).setParameter("username", username);',
+     False),
+    ("jpql 常量无占位符 → 交模型（不硬判）",
+     'String jpql = "SELECT s FROM Sqli s";\n'
+     "        Query q = entityManager.createQuery(jpql);", None),
+]
+for _label, _qbody, _want in _JPA_CASES:
+    _src = ("    @RequestMapping(\"/x\")\n    public Object x(@RequestParam String username) {\n"
+            "        " + _qbody + "\n        return null;\n    }")
+    check(f"JPA createQuery：{_label}", _verdict("sqli", _src), _want)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

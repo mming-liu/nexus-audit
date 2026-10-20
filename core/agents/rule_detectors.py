@@ -731,6 +731,18 @@ SQLI_JDBCTEMPLATE_RE = re.compile(
     r"\.\s*(?:queryForMap|queryForList|queryForObject|queryForRowSet|"
     r"update|batchUpdate)\s*\(", re.I)
 SQLI_PREPARE_RE = re.compile(r"\.\s*prepare(?:Statement|Call)\s*\(\s*([^;]{0,300})", re.I | re.S)
+# JPA 的手写查询入口：`entityManager.createQuery(jpql)` / `createNativeQuery(sql)`。
+# 它就是 JPQL 世界的 `prepareStatement` —— 传进去的是**语句文本**，不是参数，
+# 所以判据与 prepareStatement 完全同构：先回溯源变量，再看文本里有没有拼接。
+#
+# JavaSecLab `JPAController` 给了三个对照样本：
+#     vul1  jpql = "... s.username = '" + username + "'"      → 拼接 ⇒ 注入
+#     vul2  jpql = "... ORDER BY s." + orderBy                → 拼接 ⇒ 注入
+#     safe  jpql = "... s.username = :username" + setParameter → 绑定 ⇒ 安全
+# 三条此前全部退回模型（判据只认 prepareStatement），模型对 JPQL 的
+# 命名参数与字符串拼接最容易看反 —— 这正是"规则能确定性判定就别交模型"的场景。
+SQLI_JPA_QUERY_RE = re.compile(
+    r"\.\s*create(?:Native)?Query\s*\(\s*([^;]{0,200})", re.I)
 # 字符串拼接：`"..." + 变量` 或 `变量 + "..."`
 SQLI_CONCAT_RE = re.compile(
     r'"[^"]*"\s*\+|\+\s*"[^"]*"')
@@ -748,6 +760,52 @@ MYBATIS_DOLLAR_RE = re.compile(r"\$\{\s*_?\w+\s*\}")
 MYBATIS_HASH_RE = re.compile(r"#\{\s*_?\w+\s*\}")
 
 
+# ---------------- Spring Data 仓库：框架生成的查询必然是参数化的 ----------------
+#
+# micro_service_seclab 的 `/sqlinjection/jpaone` 与 `/jpaWithAnnotations`：
+#
+#     public interface PersonRepository extends JpaRepository<Person, String> {
+#         public List<Person> findPersonByUsername(String username);            // 派生查询
+#         @Query("SELECT nickname FROM Person WHERE nickname = '?1'")
+#         public List<Person> findPersonByNickname(String nickname);            // JPQL 绑定
+#     }
+#
+# 这是**可逐行核对的框架契约**，不是语义推断：`findPersonByUsername` 由方法名
+# 派生（`username` 是实体属性），Spring Data 生成的永远是 `where username = ?`；
+# `@Query` 里的 `?1` 是位置占位符，绑定到 `setParameter`。两条路径都不拼接字符串。
+#
+# 判据必须同时满足两条，少一条都不判 safe：
+#   ① 切片里有 `interface X extends <某个 Spring Data 仓库接口>`
+#   ② 该声明段内**没有任何字符串拼接**（`"..." + x`）
+#
+# ② 是防漏报闸门：`@Query` 里手写 `+` 是真实存在的写法（nativeQuery 拼表名），
+# 那种情况参数化与否取决于拼进去的是什么，不能一概放行。
+# 反过来，只要没有任何拼接，就不存在注入面 —— 这与"白名单够不够严"不同，
+# 是个封闭问题。
+_JPA_REPO_DECL_RE = re.compile(
+    r"\binterface\s+\w+\s+extends\s+[^{;]*\b(?:JpaRepository|JpaSpecificationExecutor|"
+    r"CrudRepository|PagingAndSortingRepository|MongoRepository|"
+    r"ReactiveCrudRepository|R2dbcRepository|ElasticsearchRepository)\b")
+_CONCAT_ANY_RE = re.compile(r'"[^"\n]*"\s*\+|\+\s*"')
+
+
+def _jpa_derived_query_safe(source: str) -> bool:
+    """切片里有 Spring Data 仓库接口声明，且整段声明没有任何字符串拼接。"""
+    marker = "被调方法的接口声明"
+    i = source.find(marker)
+    if i < 0:
+        return False
+    seg = source[i:]
+    nxt = re.search(r"^//\s*----", seg[len(marker):], re.M)
+    if nxt:
+        seg = seg[: len(marker) + nxt.start()]
+    if not _JPA_REPO_DECL_RE.search(seg):
+        return False
+    if _CONCAT_ANY_RE.search(seg):
+        return False
+    return True
+
+
 def sqli_verdict(source: str) -> bool | None:
     body = entry_body(source)
     impl = _impl_segment(source)
@@ -760,6 +818,13 @@ def sqli_verdict(source: str) -> bool | None:
     #    `.matches(...)` 在 Java 里**本身就是全串匹配**，不需要再看函数名。
     m_wl = SQLI_WHITELIST_RE.search(body)
     if m_wl and not _TRIVIAL_WHITELIST_RE.search(m_wl.group(0)):
+        return False
+
+    # C2) Spring Data 仓库：切片里带着 `extends JpaRepository` 的声明段，
+    #     且整段没有任何字符串拼接 → 查询由框架生成，必然参数化。
+    #     放在 MyBatis 之前：Mapper 接口与 Repository 接口都只有声明，
+    #     但只有后者能靠 extends 子句给出确定性答案。
+    if _jpa_derived_query_safe(source):
         return False
 
     # B) MyBatis：只有能确认用的是 ${} 还是 #{} 才判
@@ -793,8 +858,13 @@ def sqli_verdict(source: str) -> bool | None:
     #          （`String id` / `Integer id`）。常量与字段不构成注入。
     if not (SQLI_CREATE_STMT_RE.search(body) or SQLI_JDBCTEMPLATE_RE.search(body)
             or SQLI_JDBC_SINK_RE.search(body)):
-        if _helper_concat_sql(source):
+        hv = _helper_concat_sql(source)
+        if hv is True:
             return True
+        if hv is False:
+            # 值域锁死（`List<Long>` / `Integer`）—— 与入口体里的
+            # `_concat_params_all_numeric` 是同一条事实，只是形参在下一跳。
+            return False
 
     # A) JDBC：看 SQL 是怎么造出来的
     if SQLI_CREATE_STMT_RE.search(body) or SQLI_JDBCTEMPLATE_RE.search(body):
@@ -822,6 +892,19 @@ def sqli_verdict(source: str) -> bool | None:
                 return False if _sql_encoded_concat_safe(body) else None
             return True
         return None                    # 常量 SQL，不是注入面
+    m = SQLI_JPA_QUERY_RE.search(body)
+    if m:
+        arg = _resolve_sql_var(body, m.group(1))
+        if SQLI_CONCAT_RE.search(arg):
+            if _sql_concat_all_constant(body, _sibling_methods(source)):
+                return False
+            return True
+        # `:name`（JPQL 命名参数）与 `?1`（位置参数）都是绑定，不可能注入
+        if "?" in arg or re.search(r":\s*\w", arg):
+            return False
+        # `createQuery(cq)` 的 Criteria API 形态：查询由构造器拼出，不在文本里。
+        # 判不了就是判不了。
+        return None
     m = SQLI_PREPARE_RE.search(body)
     if m:
         arg = m.group(1)
@@ -1032,7 +1115,13 @@ def _resolve_sql_var(body: str, arg: str) -> str:
         PreparedStatement st = con.prepareStatement(sql);
     实参 `sql)` 里既没有 `?` 也没有拼接，但 SQL 本身是拼出来的。
     """
-    name = arg.strip().rstrip(")").strip()
+    name = arg.strip()
+    # 链式调用：`createQuery(jpql).setParameter("x", y)` 的实参段是
+    # `jpql)\n.setParameter(...)`，只做 rstrip(")") 会连方法名一起留下，
+    # 结果不是纯标识符、原样返回，于是 JPQL 常量 + setParameter 的安全样本
+    # 被判成"查不出语句"。先取第一个 `)` 之前的标识符。
+    m0 = re.match(r"([A-Za-z_]\w*)\s*\)", name)
+    name = m0.group(1) if m0 else name.rstrip(")").strip()
     if not re.fullmatch(r"[A-Za-z_]\w*", name):
         return arg
     m = re.findall(rf"\b(?:String\s+)?{re.escape(name)}\s*=\s*([^;]+);", body)
@@ -1044,8 +1133,17 @@ def _impl_segment(source: str) -> str:
 
     这一段放的是 Mapper XML / @Select 注解 / 接口实现类的方法体 ——
     判断 ${} vs #{} 只能在这里找，入口方法体只有一行 mapper 调用。
+
+    **必须锚定"以下为实现体"这个完整段头**，不能只找"跨文件证据"：
+    切片器还有其他同前缀的段（`跨文件证据：被调方法的接口声明`、
+    `跨文件证据：xxx() 的接口实现类方法体`）。只找前缀会把接口声明段
+    一并吞进来 —— java-sec-code 的 `UserMapper` Javadoc 里那句
+    「If using ${username} ...」正是这样把 `#{}` 安全样本判成了注入。
+    判据扫的范围比判据本身更容易错，这是第三次栽在同一处。
     """
-    i = source.find("跨文件证据")
+    i = source.find("跨文件证据：以下为实现体")
+    if i < 0:
+        i = source.find("跨文件证据")
     return source[i:] if i >= 0 else ""
 
 
@@ -1054,34 +1152,213 @@ _SQL_EXEC_RE = re.compile(
     r"|queryForObject|update|batchUpdate)\s*\(", re.I)
 
 
-def _helper_concat_sql(source: str) -> bool:
+# ---------------- 值域判据：类型能不能承载危险字符 ----------------
+#
+# micro_service_seclab 把这个问题的**唯一正确答案**放在了一行类型声明里：
+#
+#     in(@RequestBody List<String> user_list)      → 拼接进 SQL  ⇒ 注入
+#     longin(@RequestBody List<Long> user_list)    → 拼接进 SQL  ⇒ 不注入
+#
+# 两个方法**逐字同构**，连 `Joiner.on("','").join(name_list)` 都一模一样，
+# 差异只有泛型实参。作者在 `/longin` 上方写着：
+#     // 这并不是一个注入，如果SAST扫描器将这个报为SQL注入漏洞，那么这是一个误报问题
+#
+# 判据不能靠"看它像不像在拼接"，只能靠"**被拼进去的值能不能是 `'`**"。
+# 类型就是这件事的事实支点，而且逐行可核对 —— 不需要理解 SQL 语义。
+#
+# 为什么 `List<Long>` 真的安全：Jackson 把 `["1 or 1=1"]` 反序列化成
+# `List<Long>` 时直接抛类型异常，请求到不了业务代码；就算到了，
+# `Joiner` 也只是把数字转成字符串，`'` 无从出现。
+#
+# **未知一律 None，不猜**：`Object`、`var`、没见过的类都在这一档。
+# 这条判据只用于**放行 safe**（False），判漏洞仍由污点链负责。
+_SAFE_SCALAR_TYPES = frozenset({
+    "int", "integer", "long", "short", "byte", "double", "float",
+    "boolean", "bool", "bigdecimal", "biginteger", "number",
+})
+_STR_SCALAR_TYPES = frozenset({
+    "string", "char", "character", "charsequence", "text",
+    "stringbuilder", "stringbuffer",
+})
+# 容器/包装：剥一层再看里面的元素类型。`Iterable` 与 `Collection` 都算，
+# 因为 `Joiner.join(Iterable)` 吃的是元素。
+_CONTAINER_TYPE_RE = re.compile(
+    r"^(?:[\w.]*\b)?(?:List|Set|Collection|Iterable|Queue|Deque|"
+    r"ArrayList|LinkedList|HashSet|TreeSet|LinkedHashSet|Optional)\s*<(.+)>$",
+    re.I)
+
+
+def _type_carries_taint(ty: str) -> bool | None:
+    """声明类型 `ty` 的值能否携带能破坏 SQL 的字符（`'` / `--` / `OR`）。
+
+    True = 可以（String 族）；False = 不可以（数值族）；None = 不知道。
+    """
+    ty = (ty or "").strip()
+    if not ty:
+        return None
+    # 数组：String[] / Long[]
+    if ty.endswith("[]"):
+        return _type_carries_taint(ty[:-2])
+    m = _CONTAINER_TYPE_RE.match(ty)
+    if m:
+        return _type_carries_taint(m.group(1))
+    bare = ty.rsplit(".", 1)[-1].strip().lower()
+    if bare in _SAFE_SCALAR_TYPES:
+        return False
+    if bare in _STR_SCALAR_TYPES:
+        return True
+    return None
+
+
+def _split_args_generic_aware(args: str) -> list[str]:
+    """按顶层逗号拆形参，**尖括号深度也算层级**。
+
+    `_split_args` 只跟踪 `([{`，遇到 `Map<String, Object> m` 会在泛型里的
+    那个逗号处断成两截，于是 `m` 的类型被读成 `Object>` —— 一个本该是
+    「不知道」的类型被读成「Object」。这个靶场没踩到，但同一条链上的
+    下一个样本会。
+    """
+    out, depth, cur = [], 0, ""
+    for ch in args:
+        if ch in "([{<":
+            depth += 1
+        elif ch in ")]}>":
+            depth -= 1
+        if ch == "," and depth == 0:
+            out.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+    if cur.strip():
+        out.append(cur.strip())
+    return out
+
+
+def _param_decl_types(sig: str) -> dict[str, str]:
+    """形参名 → 声明类型（**含泛型实参**）。`@RequestBody List<Long> x` → {x: List<Long>}。
+
+    不要与后面那个同名的 `_param_types` 混用：它走 `_PARAM_SEG_RE`
+    （`([A-Z]\\w*)(?:<[^>]*>)?\\s+(\\w+)`），泛型实参被 `?` 吃掉，
+    `List<Long>` 只剩 `List` —— 而本靶场的 in / longin 之辨**全在泛型实参上**，
+    丢掉它等于把唯一的事实支点丢了。函数名分开，免得后写的那份把这份覆盖掉
+    （同名定义在 Python 里是静默后写胜出，不报错，极难发现）。
+    """
+    sig = re.sub(r"@\w+\s*(?:\([^()]*(?:\([^()]*\)[^()]*)*\))?", " ", sig)
+    out: dict[str, str] = {}
+    for seg in _split_args_generic_aware(sig):
+        seg = seg.strip()
+        if not seg or seg in ("final",):
+            continue
+        parts = seg.split()
+        if len(parts) < 2:
+            continue
+        name = parts[-1].strip()
+        out[name] = " ".join(parts[:-1]).replace(" final ", " ").strip()
+    return out
+
+
+def _segment_param_types(seg: str) -> dict[str, str]:
+    """段内**所有**方法签名的形参类型并集（先到先得）。
+
+    同一段里出现同名形参是常态（`id` 在十来个方法里都有），按方法体精确
+    归属会让这段代码膨胀一倍。先到先得在本靶场的实测结果与人工核对一致；
+    若将来出现"同名不同类型"导致误判，正确做法是**不表态**而不是挑一个，
+    所以这里只用来放行 False，不用来判 True。
+    """
+    out: dict[str, str] = {}
+    for m in re.finditer(r"\b(\w+)\s*\(([^()]*)\)\s*(?:throws[^{;]*)?\{", seg):
+        for name, typ in _param_decl_types(m.group(2)).items():
+            out.setdefault(name, typ)
+    return out
+
+
+def _concat_operand_taint(rhs: str, seg: str,
+                          decls: dict[str, str] | None = None) -> bool | None:
+    """SQL 拼接右值的**每一个操作数**是否都只能取到无害值。
+
+    True  = 至少一个操作数能携带 `'`（污点成立）
+    False = 所有操作数都能被类型/字面量锁定为无害
+    None  = 有操作数查不出来
+
+    与 `_operand_vars` 的分工：那个只认**裸变量**（`+ id +`），因此
+    `Joiner.on("','").join(name_list)`、`username.get()`、
+    `String.valueOf(id)` 三种形态一概看不见 —— micro_service_seclab 的
+    `/in` `/longin` `/optinal_like` `/objectint` 四条就全部卡在这里，
+    真漏洞和误报陷阱一起退回模型（模型对"拼进 SQL 的是 List"没有类型
+    信息，只能猜）。
+    """
+    if decls is None:
+        decls = _segment_param_types(seg)
+    seen: list[bool | None] = []
+    for part in _STR_LIT_RE.sub('""', rhs).split("+"):
+        p = part.strip()
+        if not p or p == '""':
+            continue                       # 纯字面量
+        if re.fullmatch(r"\d+[lLdDfF]?", p):
+            continue                       # 数字字面量
+        ids = _expr_identifiers(p)
+        if not ids:
+            # `Integer.valueOf(1)` / `System.currentTimeMillis()` 这类不引用
+            # 任何局部变量的调用：结果与外部输入无关。
+            seen.append(False)
+            continue
+        for v in ids:
+            ty = decls.get(v)
+            if ty:
+                seen.append(_type_carries_taint(ty))
+                continue
+            # 局部变量：`List<Long> list = ...` / `int n = ...`
+            m = re.search(
+                rf"\b([A-Za-z_][\w.]*(?:\s*<[^<>]*>)?(?:\[\])?)\s+"
+                rf"{re.escape(v)}\s*=(?!=)\s*([^;]+);", seg)
+            if m:
+                seen.append(_type_carries_taint(m.group(1)))
+                continue
+            seen.append(None)
+    if any(s is True for s in seen):
+        return True
+    if seen and all(s is False for s in seen):
+        return False
+    return None
+
+
+def _helper_concat_sql(source: str) -> bool | None:
     """多跳调用链里是否存在「形参拼进 SQL 并执行」。
 
-    只看切片器产出的「跨文件辅助方法实现」段（`[Hop 1..N]`）。三个条件
+    只看切片器产出的「跨文件辅助方法实现」段（`[Hop 1..N]`）。两个条件
     缺一不可，少一个就会误报：
 
       ① 段内有执行方法（execute / query / update / batchUpdate）
-      ② 段内有字符串拼接造 SQL
-      ③ 拼接的操作数里有**裸变量**，且该变量在段内被声明为形参
+      ② 段内有字符串拼接造 SQL，且 `_concat_operand_taint` 判定成立
 
-    条件 ③ 是防误报的关键：`String sql = "..." + "constant"` 里的操作数
-    是字面量（`_operand_vars` 返回 None），字段拼接也不是形参。
+    返回值是三态，**False 与 None 的区分是这条判据的重点**：
+
+      True  → 有操作数能把 `'` 带进 SQL，判漏洞
+      False → **每一个**操作数都被类型或字面量锁死为无害，可以放行 safe
+      None  → 有操作数查不出来（`Object`、没见过的工具类），不表态
+
+    第三态曾经写成 `return False`（等同"不成立"，继续往下走到 None），
+    于是"我查不出来"和"我确认它安全"混在一起。micro_service_seclab 的
+    `/longin` 恰好落在这个缝里：操作数是 `List<Long>`，值域锁死，
+    本该判 safe，却因为"不是裸变量"被判成"不成立"，最终交模型抽签。
     """
     i = source.find("跨文件辅助方法实现")
     if i < 0:
-        return False
+        return None
     seg = source[i:]
     if not _SQL_EXEC_RE.search(seg):
-        return False
+        return None
+    decls = _segment_param_types(seg)
+    seen: list[bool | None] = []
     for rhs in _sql_rhs_iter(seg):
-        vars_ = _operand_vars(rhs)
-        if not vars_:
-            continue
-        for v in vars_:
-            if re.search(rf"\b(?:String|Integer|int|Long|long|Object|var)\s+"
-                         rf"{re.escape(v)}\b", seg):
-                return True
-    return False
+        t = _concat_operand_taint(rhs, seg, decls)
+        if t is True:
+            return True
+        seen.append(t)
+    if seen and all(t is False for t in seen):
+        return False
+    return None
+
 
 
 # ---------------- xss ----------------
@@ -3120,11 +3397,39 @@ SSRF_SINK_RE = re.compile(
     r"\b\w*(?:Http|http|Service|Utils|Request)\w*\s*\.\s*\w+\s*\(\s*\w*url\w*", re.I)
 
 
+# Apache HttpClient 4.x 的**变量形态**：`HttpGet req = new HttpGet(url); client.execute(req);`
+# 上面 `SSRF_SINK_RE` 的 `\.\s*execute\s*\(\s*(?:new\s+)?Http\w*` 只认内联写法
+# `client.execute(new HttpGet(url))`。真实代码几乎都先声明变量，实参是小写
+# 变量名，一个字符都对不上 —— 整条落到"不是本类目对象 → None"。
+# micro_service_seclab 的 `/ssrf/four`（DefaultHttpClient）就是这样。
+_HTTPCLIENT_REQ_RE = re.compile(
+    r"new\s+Http(?:Get|Post|Put|Delete|Head|Patch|RequestBase)\s*\(\s*([^)]*)\)")
+
+
+def _httpclient_sink_hit(body: str) -> bool:
+    """是否存在「用外部值构造 HttpClient 请求并执行」的形态。
+
+    只认构造实参**不是字面量**的写法：`new HttpGet("http://fixed/")` 目标
+    写死在代码里，不是本类目的判定对象。这里不判防护，只判"有没有发起请求"。
+    """
+    if not re.search(r"\.\s*execute\s*\(", body):
+        return False
+    for m in _HTTPCLIENT_REQ_RE.finditer(body):
+        arg = m.group(1).strip()
+        if not arg or arg.startswith('"'):
+            continue
+        if re.fullmatch(r"[A-Za-z_]\w*", arg):
+            return True
+        if re.search(r"[A-Za-z_]\w*", _STR_LIT_RE.sub(" ", arg)):
+            return True
+    return False
+
+
 def ssrf_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not body:
         return None
-    if not SSRF_SINK_RE.search(body):
+    if not SSRF_SINK_RE.search(body) and not _httpclient_sink_hit(body):
         return None
 
     if SSRF_HOOK_RE.search(body):
