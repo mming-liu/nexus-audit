@@ -1449,6 +1449,101 @@ private static String doSomething(HttpServletRequest request, String param)
 check("xpathi guard 前旧值是脏值 → 不许放行(方向护栏)", _verdict("xpathi", _XP_CONTAINER_LEAK), None)
 
 
+# ---------------- [38] OWASP 全量扫描暴露的五类机制 ----------------
+#
+# 这一段的来源不是设计，是 `benchmarks/regress_owasp_rules.py`（全量 2740
+# 样本）逼出来的：30 条/类的抽样池把 41 条 safe→True 与 15 条 vul→False
+# 全盖住了。逐条打开源码后归成五类，每类一条断言。
+#
+# 三条是**方向护栏**（必须判 True / None），比"能判出 False"更重要：
+# 判据放宽时最先坏的总是它们，而它们坏掉就是静默放行真漏洞。
+
+# ① 容器顶掉脏值，写在**入口体**里（不只是 helper 内）
+_SQL_CONTAINER_INLINE = _SQL_HEAD + '''    String bar = "alsosafe";
+    if (param != null) {
+        java.util.List<String> valuesList = new java.util.ArrayList<String>();
+        valuesList.add("safe");
+        valuesList.add(param);
+        valuesList.add("moresafe");
+        valuesList.remove(0);
+        bar = valuesList.get(1);
+    }
+''' + _SQL_SINK + _SQL_TAIL
+check("入口体容器顶掉脏值 → 安全(00200)", _verdict("sqli", _SQL_CONTAINER_INLINE), False)
+
+# ② switch 选择子 `charAt(1)` = 'B' → 走常量分支
+_SQL_SWITCH_SAFE = _SQL_HEAD + '''    String bar;
+    String guess = "ABC";
+    char switchTarget = guess.charAt(1);
+    switch (switchTarget) {
+        case 'A':
+            bar = param;
+            break;
+        case 'B':
+            bar = "bob";
+            break;
+        case 'C':
+        case 'D':
+            bar = param;
+            break;
+        default:
+            bar = "bob's your uncle";
+            break;
+    }
+''' + _SQL_SINK + _SQL_TAIL
+check("switch charAt(1)='B' 走常量分支 → 安全(01806)", _verdict("sqli", _SQL_SWITCH_SAFE), False)
+
+# ③ 方向护栏：同一个 switch，`charAt(2)` = 'C' 走的是脏值分支。
+#    01803/01807/01814 就是这一族。靶场把 01807 标成 safe 是**真值错误**
+#    （已登记 disputed_truth.py），规则必须判 True 而不是被 switch 折叠忽悠成安全。
+_SQL_SWITCH_VUL = _SQL_SWITCH_SAFE.replace("charAt(1)", "charAt(2)")
+check("switch charAt(2)='C' 走脏值分支 → 真漏洞(方向护栏)", _verdict("sqli", _SQL_SWITCH_VUL), True)
+
+# ④ 跨文件接口实现体 return 字面量（`SeparateClassRequest.getTheValue`）
+#    证据在切片的「跨文件证据：getTheValue() 的接口实现类方法体」段里，
+#    `_element_is_constant` 必须去读它，否则整族样本永远判不出常量。
+_SQL_SAFE_SOURCE = _SQL_HEAD + '''    String param2 = scr.getTheValue("p");
+    String bar = thing.doSomething(param2);
+''' + _SQL_SINK + _SQL_TAIL + '''
+// ---- 跨文件证据：getTheParameter() 的接口实现类方法体 @ src/SeparateClassRequest.java ----
+    public String getTheParameter(String p) {
+        return request.getParameter(p);
+    }
+// ---- 跨文件证据：getTheValue() 的接口实现类方法体 @ src/SeparateClassRequest.java ----
+    public String getTheValue(String p) {
+        return "bar";
+    }
+'''
+check("跨文件实现体 return 字面量 → 安全(00863 族)", _verdict("sqli", _SQL_SAFE_SOURCE), False)
+
+# ⑤ 方向护栏：`encodeBase64` 是数据变换，不是输出编码。
+#    宽写成 `encode\w*\(` 会让 OWASP 00385 这类真漏洞被判"已编码"→ 静默放行。
+#    要求只到"不得判 False"这一档：值经过 helper 产出，是否已转义取决于
+#    那个方法体，规则看不到就不能给确定结论（与 _echo_value_traced_locally
+#    的三态一致）。
+_XSS_BASE64_VUL = '''public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    String param = request.getParameter("p");
+    String bar = new String(java.util.Base64.decodeBase64(
+            java.util.Base64.encodeBase64(param.getBytes())));
+    java.io.PrintWriter out = response.getWriter();
+    out.println(bar);
+}'''
+check("encodeBase64 不算输出编码 → 不得判安全(方向护栏)",
+      _verdict("xss", _XSS_BASE64_VUL) is not False, True)
+
+# ⑥ 方向护栏：`PrintWriter out = response.getWriter(); out.format(...)`
+#    回显经过中间变量，连写形态 `getWriter().format(` 匹配不到。
+#    漏掉的后果不是少报一个 sink，而是整条落到"无回显 → False"。
+_XSS_WRITER_VUL = '''public void doPost(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    String param = request.getParameter("p");
+    String bar = param;
+    Object[] obj = {"a", bar};
+    java.io.PrintWriter out = response.getWriter();
+    out.format(java.util.Locale.US, "Formatted like: %1$s and %2$s.", obj);
+}'''
+check("PrintWriter 中间变量回显 → 真漏洞(方向护栏)", _verdict("xss", _XSS_WRITER_VUL), True)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

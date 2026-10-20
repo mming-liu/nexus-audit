@@ -1063,8 +1063,32 @@ XSS_ECHO_SINK_RE = re.compile(
     # 不能因为中间有调用就当作没有回显：是否安全由 encode 检测另行判定，
     # 两件事必须分开判，否则 `return encode(xss)` 会被漏成"无回显"。
     r"return\s+\w+\s*\([^)]*\)\s*;", re.I)
+
+# `java.io.PrintWriter out = response.getWriter(); out.format(...)` ——
+# 回显经过一个中间变量，连写形态 `getWriter().format(` 完全匹配不到。
+# OWASP 的 01046/01047/01335/01417/01505/01583/02221 全是这个写法，
+# 漏掉的后果不是"少报一个 sink"，而是整条落到"无回显 → False"，
+# 也就是**静默放行真漏洞**（比误报危险，方向必须写死）。
+_WRITER_VAR_RE = re.compile(
+    r"\b([A-Za-z_]\w*)\s*=(?!=)\s*[^;]*\.\s*getWriter\s*\(\s*\)")
+
+
+def _echo_sink_hit(body: str) -> bool:
+    """方法体里是否存在回显点（含 `PrintWriter` 中间变量形态）。"""
+    if XSS_ECHO_SINK_RE.search(body):
+        return True
+    for m in _WRITER_VAR_RE.finditer(body):
+        v = m.group(1)
+        if re.search(rf"(?<![\w.]){re.escape(v)}\s*\.\s*"
+                     r"(?:print|write|println|printf|format)\s*\(", body):
+            return True
+    return False
+
 XSS_ENCODE_RE = re.compile(
-    r"encode\w*\s*\(|escape\w*\s*\(|HtmlUtils\s*\.\s*htmlEscape|"
+    # `encode(?!Base64)` 是必须的负向前瞻：OWASP 的传播链模板里
+    # `Base64.encodeBase64(...)` 是**数据变换**不是输出编码，
+    # 宽写成 `encode\w*\(` 会让 00385 这类真漏洞被判成"已编码"→ 静默放行。
+    r"encode(?!Base64)\w*\s*\(|escape\w*\s*\(|HtmlUtils\s*\.\s*htmlEscape|"
     r"StringEscapeUtils|ESAPI\s*\.\s*encoder|encodeForHTML|"
     r"Encode\s*\.\s*forHtml|Jsoup\s*\.\s*clean", re.I)
 XSS_PARAM_RE = re.compile(
@@ -1548,12 +1572,42 @@ def _literal_or_none(expr: str) -> str | None:
     return m.group(1) if m else None
 
 
-def _last_assignment_untainted(body: str, var: str) -> bool:
+def _element_is_constant(val: str, body: str, helpers: str = "",
+                        params: set[str] | None = None, skip: str = "",
+                        p2a: dict[str, str] | None = None) -> bool:
+    """容器元素是否常量：先看字面量，再看能否跨方法上溯到常量。
+
+    为什么需要第二步：OWASP 00867 的容器里装的是
+    `param = scr.getTheValue(...)`，而 `SeparateClassRequest.getTheValue`
+    的实现体是 `return "bar";` —— 逐行可核对的常量。只看字面量会把它当脏值，
+    容器推演就白做了。`skip` 防自引用（`valuesList.add(bar)` 里 bar 就是
+    当前正在解析的变量）。
+
+    `p2a` 要先查：在 helper 体里 `param` 是形参，单看形参会一律被判成
+    tainted；但调用点已经算过"这次传进来的是常量"（02734）。
+    """
+    if _literal_or_none(val) is not None:
+        return True
+    if not re.fullmatch(r"[A-Za-z_]\w*", val) or val == skip:
+        return False
+    if p2a and val in p2a:
+        return p2a[val] == "lit"
+    if not helpers:
+        return False
+    return _value_origin(body, val, helpers, params) == "lit"
+
+
+def _last_assignment_untainted(body: str, var: str, helpers: str = "",
+                               params: set[str] | None = None,
+                               p2a: dict[str, str] | None = None) -> bool:
     """`var` 的最后一次赋值能否上溯到**常量字面量**。
 
     形如 `bar = valuesList.get(1)` / `bar = map.get("keyA")` 的赋值会回溯到
     同方法内该容器的 add / put 记录。回溯不到一律 False（= 不做判断，
     交回原逻辑）—— 绝不在"看不见"的时候断言安全。
+
+    `helpers` 给定时，容器元素可以是"能跨方法上溯到常量的局部变量"
+    （见 `_element_is_constant`），否则一律只认字面量。
     """
     lines = body.splitlines()
     last_rhs: str | None = None
@@ -1581,7 +1635,7 @@ def _last_assignment_untainted(body: str, var: str) -> bool:
         for pm in _MAP_PUT_RE.finditer(head):
             if pm.group("var") == cont and pm.group("key") == key:
                 val = pm.group("val")
-        return val is not None and _literal_or_none(val) is not None
+        return val is not None and _element_is_constant(val, body, helpers, params, var, p2a)
 
     # List：按 add 顺序 + remove 推演
     if re.fullmatch(r"\d+", arg):
@@ -1593,12 +1647,14 @@ def _last_assignment_untainted(body: str, var: str) -> bool:
                 if 0 <= k < len(seq):
                     seq.pop(k)
         idx = int(arg)
-        return idx < len(seq) and _literal_or_none(seq[idx]) is not None
+        return idx < len(seq) and _element_is_constant(seq[idx], body, helpers, params, var, p2a)
 
     return False
 
 
-def _container_proven_lit(body: str, var: str) -> bool:
+def _container_proven_lit(body: str, var: str, helpers: str = "",
+                          params: set[str] | None = None,
+                          p2a: dict[str, str] | None = None) -> bool:
     """互斥控制流下的唯一例外：**所有路径都汇到常量**。
 
     形态（OWASP 02370/02457 的 helper，xpathi 类目 4 条 FP 里的两条）：
@@ -1629,10 +1685,186 @@ def _container_proven_lit(body: str, var: str) -> bool:
     if rhs is None or not re.search(r"\b[A-Za-z_]\w*\s*\.\s*get\s*\(",
                                     _strip_cast(rhs)):
         return False
-    if not _last_assignment_untainted(body, var):
+    if not _last_assignment_untainted(body, var, helpers, params, p2a):
         return False
     prev_rhs = _strip_line_comment(spans[-2].group(1)).strip().rstrip(";").strip()
     return _literal_or_none(_strip_cast(prev_rhs)) is not None
+
+
+def _const_char_value(body: str, var: str) -> str | None:
+    """`var` 能否静态求值为**一个字符**（OWASP 的 `guess.charAt(n)` 模板）。
+
+    这是本项目最喜欢的判据形态：不是"猜分支会不会走到"，而是
+    `String guess = "ABC"; char switchTarget = guess.charAt(1);` 本身
+    在编译期就是 `'B'` —— 可逐行核对的事实，不需要控制流建模。
+
+    只认两种形态，其余返回 None：
+      - `char x = 'B';`
+      - `char x = <字符串字面量>.charAt(<数字>);`
+        （`<字符串字面量>` 可以是直接写字面量，也可以是同方法内的局部变量，
+         只要它最后一次赋值是字面量）
+    """
+    rhs = _last_assign_rhs(body, var)
+    if rhs is None:
+        return None
+    rhs = _strip_cast(_strip_line_comment(rhs)).strip().rstrip(";").strip()
+
+    m = re.fullmatch(r"'(?:\\.|[^'])'", rhs)
+    if m:
+        return rhs[1:-1]
+
+    m = re.fullmatch(r"(?P<base>[A-Za-z_]\w*)\s*\.\s*charAt\s*\(\s*(?P<idx>\d+)\s*\)", rhs)
+    if m:
+        s = _literal_or_none(_last_assign_rhs(body, m.group("base")) or "")
+        if s is None:
+            return None
+        idx = int(m.group("idx"))
+        return s[idx] if idx < len(s) else None
+
+    m = re.fullmatch(r'"(?P<s>[^"]*)"\s*\.\s*charAt\s*\(\s*(?P<idx>\d+)\s*\)', rhs)
+    if m:
+        idx = int(m.group("idx"))
+        s = m.group("s")
+        return s[idx] if idx < len(s) else None
+
+    return None
+
+
+def _switch_const_branch_rhs(body: str, var: str) -> str | None:
+    """switch 的选择子可静态求值时，取**实际会走的那一支**给 `var` 赋的右值。
+
+    为什么值得为它写一整套解析：OWASP 的 sqli/pathtraver 有一整族样本
+    （00340 / 00366 / 00934 / 00935 / 01806 / 01808）长得一模一样 ——
+    `charAt(1)` = `'B'` → `case 'B': bar = "bob";`，真值 safe。
+    而 01803 / 01807 / 01814 用 `charAt(2)` = `'C'` → `bar = param;`，
+    走的是脏值分支。**这两族在语法上天差地别只在那个下标**，
+    靠"所有分支都赋字面量"是判不出来的（'C' 分支就赋脏值）。
+
+    Fall-through 要处理：`case 'C': case 'D': bar = param; break;`
+    命中 'C' 时段内是空的，赋值在下一段里。
+    """
+    for m in re.finditer(r"\bswitch\s*\(\s*([A-Za-z_]\w*)\s*\)", body):
+        sw = m.group(1)
+        if not re.search(rf"(?<![\w.]){re.escape(var)}\s*=(?!=)", _brace_block(body, m.end())):
+            continue                     # 这个 switch 不动 var，不是我们要的
+        val = _const_char_value(body, sw)
+        if val is None:
+            continue
+        block = _brace_block(body, m.end())
+        if not block:
+            continue
+
+        segs: list[tuple[list[str], str]] = []
+        labels: list[str] = []
+        pos = 0
+        for lm in re.finditer(r"\b(case\s+(?:'(?:\\.|[^'])'|\d+)\s*:|default\s*:)", block):
+            segs.append((labels, block[pos:lm.start()]))
+            lbl = lm.group(1)
+            if lbl.startswith("default"):
+                labels = ["__default__"]
+            else:
+                c = re.search(r"'(?:\\.|[^'])'", lbl)
+                labels = [c.group(0)[1:-1]] if c else [lbl]
+            pos = lm.end()
+        segs.append((labels, block[pos:]))
+
+        hit = next((i for i, (lbs, _) in enumerate(segs) if val in lbs), None)
+        if hit is None:
+            hit = next((i for i, (lbs, _) in enumerate(segs) if "__default__" in lbs), None)
+        if hit is None:
+            continue
+
+        for i in range(hit, len(segs)):
+            seg = segs[i][1]
+            am = re.search(rf"(?<![\w.]){re.escape(var)}\s*=(?!=)\s*([^;]+);", seg)
+            if am:
+                return _strip_line_comment(am.group(1)).strip()
+            if re.search(r"\bbreak\s*;", seg):
+                return None          # 该段自己 break 却没赋值：var 保持旧值
+    return None
+
+
+_JAVA_KEYWORDS = frozenset("""
+new return if else for while do switch case default break continue throw throws try
+catch finally int long short byte char boolean float double void String Object
+null true false this super instanceof final static private public protected
+""".split())
+
+
+_QUALIFIED_RE = re.compile(r"\b(?:[A-Za-z_]\w*\s*\.\s*)+[A-Za-z_]\w*")
+
+
+def _expr_identifiers(expr: str) -> set[str]:
+    """表达式里的**裸局部变量名**（排除类名、方法名、字段访问、关键字）。
+
+    这是"值来源"判定的前置过滤：`new String(Base64.decode(param.getBytes()))`
+    里只有 `param` 是变量，`String`/`Base64` 是类名、`decode`/`getBytes`
+    是方法名、`TESTFILES_DIR` 这类全大写是常量字段。
+
+    点链要先整体处理，否则 `org.apache.commons.codec.binary.Base64` 的
+    包名首段 `org` 会被当成变量（00930 就卡在这里：一个 `org` 让整条
+    赋值链判不出常量）。判据是链里有没有大写段 —— 有就是全限定类名
+    或常量字段链，整条不参与；没有就是 `obj.method` 形态，保留接收者。
+    """
+    def _chain(m: re.Match) -> str:
+        parts = [p.strip() for p in m.group(0).split(".")]
+        if any(p[:1].isupper() for p in parts):
+            return " "
+        # 末尾补一个点：`param.getBytes(` 抹成 ` param .`，否则残留的 `(`
+        # 会让 `param` 被当成方法名排除掉（00930 就卡在这一格）。
+        return " " + parts[0] + " . "
+
+    cleaned = _QUALIFIED_RE.sub(_chain, expr)
+    out: set[str] = set()
+    for m in re.finditer(r"(?<![.\w])([A-Za-z_]\w*)", cleaned):
+        name = m.group(1)
+        if name in _JAVA_KEYWORDS or name[0].isupper():
+            continue                      # 关键字 / 类名 / 全大写常量
+        tail = cleaned[m.end():].lstrip()
+        if tail.startswith("("):
+            continue                      # 方法名
+        out.add(name)
+    return out
+
+
+def _all_assigns_lit(body: str, var: str, helpers: str = "",
+                     params: set[str] | None = None) -> bool:
+    """`var` 的**每一处**赋值右式都只由 lit 变量/字面量构成。
+
+    这是互斥控制流里最通用的一条：不需要知道"走哪条分支"，只需要知道
+    **每条分支给的都是常量**，那么走哪条都是常量。OWASP 00930 就是这样：
+
+        String bar = "";
+        if (param != null) {
+            bar = new String(Base64.decodeBase64(Base64.encodeBase64(
+                    param.getBytes())));        // param 上溯到 "bar" 字面量
+        }
+
+    `bar` 被赋了两次、`if` 条件非恒定，`_ambiguous_control_flow` 会拦下，
+    但两条路径的右式都是常量派生。
+
+    方向写死为否定证据：**任一**赋值不可证常量就返回 False（= 不表态）。
+    """
+    if params is None:
+        params = set(_bare_params(_entry_signature(body)))
+    spans = _assign_spans(body, var)
+    if not spans:
+        return False
+    for m in spans:
+        rhs = _strip_line_comment(m.group(1)).strip().rstrip(";").strip()
+        if not rhs:
+            return False
+        if _literal_or_none(rhs) is not None:
+            continue
+        ids = _expr_identifiers(rhs)
+        if not ids:
+            return False                  # 有无法归类的形态（下标/类型转换等）
+        for v in ids:
+            if v == var:
+                return False              # 自引用：不表态，别递归下去
+            if _value_origin(body, v, helpers, params) != "lit":
+                return False
+    return True
 
 
 # ---------------- 值来源解析：sqli / pathtraver 共用的「常量顶掉脏值」闸门 ----------------
@@ -1971,10 +2203,21 @@ def _resolve_rhs_origin(rhs: str, body: str, helpers: str, depth: int,
         if expr in params:
             return "tainted"           # helper/入口的形参 = 外部输入
         if _ambiguous_control_flow(body, expr):
-            # 互斥路径一般"取哪个都不对"。唯一可逐行核对的例外：最后一次
-            # 赋值是容器 get 且容器推演为常量、guard 前旧值也是字面量 ——
-            # 两条路径都汇到常量才放行（见 _container_proven_lit）。
-            if _container_proven_lit(body, expr):
+            # 互斥路径一般"取哪个都不对"。两类可逐行核对的例外：
+            #   ① 最后一次赋值是容器 get 且容器推演为常量、guard 前旧值
+            #      也是字面量 —— 两条路径都汇到常量（_container_proven_lit）
+            #   ② switch 选择子能静态求值 —— 走哪一支是编译期事实
+            #      （_switch_const_branch_rhs，`charAt(1)` 那一族）
+            # **必须与 `_value_origin` 里的两条例外保持一致**：两处是不同的
+            # 递归入口，只改一处会留下"单独调用正确、真实链路仍 unknown"
+            # 的假象（01806 就是这么卡住的）。
+            if _container_proven_lit(body, expr, helpers, params, p2a):
+                return "lit"
+            branch = _switch_const_branch_rhs(body, expr)
+            if branch is not None:
+                return _resolve_rhs_origin(branch, body, helpers, depth + 1,
+                                           expr, params, p2a)
+            if _all_assigns_lit(body, expr, helpers, params):
                 return "lit"
             return "unknown"
         sub = _const_branch_rhs(body, expr) or _last_assign_rhs(body, expr)
@@ -2026,6 +2269,17 @@ def _value_origin(body: str, var: str, helpers: str = "",
     if params is None:
         params = set(_bare_params(_entry_signature(body)))
     if _ambiguous_control_flow(body, var):
+        # 互斥控制流里两类**可判定**的例外：走哪条路径值都确定。
+        #   ① 容器先放常量再覆盖（02370 形态，见 _container_proven_lit）
+        #   ② switch 选择子可静态求值（01806 的 charAt(1) 形态）
+        # 顺序有意义：容器判据更严（要求 guard 前旧值也是字面量），先试它。
+        if _container_proven_lit(body, var, helpers, params):
+            return "lit"
+        branch = _switch_const_branch_rhs(body, var)
+        if branch is not None:
+            return _resolve_rhs_origin(branch, body, helpers, 0, var, params)
+        if _all_assigns_lit(body, var, helpers, params):
+            return "lit"
         return "unknown"
     rhs = _const_branch_rhs(body, var) or _last_assign_rhs(body, var)
     if rhs is None:
@@ -2075,45 +2329,91 @@ def _sql_concat_all_constant(body: str, helpers: str) -> bool:
 
 _FIELD_REF_RE = re.compile(r"^[A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)+$")
 
+# 所有会"真的碰文件"的构造/调用。`FileOutputStream` 必须单列 ——
+# `new\s+File\b` 匹配不到 `new java.io.FileOutputStream(...)`，
+# 而 OWASP 00220/00628 正是用 FileOutputStream 承载路径变量的。
+_PATH_API_RE = re.compile(
+    r"(?:Paths\s*\.\s*get|new\s+(?:java\.io\.)?File(?:Input|Output)?Stream"
+    r"|new\s+(?:java\.io\.)?File|FileInputStream|FileOutputStream|RandomAccessFile)\s*\(")
+
+
+def _path_operand_is_constant(expr: str, body: str, helpers: str,
+                              params: set[str]) -> bool | None:
+    """路径实参/左式是否**只由常量与字段前缀**构成。
+
+    True = 全常量；False = 有脏值或不可判形态；None = 这条表达式里
+    一个局部变量都没有（纯字面量/纯字段），本闸门没有判断依据。
+    """
+    ok, checked = True, False
+    for part in _STR_LIT_RE.sub('""', expr).split("+"):
+        p = _strip_cast(part.strip())
+        if not p or p == '""':
+            continue
+        if re.fullmatch(r"[A-Za-z_]\w*", p):
+            checked = True
+            if _value_origin(body, p, helpers, params) != "lit":
+                ok = False
+        elif _FIELD_REF_RE.match(p):
+            leaf = p.split(".")[-1].strip()
+            if re.search(rf"\b{re.escape(leaf)}\s*=(?!=)", body):
+                ok = False           # 字段被写过，可能承载输入
+        elif re.fullmatch(r"\d+", p) or re.fullmatch(r"\"[^\"]*\"", p):
+            continue
+        else:
+            ok = False               # 调用/下标等：不表态
+    return ok if checked else None
+
 
 def _path_concat_all_constant(body: str, helpers: str) -> bool:
-    """拼进文件 sink 的那个变量是否只由「常量 + 字段前缀」拼成。
+    """拼进文件 sink 的那个值是否只由「常量 + 字段前缀」构成。
 
-    形态：`String fileName = Utils.TESTFILES_DIR + bar;` —— 只看 `bar`。
+    两种形态都要覆盖，此前只做了第一种：
+
+      ① 中间变量：`String fileName = Utils.TESTFILES_DIR + bar;`
+         之后 `new FileOutputStream(fileName)` —— 只看拼接左式。
+      ② **直接构造**：`new java.io.File(bar, "/Test.txt")` /
+         `Paths.get(prefix + bar)` —— 没有中间赋值可扫。OWASP 的
+         pathtraver 大量用这一形态（00217/00220/00621/00863 …），
+         漏掉它就等于这条闸门在这些样本上从来没生效过。
+
     字段前缀（`Utils.TESTFILES_DIR`）的值不参与判定（那是另一个类的常量，
     本判据不追），但要求它**在本方法内没被重新赋值** —— 否则它可能承载
     外部输入，`this.base = param` 之后拼进路径就是真漏洞。
 
-    必须至少核到一个**局部变量**，否则不算通过：全靠字段拼出来的路径，
-    本闸门没有判断依据。
+    必须至少核到一个**局部变量**，否则不算通过：全靠字段/字面量拼出来的
+    路径没有判断依据，交给别的判据。
     """
     params = set(_bare_params(_entry_signature(body)))
+
+    # ① 中间变量形态
     for m in re.finditer(r"\b([A-Za-z_]\w*)\s*=(?!=)\s*([^;]+);", body):
         var, rhs = m.group(1), m.group(2)
-        if not re.search(
-                rf"(?:Paths\s*\.\s*get|new\s+File|FileInputStream)\s*\([^)]*\b{re.escape(var)}\b",
-                body):
+        if "+" not in rhs:
+            continue
+        if not re.search(rf"{_PATH_API_RE.pattern}[^;]*\b{re.escape(var)}\b", body):
             continue
         # 不要求 RHS 里有字符串字面量：文件路径的前缀常常是字段
         # （`Utils.TESTFILES_DIR + bar`），一个引号都没有。
-        if "+" not in rhs:
+        if _path_operand_is_constant(rhs, body, helpers, params) is True:
+            return True
+
+    # ② 直接构造形态：文件 API 的实参里直接出现裸变量
+    for m in _PATH_API_RE.finditer(body):
+        args = _balanced_cond(body, m.end())
+        if args is None:
             continue
-        ok, checked = True, False
-        for part in _STR_LIT_RE.sub('""', rhs).split("+"):
-            p = _strip_cast(part.strip())
-            if not p or p == '""':
+        hits = 0
+        verdict = True
+        for a in _split_args(args):
+            if not a:
                 continue
-            if re.fullmatch(r"[A-Za-z_]\w*", p):
-                checked = True
-                if _value_origin(body, p, helpers, params) != "lit":
-                    ok = False
-            elif _FIELD_REF_RE.match(p):
-                leaf = p.split(".")[-1].strip()
-                if re.search(rf"\b{re.escape(leaf)}\s*=(?!=)", body):
-                    ok = False           # 字段被写过，可能承载输入
-            else:
-                ok = False               # 调用/下标等：不表态
-        if ok and checked:
+            got = _path_operand_is_constant(a, body, helpers, params)
+            if got is None:
+                continue
+            hits += 1
+            if got is False:
+                verdict = False
+        if hits and verdict:
             return True
     return False
 
@@ -2456,7 +2756,7 @@ def xss_verdict(source: str) -> bool | None:
     reader = _chain_reader_body(source)
 
     # 1) 反射型：有外部入参 + 有回显 + 无编码
-    if has_param and XSS_ECHO_SINK_RE.search(body):
+    if has_param and _echo_sink_hit(body):
         if XSS_ENCODE_RE.search(body):
             # `printf`/`format` 的格式串位置如果是变量，说明用户能控制
             # Formatter 的转换说明符 —— 那是另一套注入面，ENCODE 未必覆盖。
@@ -2520,7 +2820,7 @@ def xss_verdict(source: str) -> bool | None:
     #    连接描述行同样以 `//` 起头，会让 `reader` 取到内容却没有任何普通
     #    介质连接 —— 于是 (2b) 的 DB 判定被整段跳过，写入方被判 False。
     if reader and _has_plain_chain(source):
-        if not XSS_ECHO_SINK_RE.search(reader):
+        if not _echo_sink_hit(reader):
             return False               # 读取点没有回显，链路不闭合
         if XSS_ENCODE_RE.search(reader):
             return False               # 读取点做了输出编码
