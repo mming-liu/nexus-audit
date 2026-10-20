@@ -505,9 +505,47 @@ DESERIAL_SAFE_RE = re.compile(
 DESERIAL_BLACKLIST_RE = re.compile(
     r"denyClasses|denyList|blacklist|setBlacklist|startsWith\s*\(\s*deny", re.I)
 
+# ---- fastjson：**版本决定结论**，代码本身给不出答案 ----
+#
+# `JSON.parseObject(body, X.class)` 这一行：
+#   fastjson 1.2.31 —— autoType 可被 `@type` 劫持（<=1.2.47 的 Class 缓存
+#                     绕过全线通杀，1.2.31 正是靶场里那个）
+#   fastjson 1.2.83 —— safeMode 默认开启，同一行不可利用
+# 判据必须问版本，而版本在 pom.xml 里。切片尾部的
+# `// ---- 依赖组件版本 ----` 由 core/context/dependency_versions.py 注入。
+#
+# 三态写死：低于 1.2.83 → True；>= 1.2.83 → False；**没有版本证据 → None**。
+# 少了第三条，"我不知道"就会被伪装成"我有把握"。
+FASTJSON_SAFE_VERSION = "1.2.83"
+_FASTJSON_SINK_RE = re.compile(
+    r"\bJSON\s*\.\s*parse(?:Object|Array)?\s*\(|"
+    r"\bJSONObject\s*\.\s*parse\w*\s*\(|"
+    r"\bJSON\s*\.\s*parseWithException\s*\(", re.I)
+# 全局关掉 autoType / 打开 safeMode：与版本无关地消除该风险
+_FASTJSON_SAFE_RE = re.compile(
+    r"setSafeMode\s*\(\s*true|ParserConfig\s*\.\s*getGlobalInstance\s*\(\s*\)\s*\."
+    r"\s*setSafeMode|setAutoTypeSupport\s*\(\s*false", re.I)
+
+
+def _fastjson_verdict(source: str, body: str) -> bool | None:
+    from core.context.dependency_versions import compare_versions, parse_block
+
+    if _FASTJSON_SAFE_RE.search(source):
+        return False                    # 代码里显式关了 autoType
+    if not has_external_input(source):
+        return None                     # 解析的是常量，谈不上注入面
+    ver = parse_block(source).get("fastjson")
+    rel = compare_versions(ver, FASTJSON_SAFE_VERSION)
+    if rel is None:
+        return None                     # 没有版本证据：不表态
+    return rel < 0
+
 
 def deserial_verdict(source: str) -> bool | None:
     body = entry_body(source)
+    # fastjson 单独一条：同一行代码在两个版本上是两个结论。
+    if _FASTJSON_SINK_RE.search(body):
+        return _fastjson_verdict(source, body)
     # 只有当**入口体自己**把外部数据交给反序列化 API 时才判；
     # 体里没有 sink 就说明反序列化发生在别处（helper），交给 LLM。
     #
@@ -4036,6 +4074,126 @@ PATH_SAFE_RE = re.compile(
 _PATH_GUARD_RE = re.compile(
     r"\b\w*(?:check|filter|valid|verify|allow|safe|traversal)\w*\s*\(", re.I)
 
+# ---- 后缀截取：`S = F.substring(F.lastIndexOf("."))` 抹掉了目录能力 ----
+#
+# 为什么这是确定性事实，而不是"看起来没事"：
+# `lastIndexOf(".")` 定位的是**最后一个点**，截出的串必然形如
+# 「"." + 一段不含点的尾巴」。尾巴里没有点 ⇒ 拼不出 `..`；
+# 以 "." 开头 ⇒ 不可能是绝对路径。所以无论原始文件名里塞多少 `../`，
+# 落到 sink 的值最多带 `/`（进子目录），无法上跳基目录。
+# 这是字符串的几何性质，与"开发者意图"无关，可逐字符核对。
+#
+# 但截断必须**真的把值挡在门外**，三条同时成立才算数：
+#   ① 存在 `S = F.substring(F.lastIndexOf("."))` 这条赋值；
+#   ② 除该赋值与 F 自身的定义外，F 在方法体里一次都不再出现
+#      —— 原文名被另外拼进路径，截断就形同虚设（最常见的半吊子写法）；
+#   ③ 文件 API 实参里的每个动态变量都能沿「赋值 / append / 构造实参」链
+#      走到 S —— 切个后缀只为打日志、路径仍用别的东西拼，不算。
+#
+# 方向照旧：本判据只出**否定证据**（True→False），不参与"判漏洞"。
+_SUFFIX_CUT_RE = re.compile(
+    r"\b([A-Za-z_]\w*)\s*=(?!=)[^;]*?\b([A-Za-z_]\w*)\s*\.\s*substring\s*\(\s*"
+    r"\2\s*\.\s*lastIndexOf\s*\(\s*(?:'\.'|\"\.\")\s*\)\s*\)\s*;")
+
+
+def _var_build_edges(body: str) -> dict[str, set[str]]:
+    """变量之间的「由…构成」边：赋值右式 / `append(实参)` / 构造实参。
+
+    只收裸标识符（`_expr_identifiers` 已排除类名与字段链），
+    用来回答"这个变量是不是由那个变量拼出来的"。
+    """
+    edges: dict[str, set[str]] = {}
+
+    def _add(dst: str, names: set[str]) -> None:
+        if names:
+            edges.setdefault(dst, set()).update(names)
+
+    for m in re.finditer(r"\b([A-Za-z_]\w*)\s*=(?!=)\s*([^;]+);", body):
+        _add(m.group(1), _expr_identifiers(m.group(2)))
+    # `sb.append(a).append(b).append(c);` —— 链式调用的接收者只有第一个，
+    # 后两段前面是 `)` 而不是变量名，按 `.append(` 逐个抓会丢掉 b/c。
+    # 因此按语句为单位：语句的**首个变量**就是接收者，整句里所有 append
+    # 实参都算它的构成来源（实测 newbee 的 `suffixName` 正是第 3 段）。
+    for stmt in body.split(";"):
+        if ".append" not in stmt:
+            continue
+        head = re.match(r"\s*([A-Za-z_]\w*)\s*\.", stmt)
+        if not head:
+            continue
+        names: set[str] = set()
+        for am in re.finditer(r"\.\s*append\s*\(", stmt):
+            a = _balanced_cond(stmt, am.end())
+            if a is not None:
+                names |= _expr_identifiers(a)
+        _add(head.group(1), names)
+    return edges
+
+
+def _builds_from(edges: dict[str, set[str]], start: str, target: str,
+                 depth: int = 3) -> bool:
+    """沿「由…构成」边向上走 `depth` 跳，能否到达 target。"""
+    if start == target:
+        return True
+    seen, cur = {start}, {start}
+    for _ in range(depth):
+        nxt: set[str] = set()
+        for v in cur:
+            for w in edges.get(v, ()):      # noqa: PLC0206
+                if w == target:
+                    return True
+                if w not in seen:
+                    seen.add(w)
+                    nxt.add(w)
+        if not nxt:
+            return False
+        cur = nxt
+    return False
+
+
+def _path_suffix_cut_masks_taint(body: str, helpers: str = "") -> bool:
+    """写盘路径里唯一来自用户的片段是否被后缀截取锁死（三条全部成立）。"""
+    cut = _SUFFIX_CUT_RE.search(body)
+    if not cut:
+        return False
+    suffix_var, src_var = cut.group(1), cut.group(2)
+
+    # ② 原文名不许在别处再用（去掉截断式与 F 的定义后再找一遍）
+    residue = _SUFFIX_CUT_RE.sub(" ", body)
+    residue = re.sub(rf"\b{re.escape(src_var)}\s*=(?!=)[^;]*;", " ", residue)
+    if re.search(rf"(?<![\w.]){re.escape(src_var)}\b", residue):
+        return False
+
+    # ③ 文件 API 实参里的每个动态变量都必须由 S 构成（或本身是常量）
+    edges = _var_build_edges(body)
+    params = set(_bare_params(_entry_signature(body)))
+    checked = False
+    for api in _PATH_API_RE.finditer(body):
+        args = _balanced_cond(body, api.end())
+        if args is None:
+            return False
+        for part in _STR_LIT_RE.sub('""', args).split("+"):
+            p = _strip_cast(part.strip())
+            if not p:
+                continue
+            names = _expr_identifiers(p)
+            if not names:
+                continue        # 字段链（`Constants.FILE_UPLOAD_DIC`）/ 字面量 / 全大写常量
+            # `sb.toString()` 是纯取值，不改变内容，按 `sb` 本身继续判；
+            # 其它调用（`getXxx()` / `Paths.get(...)`）一律不下结论。
+            m_to = re.fullmatch(r"([A-Za-z_]\w*)\s*\.\s*toString\s*\(\s*\)", p)
+            if m_to:
+                names = {m_to.group(1)}
+            elif "(" in p:
+                return False
+            for v in names:
+                checked = True
+                if _builds_from(edges, v, suffix_var):
+                    continue
+                if _value_origin(body, v, helpers, params) == "lit":
+                    continue        # 生成名（UUID / 时间戳）也算常量侧
+                return False
+    return checked
+
 
 def pathtraver_verdict(source: str) -> bool | None:
     body = entry_body(source)
@@ -4062,6 +4220,12 @@ def pathtraver_verdict(source: str) -> bool | None:
 
     # 1) 规范化 + 前缀校验 / 只取文件名 → 目录逃逸被物理阻断
     if PATH_SAFE_RE.search(body):
+        return False
+
+    # 1c) 只取「最后一个点之后」的后缀再落盘 → `..` 在几何上拼不出来。
+    #     必须三条全过（见 _path_suffix_cut_masks_taint）：有截断式、原文名
+    #     没在别处再用、目标确实由截断结果构成。少一条都退回原判。
+    if _path_suffix_cut_masks_taint(body, _sibling_methods(source)):
         return False
 
     # 1b) 拼进 sink 的那个变量能上溯到常量（容器先放常量再覆盖 / 恒真分支 /
@@ -4285,6 +4449,22 @@ _AUTHZ_GLOBAL_GUARD_RE = re.compile(
     r'addPathPatterns\(\s*"\s*/(?!\*\*)[\w-]+/\*\*\s*"\s*\)')
 
 
+def _container_flows_to_service(body: str, holder: str) -> bool:
+    """容器（或其包装对象）是否**真作为实参**进了 Service/Mapper 调用。
+
+    只往容器里放东西说明不了任何查询范围 —— 得看到它被交出去。
+    容器常被包一层：`PageQueryUtil pageUtil = new PageQueryUtil(params);`
+    所以同时接受"包装后的变量名"。
+    """
+    holders = {holder}
+    for wm in re.finditer(r"\b(\w+)\s*=\s*new\s+[\w.<>]+\s*\(\s*(\w+)\s*[,)]", body):
+        if wm.group(2) in holders:
+            holders.add(wm.group(1))
+    alt = "|".join(sorted(map(re.escape, holders)))
+    return re.search(rf"\b\w*(?:Service|Mapper|Dao|DAO)\s*\.\s*\w+\s*\("
+                     rf"[^;]{{0,240}}?\b(?:{alt})\b", body) is not None
+
+
 def authz_verdict(source: str) -> bool | None:
     """越权/未授权的确定性判定：False(有校验) / True(入参直查且无主体) / None。"""
     body = entry_body(source)
@@ -4323,8 +4503,24 @@ def authz_verdict(source: str) -> bool | None:
             if re.search(rf"\b\w*(?:Service|Mapper|Dao|DAO)\s*\.\s*\w+\s*\("
                          rf"[^;]{{0,240}}?{key}", body):
                 return False
-            if re.search(rf"\.\s*set\w*[Ii]d\s*\(\s*{key}\s*\)", body):
-                return False
+
+    # 2b-2) 主体 ID 先赋给 **DTO/实体属性**，再把整个对象交给 Service ——
+    #     与 2c 同构，载体从 Map 换成实体字段：
+    #
+    #         item.setUserId(user.getUserId());
+    #         cartService.saveNewBeeMallCartItem(item);   // → where user_id = ?
+    #
+    #     两个事实缺一不可，只 set 不传不算数（`log.info(item)` 之后什么都没发生，
+    #     主体并没有参与资源选择）。右式必须是**会话/Principal 主体变量**，
+    #     严禁认 `@RequestBody Order order` 自带的 `order.getUserId()` ——
+    #     那是客户端可控值，把它当主体就是把越权当校验。
+    if has_subject:
+        for var in set(_AUTHZ_SUBJECT_VAR_RE.findall(body)):
+            key = rf"\b{var}\s*\.\s*get\w*[Ii]d\s*\(\s*\)"
+            for sm in re.finditer(rf"\b(?<!this\.)([A-Za-z_]\w*)\s*\.\s*set\w*[Ii]d\s*"
+                                  rf"\(\s*{key}\s*\)", body):
+                if _container_flows_to_service(body, sm.group(1)):
+                    return False
 
     # 2c) 主体值先写进**查询容器**，再整体交给 Service（Map / DTO / PageQueryUtil）：
     #
@@ -4343,15 +4539,7 @@ def authz_verdict(source: str) -> bool | None:
             for pm in re.finditer(
                     rf"\b(\w+)\s*\.\s*(?:put|putAll|add)\s*\("
                     rf"\s*\"[^\"]*\"\s*,\s*{key}\s*\)", body):
-                holders = {pm.group(1)}
-                # 容器通常还会被包一层：`new PageQueryUtil(params)`
-                for wm in re.finditer(r"\b(\w+)\s*=\s*new\s+[\w.<>]+\s*\(\s*(\w+)\s*[,)]",
-                                      body):
-                    if wm.group(2) in holders:
-                        holders.add(wm.group(1))
-                alt = "|".join(sorted(map(re.escape, holders)))
-                if re.search(rf"\b\w*(?:Service|Mapper|Dao|DAO)\s*\.\s*\w+\s*\("
-                             rf"[^;]{{0,240}}?\b(?:{alt})\b", body):
+                if _container_flows_to_service(body, pm.group(1)):
                     return False
 
     # 2d) 主体由**被调方**获取：控制器把 `HttpSession` / `HttpServletRequest`

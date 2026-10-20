@@ -164,6 +164,7 @@ class JavaSlicer:
         self._cfg = None
         self._impls = None
         self._wiring = None
+        self._deps = None
 
     @staticmethod
     def _guess_project_root(p: Path) -> Path:
@@ -204,6 +205,18 @@ class JavaSlicer:
             self._impls = JavaImplResolver(self.config_root,
                                            source_root=self.repo_path)
         return self._impls
+
+    def _dep_resolver(self):
+        """懒加载构建文件里的敏感组件版本（fastjson / shiro / jackson …）。
+
+        与 `_wiring_resolver` 同理：版本是**方法体外的证据**，
+        但 `JSON.parseObject(x)` 在 fastjson 1.2.31 与 1.2.83 上是两个结论。
+        没有这一块，判定层只能退回模型，而模型手里根本没有 pom.xml。
+        """
+        if self._deps is None:
+            from core.context.dependency_versions import DependencyVersionResolver
+            self._deps = DependencyVersionResolver(self.config_root)
+        return self._deps
 
     def _impl_block(self, source: str) -> str:
         """为「真正传了外部入参的调用」补实现体，再为「防护类静态调用」补工具类实现。
@@ -1054,6 +1067,11 @@ class JavaSlicer:
                 w = self._wiring_resolver().describe_aliases(route_aliases or [route_path])
                 if w:
                     source += "\n" + w
+            # 依赖组件版本：只列该仓库真有的敏感组件（其余仓库一块都不多写）。
+            # 放在最后，`entry_body()` 早在第一个 `// ----` 处就截断了。
+            dep = self._dep_resolver().describe()
+            if dep:
+                source += "\n" + dep
 
             units.append(CodeUnit(
                 file_path=str(path),

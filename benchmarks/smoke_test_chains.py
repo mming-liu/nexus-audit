@@ -2099,6 +2099,141 @@ check("别名：全部别名都被覆盖 → 才渲染保护证据",
       "addPathPatterns" in _wb.describe_aliases(["/admin/list", "/manage/list"]), True)
 
 
+# ---------------- [49] 后缀截取：写盘名里 `..` 在几何上拼不出来 ----------------
+#
+# `S = F.substring(F.lastIndexOf("."))` 截出的串必然是「"." + 无点尾巴」：
+# 尾巴无点 ⇒ 拼不出 `..`；以 "." 开头 ⇒ 不是绝对路径。所以它是**可逐字符
+# 核对的安全事实**，不是"看起来没事"。但必须三条同时成立才算 —— 三条各自
+# 配一条反方向护栏，缺一条就会被半吊子写法骗过去。
+print("\n[49] 路径遍历：后缀截取安全短路")
+
+_SUF_OK = '''@RequestMapping("/up")
+public Result up(MultipartFile file) {
+    String fileName = file.getOriginalFilename();
+    String suffixName = fileName.substring(fileName.lastIndexOf("."));
+    String newFileName = UUID.randomUUID().toString() + suffixName;
+    return file.transferTo(new File(Constants.FILE_UPLOAD_DIC + newFileName));
+}'''
+check("后缀截取：只保留「. + 无点尾巴」→ 判安全",
+      verdict("pathtraver", _SUF_OK), False)
+
+_SUF_APPEND = '''@RequestMapping("/up2")
+public Result up2(MultipartFile file) {
+    String fileName = file.getOriginalFilename();
+    String suffixName = fileName.substring(fileName.lastIndexOf("."));
+    StringBuilder tempName = new StringBuilder();
+    tempName.append(System.currentTimeMillis()).append(rand.nextInt(100)).append(suffixName);
+    return file.transferTo(new File(DIR + tempName.toString()));
+}'''
+check("后缀截取：StringBuilder 链式 append 也算『由 S 构成』",
+      verdict("pathtraver", _SUF_APPEND), False)
+
+# 护栏 ①：切了后缀，但原文名照样拼进路径 —— 截断形同虚设
+_SUF_RAW = '''@RequestMapping("/up3")
+public Result up3(MultipartFile file) {
+    String fileName = file.getOriginalFilename();
+    String suffixName = fileName.substring(fileName.lastIndexOf("."));
+    log.info(suffixName);
+    return file.transferTo(new File(DIR + fileName));
+}'''
+check("后缀截取护栏：原文名仍被拼进路径 → 必须维持判漏洞",
+      verdict("pathtraver", _SUF_RAW), True)
+
+# 护栏 ②：目录前缀来自请求参数 —— 后缀安全救不了目录
+_SUF_DIRTY_DIR = '''@RequestMapping("/up4")
+public Result up4(MultipartFile file, @RequestParam("dir") String dir) {
+    String fileName = file.getOriginalFilename();
+    String suffixName = fileName.substring(fileName.lastIndexOf("."));
+    return file.transferTo(new File(dir + suffixName));
+}'''
+check("后缀截取护栏：目录前缀来自请求参数 → 必须维持判漏洞",
+      verdict("pathtraver", _SUF_DIRTY_DIR), True)
+
+# 护栏 ③：切后缀只为打日志，落盘用的是另一个外部值
+_SUF_DECOY = '''@RequestMapping("/up5")
+public Result up5(MultipartFile file, HttpServletRequest request) {
+    String fileName = file.getOriginalFilename();
+    String suffixName = fileName.substring(fileName.lastIndexOf("."));
+    log.info(suffixName);
+    String dest = request.getParameter("dest");
+    return file.transferTo(new File(dest));
+}'''
+check("后缀截取护栏：截断结果没进 sink（只为打日志）→ 维持判漏洞",
+      verdict("pathtraver", _SUF_DECOY), True)
+
+# 护栏 ④：根本没有截断
+_NO_CUT = '''@RequestMapping("/up6")
+public Result up6(MultipartFile file) {
+    String fileName = file.getOriginalFilename();
+    return file.transferTo(new File(DIR + fileName));
+}'''
+check("后缀截取护栏：没有 lastIndexOf 截断 → 维持判漏洞",
+      verdict("pathtraver", _NO_CUT), True)
+
+
+# ---------------- [50] 主体 ID 赋给 DTO 属性：两个事实缺一不可 ----------------
+#
+# 与 `/orders` 的 `params.put("userId", ...)` 同构，载体从 Map 换成实体字段。
+# ① 右式必须是会话/Principal 主体变量；② 该 DTO 必须真作为实参进了 Service。
+# 只 set 不传（打日志/回显）不算"主体参与了资源选择"。
+print("\n[50] authz：主体入 DTO 载体")
+
+_DTO_OK = '''@PostMapping("/cart")
+public Result save(@RequestBody Item item, HttpSession session) {
+    User user = (User) session.getAttribute(KEY);
+    item.setUserId(user.getUserId());
+    return cartService.save(item);
+}'''
+check("DTO 载体：主体 id 写进实体 + 实体进 Service → 判安全",
+      verdict("authz", _DTO_OK), False)
+
+_DTO_NOFLOW = '''@PostMapping("/cart")
+public Result save(@RequestBody Item item, HttpSession session) {
+    User user = (User) session.getAttribute(KEY);
+    item.setUserId(user.getUserId());
+    log.info("cart owner = {}", item);
+    return Result.ok();
+}'''
+check("DTO 载体护栏：只 set 不传 Service → 不许判安全",
+      verdict("authz", _DTO_NOFLOW), None)
+
+_DTO_CLIENT = '''@PostMapping("/cart")
+public Result save(@RequestBody Item item, HttpSession session) {
+    User user = (User) session.getAttribute(KEY);
+    item.setUserId(item.getUserId());
+    return cartService.save(item);
+}'''
+check("DTO 载体护栏：右式是客户端自带的 userId → 不许判安全",
+      verdict("authz", _DTO_CLIENT), None)
+
+
+# ---------------- [51] fastjson：版本决定结论（三态） ----------------
+#
+# 同一行 `JSON.parseObject(body, X.class)` 在 1.2.31 上是 autoType 入口、
+# 在 1.2.83 上默认 safeMode。判据必须读 pom 里的版本；读不到就退回，不许猜。
+print("\n[51] 反序列化：fastjson 版本证据")
+
+_FJ_BODY = '''@PostMapping("/create")
+public Object create(@RequestBody String body) {
+    return JSON.parseObject(body, Teacher.class);
+}'''
+_FJ_OLD = _FJ_BODY + "\n// ---- 依赖组件版本（测试夹具）----\n// fastjson = 1.2.31\n"
+_FJ_NEW = _FJ_BODY + "\n// ---- 依赖组件版本（测试夹具）----\n// fastjson = 1.2.83\n"
+check("fastjson 1.2.31 + parseObject(外部输入) → 判漏洞",
+      verdict("deserial", _FJ_OLD), True)
+check("fastjson 1.2.83 → 判安全（safeMode 默认开）",
+      verdict("deserial", _FJ_NEW), False)
+check("没有版本证据 → 退回（不许猜）",
+      verdict("deserial", _FJ_BODY), None)
+_FJ_SAFEMODE = ('@PostMapping("/create")\n'
+                'public Object create(@RequestBody String body) {\n'
+                '    ParserConfig.getGlobalInstance().setSafeMode(true);\n'
+                '    return JSON.parseObject(body, Teacher.class);\n'
+                '}\n// ---- 依赖组件版本（测试夹具）----\n// fastjson = 1.2.31\n')
+check("显式 setSafeMode(true) → 版本再低也判安全",
+      verdict("deserial", _FJ_SAFEMODE), False)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

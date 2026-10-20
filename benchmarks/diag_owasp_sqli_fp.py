@@ -52,6 +52,9 @@ def _slicer_fingerprint() -> str:
              # 旧缓存失效。指纹漏一个"影响切片内容"的文件，就等于留一条
              # "改了但回归说你没改"的后门 —— 这次差点又漏掉它。
              os.path.join(ROOT, "core", "context", "framework_wiring.py"),
+             # 依赖组件版本块也进切片：新增/改动它同样会让旧缓存失效。
+             # 漏掉这一行的后果与上次一模一样 —— 回归"通过"用的还是旧切片。
+             os.path.join(ROOT, "core", "context", "dependency_versions.py"),
              # CodeUnit 的字段变了（route_path），切片文本随之变化
              os.path.join(ROOT, "core", "models.py"),
              os.path.join(ROOT, "core", "text_utils.py"),

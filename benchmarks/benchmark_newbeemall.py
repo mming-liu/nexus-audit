@@ -130,16 +130,21 @@ AUTHZ_TRUTH_BY_UNIT: dict[str, tuple[bool, str]] = {
     "ShoppingCartController.updateNewBeeMallShoppingCartItem": (False, "subject-key"),
 }
 
-# 真值存疑：规则判 True 但"是否有可达注入面"静态无法定论。
-# 按项目铁律单列、不进分母、不改判据。
-DISPUTED: dict[str, str] = {
+# 曾经的「真值存疑」，本轮转正为**确定性安全**。
+#
+# 判据支点不是"看起来没事"，是字符串几何：`lastIndexOf(".")` 之后截出来的
+# 必然是「"." + 一段不含点的尾巴」，尾巴无点 ⇒ 拼不出 `..`；以 "." 开头 ⇒
+# 不可能是绝对路径。所以无论原始文件名塞多少 `../`，落盘名最多带 `/`（进
+# 子目录），无法上跳常量基目录。实现见
+# `rule_detectors._path_suffix_cut_masks_taint`，反向护栏见冒烟 [49]。
+#
+# 这里从"不进分母"改成"必须判 False"：规则要是哪天把这两条判回 True，
+# --strict 立刻失败。
+PATH_SUFFIX_SAFE: dict[str, str] = {
     "UploadController.upload":
-        "pathtraver：写入路径 = 常量目录 + 生成的文件名，用户可控部分只是"
-        "`fileName.substring(lastIndexOf('.'))`。它能含 `/`，但要逃出基目录需要"
-        "存在一个名为 `<时间戳><随机数>.` 的中间目录（mkdir 只建常量目录），"
-        "静态无法证明可利用，也无法证明绝对不可利用 → 不进分母。",
+        "常量目录 + 时间戳/随机数 + 只取 `lastIndexOf('.')` 之后的后缀",
     "UploadController.uploadV2":
-        "同 upload：同样的文件名后缀拼接与常量目录。",
+        "同 upload：批量版，同样的后缀截取与常量目录",
 }
 
 
@@ -276,7 +281,7 @@ def main() -> None:
         rv = rule_verdict("authz", r["unit"].source_code)
         (decided if rv is not None else fallback).append((r, rv))
 
-    judged = [(r, rv) for r, rv in decided if r["unit"].unit_name not in DISPUTED]
+    judged = [(r, rv) for r, rv in decided]
     right = sum(1 for r, rv in judged if rv == r["real_vuln"])
     print(f"   规则直接给出结论：{len(decided)}/{len(rows)}"
           f"（覆盖 {len(decided) / max(len(rows), 1) * 100:.0f}%）")
@@ -323,16 +328,16 @@ def main() -> None:
         print(f"     ! {n}")
     print(f"   规则判 False（判安全）  ：{sqli_f} / {len(units)}")
 
-    # ---------- 存疑 ----------
-    pt_t = [u.unit_name for u in units
-            if rule_verdict("pathtraver", u.source_code) is True]
-    print(f"\n④ 存疑（不进分母、不改判据）：{len(DISPUTED)} 条")
-    for n, why in DISPUTED.items():
-        v = rule_verdict("pathtraver", next(
-            (u.source_code for u in units if u.unit_name == n), ""))
-        print(f"   {n}  规则 pathtraver={v}")
+    # ---------- ④ 路径后缀截断（本轮由"存疑"转正为"必须判安全"）----------
+    pt_v = {u.unit_name: rule_verdict("pathtraver", u.source_code) for u in units}
+    pt_t = [n for n, v in pt_v.items() if v is True]
+    suffix_wrong = [n for n in PATH_SUFFIX_SAFE if pt_v.get(n) is not False]
+    print(f"\n④ 后缀截断（转正）：{len(PATH_SUFFIX_SAFE)} 条必须判 False")
+    for n, why in PATH_SUFFIX_SAFE.items():
+        print(f"   {n}  规则 pathtraver={pt_v.get(n)}"
+              f"{'' if pt_v.get(n) is False else '  <-- 必须为 False'}")
         print(f"     {why}")
-    extra = [n for n in pt_t if n not in DISPUTED]
+    extra = [n for n in pt_t if n not in PATH_SUFFIX_SAFE]
     if extra:
         print(f"   ! 另有 {len(extra)} 条 pathtraver 判 True 且未登记，需补真值：")
         for n in extra:
@@ -361,15 +366,16 @@ def main() -> None:
         },
         "sqli_false_positive": sqli_t,
         "sqli_safe_decided": sqli_f,
+        "path_suffix_safe": {n: pt_v.get(n) for n in PATH_SUFFIX_SAFE},
+        "path_suffix_wrong": suffix_wrong,
         "distribution": snap,
-        "disputed": DISPUTED,
     }
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(out, ensure_ascii=False, indent=2),
                                  encoding="utf-8")
     print(f"\n结果写入 {args.output}")
-    if args.strict and (not ok or sqli_t):
-        print("! --strict：基线漂移或存在 sqli 误报 → 退出码 3")
+    if args.strict and (not ok or sqli_t or suffix_wrong):
+        print("! --strict：基线漂移 / sqli 误报 / 后缀截断判反 → 退出码 3")
         sys.exit(3)
 
 
