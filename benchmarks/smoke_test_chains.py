@@ -2304,6 +2304,48 @@ check("拿主体跟自己比 → 不构成任何归属校验",
       verdict("authz", _OWN_SELF), None)
 
 
+# ---------------- [54] authz：logout 不是"建立身份"，不进认证入口排除 ----------------
+#
+# 旧口径把 logout 和 login/register 一起排除 → newbee-mall-api 的
+# /manage-api/v1/logout 静默退回。正确口径：logout 走正常判据链 ——
+# 主体自己的 token 作资源键 → False；外部可控 userId 注销他人 → True；
+# 只 invalidate 自己的 session → 证据不足 None。login 仍必须排除（防放宽）。
+print("\n[54] authz：logout 路由口径")
+
+_LOGOUT_MARK = ("\n// ---- 形参主体注解（测试夹具）----\n"
+                "// @TokenToAdminUser -> 形参 adminUser   由 AdminResolver 注入\n")
+
+_LOGOUT_OK = '''@RequestMapping(value = "/logout", method = RequestMethod.DELETE)
+public Result logout(@TokenToAdminUser AdminUserToken adminUser) {
+    adminUserService.logout(adminUser.getAdminUserId());
+    return ResultGenerator.genSuccessResult();
+}''' + _LOGOUT_MARK
+check("logout：主体自己的 token id 作资源键 → 判安全",
+      verdict("authz", _LOGOUT_OK), False)
+
+_LOGOUT_FOREIGN = '''@PostMapping("/logout")
+public Result logout(String userId) {
+    return userService.logout(userId);
+}'''
+check("logout：外部可控 userId 注销他人会话、无主体 → 判漏洞",
+      verdict("authz", _LOGOUT_FOREIGN), True)
+
+_LOGOUT_SESSION = '''@GetMapping("/logout")
+public String logout(HttpSession session) {
+    session.invalidate();
+    return "redirect:/login";
+}'''
+check("logout：只 invalidate 请求自身的 session → 证据不足退回",
+      verdict("authz", _LOGOUT_SESSION), None)
+
+_LOGOUT_LOGIN = '''@PostMapping("/login")
+public Result login(String loginName, String password) {
+    return userService.login(loginName, password);
+}'''
+check("login 仍在认证入口排除内（防放宽） → 不做授权判定",
+      verdict("authz", _LOGOUT_LOGIN), None)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

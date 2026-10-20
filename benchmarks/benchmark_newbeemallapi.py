@@ -144,6 +144,9 @@ AUTHZ_TRUTH: dict[str, tuple[bool, str]] = {
     "NewBeeAdminManageUserAPI.nameUpdate": (False, "subject-key"),
     "NewBeeAdminManageUserAPI.passwordUpdate": (False, "subject-key"),
     "NewBeeAdminManageUserAPI.profile": (False, "subject-key"),
+    # 旧口径被"认证入口"排除、判 None 的那条：logout 是使用身份而非建立身份，
+    # `adminUserService.logout(adminUser.getAdminUserId())` 是标准 2b 形态。
+    "NewBeeAdminManageUserAPI.logout": (False, "subject-key"),
 }
 
 SERVICE_CALL_RE = re.compile(r"\b([A-Za-z_]\w*[Ss]ervice)\s*\.\s*([A-Za-z_]\w*)\s*\(")

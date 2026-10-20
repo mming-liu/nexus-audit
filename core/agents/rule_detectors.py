@@ -4447,12 +4447,19 @@ _AUTHZ_SUBJECT_RE = re.compile(
 _AUTHZ_SUBJECT_VAR_RE = re.compile(
     r"(\w+)\s*=\s*\(?\s*[A-Z][\w.]*\s*\)?\s*\w*[Ss]ession\s*\.\s*getAttribute\s*\(")
 
-# 认证入口（登录/注册/登出/验证码）。它们本身就是**建立身份**的地方，
+# 认证入口（登录/注册/验证码）。它们本身就是**建立身份**的地方，
 # 不做授权判定 —— 把 `login(loginName, password)` 的入参当成"直查资源"
 # 会稳定误报（旧判据下 newbee-mall 的 /login 与 /register 都判 True）。
+#
+# `logout` **不**在此列：注销是"使用/销毁当前身份"，不是"建立身份"，走正常判据链
+#   · 主体自己的 token/session 作资源键（`logout(adminUser.getAdminUserId())`）
+#     → 2b 判 False；
+#   · 接收外部可控 userId 注销他人会话且无主体 → 4) 判 True；
+#   · 只 `session.invalidate()` / `removeAttribute` 的 → 证据不足退 None。
+# 旧口径把 logout 一并排除，newbee-mall-api 的 /manage-api/v1/logout 因此静默退回。
 _AUTHZ_AUTHN_ROUTE_RE = re.compile(
     r"@(?:Request|Get|Post|Put|Delete|Patch)Mapping\s*\(\s*(?:value\s*=\s*)?\{?[^)]{0,200}?"
-    r"\"(?:/?(?:admin/)?(?:login|logout|register|signin|signup|kaptcha|captcha))\"", re.I)
+    r"\"(?:/?(?:admin/)?(?:login|register|signin|signup|kaptcha|captcha))\"", re.I)
 
 # 声明式角色/权限校验。注解在方法签名上，`entry_body` 里看不到，必须扫 source。
 _AUTHZ_ROLE_RE = re.compile(
@@ -4539,6 +4546,7 @@ def authz_verdict(source: str) -> bool | None:
 
     # 0) 认证入口本身不做授权判定。登录接口的"资源"就是凭据库，身份由口令校验
     #    建立；把 `login(loginName, password)` 的入参当成"直查资源"是口径错误。
+    #    logout 不在此列（"使用身份"≠"建立身份"，见正则上方注释）。
     if _AUTHZ_AUTHN_ROUTE_RE.search(body):
         return None
 

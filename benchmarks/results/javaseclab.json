@@ -196,5 +196,195 @@
       "route": "/safe"
     }
   ],
-  "model": []
+  "model": [
+    {
+      "unit": "XXEController.xxeVul",
+      "category": "xxe",
+      "real_vuln": true,
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 8.1
+    },
+    {
+      "unit": "XXEController.xxeSafe",
+      "category": "xxe",
+      "real_vuln": false,
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 7.5
+    },
+    {
+      "unit": "OtherController.vul1Upload",
+      "category": "xss",
+      "real_vuln": true,
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 537.0
+    },
+    {
+      "unit": "ReflectController.vul1",
+      "category": "xss",
+      "real_vuln": true,
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 29.2
+    },
+    {
+      "unit": "StoreController.vul",
+      "category": "xss",
+      "real_vuln": true,
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "Scenario=xss=HIT, PropertyCheck=MISSING（采样不一致）",
+      "elapsed_s": 103.2
+    },
+    {
+      "unit": "SSTIController.vul1",
+      "category": "spel",
+      "real_vuln": true,
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 13.4
+    },
+    {
+      "unit": "SSTIController.vul3",
+      "category": "spel",
+      "real_vuln": true,
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 27.2
+    },
+    {
+      "unit": "SSTIController.safe1",
+      "category": "spel",
+      "real_vuln": false,
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 13.7
+    },
+    {
+      "unit": "SsrfController.safe",
+      "category": "ssrf",
+      "real_vuln": false,
+      "flagged": false,
+      "stage": "protected",
+      "detail": "Scenario=ssrf=HIT, PropertyCheck=PRESENT（采样不一致）",
+      "elapsed_s": 34.2
+    },
+    {
+      "unit": "CodeController.safeGroovy",
+      "category": "spel",
+      "real_vuln": false,
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 14.3
+    },
+    {
+      "unit": "CommandController.safe",
+      "category": "cmdi",
+      "real_vuln": false,
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 10.8
+    },
+    {
+      "unit": "UrlRedirectController.UrlRedirectVul",
+      "category": "redir",
+      "real_vuln": true,
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 11.0
+    },
+    {
+      "unit": "UrlRedirectController.UrlRedirectSafe",
+      "category": "redir",
+      "real_vuln": false,
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 6.4
+    },
+    {
+      "unit": "UrlRedirectController.vul5",
+      "category": "redir",
+      "real_vuln": true,
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "Scenario=redir=HIT, PropertyCheck=MISSING（采样不一致）",
+      "elapsed_s": 39.5
+    },
+    {
+      "unit": "VerticalController.vul",
+      "category": "authz",
+      "real_vuln": true,
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "Scenario=authz=HIT, PropertyCheck=MISSING（采样不一致）",
+      "elapsed_s": 24.2
+    },
+    {
+      "unit": "DirTraversalController.safe1",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "flagged": true,
+      "stage": "missing_property",
+      "detail": "Scenario=pathtraver=HIT, PropertyCheck=MISSING（采样不一致）",
+      "elapsed_s": 179.0
+    },
+    {
+      "unit": "DirTraversalController.safe2",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "flagged": false,
+      "stage": "protected",
+      "detail": "Scenario=pathtraver=HIT, PropertyCheck=PRESENT（采样不一致）",
+      "elapsed_s": 88.5
+    },
+    {
+      "unit": "DeleteController.safe",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "flagged": false,
+      "stage": "protected",
+      "detail": "Scenario=pathtraver=HIT, PropertyCheck=PRESENT（采样不一致）",
+      "elapsed_s": 113.7
+    },
+    {
+      "unit": "ReadController.safe",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "flagged": false,
+      "stage": "protected",
+      "detail": "Scenario=pathtraver=HIT, PropertyCheck=PRESENT（采样不一致）",
+      "elapsed_s": 26.8
+    },
+    {
+      "unit": "UploadController.safe",
+      "category": "pathtraver",
+      "real_vuln": false,
+      "flagged": false,
+      "stage": "protected",
+      "detail": "Scenario=pathtraver=HIT, PropertyCheck=PRESENT（采样不一致）",
+      "elapsed_s": 300.6
+    },
+    {
+      "unit": "XMLDecoderController.safe",
+      "category": "deserial",
+      "real_vuln": false,
+      "flagged": null,
+      "stage": "error",
+      "detail": "调用失败",
+      "elapsed_s": 12.0
+    }
+  ]
 }
