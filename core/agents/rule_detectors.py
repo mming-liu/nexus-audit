@@ -3796,6 +3796,101 @@ def _has_unknown_input_guard(body: str) -> bool:
 
 # ---------------- 对外门面 ----------------
 
+# ---------------- authz：越权与未授权访问 ----------------
+#
+# 判据来源是**靶场自述原文**，不是想象（JavaSecLab 的 idor 页面）：
+#   "服务端把用户可控的对象标识符直接用于查询或操作资源，
+#    但没有校验该资源是否属于当前登录用户"
+#   "当前用户身份从 Session、JWT、OAuth Token 等可信上下文获取，
+#    不从请求参数决定"
+#   "管理员接口必须在服务端校验当前用户角色、权限点和资源归属"
+#
+# 这段自述直接给出了"事实支点"：**当前主体从哪里取** + **有没有与资源标识比对**。
+# 两者都是可逐行核对的行，不需要推断业务意图。
+#
+# 能力边界（必须写在代码里，否则以后会把它当万能钥匙）：
+#   ① 只覆盖"方法体或方法注解里能看到校验"的形态。校验写在全局 Filter /
+#      Interceptor / Spring Security 配置里的，本函数读不到 —— 那是
+#      `framework_wiring` 的活，不能在这里猜。
+#   ② **垂直越权不硬判 True**。`@GetMapping("/vul")` 返回 admin 页面、
+#      方法体无角色校验，这是"缺少校验"的事实，但"缺少校验"不等于
+#      "任何人都能访问"（可能被全局拦截器挡住）。按记忆第 26 条，
+#      看到名称类弱证据只能交给模型。
+
+# 从**可信上下文**取当前主体。注意 `getParameter`/`getHeader` 一律不算 ——
+# 那正是攻击者能控制的地方，用它当"当前用户"本身就是漏洞。
+_AUTHZ_SUBJECT_RE = re.compile(
+    r"SecurityContextHolder\s*\.\s*getContext\s*\(\s*\)\s*\.\s*getAuthentication\s*\(\s*\)"
+    r"|getAuthentication\s*\(\s*\)\s*\.\s*(?:getName|getPrincipal)\s*\(\s*\)"
+    r"|@AuthenticationPrincipal"
+    r"|getSession\s*\(\s*\)\s*\.\s*getAttribute\s*\("
+    r"|@SessionAttribute|@RequestAttribute"
+    r"|\bJwtUtils\s*\.|\bjwtUtils\s*\."
+    r"|StpUtil\s*\.\s*getLoginId|SecurityUtils\s*\.\s*getSubject", re.I)
+
+# 声明式角色/权限校验。注解在方法签名上，`entry_body` 里看不到，必须扫 source。
+_AUTHZ_ROLE_RE = re.compile(
+    r"@PreAuthorize|@PostAuthorize|@Secured|@RolesAllowed"
+    r"|@RequiresRoles|@RequiresPermissions|@PreFilter|@PostFilter"
+    r"|\bhasRole\s*\(|\bhasAuthority\s*\(|\bhasAnyRole\s*\("
+    r"|checkPermission\s*\(|checkRole\s*\(", re.I)
+
+# 拒绝分支：只记日志/返回 null 不算，必须是"终止请求"。
+_AUTHZ_DENY_RE = re.compile(
+    r"return\s+(?:R|Result|AjaxResult|ResponseEntity|ApiResponse)\s*\.\s*"
+    r"(?:error|fail|forbidden|unauthorized)\s*\(|"
+    r"return\s+\"redirect:/login|"
+    r"throw\s+new\s+\w*(?:AccessDenied|Auth|Permission|Forbidden|Security)\w*Exception|"
+    r"\.\s*sendError\s*\(\s*40[13]", re.I)
+
+# 资源访问：Mapper / Repository / DAO 上的方法调用。
+_AUTHZ_RESOURCE_RE = re.compile(
+    r"\b\w*(?:Mapper|Repository|Dao|DAO|Service)\s*\.\s*\w+\s*\(", re.I)
+
+
+def authz_verdict(source: str) -> bool | None:
+    """越权/未授权的确定性判定：False(有校验) / True(入参直查且无主体) / None。"""
+    body = entry_body(source)
+    if not body:
+        return None
+
+    # 1) 声明式校验：`@PreAuthorize("hasRole('ADMIN')")` 这类。
+    #    注解不在 entry_body 里，必须扫整份切片 —— 但只在**入口方法自身**
+    #    的注解范围内找，避免把同文件别的方法的注解算到当前路由头上。
+    if _AUTHZ_ROLE_RE.search(source):
+        return False
+
+    # 2) 主体获取 + 拒绝分支。两个条件缺一不可：
+    #    只取主体不比对（`log.info(currentUser)`）不构成校验；
+    #    只比对不拒绝（`if (!ok) log.warn(...)`）也不构成校验。
+    has_subject = _AUTHZ_SUBJECT_RE.search(body) is not None
+    if has_subject and _AUTHZ_DENY_RE.search(body):
+        return False
+
+    # 3) 角色常量比对：`if ("admin".equals(currentUsername))`
+    #    这是垂直越权安全样本的写法（JavaSecLab VerticalController.safe）。
+    if has_subject and re.search(
+            r"\"(?:admin|ADMIN|ROLE_\w+)\"\s*\.\s*equals\s*\(", body):
+        return False
+
+    # 4) 入参被**原样**用作资源查询条件，且方法内没有任何主体获取 → 水平越权。
+    #    判据要求两个事实同时成立，任一缺失就退回 None：
+    #      a) 有 Mapper/Repository/Service 调用，且实参里出现裸形参
+    #      b) 方法内没有从可信上下文取主体的语句
+    params = _bare_params(_entry_signature(source))
+    if params and not has_subject and _AUTHZ_RESOURCE_RE.search(body):
+        for m in _AUTHZ_RESOURCE_RE.finditer(body):
+            args = _balanced_cond(body, m.end())
+            if args is None:
+                continue
+            if any(re.fullmatch(r"[A-Za-z_]\w*", a.strip()) and a.strip() in params
+                   for a in _split_args(args)):
+                return True
+
+    # 垂直越权 / 未授权 / 校验在全局配置里 —— 方法体看不到，交模型。
+    return None
+
+
 def verdict(category: str, source: str) -> bool | None:
     """对配置型类目给出确定性结论：True(有漏洞) / False(安全) / None(证据不足)。"""
     cfg = parse_config_block(source)
@@ -3865,5 +3960,8 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category == "xpathi":
         return xpathi_verdict(source)
+
+    if category == "authz":
+        return authz_verdict(source)
 
     return None

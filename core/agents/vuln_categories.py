@@ -221,8 +221,7 @@ CATEGORIES: dict[str, VulnCategory] = {
                   "（如校验以 / 开头且不含 ://，或域名白名单校验）？"),
     ),
     "cors": VulnCategory(
-        key="cors", display="跨域配置缺陷", cwe="CWE-942", owasp=False, needs_taint=False,
-        # 配置型缺陷：问题出在 CORS 响应头的取值上。
+        key="cors", display="跨域配置缺陷", cwe="CWE-942", owasp=False, needs_taint=False,        # 配置型缺陷：问题出在 CORS 响应头的取值上。
         # 注意 vuls2 写的是 `Access-Control-Allow-Origin: *`（常量），
         # 若按污点可达提问会被判成"没有外部输入流入，无 sink"。
         sink_question=("函数是否设置了 CORS 响应头 Access-Control-Allow-Origin"
@@ -232,6 +231,36 @@ CATEGORIES: dict[str, VulnCategory] = {
                   "request.getHeader(\"Origin\")) 未经校验），本属性为 No。"
                   "注意：固定为 \"*\" 是公开可读的常规用法，"
                   "只有同时设置了 Access-Control-Allow-Credentials: true 才构成缺陷。"),
+    ),
+    "authz": VulnCategory(
+        key="authz", display="越权与未授权访问", cwe="CWE-285",
+        owasp=False,
+        # 判据来源不是想象，是 JavaSecLab 的 idor 页面自述原文：
+        #   "服务端把用户可控的对象标识符直接用于查询或操作资源，
+        #    但没有校验该资源是否属于当前登录用户"
+        #   "当前用户身份从 Session、JWT、OAuth Token 等可信上下文获取，
+        #    不从请求参数决定"
+        #   "管理员接口必须在服务端校验当前用户角色、权限点和资源归属"
+        #
+        # needs_taint=False 是刻意的：未授权访问样本（`/vulnapi/unauth/api/info`
+        # 直接吐身份证号）**根本没有入参**。若按"外部输入可达汇聚点"提问，
+        # 模型会严格照字面答 No，整类漏报 —— 与记忆里"定义上成立的短路仍会
+        # 漏报"是同一个坑。本类目的判据是"资源访问是否缺少主体归属/角色校验"，
+        # 与入参可不可控是两件事。
+        needs_taint=False,
+        sink_question=("函数是否在服务端访问了**归属于某个主体的资源**"
+                       "（按用户名/用户ID/订单ID/文件名查库或读文件并返回其内容），"
+                       "或者是否暴露了只应给特定角色/已登录用户使用的功能？"),
+        property=("访问该资源前是否在**服务端**核对了主体归属或角色？有效防护包括："
+                  "① 从可信上下文取当前主体（SecurityContextHolder 的 Authentication、"
+                  "Session、JWT/OAuth Token）并与请求里的资源标识比对，不匹配则拒绝；"
+                  "② 角色/权限点校验（@PreAuthorize、@RequiresRoles、hasRole、"
+                  "或对当前主体做显式的角色常量比对）；"
+                  "③ 查询条件本身把归属写死（如 where 里带 owner_id = 当前用户），"
+                  "使越权在 SQL 层物理不可能。"
+                  "注意：① 只在前端隐藏入口、只靠 URL 不公开、或只在方法注释里写"
+                  "\"需要管理员\"，都不算服务端校验；② 把资源标识入参原样透传给"
+                  "Mapper/DAO 而没有任何主体比对，本属性即为 No。"),
     ),
 }
 

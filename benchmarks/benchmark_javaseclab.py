@@ -69,6 +69,19 @@ MODULE_TO_CATEGORY = {
     "deserialize": "deserial",
     "crossorigin": "cors",
     "other/urlredirect": "redir",
+    # 越权模块。此前**没有**这一项，于是 227 个入口里 idor 的 6 个整块被
+    # 当成"无类目"排除 —— 这也是"with_truth 只有 59"的一部分原因。
+    "logic/idor": "authz",
+}
+
+# 少数漏洞路由的名字里没有 `vul` 字样，真值取自靶场自己的页面标注。
+#
+# `logic/idor`：horizontal.html 第 161 行
+#   common.formListenFun("vul-horizontal-button", "", "/logic/idor/horizontal/getUserInfo", ...)
+# 与页面正文"越权入口"/"安全场景：验证Session"的对照 —— 前一个按钮是越权入口，
+# 后一个（`/safe`）是安全场景。所以 `getUserInfo` 为 vul，`safe` 走 ROUTE_SAFE。
+MODULE_VUL_ROUTES = {
+    "logic/idor": {"getUserInfo"},
 }
 
 # 类名级覆盖（模块路径判不出时兜底）
@@ -137,9 +150,15 @@ def route_of(unit) -> str:
 
 
 def module_path_of(unit) -> str:
-    """从文件路径里取 `modules/` 之后、`/controller` 之前的那一段。"""
+    """取 `modules/` 之后、文件名之前的**完整**目录串。
+
+    不能写成 `r"/modules/(.+?)/"`（非贪婪只取第一段）：那样
+    `modules/logic/idor/controller/X.java` 只会得到 `logic`，
+    于是 `logic/idor` 这个键永远匹配不上，整个越权模块被静默排除。
+    症状与切片缺证据同型 —— 不报错，只是数字里少了一块。
+    """
     p = str(unit.file_path).replace("\\", "/")
-    m = re.search(r"/modules/(.+?)/", p)
+    m = re.search(r"/modules/(.+)/[^/]+\.java$", p)
     return m.group(1) if m else ""
 
 
@@ -164,6 +183,11 @@ def classify(unit) -> tuple[str, bool | None, str]:
         return cat, True, "route"
     if ROUTE_SAFE.search(route):
         return cat, False, "route"
+    # 路由名里没有 vul/safe 时，退到靶场页面标注的漏洞入口清单
+    tail = route.rsplit("/", 1)[-1]
+    for mod, names in MODULE_VUL_ROUTES.items():
+        if (mp == mod or mp.startswith(mod + "/")) and tail in names:
+            return cat, True, "page"
     return cat, None, ""
 
 

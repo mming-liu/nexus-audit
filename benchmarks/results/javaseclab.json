@@ -1,10 +1,10 @@
 {
   "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\JavaSecLab-main",
   "total_units": 227,
-  "with_truth": 59,
-  "rule_covered": 33,
-  "rule_coverage": 0.5593,
-  "rule_correct": 32,
+  "with_truth": 63,
+  "rule_covered": 36,
+  "rule_coverage": 0.5714,
+  "rule_correct": 35,
   "rule_accuracy": 1.0,
   "per_category": {
     "xxe": {
@@ -48,6 +48,12 @@
       "safe_n": 2,
       "decided": 7,
       "correct": 7
+    },
+    "authz": {
+      "n": 4,
+      "safe_n": 2,
+      "decided": 3,
+      "correct": 3
     },
     "pathtraver": {
       "n": 11,
@@ -180,6 +186,12 @@
     {
       "unit": "UrlRedirectController.UrlRedirectVul",
       "category": "redir",
+      "real_vuln": true,
+      "route": "/vul"
+    },
+    {
+      "unit": "VerticalController.vul",
+      "category": "authz",
       "real_vuln": true,
       "route": "/vul"
     },

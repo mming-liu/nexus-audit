@@ -1544,6 +1544,67 @@ _XSS_WRITER_VUL = '''public void doPost(HttpServletRequest request, HttpServletR
 check("PrintWriter 中间变量回显 → 真漏洞(方向护栏)", _verdict("xss", _XSS_WRITER_VUL), True)
 
 
+# ---------------- [39] authz：越权与未授权访问 ----------------
+#
+# 判据来源是靶场自述原文（JavaSecLab idor 页面）。这一段的两条护栏比
+# 正例更重要：
+#   · 只取主体、不做拒绝分支 → 必须是 None（不是 False）。"log 了一句
+#     当前用户"不构成校验，判 False 就是静默放行。
+#   · 垂直越权的视图路由 → 必须是 None（不是 True）。"方法体没有角色校验"
+#     是事实，但"没有校验"不等于"谁都能访问"——可能被全局拦截器挡住。
+
+_AUTHZ_VUL = '''public R getUserInfo(String username){
+    User user = userMapper.getAllByUsername(username);
+    if (user != null) {
+        return R.ok("用户名：" + user.getUsername() + " 密码：" + user.getPassword());
+    } else return R.error("用户名不存在");
+}'''
+check("入参直查资源且无主体获取 → 越权(True)", _verdict("authz", _AUTHZ_VUL), True)
+
+_AUTHZ_SAFE = '''public R safe(String username){
+    String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+    if (username == null || !username.equals(currentUsername)) {
+        return R.error("您没有权限查看该用户的资料");
+    }
+    User user = userMapper.getAllByUsername(username);
+    return R.ok("用户名：" + user.getUsername());
+}'''
+check("取主体 + 比对 + 拒绝分支 → 安全(False)", _verdict("authz", _AUTHZ_SAFE), False)
+
+_AUTHZ_ROLE = '''public R safe() {
+    String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+    if ("admin".equals(currentUsername)) {
+        return R.ok("管理员权限校验通过");
+    }
+    return R.error("当前用户无管理员权限：" + currentUsername);
+}'''
+check("角色常量比对 → 安全(False)", _verdict("authz", _AUTHZ_ROLE), False)
+
+_AUTHZ_ANNOTATION = '''@PreAuthorize("hasRole('ADMIN')")
+public R list() {
+    return R.ok(userMapper.selectAll());
+}'''
+check("@PreAuthorize 声明式校验 → 安全(False)", _verdict("authz", _AUTHZ_ANNOTATION), False)
+
+# 方向护栏：只记日志、没有终止请求 → 不构成校验
+_AUTHZ_LOG_ONLY = '''public R getUserInfo(String username){
+    String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+    log.info("current user = {}", currentUsername);
+    User user = userMapper.getAllByUsername(username);
+    return R.ok("用户名：" + user.getUsername() + " 密码：" + user.getPassword());
+}'''
+check("只取主体 + 记日志、无拒绝分支 → 不得判安全(方向护栏)",
+      _verdict("authz", _AUTHZ_LOG_ONLY) is not False, True)
+
+# 方向护栏：垂直越权的视图路由，方法体看不到全局拦截器
+_AUTHZ_VERTICAL = '''@GetMapping("/vul")
+public String vul() {
+    return "vul/logic/idor/admin";
+}'''
+check("垂直越权视图路由 → 交模型，不硬判 True(方向护栏)",
+      _verdict("authz", _AUTHZ_VERTICAL), None)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
