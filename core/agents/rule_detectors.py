@@ -4836,7 +4836,14 @@ def _looks_python(source: str) -> bool:
 
 
 def _looks_solidity(source: str) -> bool:
-    return bool(re.search(r"\bpragma\s+solidity\b|\bcontract\s+[A-Za-z_]\w*", source))
+    if re.search(r"\bpragma\s+solidity\b|\bcontract\s+[A-Za-z_]\w*", source):
+        return True
+    # 函数级切片（smartbugs 逐函数审计）：文件头不在切片里，
+    # 靠"Solidity 签名 + Solidity 专属词法"识别。Java/Python 都没有
+    # `uint` / `payable` / `msg.sender` / `mapping`。
+    return bool(re.search(r"\bfunction\s+\w+\s*\([^)]*\)", source)
+                and re.search(r"\b(?:uint\d*|address|payable|msg\s*\.\s*sender|"
+                              r"selfdestruct|mapping\s*\(|require\s*\()", source))
 
 
 def _py_func_params(source: str) -> set[str]:
@@ -5125,28 +5132,59 @@ def python_authz_verdict(source: str) -> bool | None:
     return None
 
 
+_SOLIDITY_MOD_SEP = "// ---- 修饰符定义（本合约，供核验）----"
+
+
+def _split_sol_modifier_block(source: str) -> tuple[str, str]:
+    """把切片拆成（函数自身源码, 修饰符定义块）。无块时块为空串。"""
+    if _SOLIDITY_MOD_SEP in source:
+        a, b = source.split(_SOLIDITY_MOD_SEP, 1)
+        return a, b
+    return source, ""
+
+
+def _sol_signature(source: str) -> str:
+    """函数签名段：从 `function` 关键字到其后的第一个 `{`。
+
+    不能整体 split("{")[0]：合成夹具/整合约文本里 contract 的 `{`
+    出现在函数声明之前，会切掉整个签名段（实测 [57] 三条断言静默
+    退 None 后修正）。
+    """
+    m = re.search(r"\bfunction\s+[A-Za-z_]\w*", source)
+    if not m:
+        return ""
+    brace = source.find("{", m.start())
+    return source[m.start(): brace if brace != -1 else len(source)]
+
+
 def solidity_reentrancy_verdict(source: str) -> bool | None:
     """Solidity 重入：CEI 顺序是逐行可核对的事实。
 
     · 签名带 `nonReentrant`（或体内有重入锁）→ False
-    · 所有外部转账调用（`.call{value:` / `.send(` / `.transfer(`）的行号
-      **严格大于**状态扣减行号 → False（CEI 正序）
+    · 所有外部转账调用的行号**严格大于**状态扣减行号 → False（CEI 正序）
     · 外部调用在扣减**之前**且无锁 → True
     · 缺少任一侧证据 → None
+
+    Module 13（smartbugs 实测）：老语法 `msg.sender.call.value(x)()`
+    （0.4.x 时代的主流写法）必须与 `.call{value:` 同等对待，否则
+    PrivateBank/CashOut、SimpleBank/Collect 这批经典真漏洞全部静默退回。
     """
+    func_src, _mod_block = _split_sol_modifier_block(source)
     if re.search(r"\bnonReentrant\b|locked|entered|_status\s*==\s*1|_reentrancyGuard",
-                 source):
+                 func_src):
         return False
     ext_lines = []
-    for m in re.finditer(r"\.\s*call\s*\{[^}]*value:|\.send\s*\(|\.transfer\s*\(",
-                         source):
-        ext_lines.append(source[:m.start()].count("\n") + 1)
-    # 状态扣减：映射/变量减法与清零（`balances[x] -=` / `balances[x] = 0`）
+    for m in re.finditer(r"\.\s*call\s*\{[^}]*value:|\.send\s*\(|\.transfer\s*\("
+                         r"|\.\s*call\s*\.\s*value\s*\(|\.\s*call\s*\.\s*gas\s*\(",
+                         func_src):
+        ext_lines.append(func_src[:m.start()].count("\n") + 1)
+    # 状态扣减：映射/变量减法与清零（`balances[x] -=` / `acc.balance = 0`）。
+    # 扣减只认函数自身源码 —— 修饰符定义块里的同名赋值不是本函数的 CEI 证据。
     ded_lines = []
-    for m in re.finditer(r"^\s*[\w\[\]\.]+\s*(?:-=|\s*=\s*0\s*;)", source, re.M):
-        ln = source[:m.start()].count("\n") + 1
-        line = source.splitlines()[ln - 1]
-        if re.search(r"[Bb]alance|[Dd]eposit|shares| stake|funds|credit", line):
+    for m in re.finditer(r"^\s*[\w\[\]\.]+\s*(?:-=|\s*=\s*0\s*;)", func_src, re.M):
+        ln = func_src[:m.start()].count("\n") + 1
+        line = func_src.splitlines()[ln - 1]
+        if re.search(r"[Bb]alance|[Dd]eposit|shares|stake|funds|credit|[Cc]redit", line):
             ded_lines.append(ln)
     if not ext_lines or not ded_lines:
         return None
@@ -5157,36 +5195,99 @@ def solidity_reentrancy_verdict(source: str) -> bool | None:
     return None                         # 交错：行序不足以下结论
 
 
-def solidity_access_verdict(source: str) -> bool | None:
-    """Solidity 访问控制：修饰符 / require(msg.sender == …) → False；
-    external/public 且执行 selfdestruct / 改 owner / 无条件转出全部余额，
-    而方法内没有任何 msg.sender 检查 → True；其余 None。
+_SOLIDITY_OWNERISH_RE = re.compile(
+    r"\b(?:owner|creator|owner_|contract_owner|admin)\b(?:\s*\.\s*balance)?\s*"
+    r"(?<!=[=!<>])=(?!=)", re.I)
+_SOLIDITY_SELFDESTRUCT_RE = re.compile(r"\b(?:selfdestruct|suicide)\s*\(")
+_SOLIDITY_DRAIN_RE = re.compile(
+    r"\.\s*(?:transfer|send)\s*\([^;]*(?:address\s*\(\s*this\s*\)|\bthis)\s*\.\s*balance"
+    r"|\.call\s*\{[^}]*\}\s*\([^;]*(?:address\s*\(\s*this\s*\)|\bthis)\s*\.\s*balance",
+    re.S)
+_SOLIDITY_MSGSENDER_CHECK_RE = re.compile(
+    r"require\s*\(\s*(?:msg\s*\.\s*sender\s*==|msg\s*\.\s*sender\s*!=|\w+\s*==\s*msg\s*\.\s*sender)"
+    r"|assert\s*\(\s*msg\s*\.\s*sender\s*=="
+    r"|if\s*\(\s*msg\s*\.\s*sender\s*!=\s*\w+\s*\)\s*(?:revert|throw|return)")
 
-    可见性必须从 `function …() external/public` 的**签名段**里找：
-    `source.split("{")[0]` 会切在 contract 的第一个花括号上，函数签名
-    全部落空 —— 实测 3 条断言因此静默退 None。
+
+def solidity_access_verdict(source: str) -> bool | None:
+    """Solidity 访问控制（Module 13 按 smartbugs 真实合约重写）。
+
+    判据挂机制不挂名字：
+      · 修饰符**实现体**里真有 msg.sender 检查 → False（只有名字不算，
+        空实现/确认型 modifier 防不了越权）；
+      · 函数体内 `require(msg.sender == …)` → False；
+      · `tx.origin ==` **不算**保护（钓鱼反模式，Phishable 正是标注漏洞）；
+      · 构造函数（函数名 == 合约名，0.4.x 无 visibility 时代）写 owner
+        是正常初始化 → 不判；
+      · **函数名 != 合约名**（错名构造函数，Rubixi/incorrect_constructor）
+        且写 owner 态 / selfdestruct，而没有任何保护 → True；
+      · external/public + selfdestruct / 转出 this.balance 且无 msg.sender
+        检查 → True；其余 None。
     """
-    if re.search(r"\bonly(?:Owner|Admin|Role\w*)\b|onlyAuthorized", source):
-        return False
-    if re.search(r"require\s*\(\s*(?:msg\s*\.\s*sender\s*==|tx\s*\.\s*origin\s*==|"
-                 r"\w+\s*==\s*msg\s*\.\s*sender)", source) \
-            or re.search(r"assert\s*\(\s*msg\s*\.\s*sender\s*==", source) \
-            or re.search(r"if\s*\(\s*msg\s*\.\s*sender\s*!=\s*\w+\s*\)\s*"
-                         r"(?:revert|throw|return)", source):
-        return False
-    if not re.search(r"function\s+[A-Za-z_]\w*\s*\([^)]*\)[^{;]*\b(?:external|public)\b",
-                     source):
+    func_src, mod_block = _split_sol_modifier_block(source)
+    sig = _sol_signature(func_src)
+    m = re.search(r"function\s+([A-Za-z_]\w*)", sig)
+    if not m:
         return None
-    danger = re.search(r"\bselfdestruct\s*\(|\bsuicide\s*\(", source)
-    owner_write = re.search(r"(?m)^\s*owner\s*=\s*[^=]", source) \
-        or re.search(r"\btransferOwnership\s*\(", source)
-    drain = re.search(r"\.\s*(?:transfer|send)\s*\([^;]*address\s*\(\s*this\s*\)"
-                      r"\s*\.\s*balance", source) \
-        or re.search(r"\.call\s*\{[^}]*\}\s*\([^;]*address\s*\(\s*this\s*\)"
-                     r"\s*\.\s*balance", source)
+    fname = m.group(1)
+    cm = re.search(r"contract:\s*(\S+)", source)
+    contract_name = cm.group(1) if cm else ""
+    is_constructor = bool(contract_name and contract_name != "?"
+                          and fname == contract_name)
+
+    # 保护判定：函数体内 + 修饰符**实现体**里的 msg.sender 恒等检查。
+    # tx.origin 不算保护（钓鱼反模式）；纯状态门 modifier（parity 的
+    # only_uninitialized 只查 m_numOwners）也**不算**保护 —— 把状态门
+    # 当保护会把 initWallet 判反，方向错误比退回恶劣得多。
+    protected = bool(_SOLIDITY_MSGSENDER_CHECK_RE.search(func_src))
+    if not protected and mod_block:
+        for mb in re.finditer(r"modifier\s+[A-Za-z_]\w*[^{]*\{(.*)", mod_block, re.S):
+            body = mb.group(1)
+            if _SOLIDITY_MSGSENDER_CHECK_RE.search(body):
+                protected = True
+                break
+            # modifier 里的门形态是 `if (msg.sender == owner) _;` ——
+            # 守护动作是占位符 `_` 而不是 revert（rubixi）。恒等比较在
+            # 条件里就足以证明"查了身份"。
+            if re.search(r"\b(?:require|if)\s*\(\s*msg\s*\.\s*sender\s*==", body):
+                protected = True
+                break
+    if protected:
+        return False
+
+    # 危险动作（只看函数自身源码）
+    danger = bool(_SOLIDITY_SELFDESTRUCT_RE.search(func_src))
+    owner_write = bool(_SOLIDITY_OWNERISH_RE.search(func_src)) \
+        or bool(re.search(r"\btransferOwnership\s*\(", func_src))
+    drain = bool(_SOLIDITY_DRAIN_RE.search(func_src))
     if not (danger or owner_write or drain):
         return None
-    return True
+
+    # 签名带 modifier 但切片里没有它的定义体（合成夹具/切片截断）——
+    # "看实现体不看名字"铁律下既不能当保护也不能当没有：退回交模型。
+    # （smartbugs 切片器会把用到的 modifier 体拼进切片，不受影响。）
+    _VIS_KW = {"external", "public", "internal", "private", "view", "pure",
+               "payable", "constant", "returns", "virtual", "override"}
+    tail = sig[sig.find(")") + 1:] if ")" in sig else ""
+    named_mods = [w for w in re.findall(r"\b([A-Za-z_]\w*)\b", tail)
+                  if w not in _VIS_KW]
+    if named_mods and not mod_block:
+        return None
+
+    if is_constructor:
+        # 正常构造函数写 owner 是初始化；无 visibility 的老构造函数
+        # 连调用面都没有，不构成越权（真相由函数名==合约名锁定）。
+        return None
+
+    # 错名构造函数：写 owner 态但函数名 != 合约名 —— 任何人部署后可调
+    # 用它把自己变成 owner（Rubixi 的 DynamicPyramid）。
+    if owner_write:
+        return True
+    if danger or drain:
+        if re.search(r"\b(?:external|public)\b", sig):
+            return True
+    return None
+
 
 
 def verdict(category: str, source: str) -> bool | None:

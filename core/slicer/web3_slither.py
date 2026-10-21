@@ -37,6 +37,8 @@ FEE_CONSTANTS = {"997", "9970", "970", "1000", "10000", "3"}
 class SoliditySlicer:
     language = "solidity_web3"
 
+    def __init__(self, repo_path: str | Path | None = None):
+        self.repo_path = repo_path
     def extract_entry_units(self, repo_path: str | Path) -> List[CodeUnit]:
         repo = Path(repo_path)
         units: List[CodeUnit] = []
@@ -48,6 +50,38 @@ class SoliditySlicer:
             except OSError:
                 continue
             lines = text.splitlines()
+            # 合约边界：`contract X ... {` 到配平 `}`。函数归属哪个合约、
+            # "函数名 != 合约名"（错名构造函数）的判定都需要它。
+            contract_spans: list[tuple[int, int, str]] = []
+            for cm in re.finditer(r"\bcontract\s+([A-Za-z_]\w*)[^{]*\{", text):
+                depth = 0
+                start = cm.end() - 1
+                for idx in range(start, len(text)):
+                    if text[idx] == "{":
+                        depth += 1
+                    elif text[idx] == "}":
+                        depth -= 1
+                        if depth == 0:
+                            contract_spans.append(
+                                (cm.start(), idx, cm.group(1)))
+                            break
+            # 修饰符定义体：`modifier xxx(...) { ... _; ... }`。
+            # 权限判定铁律是"看实现体不看名字"—— onlyowner 名字防不了
+            # 空实现，必须把 body 拼进切片让规则核验 msg.sender 检查。
+            mod_spans: list[tuple[int, int, str, str]] = []
+            # modifier 可以无参（rubixi 的 `modifier onlyowner {`）——
+            # 括号组必须可选，否则整类权限修饰符静默进不了切片。
+            for mm in re.finditer(r"\bmodifier\s+([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*[^{;]*\{", text):
+                depth = 0
+                for idx in range(mm.end() - 1, len(text)):
+                    if text[idx] == "{":
+                        depth += 1
+                    elif text[idx] == "}":
+                        depth -= 1
+                        if depth == 0:
+                            mod_spans.append((mm.start(), idx, mm.group(1),
+                                              mm.group(0) + text[mm.end():idx]))
+                            break
             for m in FUNC_RE.finditer(text):
                 name = m.group(1)
                 start_line = text[:m.start()].count("\n") + 1
@@ -66,10 +100,31 @@ class SoliditySlicer:
                 vis = m.group(0)
                 visibility = next((v for v in ("external", "public", "internal", "private")
                                    if re.search(rf"\b{v}\b", vis)), "default")
+                mods = [f"modifier:{n}" for n in
+                        re.findall(r"\b([A-Za-z_]\w*)\s*(?:\([^()]*\))?(?=[^()]*\{)",
+                                   vis[vis.find(")") + 1:] if ")" in vis else "")
+                        if n not in {"public", "external", "internal", "private",
+                                     "view", "pure", "payable", "constant", "returns"}
+                        and re.search(rf"\b{n}\b", vis)]
+                # 所属合约：函数起点落在哪个合约 span 里
+                contract = next((c for s, e, c in contract_spans
+                                 if s <= m.start() <= e), "")
+                mods.append(f"contract:{contract}" if contract else "contract:?")
+
+                # 本函数签名用到的修饰符定义体拼进切片（可被规则核验）
+                used = set(re.findall(r"\b([A-Za-z_]\w*)\b", vis))
+                extra = [seg for _ms, _me, mname, seg in mod_spans
+                         if mname in used]
+                # 合约名写进切片首行注释：函数级切片没有文件头，
+                # "函数名 == 合约名 → 构造函数"的判定只能靠它。
+                src = f"// contract: {contract or '?'}\n" + src
+                if extra:
+                    src = (src + "\n// ---- 修饰符定义（本合约，供核验）----\n"
+                           + "\n".join(extra))
                 units.append(CodeUnit(
                     file_path=str(sol), language=Language.SOLIDITY_WEB3,
                     unit_name=name, start_line=start_line, end_line=end_line,
-                    decorators_or_modifiers=[visibility],
+                    decorators_or_modifiers=[visibility, *mods],
                     called_symbols=self._calls(src), source_code=src))
         return units
 

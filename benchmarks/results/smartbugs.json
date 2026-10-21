@@ -1,0 +1,21 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\smartbugs-curated-main",
+  "total_functions": 248,
+  "registered": 246,
+  "safe_denominator": 198,
+  "decided": 49,
+  "correct": 49,
+  "fp": 0,
+  "reverse_fn": 0,
+  "fallback": 197,
+  "disputed": [
+    {
+      "file": "parity_wallet_bug_1.sol",
+      "unit": "kill"
+    },
+    {
+      "file": "parity_wallet_bug_2.sol",
+      "unit": "kill"
+    }
+  ]
+}

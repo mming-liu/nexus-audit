@@ -2736,8 +2736,16 @@ contract Piggy {
 
 check("Solidity 访问控制：裸 setOwner → 判漏洞",
       verdict("access_control", _SOL_SETOWNER_VUL), True)
-check("Solidity 访问控制：onlyOwner 修饰符 → 判安全",
-      verdict("access_control", _SOL_SETOWNER_OK), False)
+check("Solidity 访问控制：onlyOwner 修饰符但无定义体 → 退回（看实现体不看名字）",
+      verdict("access_control", _SOL_SETOWNER_OK), None)
+
+check("Solidity 访问控制：onlyOwner 定义体含 msg.sender 恒等 → 判安全",
+      verdict("access_control", _SOL_SETOWNER_OK + """
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner {
+    require(msg.sender == owner, "not owner");
+    _;
+}"""), False)
 check("Solidity 访问控制：无条件转出全部余额 → 判漏洞",
       verdict("access_control", _SOL_DRAIN_VUL), True)
 
@@ -3033,6 +3041,111 @@ if _Vul62.exists():
           _v62_got, _v62_truth)
 else:
     print("  -- vulpy 靶场不在 reference_repos，跳过 E2E（安装见 Module 10）")
+
+
+# ---------------- [63] Solidity 真实合约形态（smartbugs 机制锁定）----------------#
+# smartbugs（第 8 靶场）抓出的四个判据坑：
+#   ① _looks_solidity 只认 pragma/contract 关键字 → 函数级切片全退 None；
+#   ② 0.4.x 老语法 msg.sender.call.value(x)() 不在外部调用集合 → 经典
+#      重入（PrivateBank/CashOut、SimpleBank/Collect）全部静默退回；
+#   ③ modifier 可无参（modifier onlyowner {）→ 带参正则漏掉整类权限；
+#   ④ 状态门 modifier（only_uninitialized 查 m_numOwners）不是身份检查，
+#      拿它判安全会把 parity initWallet 判反。
+#   以及错名构造函数（Rubixi 的 DynamicPyramid）必须判 True。
+print("\n[63] Solidity 真实合约形态 / 重入老语法 / modifier 实现体")
+
+from core.slicer.web3_slither import SoliditySlicer    # noqa: E402
+
+_SOL_OLD_REENTRANT = '''// contract: PrivateBank
+function CashOut(uint _am) public payable {
+    if(_am <= balances[msg.sender]) {
+        if(msg.sender.call.value(_am)()) {
+            balances[msg.sender] -= _am;
+        }
+    }
+}'''
+check("老语法 call.value()() 先外转后扣减 → 判漏洞",
+      verdict("reentrancy", _SOL_OLD_REENTRANT), True)
+
+_SOL_OLD_CEI = '''// contract: GoodBank
+function withdraw(uint _am) public payable {
+    balances[msg.sender] -= _am;
+    msg.sender.call.value(_am)();
+}'''
+check("老语法 CEI 正序（先扣减后外转）→ 判安全",
+      verdict("reentrancy", _SOL_OLD_CEI), False)
+
+_SOL_MOD_NOPARAM = '''// contract: Vault
+function changeOwner(address _owner) onlyowner {
+    owner = _owner;
+}
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyowner {
+    if (msg.sender == creator) _;
+}'''
+check("无参 modifier 实现体含 msg.sender 恒等 → 判安全",
+      verdict("access_control", _SOL_MOD_NOPARAM), False)
+
+_SOL_STATE_GATE = '''// contract: Wallet
+function initWallet(address[] _owners, uint _required) only_uninitialized {
+    initMultiowned(_owners, _required);
+}
+// ---- 修饰符定义（本合约，供核验）----
+modifier only_uninitialized { if (m_numOwners > 0) throw; _; }'''
+check("纯状态门 modifier 不是身份检查 → 不判安全（退回交模型）",
+      verdict("access_control", _SOL_STATE_GATE), None)
+
+_SOL_RUBIXI = '''// contract: Rubixi
+function DynamicPyramid() {
+    creator = msg.sender;
+}'''
+check("错名构造函数写 owner 态 → 判漏洞（Rubixi）",
+      verdict("access_control", _SOL_RUBIXI), True)
+
+_SOL_TRUE_CTOR = '''// contract: MyContract
+function MyContract() public {
+    owner = msg.sender;
+}'''
+check("同名构造函数写 owner = 正常初始化 → 不判",
+      verdict("access_control", _SOL_TRUE_CTOR), None)
+
+_SOL_TXORIGIN = '''// contract: Phishable
+function withdrawAll(address _recipient) public {
+    require(tx.origin == owner);
+    _recipient.transfer(this.balance);
+}'''
+check("tx.origin 保护不算数（钓鱼反模式）→ 判漏洞",
+      verdict("access_control", _SOL_TXORIGIN), True)
+
+# smartbugs 真实仓库 E2E：strict 门禁关键数字
+_SB = Path(__file__).resolve().parent.parent / "reference_repos" / "smartbugs-curated-main"
+if _SB.exists():
+    _sb_meta = {Path(x["path"]).name: x
+                for x in _json.loads((_SB / "vulnerabilities.json").read_text(encoding="utf-8"))}
+    _sb_rows = []
+    for _cat in ("reentrancy", "access_control"):
+        for _u in SoliditySlicer(_SB).extract_entry_units(_SB / "dataset" / _cat):
+            _e = _sb_meta.get(Path(_u.file_path).name)
+            if not _e:
+                continue
+            _vl = {l for v in _e["vulnerabilities"]
+                   if v["category"] == _cat for l in v["lines"]}
+            if not _vl:
+                continue
+            if (Path(_u.file_path).name, _u.unit_name) in {("parity_wallet_bug_1.sol", "kill"),
+                                                           ("parity_wallet_bug_2.sol", "kill")}:
+                continue                     # 口径分歧剔除
+            _sb_rows.append((_cat, any(_u.start_line <= l <= _u.end_line for l in _vl),
+                             verdict(_cat, _u.source_code)))
+    _sb_fp = sum(1 for _c, _t, _g in _sb_rows if _g is True and not _t)
+    _sb_rev = sum(1 for _c, _t, _g in _sb_rows if _g is False and _t)
+    _sb_dec = sum(1 for _c, _t, _g in _sb_rows if _g is not None)
+    check("smartbugs E2E：零误报（safe 分母 ~198）", _sb_fp, 0)
+    check("smartbugs E2E：零判反", _sb_rev, 0)
+    check("smartbugs E2E：确定性判定 ≥ 40 条（老语法/modifier 修复生效）",
+          _sb_dec >= 40, True)
+else:
+    print("  -- smartbugs 靶场不在 reference_repos，跳过 E2E（安装见 Module 12）")
 
 
 print()
