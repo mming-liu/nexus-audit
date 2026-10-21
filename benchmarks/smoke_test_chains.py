@@ -2346,6 +2346,46 @@ check("login 仍在认证入口排除内（防放宽） → 不做授权判定",
       verdict("authz", _LOGOUT_LOGIN), None)
 
 
+# ---------------- [55] pr-scan：Mapper XML 变更的反向依赖 ----------------
+#
+# Step 7 的缺口：pr-scan 原来只对入口自身方法体（第 1 跳直调）求反向依赖，
+# 且 `_changed_methods_of` 的方法签名正则在 XML 上必然落空 —— 改第 3 跳的
+# Mapper 语句，受影响入口一个都找不到。两个新助手必须满足：
+#   ① 语句 id 从 diff 增删行里抓（select/insert/update/delete/sql，不含 resultMap）；
+#   ② 调用集合取整份切片（[Hop N] 段里的调用也算"该入口可达"）。
+print("\n[55] pr-scan：XML 语句 id 与全文调用集")
+
+from cli import _java_called_names, _xml_statement_ids   # noqa: E402
+
+_DIFF_XML = """diff --git a/NewBeeMallOrderMapper.xml b/NewBeeMallOrderMapper.xml
+--- a/NewBeeMallOrderMapper.xml
++++ b/NewBeeMallOrderMapper.xml
+@@ -12,7 +12,7 @@
+-  <select id="findNewBeeMallOrderList" resultMap="OrderVO">
++  <select id="findNewBeeMallOrderList" resultMap="OrderVO">
+     where 1=1
+-  <sql id="Order_Where">
++  <sql id="Order_Where">
+   <resultMap id="OrderVOMap">
+   <select id="getTotalNewBeeMallOrders" resultMap="OrderVO">"""
+
+ids = _xml_statement_ids(_DIFF_XML)
+check("语句 id：改到的 select/sql 都抓到", ids == {"findNewBeeMallOrderList", "Order_Where"}, True)
+check("resultMap 不收（太宽，交给文件名兜底）", "OrderVOMap" not in ids, True)
+
+_SLICE_SRC = '''@GetMapping("/orders")
+public Result list() {
+    return orderService.getMyOrders(p);
+}
+// 来自 NewBeeMallOrderServiceImpl.java:67 [Hop 1]
+public List<OrderVO> getMyOrders(PageQueryUtil p) {
+    return newBeeMallOrderMapper.findNewBeeMallOrderList(p);
+}'''
+calls = _java_called_names(_SLICE_SRC)
+check("全文调用集：第 2 跳的 mapper 调用也在内",
+      {"getMyOrders", "findNewBeeMallOrderList"} <= calls, True)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

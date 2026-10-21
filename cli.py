@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import difflib
 import os
 import re
 import subprocess
@@ -417,12 +418,20 @@ def cmd_pr_scan(args):
               f"（可用 --base HEAD~1 或具体 commit）")
         return
     changed = [l.strip() for l in diff.stdout.splitlines() if l.strip()]
-    code_exts = (".py", ".java", ".kt", ".go", ".js", ".ts", ".sol")
+    # .xml 必须在列：Mapper XML 是 SQL 注入真值的所在地（第 2/3 跳），
+    # 把它当"非代码"过滤掉，改 Mapper 的 PR 会被误判为"无变更，跳过"
+    # （实测 newbee-mall 的 C 场景：diff 明明有文件，却报 0 个）。
+    code_exts = (".py", ".java", ".kt", ".go", ".js", ".ts", ".sol", ".xml")
     changed = [f for f in changed if f.endswith(code_exts)]
     print(f"PR 增量扫描：{len(changed)} 个代码文件变更（基于 {args.base}）")
     for f in changed:
         print(f"  - {f}")
     if not changed:
+        if getattr(args, "fix", False):
+            # fix 模式不依赖 diff：补丁自检的对象是"规则层命中"，全量即可
+            print("无代码变更；--fix 模式改为覆盖全量入口")
+            _verify_fixes(repo, _slice_for_pr(repo, args.language))
+            return
         print("无代码变更，跳过")
         return
 
@@ -453,6 +462,27 @@ def cmd_pr_scan(args):
     # 增量扫描就退化成全量扫描了。
     changed_methods = _changed_methods_of(repo, args.base, changed)
 
+    # Mapper XML 变更：`_changed_methods_of` 的方法签名正则在 XML 上必然
+    # 落空，而 XML 恰恰是 SQL 注入真值的所在地（第 2/3 跳）。两步走：
+    #   精确层：从 diff 里抓被改的语句 id（<select id="x">），
+    #           命中"切片里贴进了这条语句"的入口；
+    #   兜底层：解析不出 id 时，凡切片引用了该 XML 文件名的入口全部拉入
+    #           （宁多不漏，与 hot 的文件级退回同一原则）。
+    xml_ids: set[str] = set()
+    xml_bases: list[str] = []
+    for f in changed:
+        if not f.endswith(".xml"):
+            continue
+        xml_bases.append(Path(f).name)
+        r = subprocess.run(["git", "-C", str(repo), "diff", "-U3", args.base, "HEAD", "--", f],
+                           capture_output=True, text=True)
+        ids = _xml_statement_ids(r.stdout)
+        if ids:
+            xml_ids |= ids
+    if xml_ids:
+        print(f"  变更的 Mapper 语句：{', '.join(sorted(xml_ids)[:10])}"
+              f"{' ...' if len(xml_ids) > 10 else ''}")
+
     # 所有被改动的方法名（跨文件合并），供反向依赖使用。
     # 注意不能只用 _changed_symbols()：它从 diff 文本抓签名，改动内容是
     # `// patched` 这种注释时抓不到任何签名。_changed_methods_of() 是按
@@ -478,9 +508,26 @@ def cmd_pr_scan(args):
         # 2) 入口调用了变更函数 —— 反向依赖。
         #    这是增量扫描真正的价值所在：改一个 SecurityUtil.checkURL，
         #    所有调用它的路由都可能受影响，而改动文件本身一个入口都没有。
-        called = set(getattr(u, "called_symbols", []) or [])
+        #
+        #    调用集合必须取**整份切片**而不只是 called_symbols（后者只来自
+        #    入口自身方法体 = 第 1 跳直调）。切片的 [Hop N] 段里出现的
+        #    方法调用正是"该入口可达"的证据：改 ServiceImpl 里的深层方法、
+        #    Mapper 语句，只要切片穿透到了它，就该算受影响。
+        called = (set(getattr(u, "called_symbols", []) or [])
+                  | set(_java_called_names(u.source_code)))
+        # 自己的方法名不算"调用了变更函数"：切片的签名行 `public String logout(`
+        # 会被抓成一次 `logout` 调用，把同名的其它入口全串进来
+        # （实测改 PersonalController.logout 会多拉进 AdminController.logout）。
+        called.discard(base_unit_name(u.unit_name).split(".")[-1])
         if changed_funcs and called & changed_funcs:
             dependent.append(u)
+            continue
+        if xml_ids and any(f'id="{s}"' in u.source_code for s in xml_ids):
+            dependent.append(u)
+            continue
+        if xml_bases and any(b in u.source_code for b in xml_bases):
+            dependent.append(u)        # XML 变了但解析不出语句 id → 兜底
+            continue
 
     # 3) 装配级反向依赖：改动的函数被某个 Filter / Interceptor / CorsProcessor
     #    调用，而该组件作用于一批路由 —— 这些路由全部受影响。
@@ -494,7 +541,16 @@ def cmd_pr_scan(args):
 
     subset = hot + dependent
     if not subset:
+        if getattr(args, "fix", False):
+            # fix 模式不依赖 diff：没有变更面时对全量入口做修复自检
+            print("无受影响路由，补丁自检改为覆盖全量入口")
+            _verify_fixes(repo, units)
+            return
         print("无受影响路由，本次 PR 无需审计")
+        return
+
+    if getattr(args, "fix", False):
+        _verify_fixes(repo, subset)
         return
 
     if args.dry_run:
@@ -520,6 +576,83 @@ def cmd_pr_scan(args):
         github_comment=getattr(args, "github_comment", False))
     print("\n进入审计（仅上述受影响路由）...")
     cmd_scan_java(ns, repo)
+
+
+def _verify_fixes(repo: Path, units: list) -> None:
+    """对规则层判 True 的 sqli 命中生成 `${}`→`#{}` 补丁并自检。
+
+    只处理**规则层确定性命中**：模型命中没有可机械验证的修复模板，
+    让 LLM 生成补丁再让 LLM 验收等于自己给自己判卷。
+    自检 = 把补丁写进被审计仓库重新切片、重跑 sqli 规则；验证不过的
+    补丁一律不推荐 —— 一个"修完规则还报"的补丁比不修更危险。
+    工作树在 finally 里还原，`--fix` 从不留下未声明的文件变更。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    from core.slicer.java_servlet import JavaSlicer
+
+    targets = []
+    for u in units:
+        try:
+            if rule_verdict("sqli", u.source_code) is True:
+                targets.append(u)
+        except Exception:
+            continue
+    if not targets:
+        print("\n补丁自检：没有规则层判 True 的 sqli 命中，无需修复")
+        return
+    print(f"\n补丁自检：{len(targets)} 条规则层 sqli 命中")
+
+    lines = ["# sqli 补丁自检（`${}` → `#{}`）", ""]
+    seg_re = re.compile(r"// 来自 (\S+\.xml)[^\n]*\n(.*?)(?=\n// 来自 |\Z)", re.S)
+    fixed = 0
+    for u in targets:
+        for m in seg_re.finditer(u.source_code):
+            xml_name, body = m.group(1), m.group(2)
+            if "${" not in body:
+                continue
+            hit = next(repo.rglob(xml_name), None)
+            if hit is None:
+                continue
+            # newline=""：字节级往返。默认文本模式会把 LF 写成 CRLF（Windows），
+            # "还原"就变成了一次真实的行尾篡改（实测 git status 直接变 M）。
+            with open(hit, encoding="utf-8", errors="replace", newline="") as fh:
+                original = fh.read()
+            # 替换必须用函数：替换串里写 r"#\{\1\}" 会把 `\{` 原样留在结果里
+            # （实测产出 `#\{name\}`，规则验证还通过了 —— 坏补丁骗过规则）。
+            patched = re.sub(r"\$\{(\w+)\}", lambda mm: "#{" + mm.group(1) + "}", original)
+            if patched == original:
+                continue
+            try:
+                with open(hit, "w", encoding="utf-8", newline="") as fh:
+                    fh.write(patched)
+                # 切片器的文件缓存（java_impl_resolver._FILE_CACHE）按路径缓存、
+                # 不看 mtime —— 不清空的话重切片读到的还是补丁前的旧内容，
+                # "补丁后仍 True"就是缓存造出来的假结论。
+                from core.context.java_impl_resolver import _FILE_CACHE
+                _FILE_CACHE.clear()
+                u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                           if base_unit_name(x.unit_name) == base_unit_name(u.unit_name)), None)
+                v2 = rule_verdict("sqli", u2.source_code) if u2 else None
+            finally:
+                with open(hit, "w", encoding="utf-8", newline="") as fh:
+                    fh.write(original)      # 还原，不留变更
+                _FILE_CACHE.clear()
+            if v2 is False:
+                fixed += 1
+                diff = difflib.unified_diff(
+                    original.splitlines(), patched.splitlines(),
+                    fromfile=f"a/{xml_name}", tofile=f"b/{xml_name}", lineterm="")
+                lines += [f"## {u.unit_name}（`{xml_name}`）", "```diff",
+                          *diff, "```", "",
+                          "> 自检通过：重切片 + 重跑 sqli 规则 → False。",
+                          "> 注意 `${}`→`#{}` 把值改为绑定参数；order by / 列名等",
+                          "> **标识符拼接**场景不能这样修，应改白名单 —— 需人工确认。", ""]
+            else:
+                lines += [f"## {u.unit_name}（`{xml_name}`）",
+                          f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    out = Path("fix_sqli.md")
+    out.write_text("\n".join(lines), encoding="utf-8")
+    print(f"  生成并验证通过 {fixed} 个补丁 → {out}")
 
 
 def _changed_symbols(repo: Path, base: str, files: list[str]) -> set[str]:
@@ -555,6 +688,42 @@ _METHOD_SIG_RE = re.compile(
     r"^\s*(?:(?:public|private|protected|static|final|abstract|synchronized|native)\s+)*"
     r"(?:[\w<>\[\],.?\s]+\s+)?(\w+)\s*\([^;{]*\)\s*(?:throws\s+[\w.,\s]+)?\{",
     re.M)
+
+_XML_STMT_RE = re.compile(
+    r"<(?:select|insert|update|delete|sql)\b[^>]*?\bid=\"(\w+)\"", re.I)
+
+
+def _xml_statement_ids(diff_text: str) -> set[str]:
+    """从 Mapper XML 的 diff 里抓被改到的语句 id。
+
+    `select`/`insert`/`update`/`delete` 是可执行语句，`sql` 是被
+    `<include refid>` 复用的片段 —— 改片段等于改所有引用它的语句。
+    `resultMap` 不收：它太宽（一个 ResultMap 常被全文件共用），
+    收进来会让兜底层失去意义；resultMap 变更由"切片引用了该 XML
+    文件名"这条兜底规则接住。
+    """
+    ids: set[str] = set()
+    for ln in diff_text.splitlines():
+        if not ln.startswith(("+", "-")) or ln.startswith(("+++", "---")):
+            continue
+        ids |= set(_XML_STMT_RE.findall(ln))
+    return ids
+
+
+def _java_called_names(source: str) -> set[str]:
+    """切片全文里的方法调用名（与 JavaSlicer._called_symbols 同一口径）。
+
+    called_symbols 只来自入口自身方法体（第 1 跳）；反向依赖必须连
+    [Hop N] 段里的调用一起看，否则改第 2/3 跳的方法会漏。
+    """
+    exclude = {"if", "for", "while", "switch", "catch", "return", "new",
+               "super", "this", "println", "String", "Integer"}
+    out = set()
+    for m in re.finditer(r"(?:\.|\b)([A-Za-z_]\w*)\s*\(", source):
+        n = m.group(1)
+        if n not in exclude:
+            out.add(n)
+    return out
 
 
 def _changed_methods_of(repo: Path, base: str, files: list[str]) -> dict[str, set[str] | None]:
@@ -821,6 +990,9 @@ def main():
                       help="输出 GitHub Actions 行级 annotation + 写入 $GITHUB_STEP_SUMMARY")
     p_pr.add_argument("--dry-run", action="store_true",
                       help="只列出受影响路由，不做审计")
+    p_pr.add_argument("--fix", action="store_true",
+                      help="对规则层 sqli 命中生成 ${}→#{} 补丁并重跑规则自检"
+                           "（写 fix_sqli.md，不改仓库文件）")
     p_pr.add_argument("--output", default=None, help="报告输出路径")
     args = parser.parse_args()
     if args.command == "scan":

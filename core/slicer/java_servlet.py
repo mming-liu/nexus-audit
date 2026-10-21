@@ -548,16 +548,20 @@ class JavaSlicer:
             hit = index.get(name)
             if hit is not None:
                 path, start_line, hb = hit
-                # 同文件的方法体已在切片里，跳过
                 if Path(path).resolve() == getattr(self, "_current_file", None):
+                    # 同文件方法体已在切片里；但**同名 Mapper 语句仍可能存在**
+                    # （控制器 `list()` ↔ Mapper XML `<select id="list">` 是
+                    # CRUD 命名的常态）。不能就此跳过 —— 否则 XML 语句被入口
+                    # 的同名方法遮蔽，SQL 段整段丢失（迷你仓库实测复现）。
+                    # 继续落到下面的 impl 查找。
+                    hit = None
+                elif self._TRIVIAL_ACCESSOR_RE.match(hb.strip()):
                     continue
-                # 读写器不占名额：它只把字段原样搬运，读它等于没读。
-                if self._TRIVIAL_ACCESSOR_RE.match(hb.strip()):
+                else:
+                    ranked.append((self._security_relevance(name, hb), name, path,
+                                   start_line, hb, ""))
                     continue
-                ranked.append((self._security_relevance(name, hb), name, path,
-                               start_line, hb, ""))
-                continue
-            if impl is None:
+            if hit is None and impl is None:
                 continue
             # **重名不猜，但可以按接收者消歧**：`selectByPrimaryKey` / `insert`
             # 这类通用 CRUD 在 9 个 Mapper 里同名，按方法名取第一个会把
