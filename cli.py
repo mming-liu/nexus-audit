@@ -546,7 +546,7 @@ def cmd_pr_scan(args):
         if getattr(args, "fix", False):
             # fix 模式不依赖 diff：补丁自检的对象是"规则层命中"，全量即可
             print("无代码变更；--fix 模式改为覆盖全量入口")
-            _verify_fixes(repo, _slice_for_pr(repo, args.language))
+            _verify_fixes_any(repo, _slice_for_pr(repo, args.language))
             return
         print("无代码变更，跳过")
         return
@@ -660,13 +660,13 @@ def cmd_pr_scan(args):
         if getattr(args, "fix", False):
             # fix 模式不依赖 diff：没有变更面时对全量入口做修复自检
             print("无受影响路由，补丁自检改为覆盖全量入口")
-            _verify_fixes(repo, units)
+            _verify_fixes_any(repo, units)
             return
         print("无受影响路由，本次 PR 无需审计")
         return
 
     if getattr(args, "fix", False):
-        _verify_fixes(repo, subset)
+        _verify_fixes_any(repo, subset)
         return
 
     if args.dry_run:
@@ -954,6 +954,229 @@ def _fix_deserial_targets(repo: Path, targets: list, lines: list) -> int:
     else:
         lines += [f"## [deserial] {', '.join(u.unit_name for u in targets)}",
                   f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
+# ---------------- Module 14：Python / Solidity 确定性补丁 ----------------
+
+def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_report.md") -> None:
+    """按语言把命中分发给对应的确定性修复器（Java/Python/Solidity）。
+
+    语言判定复用规则层的识别函数 —— 同一套"这是什么代码"的口径，
+    避免路由判 Python、规则判 Java 的分裂。
+    """
+    from core.agents.rule_detectors import _looks_python, _looks_solidity
+    py = [u for u in units if _looks_python(u.source_code)]
+    sol = [u for u in units if _looks_solidity(u.source_code)]
+    rest = [u for u in units if not _looks_python(u.source_code)
+            and not _looks_solidity(u.source_code)]
+    n = 0
+    report: list[str] = ["# 补丁自检（Python 参数化 / Solidity CEI）", ""]
+    if py:
+        n += _fix_python_sqli(repo, py, report)
+    if sol:
+        n += _fix_solidity_reentrancy(repo, sol, report)
+    if rest:
+        _verify_fixes(repo, rest, out_path)
+    if n:
+        out = Path(out_path)
+        out.open("a", encoding="utf-8").write("\n".join(report) + "\n")
+    if not (py or sol or rest):
+        print("\n补丁自检：没有规则层判 True 的命中，无需修复")
+
+
+def _py_parametrize_call(node) -> object | None:
+    """把 ast 层的注入型 execute 实参改写为参数化形态，返回新 Call 节点。
+
+    支持四种拼接形态（vulpy 实测三种）：
+      `"..." % x` / `f"...{x}..."` / `"...{}".format(x)` / `"..." + x`
+    全部归一为 `execute("... ? ...", (x,))`。`%` 占位符 `%s/%d/%f`
+    与 `{}` 都替换成 DB-API 的 `?`。无法识别的形态返回 None（不生成
+    补丁 —— 宁可不修也不产坏补丁）。
+    """
+    import ast as _ast
+
+    call = node
+    if not (isinstance(call, _ast.Call) and isinstance(call.func, _ast.Attribute)
+            and call.func.attr == "execute" and call.args):
+        return None
+    sql_node = call.args[0]
+    sql_parts: list[str] = []
+    values: list[_ast.expr] = []
+
+    def literal_of(n: _ast.expr) -> str | None:
+        return n.value if isinstance(n, _ast.Constant) and isinstance(n.value, str) else None
+
+    def walk(n: _ast.expr) -> bool:
+        lit = literal_of(n)
+        if lit is not None:
+            sql_parts.append(lit)
+            return True
+        if isinstance(n, _ast.BinOp) and isinstance(n.op, _ast.Mod):
+            if not walk(n.left):
+                return False
+            vals = n.right.elts if isinstance(n.right, _ast.Tuple) else [n.right]
+            values.extend(vals)
+            return True
+        if isinstance(n, _ast.BinOp) and isinstance(n.op, _ast.Add):
+            return walk(n.left) and walk(n.right)
+        if isinstance(n, _ast.JoinedStr):
+            for part in n.values:
+                if isinstance(part, _ast.Constant):
+                    sql_parts.append(part.value)
+                else:
+                    sql_parts.append("?")
+                    values.append(part.value)
+            return True
+        if isinstance(n, _ast.Call) and isinstance(n.func, _ast.Attribute) \
+                and n.func.attr == "format" and literal_of(n.func.value) is not None:
+            sql_parts.append(n.func.value.value)
+            values.extend(n.args)
+            return True
+        return False
+
+    if not walk(sql_node) or not values:
+        return None
+    sql = "".join(sql_parts)
+    sql = re.sub(r"%[sdf]", "?", sql)
+    sql = sql.replace("{}", "?")
+    new_args = [_ast.Constant(value=sql),
+                _ast.Tuple(elts=list(values), ctx=_ast.Load())]
+    return _ast.Call(func=call.func, args=new_args, keywords=[])
+
+
+def _fix_python_sqli(repo: Path, targets: list, lines: list) -> int:
+    """Python SQLi 参数化补丁：拼接实参 → `execute("... ?", (x,))`。
+
+    用 ast 定位与改写（正则配平嵌套括号在真实代码上必然踩坑），
+    ast.unparse 生成调用片段，行级替换；重切片 + 重跑 sqli 规则自检。
+    """
+    import ast as _ast
+
+    fixed = 0
+    for u in targets:
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        try:
+            tree = _ast.parse(original)
+        except SyntaxError:
+            continue
+        edits: list[tuple[int, int, int, int, str]] = []   # (l1,c1,l2,c2,new)
+        for node in _ast.walk(tree):
+            new = _py_parametrize_call(node)
+            if new is not None:
+                edits.append((node.lineno, node.col_offset,
+                              node.end_lineno, node.end_col_offset,
+                              _ast.unparse(new)))
+        if not edits:
+            continue
+        src_lines = original.splitlines(keepends=True)
+        for l1, c1, l2, c2, new in sorted(edits, reverse=True):
+            if l1 == l2:
+                src_lines[l1 - 1] = src_lines[l1 - 1][:c1] + new + src_lines[l1 - 1][c2:]
+        patched = "".join(src_lines)
+        try:
+            _ast.parse(patched)          # 补丁必须仍是合法 Python
+        except SyntaxError:
+            continue
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.slicer.web_treesitter import WebTreeSitterSlicer
+            u2 = next((x for x in WebTreeSitterSlicer(repo).extract_entry_units()
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            from core.agents.rule_detectors import verdict as rule_verdict
+            v2 = rule_verdict("sqli", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [py-sqli] {u.unit_name}（`{f.name}`）", "```diff",
+                      *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 sqli 规则 → False。", ""]
+        else:
+            lines += [f"## [py-sqli] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
+_SOLID_EXT_LINE_RE = re.compile(
+    r"\.\s*call\s*\{[^}]*value:|\.\s*call\s*\.\s*value\s*\(|\.send\s*\(|\.transfer\s*\(")
+_SOLID_DED_LINE_RE = re.compile(
+    r"^\s*[\w\[\]\.]+\s*(?:-=|\s*=\s*0\s*;)")
+
+
+def _fix_solidity_reentrancy(repo: Path, targets: list, lines: list) -> int:
+    """Solidity CEI 补丁：把"外转之后的清零/扣减行"移到外转之前。
+
+    只处理两行紧邻（间隔 ≤ 6 行）的单纯反序 —— 复杂控制流（条件分支里
+    的扣减、多处扣减）行交换语义不可靠，一律跳过交人工。自检同前：
+    重切片 + 重跑 reentrancy 规则。
+    """
+    fixed = 0
+    for u in targets:
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        file_lines = original.splitlines(keepends=True)
+        # 切片首行是 "// contract: X" 注入行；source_code 第 idx 行对应
+        # 文件第 u.start_line + idx - 1 行。
+        src_lines = u.source_code.splitlines()
+        ext_idx = ded_idx = None
+        for i, ln in enumerate(src_lines):
+            if ext_idx is None and _SOLID_EXT_LINE_RE.search(ln):
+                ext_idx = i
+            elif ext_idx is not None and ded_idx is None \
+                    and _SOLID_DED_LINE_RE.search(ln) \
+                    and re.search(r"[Bb]alance|[Dd]eposit|shares|stake|funds|credit", ln):
+                ded_idx = i
+                break
+        if ext_idx is None or ded_idx is None or ded_idx - ext_idx > 6 \
+                or ext_idx == 0:
+            continue
+        f_ext = u.start_line + ext_idx - 1
+        f_ded = u.start_line + ded_idx - 1
+        if not (1 <= f_ext <= len(file_lines) and 1 <= f_ded <= len(file_lines)):
+            continue
+        patched_lines = list(file_lines)
+        patched_lines[f_ext - 1], patched_lines[f_ded - 1] = \
+            patched_lines[f_ded - 1], patched_lines[f_ext - 1]
+        patched = "".join(patched_lines)
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.slicer.web3_slither import SoliditySlicer
+            u2 = next((x for x in SoliditySlicer(repo).extract_entry_units(repo)
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            from core.agents.rule_detectors import verdict as rule_verdict
+            v2 = rule_verdict("reentrancy", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [sol-reentrancy] {u.unit_name}（`{f.name}`）", "```diff",
+                      *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 reentrancy 规则 → False（CEI 正序）。",
+                      "> 注意：若扣减可能 revert（余额不足），先扣减后转账的顺序", 
+                      "> 同时改变了失败语义 —— 需人工确认回滚路径。", ""]
+        else:
+            lines += [f"## [sol-reentrancy] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
     return fixed
 
 

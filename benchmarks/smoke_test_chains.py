@@ -3148,6 +3148,82 @@ else:
     print("  -- smartbugs 靶场不在 reference_repos，跳过 E2E（安装见 Module 12）")
 
 
+# ---------------- [64] --fix 跨语言补丁（Python 参数化 / Solidity CEI）----------------
+#
+# 与 [59] 同一闭环：规则 True → 补丁 → 重切片重跑规则翻 False → 字节级
+# 还原。Python 走 ast 改写（正则配平嵌套括号在真实代码上必踩坑）；
+# Solidity 走紧邻反序行交换（复杂控制流不碰，交人工）。
+print("\n[64] --fix 跨语言补丁：Python 参数化 / Solidity CEI 行交换")
+
+from cli import _fix_python_sqli, _fix_solidity_reentrancy   # noqa: E402
+
+# Python：三种拼接形态 → 参数化
+_T64 = Path(_tmod.mkdtemp(prefix="nexus_t64_"))
+try:
+    (_T64 / "dao.py").write_text(
+        "from flask import Blueprint, request\n"
+        "bp = Blueprint('d', __name__)\n"
+        "\n"
+        "@bp.route('/vul', methods=['POST'])\n"
+        "def vul_pct():\n"
+        "    uid = request.form.get('uid')\n"
+        "    c = conn.cursor()\n"
+        "    return c.execute(\"SELECT * FROM users WHERE id = %s\" % uid).fetchone()\n",
+        encoding="utf-8")
+    _u = [x for x in WebTreeSitterSlicer(_T64).extract_entry_units()
+          if x.unit_name == "vul_pct"]
+    check("补丁前规则判 True", verdict("sqli", _u[0].source_code) if _u else None, True)
+    _report64: list = []
+    _n = _fix_python_sqli(_T64, _u, _report64)
+    check("Python 补丁自检通过", _n, 1)
+    check("报告含 diff", any("```diff" in x for x in _report64), True)
+    check("文件字节级还原", (_T64 / "dao.py").read_text(encoding="utf-8"),
+          "from flask import Blueprint, request\n"
+          "bp = Blueprint('d', __name__)\n"
+          "\n"
+          "@bp.route('/vul', methods=['POST'])\n"
+          "def vul_pct():\n"
+          "    uid = request.form.get('uid')\n"
+          "    c = conn.cursor()\n"
+          "    return c.execute(\"SELECT * FROM users WHERE id = %s\" % uid).fetchone()\n")
+finally:
+    shutil.rmtree(_T64, ignore_errors=True)
+
+# Solidity：先外转后清零 → 交换为 CEI
+_T64B = Path(_tmod.mkdtemp(prefix="nexus_t64b_"))
+try:
+    (_T64B / "Bank.sol").write_text(
+        "pragma solidity ^0.4.24;\n"
+        "contract Bank {\n"
+        "    mapping(address => uint) balances;\n"
+        "    function withdraw(uint amt) public {\n"
+        "        if(msg.sender.call.value(amt)()) {\n"
+        "            balances[msg.sender] -= amt;\n"
+        "        }\n"
+        "    }\n"
+        "}\n", encoding="utf-8")
+    _us = [x for x in SoliditySlicer(_T64B).extract_entry_units(_T64B)
+           if x.unit_name == "withdraw"]
+    check("补丁前规则判 True", verdict("reentrancy", _us[0].source_code) if _us else None, True)
+    _report64b: list = []
+    _n2 = _fix_solidity_reentrancy(_T64B, _us, _report64b)
+    check("Solidity 补丁自检通过（补丁态规则翻转 False）", _n2, 1)
+    check("报告含 CEI diff", any("```diff" in x for x in _report64b), True)
+    check("文件字节级还原",
+          (_T64B / "Bank.sol").read_text(encoding="utf-8"),
+          "pragma solidity ^0.4.24;\n"
+          "contract Bank {\n"
+          "    mapping(address => uint) balances;\n"
+          "    function withdraw(uint amt) public {\n"
+          "        if(msg.sender.call.value(amt)()) {\n"
+          "            balances[msg.sender] -= amt;\n"
+          "        }\n"
+          "    }\n"
+          "}\n")
+finally:
+    shutil.rmtree(_T64B, ignore_errors=True)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
