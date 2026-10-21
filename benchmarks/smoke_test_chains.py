@@ -2799,6 +2799,145 @@ finally:
     shutil.rmtree(_d, ignore_errors=True)
 
 
+# ---------------- [61] 模型硬超时/熔断 + RuleDiagnostic 接线 ----------------
+#
+# JavaSecLab 曾在免费模型上单条挂 26 分钟：timeout=180 × 重试 6 次 × 21 条
+# 退回样本。Module 9 的答案：单请求 45s、重试 1 次、连续 3 次整体超时熔断。
+# 熔断用真实挂起 socket 验证 —— mock 一个"永不响应"的假客户端骗不过
+# httpx 超时语义（探针必须真实，假探针和判据写错症状一模一样）。
+print("\n[61] 模型硬超时 / 熔断 / 诊断头接线")
+
+import asyncio as _aio                                            # noqa: E402
+import time as _time                                              # noqa: E402
+from core.agents.router import (OpenAICompatClient, ModelCircuitOpen,   # noqa: E402
+                                _is_timeout)
+from core.agents.rule_detectors import build_rule_diagnostic      # noqa: E402
+from core.agents.scenario_matcher import ScenarioMatcher as _SM   # noqa: E402
+
+
+async def _hang_server():
+    async def _h(reader, writer):
+        try:
+            await _aio.sleep(30)          # 收下连接但永不回包 → 读超时
+        except _aio.CancelledError:
+            pass
+        finally:
+            writer.close()
+    return await _aio.start_server(_h, "127.0.0.1", 0)
+
+
+async def _breaker_flow():
+    srv = await _hang_server()
+    port = srv.sockets[0].getsockname()[1]
+    try:
+        cli1 = OpenAICompatClient(base_url=f"http://127.0.0.1:{port}/v1",
+                                  model="hang", api_key="x",
+                                  timeout=0.3, max_retries=1, backoff_base=0.05,
+                                  breaker_threshold=3)
+        t0 = _time.monotonic()
+        for _ in range(3):
+            try:
+                await cli1.chat([{"role": "user", "content": "hi"}])
+            except ModelCircuitOpen:
+                pass
+            except RuntimeError:
+                pass                      # 超时失败（重试后仍失败抛 RuntimeError）
+        hung_elapsed = _time.monotonic() - t0
+        # 3 次失败 = 每次 2 个 0.3s 超时 + 微小退避 ≈ 最多 ~3s；死等 45s 就是 bug
+        if hung_elapsed > 8:
+            return False, f"挂起客户端耗时 {hung_elapsed:.1f}s，未按时限快速失败"
+        t0 = _time.monotonic()
+        try:
+            await cli1.chat([{"role": "user", "content": "hi"}])
+            return False, "熔断后调用竟然成功了"
+        except ModelCircuitOpen:
+            pass                          # 熔断：立刻快速失败，不碰网络
+        if _time.monotonic() - t0 > 0.5:
+            return False, "熔断快速失败没有生效（还在等网络层超时）"
+        # 非超时错误（连接被拒）不喂熔断计数。注意不能用 127.0.0.1:1：
+        # 本机防火墙对它静默丢包，httpx 抛的是 ReadTimeout（探针实测），
+        # 那样"非超时不计数"根本没被测到。用真 accept-后-立即断开的
+        # 服务器制造 ReadError/ConnectError。
+        async def _rej(reader, writer):
+            writer.close()
+        rsrv = await _aio.start_server(_rej, "127.0.0.1", 0)
+        rport = rsrv.sockets[0].getsockname()[1]
+        try:
+            cli2 = OpenAICompatClient(base_url=f"http://127.0.0.1:{rport}/v1",
+                                      model="refused", api_key="x", timeout=2.0,
+                                      max_retries=0, breaker_threshold=3)
+            for _ in range(3):
+                try:
+                    await cli2.chat([{"role": "user", "content": "hi"}])
+                except RuntimeError as e:
+                    if isinstance(e, ModelCircuitOpen):
+                        return False, "连接拒绝不该触发熔断"
+            if cli2._consec_timeouts != 0:
+                return False, "连接拒绝被计入了熔断计数"
+        finally:
+            rsrv.close()
+            await rsrv.wait_closed()
+        return True, ""
+    finally:
+        srv.close()
+        await srv.wait_closed()
+
+
+_brk_ok, _brk_why = _aio.run(_breaker_flow())
+check("挂起模型在时限内快速失败 + 3 次后熔断 + 非超时不计数",
+      (_brk_ok, _brk_why), (True, ""))
+check("_is_timeout 认得出超时字样",
+      _is_timeout(RuntimeError("Request timed out: read overdue")), True)
+
+# 诊断头接线：matcher 在规则退回 None 时把注释头拼进送审代码，
+# 且 Cite-Before-Verdict 在带头的代码上依然只认真实代码行。
+_DIAG_SRC = '''@GetMapping("/vul")
+public void vul(HttpServletRequest request) throws IOException {
+    String bar = request.getParameter("q");
+    String sql = "SELECT * FROM users WHERE name = '" + bar + "'";
+    java.sql.Statement stmt = conn.createStatement();
+    stmt.executeQuery(sql);
+}'''
+_hdr = build_rule_diagnostic("sqli", _DIAG_SRC, line_offset=1)
+# 行号契约：头部占 1 行，body 从注解行起算 —— bar 在原码第 3 行 → 模型看到 L4；
+# executeQuery 在原码第 6 行 → L7。探针打印过真实头部，别凭记忆写预期。
+check("诊断头：候选输入行与 sink 行都抓到",
+      ("候选输入行: L4" in _hdr and "候选敏感操作行: L6, L7" in _hdr), True)
+
+# 带头代码上的引证核验：真实代码行通过、注释头被拒绝
+_code_h = _hdr + "\n" + _DIAG_SRC
+_ok_real, _why_real = _SM._check_evidence(
+    '{"hit": "yes", "evidence_line": "stmt.executeQuery(sql);", '
+    '"source_line": "String bar = request.getParameter(\\"q\\");", '
+    '"sink_line": "stmt.executeQuery(sql);"}',
+    _code_h, taint=True)
+check("带头代码：双引证真实行核验通过", (_ok_real, _why_real), (True, ""))
+_ok_hdr, _why_hdr = _SM._check_evidence(
+    '{"hit": "yes", "evidence_line": ' +
+    _json.dumps("// [静态前筛已核实事实] 候选输入行: L2") + '}',
+    _code_h)
+check("带头代码：引诊断头注释行被拒（不是代码）", _ok_hdr, False)
+
+
+# 端到端：matcher 拼头。用 fake llm 抓 prompt，验证头部确实进了送审代码。
+class _CatchLLM:
+    def __init__(self):
+        self.prompts = []
+
+    async def __call__(self, messages):
+        self.prompts.append(messages[-1]["content"])
+        return '{"hit": "no"}'
+
+
+_cu = unit("Vul.vul", _DIAG_SRC)
+_sm = _SM(llm=_CatchLLM())
+_hs = _aio.run(_sm.audit_unit_for(_cu, ["sqli"], "java_web"))
+check("matcher：退回样本的送审代码已带诊断头",
+      "静态前筛已核实事实" in _sm._llm.prompts[0], True)
+check("matcher：unit.source_code 不被变异",
+      _cu.source_code, _DIAG_SRC)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

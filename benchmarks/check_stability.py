@@ -49,7 +49,7 @@ async def run(args):
     load_dotenv(ROOT / ".env")
 
     matcher = ScenarioMatcher(
-        router=TwoTierRouter(tier1=OpenAICompatClient(model=args.model, timeout=180)),
+        router=TwoTierRouter(tier1=OpenAICompatClient(model=args.model)),
         max_concurrency=args.concurrency, code_language="java_web",
         # 这里必须单次采样：本脚本测的就是"单次判定有多不稳"
         scenario_votes=1, property_votes=1)

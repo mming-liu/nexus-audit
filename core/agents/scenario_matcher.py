@@ -25,7 +25,7 @@ from typing import Callable, Sequence
 from core.agents import vuln_categories as VC
 from core.agents.router import TwoTierRouter, extract_json
 # 只借一个事实判定函数（入口有没有外部输入），无反向依赖
-from core.agents.rule_detectors import has_external_input
+from core.agents.rule_detectors import has_external_input, build_rule_diagnostic
 from core.models import CodeUnit, VulnHypothesis
 
 SYSTEM_MESSAGE = (
@@ -442,6 +442,16 @@ class ScenarioMatcher:
             cat = VC.get(key)
             if cat is None:
                 continue
+            # RuleDiagnostic（Module 9 接线）：规则层对该类目退回 None 时，
+            # 把"静态前筛已核实事实"（候选输入行 / sink 行）作为注释头拼进
+            # 送审代码顶部。与 cli.py cmd_scan_java 同一套机制，但这里**不
+            # 变异** unit.source_code（按类目建局部 code），且已有头的切片
+            # 不重复注入。注释行不是可引用证据，Cite-Before-Verdict 会拒绝。
+            code = unit.source_code
+            if "静态前筛已核实事实" not in code:
+                hdr = build_rule_diagnostic(key, code, line_offset=1)
+                if hdr:
+                    code = hdr + "\n" + code
             # Step 1: Scenario（配置型缺陷走不要求污点可达的模板）
             tmpl = SCENARIO_PROMPT_TMPL if cat.needs_taint else CONFIG_SCENARIO_PROMPT_TMPL
             if cat.needs_taint:
@@ -452,8 +462,8 @@ class ScenarioMatcher:
                 try:
                     hit, s_votes = await self._vote(
                         tmpl.format(lang=lang, question=cat.sink_question,
-                                    code=unit.source_code, source_hint=hint),
-                        "hit", self.scenario_votes, code=unit.source_code, taint=True)
+                                    code=code, source_hint=hint),
+                        "hit", self.scenario_votes, code=code, taint=True)
                 except Exception as e:
                     out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=False,
                                               property_missing="",
@@ -463,8 +473,8 @@ class ScenarioMatcher:
                 try:
                     hit, s_votes = await self._vote(
                         tmpl.format(lang=lang, question=cat.sink_question,
-                                    code=unit.source_code),
-                        "hit", self.scenario_votes, code=unit.source_code)
+                                    code=code),
+                        "hit", self.scenario_votes, code=code)
                 except Exception as e:
                     out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=False,
                                               property_missing="",
@@ -476,8 +486,8 @@ class ScenarioMatcher:
             try:
                 protected, p_votes = await self._vote(
                     PROPERTY_PROMPT_TMPL.format(
-                        property=cat.property, lang=lang, code=unit.source_code),
-                    "protected", self.property_votes, code=unit.source_code)
+                        property=cat.property, lang=lang, code=code),
+                    "protected", self.property_votes, code=code)
             except Exception as e:
                 out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=True,
                                           property_missing="",

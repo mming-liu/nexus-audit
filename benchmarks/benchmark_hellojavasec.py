@@ -300,7 +300,7 @@ def main():
 
         print(f"\n模型侧：{args.model} 判定 {len(rule_none)} 条退回样本"
               f"（带 evidence_line，并发 {args.concurrency}）...", flush=True)
-        router = TwoTierRouter(tier1=OpenAICompatClient(model=args.model, timeout=180))
+        router = TwoTierRouter(tier1=OpenAICompatClient(model=args.model))
         matcher = ScenarioMatcher(router=router, max_concurrency=args.concurrency,
                                   code_language="java_web")
         sem = asyncio.Semaphore(args.concurrency)

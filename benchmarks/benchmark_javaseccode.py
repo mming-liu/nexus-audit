@@ -205,7 +205,7 @@ async def run(args):
         from cli import load_dotenv
         load_dotenv(ROOT / ".env")
     router = None if args.offline else TwoTierRouter(
-        tier1=OpenAICompatClient(model=args.model, timeout=180))
+        tier1=OpenAICompatClient(model=args.model))
     if args.offline:
         # 离线基线：不做静态判定（那属于 LLM 层的能力），只保留确定性规则，
         # 用来度量「规则前置」本身贡献了多少判定，以及链路是否还跑得通。

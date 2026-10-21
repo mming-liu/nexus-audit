@@ -176,7 +176,7 @@ def main():
     print(f"退回样本真值分布：vuln {sum(1 for r in fallback if r['real_vuln'])} / "
           f"safe {sum(1 for r in fallback if not r['real_vuln'])}")
 
-    router = TwoTierRouter(tier1=OpenAICompatClient(model=args.model, timeout=180))
+    router = TwoTierRouter(tier1=OpenAICompatClient(model=args.model))
     matcher = sm.ScenarioMatcher(router=router, max_concurrency=args.concurrency,
                                  code_language="java_web")
     sem = asyncio.Semaphore(args.concurrency)

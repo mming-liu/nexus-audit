@@ -29,22 +29,47 @@ class LLMClient(Protocol):
     async def chat(self, messages: list[dict[str, str]], temperature: float = 0.0) -> str: ...
 
 
+class ModelCircuitOpen(RuntimeError):
+    """连续超时触发熔断：本客户端在冷静期内拒绝再发请求。"""
+
+
+def _is_timeout(err: Exception) -> bool:
+    """区分「超时/挂起」与「其他失败」——只有前者喂熔断计数器。
+
+    免费模型挂起时 httpx 抛 ReadTimeout（也可能是包成 RuntimeError 的
+    transport 层超时），连接被拒/401 之类不算挂起，不该触发熔断。
+    """
+    if isinstance(err, httpx.TimeoutException) if httpx else False:
+        return True
+    return "timed out" in str(err).lower() or "timeout" in str(err).lower()
+
+
 class OpenAICompatClient:
-    """OpenAI 兼容 API 异步客户端（带 429/5xx 指数退避重试）。"""
+    """OpenAI 兼容 API 异步客户端（带 429/5xx 指数退避重试 + 超时熔断）。
+
+    超时与重试预算（Module 9）：单次请求硬超时默认 45s、最多重试 1 次 ——
+    此前 timeout=180 × 重试 6 次，一条挂起样本能把流水线拖 26 分钟。
+    连续 3 次「整个 chat 都因超时失败」触发熔断：后续调用立刻抛
+    ModelCircuitOpen，由调用方把样本标为 call_failed 剔除 —— 绝不无限
+    挂起阻塞流水线。任何一次成功都会清零计数（熔断只针对持续挂起）。
+    """
 
     # 可重试状态码：限流与上游瞬断，重试有意义
     RETRYABLE = {408, 429, 500, 502, 503, 504}
 
     def __init__(self, base_url: str | None = None, model: str | None = None,
-                 api_key: str | None = None, timeout: float = 120.0,
+                 api_key: str | None = None, timeout: float = 45.0,
                  extra_headers: dict[str, str] | None = None,
-                 max_retries: int = 6, backoff_base: float = 2.0):
+                 max_retries: int = 1, backoff_base: float = 2.0,
+                 breaker_threshold: int = 3):
         self.base_url = (base_url or os.getenv("LLM_BASE_URL", "http://localhost:8000/v1")).rstrip("/")
         self.model = model or os.getenv("LLM_MODEL", "qwen3-coder")
         self.api_key = api_key or os.getenv("LLM_API_KEY", "EMPTY")
         self.timeout = timeout
         self.max_retries = max_retries
         self.backoff_base = backoff_base
+        self.breaker_threshold = breaker_threshold
+        self._consec_timeouts = 0
         # OpenCode Go 平面要求：稳定会话头 + 真实 User-Agent（官方使用规范）
         self.extra_headers = extra_headers or {
             "x-opencode-session": os.getenv("LLM_SESSION_ID", "nexus-audit-fixed-session"),
@@ -54,6 +79,11 @@ class OpenAICompatClient:
     async def chat(self, messages: list[dict[str, str]], temperature: float = 0.0) -> str:
         if httpx is None:
             raise RuntimeError("httpx 未安装：pip install httpx")
+        if self._consec_timeouts >= self.breaker_threshold:
+            # 熔断快速失败：调用方据此把样本标 call_failed，不再等网络层超时
+            raise ModelCircuitOpen(
+                f"熔断触发：连续 {self._consec_timeouts} 次调用超时"
+                f"（模型 {self.model}），已跳过本次请求")
         headers = {"Authorization": f"Bearer {self.api_key}", **self.extra_headers}
         payload = {"model": self.model, "messages": messages,
                    "temperature": temperature, "max_tokens": 4096}
@@ -70,6 +100,8 @@ class OpenAICompatClient:
                                              headers=headers, json=payload)
             except Exception as e:      # 连接断开 / 超时
                 last_err = e
+                if _is_timeout(e):
+                    self._consec_timeouts += 1
                 continue
 
             if resp.status_code == 200:
@@ -82,6 +114,7 @@ class OpenAICompatClient:
                 if not content.strip():
                     last_err = RuntimeError("模型返回空内容")
                     continue
+                self._consec_timeouts = 0
                 return content
 
             last_err = RuntimeError(self._diagnose(resp))
