@@ -21,3 +21,5 @@ reference_repos/*
 # 切片缓存（42MB，可重建）与失效指纹
 benchmarks/results/.owasp_units.pkl
 benchmarks/results/.owasp_units.pkl.fp
+fix_sqli.md
+report_pr.md
