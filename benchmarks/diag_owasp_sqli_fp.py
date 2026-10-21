@@ -58,6 +58,18 @@ def _slicer_fingerprint() -> str:
              # 形参主体注解块也进切片：仓库里有没有 HandlerMethodArgumentResolver
              # 直接决定切片里多不多那几行注释。
              os.path.join(ROOT, "core", "context", "argument_resolvers.py"),
+             # 其余 slicer/context 模块一并纳入：按 Module 8 门禁，凡
+             # core/slicer/ 与 core/context/ 下的文件必须进指纹列表，
+             # 哪怕当前不产 Java 切片内容 —— 漏登记就是留后门。
+             os.path.join(ROOT, "core", "slicer", "web_treesitter.py"),
+             os.path.join(ROOT, "core", "slicer", "web3_slither.py"),
+             os.path.join(ROOT, "core", "slicer", "web_codeql_bridge.py"),
+             os.path.join(ROOT, "core", "slicer", "base.py"),
+             os.path.join(ROOT, "core", "context", "view_templates.py"),
+             os.path.join(ROOT, "core", "context", "symbol_indexer.py"),
+             os.path.join(ROOT, "core", "context", "config_resolver.py"),
+             os.path.join(ROOT, "core", "context", "tool_handlers.py"),
+             os.path.join(ROOT, "core", "context", "__init__.py"),
              # CodeUnit 的字段变了（route_path），切片文本随之变化
              os.path.join(ROOT, "core", "models.py"),
              os.path.join(ROOT, "core", "text_utils.py"),

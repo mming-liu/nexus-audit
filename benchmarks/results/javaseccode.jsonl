@@ -63,5 +63,5 @@
 {"unit": "XXE.XMLReaderVuln", "route": "/XMLReader/vuln", "category": "xxe", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "XXE.XMLReaderSec", "route": "/XMLReader/sec", "category": "xxe", "real_vuln": false, "truth_src": "route", "flagged": false, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "XXE.DocumentHelper", "route": "/DocumentHelper/vuln", "category": "xxe", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
-{"unit": "PathTraversal.getImageSec", "route": "/path_traversal/sec", "category": "pathtraver", "real_vuln": false, "truth_src": "route", "flagged": null, "stage": "error", "detail": "", "elapsed_s": 26.6}
-{"unit": "SSRF.DnsRebind", "route": "/dnsrebind/vuln", "category": "ssrf", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "missing_property", "detail": "Scenario=ssrf=HIT, PropertyCheck=MISSING（采样不一致）", "elapsed_s": 166.5}
+{"unit": "SSRF.DnsRebind", "route": "/dnsrebind/vuln", "category": "ssrf", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "missing_property", "detail": "Scenario=ssrf=HIT, PropertyCheck=MISSING（采样不一致）", "elapsed_s": 135.0}
+{"unit": "PathTraversal.getImageSec", "route": "/path_traversal/sec", "category": "pathtraver", "real_vuln": false, "truth_src": "route", "flagged": null, "stage": "error", "detail": "", "elapsed_s": 544.6}
