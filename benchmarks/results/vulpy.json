@@ -1,0 +1,10 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\vulpy-master",
+  "total_units": 29,
+  "registered": 6,
+  "decided": 6,
+  "correct": 6,
+  "fp": 0,
+  "silent_fn": 0,
+  "fallback": []
+}

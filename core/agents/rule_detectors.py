@@ -4901,12 +4901,18 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0) -> bool | Non
     e = expr.strip()
     if not e:
         return None
-    # 纯字面量（无任何插值/拼接痕迹）
-    if re.fullmatch(r"(?:f|rf|fr|r)?\"[^\"]*\"(?:\s*%s*)?", e) and "{" not in e \
+    # 纯字面量（无任何插值/拼接痕迹）。Python 字符串单双引号都合法 ——
+    # vulpy 的 `request.form.get('username')` 里实参就是单引号字面量，
+    # 只认双引号会让"实参是常量"判成 None（实测 bad 侧真漏洞因此丢判）。
+    if re.fullmatch(r"(?:f|rf|fr|r)?['\"][^'\"]*['\"](?:\s*%s*)?", e) and "{" not in e \
             and "+" not in e and "%" not in e and ".format(" not in e:
         return False
     # f-string / % / + / .format
-    if "{" in e and re.match(r"[rf]?\"", e):
+    # f-string 必须有 f 前缀：普通字符串里的 '{}' 占位符（vulpy 的
+    # "... username = '{}'".format(x)）会让 `{` 出现在表达式里，若只看
+    # 花括号就把 .format 调用误路由进来 —— 花括号里没有内容可分析，
+    # 返回 None，真漏洞静默丢失（vulpy bad 实测）。
+    if re.match(r"(?:[rR][fF]|[fF][rR]?)[\"']", e) and "{" in e:
         # f-string：花括号里的表达式
         natures = []
         for im in re.finditer(r"\{([^{}]+)\}", e):
@@ -4959,6 +4965,10 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0) -> bool | Non
     # 方法调用：int()/float()/len() 锁死值域；str(x)/foo(x) 取实参值域。
     if re.fullmatch(r"(?:int|float|len|bool)\s*\([^()]*\)", e):
         return False
+    # Flask 请求读取就是外部输入（vulpy：request.form.get('username')）。
+    # 判据挂机制不挂写法：form/args/values/cookies/headers/json/data/files。
+    if re.search(r"\brequest\s*\.\s*(?:form|args|values|cookies|headers|json|data|files)\b", e):
+        return True
     mm = re.match(r"[\w.]+\s*\(", e)
     if mm:
         args = _balanced_cond(e, mm.end())
@@ -4986,6 +4996,49 @@ def _py_interp_text_capable(expr: str, source: str, depth: int = 0) -> bool | No
             return _py_value_text_capable(rhs, source, depth + 1)
         return True                       # 裸形参/字段：客户端可控
     return _py_value_text_capable(e, source, depth + 1)
+
+
+_PY_TPL_STRING_RE = re.compile(r"\brender_template_string\s*\(|\bMarkup\s*\(|\bmarkupsafe\s*\.\s*Markup\s*\(")
+_PY_TPL_SAFE_RE = re.compile(r"\brender_template\s*\(")
+
+
+def python_xss_verdict(source: str) -> bool | None:
+    """Python XSS（Module 11）：Jinja2 模板机制的确定性判定。
+
+    可逐行核对的事实：
+      · `render_template("x.html", k=v)` —— Jinja2 默认对变量自动转义，
+        文件模板不走 `|safe` 过滤器的形态判 safe（模板内容有 |safe 时
+        由切片证据段另行暴露，此处按机制判 False）
+      · `render_template_string(f"...{x}...")` / `Markup(x)` —— 字符串
+        模板**没有**文件模板的自动转义语境（vulnhuntr 的经典结论：
+        SSTI/XSS 双漏洞），实参可携带外部输入 → True
+    三态：无 sink → None；sink 实参全常量/数值 → False；任一可达 → True。
+    """
+    if not (_PY_TPL_STRING_RE.search(source) or _PY_TPL_SAFE_RE.search(source)):
+        return None
+    saw_safe = False
+    for m in _PY_TPL_STRING_RE.finditer(source):
+        args = _balanced_cond(source, m.end())
+        if args is None:
+            continue
+        parts = [p for p in _split_args(args) if p.strip()]
+        if not parts:
+            continue
+        natures = [_py_value_text_capable(p, source) for p in parts]
+        if natures and all(n is False for n in natures):
+            saw_safe = True
+            continue
+        if any(n is True for n in natures):
+            return True
+        return None                      # 查不出 → 交模型，不假装安全
+    for m in _PY_TPL_SAFE_RE.finditer(source):
+        args = _balanced_cond(source, m.end())
+        if args is None:
+            continue
+        parts = [p for p in _split_args(args) if p.strip()]
+        if len(parts) >= 2 and not parts[0].strip().startswith(("f", 'f"')):
+            saw_safe = True              # 文件模板 + 显式变量 → 自动转义
+    return False if saw_safe else None
 
 
 _PY_CMDSINK_RE = re.compile(
@@ -5194,6 +5247,8 @@ def verdict(category: str, source: str) -> bool | None:
         return redir_verdict(source)
 
     if category == "xss":
+        if _looks_python(source):
+            return python_xss_verdict(source)
         return xss_verdict(source)
 
     if category == "ssrf":

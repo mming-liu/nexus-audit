@@ -2812,6 +2812,8 @@ import time as _time                                              # noqa: E402
 from core.agents.router import (OpenAICompatClient, ModelCircuitOpen,   # noqa: E402
                                 _is_timeout)
 from core.agents.rule_detectors import build_rule_diagnostic      # noqa: E402
+from core.agents.rule_detectors import (                          # noqa: E402
+    _py_value_text_capable as _py_val62)
 from core.agents.scenario_matcher import ScenarioMatcher as _SM   # noqa: E402
 
 
@@ -2936,6 +2938,101 @@ check("matcher：退回样本的送审代码已带诊断头",
       "静态前筛已核实事实" in _sm._llm.prompts[0], True)
 check("matcher：unit.source_code 不被变异",
       _cu.source_code, _DIAG_SRC)
+
+
+# ---------------- [62] Python 跨文件链 + 模板 XSS（vulpy 机制锁定）----------------
+#
+# vulpy（第 7 靶场）实测抓出的三个判据坑，全部由真实 bad/good 对照暴露：
+#   ① Python 单引号字面量不是常量被漏认（只认了双引号）；
+#   ② "... '{}'".format(x) 的 '{}' 让 .format 调用误入 f-string 分支
+#      （真 f-string 必须有 f 前缀）→ 返回 None，真漏洞静默丢失；
+#   ③ request.form.get('x') 是外部输入，但实参常量性没被识别。
+print("\n[62] Python 跨文件链 / 模板 XSS / vulpy 机制锁定")
+
+# ①②③ 单点断言
+check("单引号字面量是常量",
+      _py_val62("'password'", "x = 'password'"), False)
+check("'{}'.format(形参) 不误入 f-string 分支（返回 True 而非 None）",
+      _py_val62(
+          "\"SELECT * FROM users WHERE u = '{}'\".format(username)",
+          "def f(username):\n    q = \"SELECT * FROM users WHERE u = '{}'\".format(username)"),
+      True)
+check("request.form.get(...) 是外部输入",
+      _py_val62("request.form.get('username')",
+                "u = request.form.get('username')"), True)
+
+# 跨文件两跳链：mod 调 lib，lib 里有拼接 SQL（vulpy 的 do_login 形态）
+_T62 = Path(_tmod.mkdtemp(prefix="nexus_t62_"))
+try:
+    (_T62 / "mod_x.py").write_text(
+        "from flask import Blueprint, request\n"
+        "import lib_x\n"
+        "bp = Blueprint('x', __name__)\n"
+        "\n"
+        "@bp.route('/login', methods=['POST'])\n"
+        "def do_login():\n"
+        "    u = request.form.get('username')\n"
+        "    return lib_x.find(u)\n", encoding="utf-8")
+    (_T62 / "lib_x.py").write_text(
+        "import sqlite3\n"
+        "\n"
+        "def find(username):\n"
+        "    c = sqlite3.connect('d.sqlite').cursor()\n"
+        "    return c.execute(\"SELECT * FROM users WHERE u = '{}'\".format(username)).fetchone()\n",
+        encoding="utf-8")
+    _u62 = WebTreeSitterSlicer(_T62).extract_entry_units()
+    check("蓝图 @bp.route 入口被切出", len(_u62), 1)
+    check("跨文件 lib 体进入 [Hop 1]",
+          "[Hop 1]" in (_u62[0].source_code if _u62 else ""), True)
+    check("两跳链拼接 SQL → 判漏洞",
+          verdict("sqli", _u62[0].source_code) if _u62 else None, True)
+    (_T62 / "lib_x.py").write_text(
+        "import sqlite3\n"
+        "\n"
+        "def find(username):\n"
+        "    c = sqlite3.connect('d.sqlite').cursor()\n"
+        "    return c.execute(\"SELECT * FROM users WHERE u = ?\", (username,)).fetchone()\n",
+        encoding="utf-8")
+    _u62b = WebTreeSitterSlicer(_T62).extract_entry_units()
+    check("同链路参数化 → 判安全",
+          verdict("sqli", _u62b[0].source_code) if _u62b else None, False)
+finally:
+    shutil.rmtree(_T62, ignore_errors=True)
+
+# 模板 XSS 四形态
+check("render_template_string 拼接外部输入 → 判漏洞",
+      verdict("xss", '@app.route("/e")\ndef e():\n'
+                     '    n = request.args.get("n")\n'
+                     '    return render_template_string("<h1>" + n + "</h1>")'), True)
+check("Markup(f-string 外部输入) → 判漏洞",
+      verdict("xss", '@app.route("/m")\ndef m():\n'
+                     '    w = request.form.get("w")\n'
+                     '    return Markup(f"<b>{w}</b>")'), True)
+check("render_template 文件模板（自动转义）→ 判安全",
+      verdict("xss", '@app.route("/p")\ndef p():\n'
+                     '    return render_template("p.html", n=request.args.get("n"))'), False)
+check("render_template_string 常量 → 判安全",
+      verdict("xss", '@app.route("/c")\ndef c():\n'
+                     '    return render_template_string("<h1>hi</h1>")'), False)
+
+# vulpy 真实仓库 E2E（bad/good 成对真值 6 条）
+_Vul62 = Path(__file__).resolve().parent.parent / "reference_repos" / "vulpy-master"
+if _Vul62.exists():
+    _v62_truth = {
+        ("bad", "do_login"): True, ("bad", "do_chpasswd"): True,
+        ("bad", "do_key_create"): True,
+        ("good", "do_login"): False, ("good", "do_chpasswd_post"): False,
+        ("good", "do_key_create"): False,
+    }
+    _v62_got = {}
+    for _side in ("bad", "good"):
+        for _u in WebTreeSitterSlicer(_Vul62 / _side).extract_entry_units():
+            if (_side, _u.unit_name) in _v62_truth:
+                _v62_got[(_side, _u.unit_name)] = verdict("sqli", _u.source_code)
+    check("vulpy 成对真值 6/6（bad .format → True / good 参数化 → False）",
+          _v62_got, _v62_truth)
+else:
+    print("  -- vulpy 靶场不在 reference_repos，跳过 E2E（安装见 Module 10）")
 
 
 print()
