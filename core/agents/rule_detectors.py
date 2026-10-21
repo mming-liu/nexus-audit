@@ -3038,6 +3038,87 @@ def has_external_input(source: str) -> bool:
     return False
 
 
+# ---------------- RuleDiagnostic：半成品事实移交 ----------------
+#
+# 规则退回 None 的样本仍可能带着**已经核实了一半的事实**：哪几行是外部输入、
+# 哪几行是本类目的敏感汇聚点。这些是逐行可核对的静态事实，直接扔掉等于让
+# 模型从零开始再扫一遍 —— 而它恰恰最容易扫错行。把事实作为**纯客观注释**
+# 注入送审代码段顶部，只做"定位参考"，不替模型下结论：
+#   · 不说"这两行之间有污点流"（那是模型的判断）；
+#   · 不说"防护有效/无效"（同上）；
+#   · 只说"这几行是输入 / 这几行是汇聚点，请独立判断中间流转与防护"。
+
+# 每个类目的敏感汇聚点特征。只收 sink 层调用，不收中间加工 ——
+# 列宽了会稀释引用价值，模型反而两头都看。
+_DIAG_SINK_RES: dict[str, re.Pattern[str]] = {
+    "sqli": re.compile(
+        r"prepareStatement\s*\(|createStatement\s*\(|createQuery\s*\(|"
+        r"createNativeQuery\s*\(|executeQuery\s*\(|executeUpdate\s*\(|"
+        r"\bexecute\s*\("),
+    "cmdi": re.compile(
+        r"Runtime\s*\.\s*getRuntime\s*\(\s*\)\s*\.\s*exec\s*\(|"
+        r"\bexec\s*\(|ProcessBuilder\s*\("),
+    "xss": re.compile(
+        r"getWriter\s*\(|println\s*\(|print\s*\(|write\s*\(|"
+        r"th:utext|innerHTML", re.I),
+    "pathtraver": re.compile(
+        r"new\s+File\s*\(|FileInputStream\s*\(|FileOutputStream\s*\(|"
+        r"Files\s*\.\s*\w+\s*\(|getPath\s*\(|getCanonicalPath\s*\("),
+    "redir": re.compile(
+        r"sendRedirect\s*\(|setHeader\s*\(\s*\"Location|addHeader\s*\(\s*\"Location|"
+        r"forward\s*\("),
+    "ssrf": re.compile(
+        r"new\s+URL\s*\(|openConnection\s*\(|openStream\s*\(|HttpClient|RestTemplate"),
+    "deserial": re.compile(
+        r"ObjectInputStream\s*\(|readObject\s*\(|XMLDecoder\s*\(|"
+        r"parseObject\s*\(|YAML\s*\.\s*load\s*\(|fromXML\s*\("),
+    "spel": re.compile(
+        r"SpelExpressionParser\s*\(|parseExpression\s*\(|"
+        r"StandardEvaluationContext\s*\(|evaluateExpression\s*\("),
+    "xxe": re.compile(
+        r"DocumentBuilder\s*\(|parse\s*\(|newSAXParser\s*\(|XMLReader\s*\("),
+    "xpathi": re.compile(
+        r"XPath\s*\.\s*compile\s*\(|evaluate\s*\(|newXPath\s*\("),
+    "weakrand": re.compile(r"new\s+Random\s*\(|Math\s*\.\s*random\s*\("),
+}
+
+
+def build_rule_diagnostic(category: str, code: str,
+                          *, line_offset: int = 0) -> str:
+    """为退回 None 的 (类目, 切片) 生成一行"静态前筛已核实事实"注释头。
+
+    扫描 `code`（含入口体，不含证据段之后的实现体 —— 与 `has_external_input`
+    同口径：只报告入口自己那一段的行号），提取：
+      · 候选输入行：注解绑定 / request 读取 / 包装对象取值 / 裸形参声明行
+      · 候选敏感操作行：该类目的 sink 调用行
+
+    `line_offset`：调用方把注释头拼到代码顶部后，代码整体下移 —— 拼 N 行
+    头就传 offset=N，保证注释里的 L 编号与模型实际看到的行号自洽。
+    返回空串表示"没有值得移交的事实"（无输入行或无 sink 行），调用方不拼。
+    """
+    body = entry_body(code)
+    if not body:
+        return ""
+    sink_re = _DIAG_SINK_RES.get(category)
+    src_lines: list[str] = []
+    sink_lines: list[str] = []
+    bare = set(_bare_params(_entry_signature(code)))
+    for i, ln in enumerate(body.splitlines(), 1):
+        tag = f"L{i + line_offset}"
+        if XSS_PARAM_RE.search(ln) or _XSS_FOREIGN_SOURCE_RE.search(ln):
+            src_lines.append(tag)
+            continue
+        if any(re.search(rf"\b{re.escape(p)}\b", ln) for p in bare):
+            src_lines.append(tag)
+        if sink_re and sink_re.search(ln):
+            sink_lines.append(tag)
+    if not src_lines or not sink_lines:
+        return ""
+    return (f"// [静态前筛已核实事实] 候选输入行: {', '.join(src_lines[:6])}"
+            f" | 候选敏感操作行: {', '.join(sink_lines[:6])}"
+            f"（僅供双引证定位参考，请独立判断中间流转与防护是否有效）")
+
+
 def _has_inline_assign_after(body: str, var: str, pos: int) -> bool:
     """`pos` 之后是否还有对 `var` 的行内赋值（`if (c) bar = x;` 这种）。
 
@@ -4500,6 +4581,18 @@ _AUTHZ_ABORT_EXTRA_RE = re.compile(
     r"|\bthrow\s+new\s+\w+", re.I)
 
 
+# 会话自毁类调用：只针对**当前请求自身**的会话/凭据，不触及其它主体。
+_LOGOUT_DESTROY_RE = re.compile(
+    r"\.\s*invalidate\s*\(\s*\)"
+    r"|\.\s*removeAttribute\s*\("
+    r"|SecurityUtils\s*\.\s*getSubject\s*\(\s*\)\s*\.\s*logout\s*\("
+    r"|SecurityContextLogoutHandler\s*\(\s*\)\s*\.\s*logout"
+    r"|\.\s*logout\s*\(\s*\)", re.I)
+# 注销/删凭据类调用（实参里可能带主键 —— 主体自己的 id 算安全，外部裸形参不算）。
+_LOGOUT_CRED_CALL_RE = re.compile(
+    r"\.\s*(?:logout|deleteToken|removeToken|destroyToken|destoryToken)\s*\(", re.I)
+
+
 def _ownership_compared(body: str, subject: str) -> bool:
     """主体 id 是否在 `if (` 里与**另一个对象**的 id 做过比较。
 
@@ -4670,7 +4763,8 @@ def authz_verdict(source: str) -> bool | None:
     #      a) 有 Mapper/Repository/Service 调用，且实参里出现裸形参
     #      b) 方法内没有从可信上下文取主体的语句
     #      c) 该路由没有被前缀级鉴权拦截器整体覆盖（后台 `/admin/**`）
-    params = _bare_params(_entry_signature(source))
+    params_sig = _entry_signature(source)
+    params = _bare_params(params_sig)
     if params and not has_any_subject and _AUTHZ_RESOURCE_RE.search(body) \
             and not _AUTHZ_GLOBAL_GUARD_RE.search(source):
         for m in _AUTHZ_RESOURCE_RE.finditer(body):
@@ -4681,8 +4775,365 @@ def authz_verdict(source: str) -> bool | None:
                    for a in _split_args(args)):
                 return True
 
+    # 2f) 会话自毁分支：logout / signout 入口的**全部动作**只是销毁当前请求
+    #     自己的会话与凭据 ——
+    #
+    #         session.invalidate();
+    #         session.removeAttribute("loginUser");
+    #         SecurityUtils.getSubject().logout();
+    #         new SecurityContextLogoutHandler().logout(request, response, auth);
+    #
+    #     没有任何"外部可控主键被交给注销/删凭据"的调用 → 判 False。
+    #     放在分支 4 之后：`userService.logout(userId)` 这种把外部裸形参送进
+    #     注销的形态在 4) 已判 True（无主体）—— 2f 不能把它翻成安全。
+    #     带主体的 `xxx.logout(adminUser.getAdminUserId())` 早已被 2b 判 False。
+    #     两者都没命中而凭据调用实参不可解析时，不表态（退 None）。
+    if _LOGOUT_DESTROY_RE.search(body):
+        # 路由/方法名是否为 logout：方法名取入口体的第一个调用头（与
+        # `_entry_signature` 同一正则，取 group(0) 里的名字）；路由取入口
+        # 注解行。两者任一命中即可 —— 同一机制有两种命名位。
+        head = source.split("// ----", 1)[0]     # 注解 + 签名（不含证据段）
+        mm = re.search(r"(?<![@\w])\b([A-Za-z_]\w*)\s*\(", body)
+        method_name = (mm.group(1) if mm else "")
+        route_name = ""
+        for am in re.finditer(
+                r"@(?:Request|Get|Post|Put|Delete|Patch)Mapping\s*\([^)]*\)", head):
+            route_name += am.group(0)
+        gate = f"{method_name} {route_name}".lower()
+        if re.search(r"\blog\s?out\b|\bsign\s?out\b", gate):
+            suspicious = False
+            for cm in _LOGOUT_CRED_CALL_RE.finditer(body):
+                cargs = _balanced_cond(body, cm.end())
+                if not cargs or not cargs.strip():
+                    continue                  # 无实参：销毁自身凭据
+                if any(a.strip() in params for a in _split_args(cargs)):
+                    suspicious = True         # 外部裸形参被交给注销/删凭据
+                    break
+                # 实参存在但解析不出裸形参 → 不在 2f 下结论
+                if not any(re.fullmatch(r"[A-Za-z_]\w*", a.strip())
+                           for a in _split_args(cargs)):
+                    suspicious = True
+                    break
+            if not suspicious:
+                return False
+
     # 垂直越权 / 未授权 / 校验在全局配置里 —— 方法体看不到，交模型。
     return None
+
+
+# ---------------- 语言识别与 Python / Solidity 分支 ----------------
+#
+# `verdict()` 只拿得到切片文本。语言靠结构特征判定：
+#   Python —— `^def `（顶层/缩进皆可）且无 Java 可见性修饰符开头的方法；
+#   Solidity —— `pragma solidity` / `contract X {`。
+# 误判方向要可控：Java 源码绝不会有 `^\s*def\s+\w+\(`，Python 源码不会有
+# `public class`。两条都过不了就不会进错分支，宁可退 None 交模型。
+
+def _looks_python(source: str) -> bool:
+    if re.search(r"\b(?:public|private|protected)\s+(?:class|static|\w+\s+\w+\s*\()", source):
+        return False
+    return bool(re.search(r"(?m)^\s*(?:async\s+)?def\s+[A-Za-z_]\w*\s*\(", source))
+
+
+def _looks_solidity(source: str) -> bool:
+    return bool(re.search(r"\bpragma\s+solidity\b|\bcontract\s+[A-Za-z_]\w*", source))
+
+
+def _py_func_params(source: str) -> set[str]:
+    """入口（切片里第一个 def）的裸形参名 —— 客户端可控值。"""
+    m = re.search(r"(?m)^\s*(?:async\s+)?def\s+[A-Za-z_]\w*\s*\(", source)
+    if not m:
+        return set()
+    sig = _balanced_cond(source, m.end())
+    if sig is None:
+        return set()
+    out = set()
+    for part in _split_args(sig):
+        pm = re.search(r"([A-Za-z_]\w*)\s*(?::[^=]+)?\s*(?:=[^,]*)?$", part.strip())
+        if pm and pm.group(1) not in {"self", "cls", "request", "response", "db"}:
+            out.add(pm.group(1))
+    return out
+
+
+_PY_SQL_SINK_RE = re.compile(r"\.\s*execute(?:script)?\s*\(|\.\s*executemany\s*\(")
+_PY_PARAM_SQL_RE = re.compile(r"\"\"|'%s'\"|")   # 占位符形态在函数内逐调用判定
+
+
+def python_sqli_verdict(source: str) -> bool | None:
+    """Python SQLi：参数化/ORM → False；格式化拼接且非常量/数值转换 → True。
+
+    可逐行核对的事实（与 Java `${}` vs `#{}` 同构）：
+      · `execute(sql, (x,))` / `execute(sql, {...})` —— 参数化 → safe
+      · `cursor.execute("... WHERE id = " + int(x) + ...)` —— 值域锁死 → safe
+      · `f"... WHERE id = {x}"` / `"... %s" % x` / `"... " + x` / `.format(x)`
+        且 x 非纯数值转换 → True
+    三态：无 sink → None；每个 sink 都安全 → False；任一 sink 可注入 → True。
+    """
+    if not _PY_SQL_SINK_RE.search(source):
+        # 只有 ORM 调用：filter/filter_by/get 按字段绑定，天然参数化
+        if re.search(r"\.\s*(?:filter|filter_by|get|query|first|all)\s*\(", source):
+            return False
+        return None
+    saw_safe = False
+    for m in _PY_SQL_SINK_RE.finditer(source):
+        args = _balanced_cond(source, m.end())
+        if args is None:
+            continue
+        parts = _split_args(args)
+        if not parts:
+            continue
+        if len(parts) >= 2 and parts[1].strip():
+            saw_safe = True            # 带参数元组/字典 → 参数化
+            continue
+        sql = parts[0].strip()
+        nat = _py_value_text_capable(sql, source)
+        if nat is True:
+            return True
+        if nat is False:
+            saw_safe = True
+    return False if saw_safe else None
+
+
+def _py_value_text_capable(expr: str, source: str, depth: int = 0) -> bool | None:
+    """SQL 文本表达式能否携带运行时值（三态）。None=查不出，保守不判。"""
+    if depth > 3:
+        return None
+    e = expr.strip()
+    if not e:
+        return None
+    # 纯字面量（无任何插值/拼接痕迹）
+    if re.fullmatch(r"(?:f|rf|fr|r)?\"[^\"]*\"(?:\s*%s*)?", e) and "{" not in e \
+            and "+" not in e and "%" not in e and ".format(" not in e:
+        return False
+    # f-string / % / + / .format
+    if "{" in e and re.match(r"[rf]?\"", e):
+        # f-string：花括号里的表达式
+        natures = []
+        for im in re.finditer(r"\{([^{}]+)\}", e):
+            natures.append(_py_interp_text_capable(im.group(1), source, depth))
+        if natures and all(n is False for n in natures):
+            return False
+        if any(n is True for n in natures):
+            return True
+        return None
+    if "%s" in e or "'%" in e or '"%' in e:
+        m = re.search(r"%\s*\(?([^;]+)\)?\s*$", e)
+        if m:
+            natures = [_py_interp_text_capable(a, source, depth)
+                       for a in _split_args(m.group(1))]
+            if natures and all(n is False for n in natures):
+                return False
+            if any(n is True for n in natures):
+                return True
+        return None
+    if ".format(" in e:
+        call_args = _balanced_cond(e, e.find(".format(") + len(".format("))
+        if call_args is not None:
+            natures = [_py_interp_text_capable(a, source, depth)
+                       for a in _split_args(call_args)]
+            if natures and all(n is False for n in natures):
+                return False
+            if any(n is True for n in natures):
+                return True
+        return None
+    if "+" in e:
+        parts = [p for p in e.split("+") if p.strip()]
+        natures = [_py_value_text_capable(p, source, depth + 1) for p in parts]
+        if natures and all(n is False for n in natures):
+            return False
+        if any(n is True for n in natures):
+            return True
+        return None
+    # 裸变量：沿赋值链追；追不到时看它是不是**函数形参** ——
+    # 形参就是客户端可控值（多跳切片里 dao.fetch(uid) 的 uid 正是这种）。
+    if re.fullmatch(r"[A-Za-z_]\w*", e):
+        rhs = None
+        for am in re.finditer(rf"^\s*{re.escape(e)}\s*=\s*(.+)$", source, re.M):
+            rhs = am.group(1)
+        if rhs is not None:
+            return _py_value_text_capable(rhs, source, depth + 1)
+        if re.search(rf"(?m)^\s*(?:async\s+)?def\s+\w*\s*\([^)]*\b{re.escape(e)}\b",
+                     source):
+            return True
+        return None
+    # 方法调用：int()/float()/len() 锁死值域；str(x)/foo(x) 取实参值域。
+    if re.fullmatch(r"(?:int|float|len|bool)\s*\([^()]*\)", e):
+        return False
+    mm = re.match(r"[\w.]+\s*\(", e)
+    if mm:
+        args = _balanced_cond(e, mm.end())
+        natures = [_py_interp_text_capable(a, source, depth + 1)
+                   for a in _split_args(args or "")]
+        if natures and all(n is False for n in natures):
+            return False
+        if any(n is True for n in natures):
+            return True
+    return None
+
+
+def _py_interp_text_capable(expr: str, source: str, depth: int = 0) -> bool | None:
+    """插值表达式（f-string 花括号 / % 元组元素 / format 实参）的值域。"""
+    e = expr.strip()
+    if re.fullmatch(r"-?\d+(?:\.\d+)?", e):
+        return False
+    if re.fullmatch(r"(?:int|float)\(([^()]*)\)", e):
+        return False                      # int()/float() 转换锁死值域
+    if re.fullmatch(r"[A-Za-z_]\w*", e):
+        rhs = None
+        for am in re.finditer(rf"^\s*{re.escape(e)}\s*=\s*(.+)$", source, re.M):
+            rhs = am.group(1)
+        if rhs is not None:
+            return _py_value_text_capable(rhs, source, depth + 1)
+        return True                       # 裸形参/字段：客户端可控
+    return _py_value_text_capable(e, source, depth + 1)
+
+
+_PY_CMDSINK_RE = re.compile(
+    r"\bos\s*\.\s*system\s*\(|\bos\s*\.\s*popen\s*\(|"
+    r"subprocess\s*\.\s*(?:Popen|call|run|check_output|check_call)\s*\(")
+_PY_SHELL_TRUE_RE = re.compile(r"shell\s*=\s*True")
+_PY_SHELL_FALSE_RE = re.compile(r"shell\s*=\s*False")
+_PY_SHLEX_RE = re.compile(r"shlex\s*\.\s*(?:quote|split|join)\s*\(")
+
+
+def python_cmdi_verdict(source: str) -> bool | None:
+    """Python CMDi：列表传参（shell=False）→ False；字符串命令拼接进
+    `os.system` / `shell=True` 且无 shlex → True。
+
+    三态：无 sink → None；外部输入进字符串命令且无 shlex → True；
+    全部 sink 都走列表传参或 shlex 加固 → False。
+    """
+    if not _PY_CMDSINK_RE.search(source):
+        return None
+    if _PY_SHLEX_RE.search(source):
+        return False
+    tainted = False
+    safe = False
+    for m in _PY_CMDSINK_RE.finditer(source):
+        args = _balanced_cond(source, m.end())
+        if args is None:
+            continue
+        call_seg = source[m.start(): m.end() + len(args or "") + 40]
+        parts = _split_args(args)
+        if not parts:
+            continue
+        first = parts[0].strip()
+        is_list = first.startswith("[")
+        has_shell_true = _PY_SHELL_TRUE_RE.search(call_seg) is not None
+        if is_list and not has_shell_true:
+            safe = True                   # 列表传参：参数边界由 execve 保证
+            continue
+        nat = _py_value_text_capable(first, source)
+        if nat is True:
+            tainted = True
+        elif nat is None and _py_func_params(source):
+            # 有形参且命令里出现标识符 → 交保守判：字符串命令 + 有输入面
+            tainted = True
+        else:
+            safe = safe or nat is False
+    if tainted:
+        return True
+    return False if safe else None
+
+
+_PY_SUBJECT_RE = re.compile(
+    r"Depends\s*\(\s*get_current_user\s*\)|@login_required|@jwt_required|"
+    r"\bcurrent_user\b|\bg\s*\.\s*user\b|\brequest\s*\.\s*user\b|"
+    r"get_jwt_identity\s*\(|@requires_auth", re.I)
+_PY_OWNERSHIP_RE = re.compile(
+    r"current_user\s*\.\s*id\s*==|==\s*current_user\s*\.\s*id|"
+    r"current_user\s*\.\s*id\s*!=|!=\s*current_user\s*\.\s*id|"
+    r"\.filter(?:_by)?\s*\([^)]*(?:user_id|owner_id)\s*=\s*current_user\s*\.\s*id|"
+    r"\.filter\s*\([^)]*==\s*current_user\s*\.\s*id|"
+    r"(?:user_id|owner_id)\s*=\s*current_user\s*\.\s*id|"
+    r"abort\s*\(\s*40[13]\s*\)", re.I)
+
+
+def python_authz_verdict(source: str) -> bool | None:
+    """Python Authz：FastAPI `Depends(get_current_user)` / Flask
+    `@login_required` + 归属比对（current_user.id 参与查询或比较）→ False；
+    路由形参直接查改删且无任何主体 → True；其余退 None。"""
+    has_subject = _PY_SUBJECT_RE.search(source) is not None
+    if has_subject:
+        if _PY_OWNERSHIP_RE.search(source):
+            return False
+        # 有主体但方法体看不出比对：主体可能下沉到 Service —— 不表态
+        if re.search(r"(?:service|repo|dao|crud|manager|store)\s*\.\s*\w+\s*\(",
+                     source, re.I):
+            return None
+        return None
+    params = _py_func_params(source)
+    resource_params = {p for p in params
+                       if re.search(r"(?:id|no|name|key|slug|uuid)$", p)}
+    if resource_params and re.search(
+            r"\.\s*(?:query|get|filter|filter_by|delete|update|execute|first|"
+            r"scalar|one)\s*\(", source):
+        return True
+    return None
+
+
+def solidity_reentrancy_verdict(source: str) -> bool | None:
+    """Solidity 重入：CEI 顺序是逐行可核对的事实。
+
+    · 签名带 `nonReentrant`（或体内有重入锁）→ False
+    · 所有外部转账调用（`.call{value:` / `.send(` / `.transfer(`）的行号
+      **严格大于**状态扣减行号 → False（CEI 正序）
+    · 外部调用在扣减**之前**且无锁 → True
+    · 缺少任一侧证据 → None
+    """
+    if re.search(r"\bnonReentrant\b|locked|entered|_status\s*==\s*1|_reentrancyGuard",
+                 source):
+        return False
+    ext_lines = []
+    for m in re.finditer(r"\.\s*call\s*\{[^}]*value:|\.send\s*\(|\.transfer\s*\(",
+                         source):
+        ext_lines.append(source[:m.start()].count("\n") + 1)
+    # 状态扣减：映射/变量减法与清零（`balances[x] -=` / `balances[x] = 0`）
+    ded_lines = []
+    for m in re.finditer(r"^\s*[\w\[\]\.]+\s*(?:-=|\s*=\s*0\s*;)", source, re.M):
+        ln = source[:m.start()].count("\n") + 1
+        line = source.splitlines()[ln - 1]
+        if re.search(r"[Bb]alance|[Dd]eposit|shares| stake|funds|credit", line):
+            ded_lines.append(ln)
+    if not ext_lines or not ded_lines:
+        return None
+    if min(ext_lines) > max(ded_lines):
+        return False                    # 先扣减后外转：CEI 正序
+    if max(ext_lines) < min(ded_lines):
+        return True                     # 先外转后扣减：经典重入面
+    return None                         # 交错：行序不足以下结论
+
+
+def solidity_access_verdict(source: str) -> bool | None:
+    """Solidity 访问控制：修饰符 / require(msg.sender == …) → False；
+    external/public 且执行 selfdestruct / 改 owner / 无条件转出全部余额，
+    而方法内没有任何 msg.sender 检查 → True；其余 None。
+
+    可见性必须从 `function …() external/public` 的**签名段**里找：
+    `source.split("{")[0]` 会切在 contract 的第一个花括号上，函数签名
+    全部落空 —— 实测 3 条断言因此静默退 None。
+    """
+    if re.search(r"\bonly(?:Owner|Admin|Role\w*)\b|onlyAuthorized", source):
+        return False
+    if re.search(r"require\s*\(\s*(?:msg\s*\.\s*sender\s*==|tx\s*\.\s*origin\s*==|"
+                 r"\w+\s*==\s*msg\s*\.\s*sender)", source) \
+            or re.search(r"assert\s*\(\s*msg\s*\.\s*sender\s*==", source) \
+            or re.search(r"if\s*\(\s*msg\s*\.\s*sender\s*!=\s*\w+\s*\)\s*"
+                         r"(?:revert|throw|return)", source):
+        return False
+    if not re.search(r"function\s+[A-Za-z_]\w*\s*\([^)]*\)[^{;]*\b(?:external|public)\b",
+                     source):
+        return None
+    danger = re.search(r"\bselfdestruct\s*\(|\bsuicide\s*\(", source)
+    owner_write = re.search(r"(?m)^\s*owner\s*=\s*[^=]", source) \
+        or re.search(r"\btransferOwnership\s*\(", source)
+    drain = re.search(r"\.\s*(?:transfer|send)\s*\([^;]*address\s*\(\s*this\s*\)"
+                      r"\s*\.\s*balance", source) \
+        or re.search(r"\.call\s*\{[^}]*\}\s*\([^;]*address\s*\(\s*this\s*\)"
+                     r"\s*\.\s*balance", source)
+    if not (danger or owner_write or drain):
+        return None
+    return True
 
 
 def verdict(category: str, source: str) -> bool | None:
@@ -4735,6 +5186,8 @@ def verdict(category: str, source: str) -> bool | None:
         return xxe_verdict(source)
 
     if category == "sqli":
+        if _looks_python(source):
+            return python_sqli_verdict(source)
         return sqli_verdict(source)
 
     if category in ("redir", "openredirect"):
@@ -4747,6 +5200,8 @@ def verdict(category: str, source: str) -> bool | None:
         return ssrf_verdict(source)
 
     if category == "cmdi":
+        if _looks_python(source):
+            return python_cmdi_verdict(source)
         return cmdi_verdict(source)
 
     if category == "pathtraver":
@@ -4756,6 +5211,18 @@ def verdict(category: str, source: str) -> bool | None:
         return xpathi_verdict(source)
 
     if category == "authz":
+        if _looks_python(source):
+            return python_authz_verdict(source)
         return authz_verdict(source)
+
+    if category == "reentrancy":
+        if _looks_solidity(source):
+            return solidity_reentrancy_verdict(source)
+        return None
+
+    if category in ("access_control", "broken_access"):
+        if _looks_solidity(source):
+            return solidity_access_verdict(source)
+        return None
 
     return None

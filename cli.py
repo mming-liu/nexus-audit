@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import difflib
+import json
 import os
 import re
 import subprocess
@@ -154,6 +155,19 @@ def cmd_scan(args):
     print(f"\n完成：报告已写入 {out}")
     print(f"确认漏洞 {sum(1 for r in results if r.verified)}/{len(results)}")
 
+    # --- SARIF 2.1.0 导出（Python/Web3 赛道）---
+    if getattr(args, "sarif", None):
+        entries = [{"file": r.hypothesis.unit.file_path,
+                    "line": r.hypothesis.unit.start_line,
+                    "category": r.hypothesis.vuln_type,
+                    "unit": r.hypothesis.unit.unit_name,
+                    "level": "warning" if r.verified else "note",
+                    "message": f"[{r.hypothesis.vuln_type.upper()}] "
+                               f"{r.hypothesis.unit.unit_name}（{r.hypothesis.property_missing or '候选'}）"}
+                   for r in results]
+        write_sarif(args.sarif, entries, repo)
+        print(f"      SARIF 已写入 {args.sarif}（{len(entries)} 条 results）")
+
 
 def emit_github_annotations(flagged, failed, repo: Path) -> int:
     """向 stdout 输出 GitHub Actions 行级 annotation，返回输出条数。
@@ -187,6 +201,72 @@ def emit_github_annotations(flagged, failed, repo: Path) -> int:
               f"{cat.upper()} 判定失败（限流/超时），需重跑，不是无漏洞")
         n += 1
     return n
+
+
+def _sarif_rel(file_path: str, repo: Path) -> str:
+    """SARIF 的 artifactLocation.uri 必须是**仓库相对路径**（GitHub 按仓库
+    相对路径索引文件），对不上时退回 POSIX 绝对路径并保留可读性。"""
+    try:
+        return Path(file_path).resolve().relative_to(Path(repo).resolve()).as_posix()
+    except (ValueError, OSError):
+        return Path(file_path).as_posix()
+
+
+def build_sarif(entries: list[dict], repo: str | Path = ".") -> dict:
+    """把审计命中序列化为 SARIF v2.1.0（GitHub Code Scanning 原生格式）。
+
+    entries: [{file, line, category, unit, message, level?, flow?}]，
+    flow 为可选的调用链 [{file, line, message?}] → results[].codeFlows。
+    结构必须含 GitHub 校验的三要素：runs[0].tool.driver.rules、
+    runs[0].results[].locations[].physicalLocation（uri + region.startLine）。
+    """
+    rules: dict[str, dict] = {}
+    results: list[dict] = []
+    for e in entries:
+        cat = str(e.get("category") or "UNKNOWN").upper()
+        if cat not in rules:
+            rules[cat] = {"id": cat,
+                          "shortDescription": {"text": f"{cat} 漏洞候选"}}
+        uri = _sarif_rel(e.get("file", "."), repo)
+        line = int(e.get("line") or 1)
+        phys = {"artifactLocation": {"uri": uri},
+                "region": {"startLine": max(1, line)}}
+        res = {"ruleId": cat,
+               "level": e.get("level") or "warning",
+               "message": {"text": e.get("message") or f"{cat} @ {e.get('unit', '')}"},
+               "locations": [{"physicalLocation": phys}],
+               # codeFlows 常驻：哪怕是单点链路，GitHub 的 "Code flow" 面板
+               # 也要有东西可渲染；多跳链路把 flow 传进来即可。
+               "codeFlows": [{"threadFlows": [{"locations": [
+                   {"location": {"message": {"text": f.get("message", "")}
+                                 if f.get("message") else {},
+                                 "physicalLocation": {
+                                     "artifactLocation": {
+                                         "uri": _sarif_rel(f.get("file", e.get("file", ".")), repo)},
+                                     "region": {"startLine": max(1, int(f.get("line") or line))}}}}
+                   for f in (e.get("flow") or [{"file": e.get("file", "."), "line": line}])]}]}]}
+        results.append(res)
+    return {
+        "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {"driver": {
+                "name": "nexus-audit",
+                "version": "1.0.0",
+                "informationUri": "https://owasp.org/www-project-benchmark/",
+                "rules": list(rules.values()),
+            }},
+            "results": results,
+        }],
+    }
+
+
+def write_sarif(path: str | Path, entries: list[dict], repo: str | Path = ".") -> int:
+    """写 SARIF 文件，返回 results 条数（0 也照写 —— 空结果本身是事实）。"""
+    sarif = build_sarif(entries, repo)
+    Path(path).write_text(json.dumps(sarif, ensure_ascii=False, indent=2),
+                          encoding="utf-8")
+    return len(sarif["runs"][0]["results"])
 
 
 def emit_step_summary(report_path: Path) -> bool:
@@ -254,6 +334,29 @@ def cmd_scan_java(args, repo: Path):
             else:
                 decided[(u.unit_name, c)] = v
     print(f"      规则直接判定 {len(decided)} 项，余 {len(pending)} 项交模型")
+
+    # --- RuleDiagnostic：半成品事实移交 -----------------------------------
+    # 规则退回 None 的入口，把"已经核实了一半的事实"（候选输入行 / 候选
+    # sink 行）作为纯客观注释头拼进送审代码段顶部。只给定位参考，不下结论
+    # —— 结论仍是模型的。注释行不会被 Cite-Before-Verdict 当成可引用证据。
+    # line_offset：头部行数会使代码整体下移，重建一次让 L 编号自洽。
+    from core.agents.rule_detectors import build_rule_diagnostic
+    by_uid: dict[int, tuple] = {}
+    for u, c in pending:
+        prev = by_uid.get(id(u))
+        by_uid[id(u)] = (u, [c]) if prev is None else (u, prev[1] + [c])
+    diag_n = 0
+    for u, cats in by_uid.values():
+        headers = [d for c in cats if (d := build_rule_diagnostic(c, u.source_code))]
+        if not headers:
+            continue
+        n = len(headers)
+        headers = [d for c in cats
+                   if (d := build_rule_diagnostic(c, u.source_code, line_offset=n))]
+        u.source_code = "\n".join(headers) + "\n" + u.source_code
+        diag_n += 1
+    if diag_n:
+        print(f"      已向 {diag_n} 个入口注入静态前筛事实注释头")
 
     failed: list[tuple] = []          # 调用失败，必须与"判为无漏洞"区分
     model_flagged: list[tuple] = []
@@ -346,6 +449,19 @@ def cmd_scan_java(args, repo: Path):
     out = Path(args.output or "report_java.md")
     out.write_text("\n".join(lines), encoding="utf-8")
     print(f"\n完成：报告已写入 {out}")
+
+    # --- SARIF 2.1.0 导出（GitHub Code Scanning 可直接上传）---
+    if getattr(args, "sarif", None):
+        entries = [{"file": u.file_path, "line": u.start_line, "category": c,
+                    "unit": u.unit_name,
+                    "message": f"[{c.upper()}] 入口 {u.unit_name}（规则/模型命中）"}
+                   for u, c in flagged]
+        entries += [{"file": u.file_path, "line": u.start_line, "category": c,
+                     "unit": u.unit_name, "level": "error",
+                     "message": f"{c.upper()} 判定失败（限流/超时），需重跑，不是无漏洞"}
+                    for u, c in failed]
+        n = write_sarif(args.sarif, entries, repo)
+        print(f"      SARIF 已写入 {args.sarif}（{n} 条 results）")
 
     # CI 集成：只在 GitHub Actions 里生效，本地跑是 no-op
     if getattr(args, "github_comment", False):
@@ -573,38 +689,70 @@ def cmd_pr_scan(args):
         categories=args.categories, model=args.model, concurrency=args.concurrency,
         output=args.output or "report_pr.md", python=None, _units=subset,
         no_skeptic=getattr(args, "no_skeptic", False),
-        github_comment=getattr(args, "github_comment", False))
+        github_comment=getattr(args, "github_comment", False),
+        sarif=getattr(args, "sarif", None))
     print("\n进入审计（仅上述受影响路由）...")
     cmd_scan_java(ns, repo)
 
 
-def _verify_fixes(repo: Path, units: list) -> None:
-    """对规则层判 True 的 sqli 命中生成 `${}`→`#{}` 补丁并自检。
+def _reslice_for_fix(repo: Path, unit_name: str):
+    """补丁写入后重新切片并取回同一入口（剥 `#N` 后缀比对）。
+
+    清缓存是硬前提：`java_impl_resolver._FILE_CACHE` 按路径缓存不看 mtime，
+    不清空的话重切片读到的还是补丁前的旧内容 —— "补丁后仍 True"就是
+    缓存造出来的假结论。`DependencyVersionResolver` / `view_templates`
+    都按次实例化/读盘，无需额外清理。
+    """
+    from core.context.java_impl_resolver import _FILE_CACHE
+    _FILE_CACHE.clear()
+    from core.slicer.java_servlet import JavaSlicer
+    return next((x for x in JavaSlicer(repo).extract_entry_units()
+                 if base_unit_name(x.unit_name) == base_unit_name(unit_name)), None)
+
+
+def _verify_fixes(repo: Path, units: list, out_path: str | Path = "fix_report.md") -> None:
+    """对规则层判 True 的确定性命中生成补丁并自检（sqli / xss / deserial）。
 
     只处理**规则层确定性命中**：模型命中没有可机械验证的修复模板，
     让 LLM 生成补丁再让 LLM 验收等于自己给自己判卷。
-    自检 = 把补丁写进被审计仓库重新切片、重跑 sqli 规则；验证不过的
+    自检 = 把补丁写进被审计仓库重新切片、重跑对应规则；验证不过的
     补丁一律不推荐 —— 一个"修完规则还报"的补丁比不修更危险。
-    工作树在 finally 里还原，`--fix` 从不留下未声明的文件变更。
+    工作树在 finally 里还原（`newline=""` 字节级往返，Windows 文本模式
+    会把还原变成 CRLF 篡改），`--fix` 从不留下未声明的文件变更。
+    **验证器只能验证"规则收口"，验证不了"补丁语义正确"—— diff 必须打给人。**
     """
     from core.agents.rule_detectors import verdict as rule_verdict
-    from core.slicer.java_servlet import JavaSlicer
 
-    targets = []
+    buckets: dict[str, list] = {"sqli": [], "xss": [], "deserial": []}
     for u in units:
         try:
-            if rule_verdict("sqli", u.source_code) is True:
-                targets.append(u)
+            for cat in buckets:
+                if rule_verdict(cat, u.source_code) is True:
+                    buckets[cat].append(u)
         except Exception:
             continue
-    if not targets:
-        print("\n补丁自检：没有规则层判 True 的 sqli 命中，无需修复")
+    if not any(buckets.values()):
+        print("\n补丁自检：没有规则层判 True 的命中，无需修复")
         return
-    print(f"\n补丁自检：{len(targets)} 条规则层 sqli 命中")
+    print(f"\n补丁自检：sqli {len(buckets['sqli'])} / xss {len(buckets['xss'])} / "
+          f"deserial {len(buckets['deserial'])} 条规则层命中")
 
-    lines = ["# sqli 补丁自检（`${}` → `#{}`）", ""]
-    seg_re = re.compile(r"// 来自 (\S+\.xml)[^\n]*\n(.*?)(?=\n// 来自 |\Z)", re.S)
+    lines = ["# 补丁自检（sqli `${}`→`#{}` / xss `th:utext`→`th:text` /"
+             " deserial fastjson→1.2.83）", ""]
+    fixed = (_fix_sqli_targets(repo, buckets["sqli"], lines)
+             + _fix_xss_targets(repo, buckets["xss"], lines)
+             + _fix_deserial_targets(repo, buckets["deserial"], lines))
+    out = Path(out_path)
+    out.write_text("\n".join(lines), encoding="utf-8")
+    print(f"  生成并验证通过 {fixed} 个补丁 → {out}")
+
+
+def _fix_sqli_targets(repo: Path, targets: list, lines: list) -> int:
+    """`${}` → `#{}`：只对切片里贴了 Mapper XML 语句的 sqli 命中生效。"""
+    if not targets:
+        return 0
     fixed = 0
+    seg_re = re.compile(r"// 来自 (\S+\.xml)[^\n]*\n(.*?)(?=\n// 来自 |\Z)", re.S)
     for u in targets:
         for m in seg_re.finditer(u.source_code):
             xml_name, body = m.group(1), m.group(2)
@@ -613,8 +761,6 @@ def _verify_fixes(repo: Path, units: list) -> None:
             hit = next(repo.rglob(xml_name), None)
             if hit is None:
                 continue
-            # newline=""：字节级往返。默认文本模式会把 LF 写成 CRLF（Windows），
-            # "还原"就变成了一次真实的行尾篡改（实测 git status 直接变 M）。
             with open(hit, encoding="utf-8", errors="replace", newline="") as fh:
                 original = fh.read()
             # 替换必须用函数：替换串里写 r"#\{\1\}" 会把 `\{` 原样留在结果里
@@ -625,34 +771,190 @@ def _verify_fixes(repo: Path, units: list) -> None:
             try:
                 with open(hit, "w", encoding="utf-8", newline="") as fh:
                     fh.write(patched)
-                # 切片器的文件缓存（java_impl_resolver._FILE_CACHE）按路径缓存、
-                # 不看 mtime —— 不清空的话重切片读到的还是补丁前的旧内容，
-                # "补丁后仍 True"就是缓存造出来的假结论。
-                from core.context.java_impl_resolver import _FILE_CACHE
-                _FILE_CACHE.clear()
-                u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
-                           if base_unit_name(x.unit_name) == base_unit_name(u.unit_name)), None)
+                u2 = _reslice_for_fix(repo, u.unit_name)
+                from core.agents.rule_detectors import verdict as rule_verdict
                 v2 = rule_verdict("sqli", u2.source_code) if u2 else None
             finally:
                 with open(hit, "w", encoding="utf-8", newline="") as fh:
                     fh.write(original)      # 还原，不留变更
+                from core.context.java_impl_resolver import _FILE_CACHE
                 _FILE_CACHE.clear()
             if v2 is False:
                 fixed += 1
                 diff = difflib.unified_diff(
                     original.splitlines(), patched.splitlines(),
                     fromfile=f"a/{xml_name}", tofile=f"b/{xml_name}", lineterm="")
-                lines += [f"## {u.unit_name}（`{xml_name}`）", "```diff",
+                lines += [f"## [sqli] {u.unit_name}（`{xml_name}`）", "```diff",
                           *diff, "```", "",
                           "> 自检通过：重切片 + 重跑 sqli 规则 → False。",
                           "> 注意 `${}`→`#{}` 把值改为绑定参数；order by / 列名等",
                           "> **标识符拼接**场景不能这样修，应改白名单 —— 需人工确认。", ""]
             else:
-                lines += [f"## {u.unit_name}（`{xml_name}`）",
+                lines += [f"## [sqli] {u.unit_name}（`{xml_name}`）",
                           f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
-    out = Path("fix_sqli.md")
-    out.write_text("\n".join(lines), encoding="utf-8")
-    print(f"  生成并验证通过 {fixed} 个补丁 → {out}")
+    return fixed
+
+
+_TPL_FILE_RE = re.compile(r"//\s+(\S+\.(?:html|ftl|jsp)):\d+")
+_TPL_HIT_RE = re.compile(r"//\s*>>?\s*(\d+)\s*\|\s?(.*)")
+
+
+def _fix_xss_targets(repo: Path, targets: list, lines: list) -> int:
+    """`th:utext=` → `th:text=`：模板文件路径从切片段头精确反解。
+
+    只改"关联视图模板"证据块里标了 `>>` 的渲染点行，不整文件替换 ——
+    模板里别的 `th:utext` 可能渲染的是别的（已编码的）键。
+    """
+    if not targets:
+        return 0
+    fixed = 0
+    for u in targets:
+        i = u.source_code.find("关联视图模板")
+        if i < 0:
+            lines += [f"## [xss] {u.unit_name}",
+                      "- 切片里没有模板渲染证据段，跳过（无确定性修复模板）", ""]
+            continue
+        seg = u.source_code[i:]
+        fm = _TPL_FILE_RE.search(seg)
+        hits = [(int(n), raw) for n, raw in _TPL_HIT_RE.findall(seg)
+                if "th:utext=" in raw.lower()]
+        if fm is None or not hits:
+            lines += [f"## [xss] {u.unit_name}",
+                      "- 证据段里解析不到模板文件或 th:utext 渲染点，跳过", ""]
+            continue
+        rel = fm.group(1)
+        tpl = repo / rel
+        if not tpl.is_file():
+            tpl = next(repo.rglob(Path(rel).name), None)   # 配置根与仓库根不同级时兜底
+        if tpl is None:
+            lines += [f"## [xss] {u.unit_name}",
+                      f"- 模板文件 `{rel}` 不在仓库内，跳过", ""]
+            continue
+        with open(tpl, encoding="utf-8", errors="replace", newline="") as fh:
+            original = fh.read()
+        patched_lines = original.splitlines(keepends=True)
+        changed: list[int] = []
+        for n, _raw in hits:
+            if 1 <= n <= len(patched_lines):
+                new = patched_lines[n - 1].replace("th:utext=", "th:text=")
+                if new != patched_lines[n - 1]:
+                    patched_lines[n - 1] = new
+                    changed.append(n)
+        if not changed:
+            continue
+        patched = "".join(patched_lines)
+        try:
+            with open(tpl, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            u2 = _reslice_for_fix(repo, u.unit_name)
+            from core.agents.rule_detectors import verdict as rule_verdict
+            v2 = rule_verdict("xss", u2.source_code) if u2 else None
+        finally:
+            with open(tpl, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(
+                original.splitlines(), patched.splitlines(),
+                fromfile=f"a/{rel}", tofile=f"b/{rel}", lineterm="")
+            lines += [f"## [xss] {u.unit_name}（`{rel}`）", "```diff",
+                      *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 xss 规则 → False。"
+                      "（th:text 自动转义；如该值本应承载富文本，需人工确认。）", ""]
+        else:
+            lines += [f"## [xss] {u.unit_name}（`{rel}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
+_FASTJSON_SAFE_VERSION = "1.2.83"
+
+
+def _fastjson_pom_patches(repo: Path) -> list[tuple[Path, str, str]]:
+    """定位 fastjson 依赖的版本声明，产出 (pom, 原文, 补丁后文本)。
+
+    版本可能直接写在 `<version>` 里，也可能经 `<properties>` 占位符
+    （`${fastjson.version}`）—— 占位符必须改属性定义，只改引用处等于没改。
+    """
+    out: list[tuple[Path, str, str]] = []
+    seen: set[Path] = set()
+    for pom in sorted(repo.rglob("pom.xml")):
+        if pom in seen or "target" in pom.parts:
+            continue
+        try:
+            text = pom.read_text(encoding="utf-8", errors="replace", newline="")
+        except OSError:
+            continue
+        if "<artifactId>fastjson</artifactId>" not in text:
+            continue
+        seen.add(pom)
+        new_text = text
+        for dm in re.finditer(r"<dependency>(.*?)</dependency>", text, re.S):
+            blk = dm.group(1)
+            if "<artifactId>fastjson</artifactId>" not in blk:
+                continue
+            vm = re.search(r"<version>([^<]+)</version>", blk)
+            if not vm:
+                continue
+            val = vm.group(1).strip()
+            if val.startswith("${") and val.endswith("}"):
+                prop = val[2:-1].strip()
+                pm = re.search(rf"<({re.escape(prop)})>([^<]*)</\1>", new_text)
+                if pm:
+                    new_text = new_text[:pm.start(2)] + _FASTJSON_SAFE_VERSION \
+                        + new_text[pm.end(2):]
+            else:
+                s, e = vm.span(1)
+                new_text = new_text[:s] + _FASTJSON_SAFE_VERSION + new_text[e:]
+        if new_text != text:
+            out.append((pom, text, new_text))
+    return out
+
+
+def _fix_deserial_targets(repo: Path, targets: list, lines: list) -> int:
+    """fastjson 版本 → 1.2.83（默认 safeMode）：版本决定结论的类目，
+    修复落在 pom.xml 而不是代码 —— 这本身就是"版本是代码给不出的事实"
+    的反向应用。"""
+    if not targets:
+        return 0
+    patches = _fastjson_pom_patches(repo)
+    if not patches:
+        for u in targets:
+            lines += [f"## [deserial] {u.unit_name}",
+                      "- 仓库内没有带版本声明的 fastjson 依赖，跳过", ""]
+        return 0
+    fixed = 0
+    try:
+        for pom, _original, patched in patches:
+            with open(pom, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+        u2 = _reslice_for_fix(repo, targets[0].unit_name)
+        from core.agents.rule_detectors import verdict as rule_verdict
+        v2 = rule_verdict("deserial", u2.source_code) if u2 else None
+    finally:
+        for pom, original, _patched in patches:
+            with open(pom, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        from core.context.java_impl_resolver import _FILE_CACHE
+        _FILE_CACHE.clear()
+    if v2 is False:
+        fixed = len(targets)
+        for pom, original, patched in patches:
+            diff = difflib.unified_diff(
+                original.splitlines(), patched.splitlines(),
+                fromfile=f"a/{pom.relative_to(repo).as_posix()}",
+                tofile=f"b/{pom.relative_to(repo).as_posix()}", lineterm="")
+            lines += ["```diff", *diff, "```"]
+        names = ", ".join(u.unit_name for u in targets)
+        lines += ["", f"> 自检通过：{names}",
+                  "> 重切片 + 重跑 deserial 规则 → False（fastjson 1.2.83 起"
+                  " 默认 safeMode，autoType 不可劫持）。", ""]
+    else:
+        lines += [f"## [deserial] {', '.join(u.unit_name for u in targets)}",
+                  f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
 
 
 def _changed_symbols(repo: Path, base: str, files: list[str]) -> set[str]:
@@ -975,6 +1277,8 @@ def main():
     p_scan.add_argument("--github-comment", dest="github_comment", action="store_true",
                         help="输出 GitHub Actions 行级 annotation + 写入 $GITHUB_STEP_SUMMARY")
     p_scan.add_argument("--output", default=None, help="报告输出路径")
+    p_scan.add_argument("--sarif", default=None, metavar="OUT.sarif",
+                        help="将命中结果导出为 SARIF v2.1.0（GitHub Code Scanning 格式）")
     p_scan.add_argument("--python", default=None, help="PoC 执行使用的 Python 解释器")
     p_pr = sub.add_parser("pr-scan", help="PR 增量扫描（仅 git diff 影响的调用链）")
     p_pr.add_argument("--base", default="origin/main", help="diff 基线，如 origin/main 或 HEAD~1")
@@ -991,8 +1295,10 @@ def main():
     p_pr.add_argument("--dry-run", action="store_true",
                       help="只列出受影响路由，不做审计")
     p_pr.add_argument("--fix", action="store_true",
-                      help="对规则层 sqli 命中生成 ${}→#{} 补丁并重跑规则自检"
-                           "（写 fix_sqli.md，不改仓库文件）")
+                      help="对规则层确定性命中（sqli/xss 模板/deserial fastjson 版本）"
+                           "生成补丁并重跑规则自检（写 fix_report.md，不改仓库文件）")
+    p_pr.add_argument("--sarif", default=None, metavar="OUT.sarif",
+                      help="将命中结果导出为 SARIF v2.1.0（GitHub Code Scanning 格式）")
     p_pr.add_argument("--output", default=None, help="报告输出路径")
     args = parser.parse_args()
     if args.command == "scan":

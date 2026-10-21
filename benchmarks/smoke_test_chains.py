@@ -2309,7 +2309,8 @@ check("拿主体跟自己比 → 不构成任何归属校验",
 # 旧口径把 logout 和 login/register 一起排除 → newbee-mall-api 的
 # /manage-api/v1/logout 静默退回。正确口径：logout 走正常判据链 ——
 # 主体自己的 token 作资源键 → False；外部可控 userId 注销他人 → True；
-# 只 invalidate 自己的 session → 证据不足 None。login 仍必须排除（防放宽）。
+# 只销毁当前请求自身的会话/凭据 → 2f 判 False（2026-10-21 新增，见下）。
+# login 仍必须排除（防放宽）。
 print("\n[54] authz：logout 路由口径")
 
 _LOGOUT_MARK = ("\n// ---- 形参主体注解（测试夹具）----\n"
@@ -2335,8 +2336,35 @@ public String logout(HttpSession session) {
     session.invalidate();
     return "redirect:/login";
 }'''
-check("logout：只 invalidate 请求自身的 session → 证据不足退回",
-      verdict("authz", _LOGOUT_SESSION), None)
+check("logout：只 invalidate 自身 session → 2f 会话自毁判安全",
+      verdict("authz", _LOGOUT_SESSION), False)
+
+_LOGOUT_RMATTR = '''@GetMapping("/admin/logout")
+public String logout(HttpServletRequest request) {
+    request.getSession().removeAttribute("loginUserId");
+    request.getSession().removeAttribute("loginUser");
+    return "redirect:/admin";
+}'''
+check("logout：只 removeAttribute 自身会话属性 → 2f 判安全",
+      verdict("authz", _LOGOUT_RMATTR), False)
+
+_LOGOUT_SUBJ_DESTROY = '''@PostMapping("/logout")
+public String logout(HttpSession session) {
+    SecurityUtils.getSubject().logout();
+    return "redirect:/login";
+}'''
+check("logout：getSubject().logout() 销毁自身凭据 → 2f 判安全",
+      verdict("authz", _LOGOUT_SUBJ_DESTROY), False)
+
+# 反向：销毁动作 + 外部裸形参被交给删凭据调用 → 2f 必须让位，不判安全。
+_LOGOUT_MIXED = '''@PostMapping("/logout")
+public Result logout(@TokenToMallUser MallUser user, String userId) {
+    userService.deleteToken(userId);
+    session.removeAttribute("u");
+    return ResultGenerator.genSuccessResult();
+}''' + _LOGOUT_MARK.replace("adminUser", "user").replace("AdminUserToken", "MallUser")
+check("logout：外部 userId 进 deleteToken（有主体但未比对）→ 不判安全",
+      verdict("authz", _LOGOUT_MIXED), None)
 
 _LOGOUT_LOGIN = '''@PostMapping("/login")
 public Result login(String loginName, String password) {
@@ -2384,6 +2412,391 @@ public List<OrderVO> getMyOrders(PageQueryUtil p) {
 calls = _java_called_names(_SLICE_SRC)
 check("全文调用集：第 2 跳的 mapper 调用也在内",
       {"getMyOrders", "findNewBeeMallOrderList"} <= calls, True)
+
+
+# ---------------- [59] --fix：xss 模板补丁与 deserial pom 补丁的 E2E 自检 ----------------
+#
+# 两个迷你仓库：① Thymeleaf `th:utext` 渲染外部输入 → xss 规则 True，
+# 补丁把 `th:utext` 换成 `th:text` 后必须翻转 False；
+# ② fastjson 1.2.25 + `JSON.parseObject(外部输入)` → deserial 规则 True，
+# pom 版本补到 1.2.83 后必须翻转 False。
+# 全程验证：补丁写入 → 清缓存 → 重切片 → 翻转 → 还原（git 字节级往返）。
+print("\n[59] --fix：xss 模板 / deserial fastjson 补丁自检")
+
+import shutil                                        # noqa: E402
+import tempfile                                      # noqa: E402
+
+from cli import _verify_fixes                        # noqa: E402
+from core.slicer.java_servlet import JavaSlicer      # noqa: E402
+
+_TMP = Path(tempfile.mkdtemp(prefix="nexus_fix_smoke_"))
+try:
+    pkg = _TMP / "src" / "main" / "java" / "demo"
+    res = _TMP / "src" / "main" / "resources" / "templates" / "xss"
+    pkg.mkdir(parents=True)
+    res.mkdir(parents=True)
+    (pkg / "XssController.java").write_text(
+        'package demo;\n'
+        'import org.springframework.stereotype.Controller;\n'
+        'import org.springframework.ui.Model;\n'
+        'import org.springframework.web.bind.annotation.*;\n'
+        '@Controller\n'
+        'public class XssController {\n'
+        '    @GetMapping("/xss/echo")\n'
+        '    public String echo(@RequestParam("html") String html, Model model) {\n'
+        '        model.addAttribute("html", html);\n'
+        '        return "xss/other";\n'
+        '    }\n'
+        '}\n', encoding="utf-8", newline="")
+    (res / "other.html").write_text(
+        '<!DOCTYPE html>\n<html>\n'
+        '<p th:text="${safe}">ignored</p>\n'
+        '<p th:utext="${html}"></p>\n'
+        '</html>\n', encoding="utf-8", newline="")
+
+    units = JavaSlicer(_TMP).extract_entry_units()
+    check("迷你仓库：xss 规则判 True", verdict("xss", units[0].source_code), True)
+    before = (res / "other.html").read_text(encoding="utf-8", newline="")
+    rep = _TMP / "fix_report.md"
+    _verify_fixes(_TMP, units, out_path=rep)
+    after = (res / "other.html").read_text(encoding="utf-8", newline="")
+    check("xss：--fix 不留下文件变更（字节级还原）", after, before)
+    rep_text = rep.read_text(encoding="utf-8")
+    check("xss：补丁自检通过并给出 diff", "th:text=" in rep_text and "自检通过" in rep_text, True)
+
+    # ---- deserial：fastjson 版本补丁 ----
+    (pkg / "DeserController.java").write_text(
+        'package demo;\n'
+        'import com.alibaba.fastjson.JSON;\n'
+        'import org.springframework.web.bind.annotation.*;\n'
+        '@RestController\n'
+        'public class DeserController {\n'
+        '    @PostMapping("/deser")\n'
+        '    public Object deser(@RequestBody String body) {\n'
+        '        return JSON.parseObject(body);\n'
+        '    }\n'
+        '}\n', encoding="utf-8", newline="")
+    (_TMP / "pom.xml").write_text(
+        '<?xml version="1.0"?>\n<project>\n'
+        '  <properties><fastjson.version>1.2.25</fastjson.version></properties>\n'
+        '  <dependencies>\n'
+        '    <dependency>\n'
+        '      <groupId>com.alibaba</groupId>\n'
+        '      <artifactId>fastjson</artifactId>\n'
+        '      <version>${fastjson.version}</version>\n'
+        '    </dependency>\n'
+        '  </dependencies>\n'
+        '</project>\n', encoding="utf-8", newline="")
+    units2 = JavaSlicer(_TMP).extract_entry_units()
+    deser = next((u for u in units2 if "Deser" in u.unit_name), None)
+    check("迷你仓库：deserial 规则判 True（版本 1.2.25 < 1.2.83）",
+          verdict("deserial", deser.source_code), True)
+    pom_before = (_TMP / "pom.xml").read_text(encoding="utf-8", newline="")
+    _verify_fixes(_TMP, units2, out_path=rep)
+    pom_after = (_TMP / "pom.xml").read_text(encoding="utf-8", newline="")
+    check("deserial：--fix 不留下 pom 变更（字节级还原）", pom_after, pom_before)
+    rep_text = rep.read_text(encoding="utf-8")
+    check("deserial：占位符属性被改为 1.2.83 且自检通过",
+          "1.2.83" in rep_text and "自检通过" in rep_text, True)
+finally:
+    shutil.rmtree(_TMP, ignore_errors=True)
+
+
+# ---------------- [60] db 写入方载荷常量性：数值/状态位不构成跨路由 XSS 串接 ----------------
+#
+# 方向锁只回答"这一侧往库里塞内容吗"。真实项目里大量写入塞的全是数值/
+# 状态位（payStatus=1、主键回填），几何上携带不了 XSS 污点 —— 不许给
+# 只读路由贴凭空串接证据。三态：全常量→撤写入方；任一值可能带文本→保留；
+# 查不出→保守保留。
+print("\n[60] db 写入方载荷常量性")
+
+_NUM_W = '''@PostMapping("/num/save")
+@ResponseBody
+public Result save() {
+    Item item = new Item();
+    item.setPayStatus(1);
+    item.setGoodsId(42L);
+    item.setCategoryId(7);
+    itemService.saveItem(item);
+    return ResultGenerator.genSuccessResult();
+}'''
+
+_STR_W = '''@PostMapping("/str/save")
+@ResponseBody
+public Result save(@RequestBody Item item) {
+    item.setContent(payload);
+    itemService.saveItem(item);
+    return ResultGenerator.genSuccessResult();
+}'''
+
+_READER = unit("ListReader", '''@GetMapping("/num/list")
+@ResponseBody
+public Result list() {
+    return itemService.listItems();
+}''')
+_res = build_chains([unit("NumWriter", _NUM_W), _READER])
+check("数值/状态位实体写入 → 不产生跨路由串接",
+      [l for l in _res.links if l.medium == "db"], [])
+
+_res2 = build_chains([unit("StrWriter", _STR_W), _READER])
+check("实体带文本字段（@RequestBody/字符串形参）→ 串接保留",
+      len([l for l in _res2.links if l.medium == "db"]), 1)
+
+# 锚点机制（真实仓库锚点由大回归覆盖）：字符串写入方 → 读取点保持连接。
+_ANCHOR_W = unit("StoreController.vul", '''@GetMapping("/vul")
+public String vul(@RequestParam("content") String content) {
+    xssService.insertOne(new Xss(content));
+    return "stored";
+}''')
+_ANCHOR_R = unit("StoreController.getXssList", '''@GetMapping("/list")
+public String getXssList(Model model) {
+    model.addAttribute("list", xssService.selectAll());
+    return "list";
+}''')
+_res3 = build_chains([_ANCHOR_W, _ANCHOR_R])
+check("锚点机制：字符串写入方 → 读取点保持连接",
+      len([l for l in _res3.links if l.medium == "db"]), 1)
+
+
+# ---------------- [56] Python Web：多跳切片与确定性规则 ----------------
+#
+# Python 赛道此前只有"第 1 跳"：sink 藏在 Service/DAO 里时，规则与模型
+# 都只看到转发语句。两个收口：
+#   ① web_treesitter 多跳展开（[Hop N] 段、防环、段数预算）；
+#   ② sqli/cmdi/authz 的 Python 语法分支（参数化 vs f-string、列表传参 vs
+#      shell=True、Depends 归属比对 vs 路由参数直查）。
+print("\n[56] Python Web 规则与多跳切片")
+
+import core.slicer.web_treesitter as WT            # noqa: E402
+from core.slicer.web_treesitter import WebTreeSitterSlicer  # noqa: E402
+
+_PY_SQLI_VUL = '''@app.get("/user")
+def get_user(uid):
+    sql = f"SELECT * FROM users WHERE id = {uid}"
+    cursor.execute(sql)
+    return cursor.fetchone()'''
+
+_PY_SQLI_PARAM = '''@app.get("/user")
+def get_user(uid):
+    cursor.execute("SELECT * FROM users WHERE id = %s", (uid,))
+    return cursor.fetchone()'''
+
+_PY_SQLI_INT = '''@app.get("/user")
+def get_user(uid):
+    cursor.execute("SELECT * FROM users WHERE id = " + str(int(uid)))
+    return cursor.fetchone()'''
+
+check("Python SQLi：f-string 拼接形参 → 判漏洞",
+      verdict("sqli", _PY_SQLI_VUL), True)
+check("Python SQLi：参数化元组 → 判安全",
+      verdict("sqli", _PY_SQLI_PARAM), False)
+check("Python SQLi：int() 锁死值域 → 判安全",
+      verdict("sqli", _PY_SQLI_INT), False)
+
+_PY_CMDI_VUL = '''@app.post("/ping")
+def ping(host: str):
+    cmd = "ping -c 1 " + host
+    os.system(cmd)
+    return "done"'''
+
+_PY_CMDI_SAFE = '''@app.post("/ping")
+def ping(host: str):
+    subprocess.run(["ping", "-c", "1", host], shell=False)
+    return "done"'''
+
+check("Python CMDi：os.system 字符串拼接 → 判漏洞",
+      verdict("cmdi", _PY_CMDI_VUL), True)
+check("Python CMDi：列表传参 shell=False → 判安全",
+      verdict("cmdi", _PY_CMDI_SAFE), False)
+
+_PY_AUTHZ_VUL = '''@app.get("/orders/{order_id}")
+def get_order(order_id: int):
+    order = db.query(Order).filter(Order.id == order_id).first()
+    return order'''
+
+_PY_AUTHZ_OK = '''@app.get("/orders/{order_id}")
+def get_order(order_id: int, user=Depends(get_current_user)):
+    order = db.query(Order).filter(Order.id == order_id,
+                                   Order.user_id == current_user.id).first()
+    return order'''
+
+check("Python Authz：路由形参直查、无主体 → 判越权",
+      verdict("authz", _PY_AUTHZ_VUL), True)
+check("Python Authz：Depends 主体 + 归属比对 → 判安全",
+      verdict("authz", _PY_AUTHZ_OK), False)
+check("Python Authz：有主体但比对下沉 Service → 不表态",
+      verdict("authz", '''@app.get("/orders/{order_id}")
+def get_order(order_id: int, user=Depends(get_current_user)):
+    return order_service.get_order(order_id)'''), None)
+
+# 多跳切片：入口 → service（Hop 1）→ dao（Hop 2），sink 在第 2 跳。
+_TMP2 = Path(tempfile.mkdtemp(prefix="nexus_py_hops_"))
+try:
+    app_d = _TMP2 / "app"
+    app_d.mkdir()
+    (app_d / "routes.py").write_text(
+        'from service import UserService\n\n'
+        '@app.get("/user/{uid}")\n'
+        'def get_user(uid: int):\n'
+        '    return UserService.find(uid)\n', encoding="utf-8", newline="")
+    (app_d / "service.py").write_text(
+        'from dao import UserDao\n\n'
+        'class UserService:\n'
+        '    @staticmethod\n'
+        '    def find(uid):\n'
+        '        return UserDao.fetch(uid)\n', encoding="utf-8", newline="")
+    (app_d / "dao.py").write_text(
+        'class UserDao:\n'
+        '    @staticmethod\n'
+        '    def fetch(uid):\n'
+        '        sql = "SELECT * FROM users WHERE id = " + uid\n'
+        '        return cursor.execute(sql)\n', encoding="utf-8", newline="")
+    units_py = WebTreeSitterSlicer(_TMP2).extract_entry_units()
+    u0 = next((u for u in units_py if u.unit_name == "get_user"), None)
+    check("多跳切片：Hop1/Hop2 段都进切片",
+          u0 is not None and "[Hop 1]" in u0.source_code and "[Hop 2]" in u0.source_code,
+          True)
+    check("多跳切片：第 2 跳的 sink 被规则看见（拼接 SQL → True）",
+          verdict("sqli", u0.source_code), True)
+    check("多跳切片：helper 体可被引证（不是注释行）",
+          any(ln.strip().startswith("sql =") for ln in u0.source_code.splitlines()
+              if not ln.strip().startswith("//")), True)
+finally:
+    shutil.rmtree(_TMP2, ignore_errors=True)
+
+
+# ---------------- [57] Solidity：重入 CEI 与访问控制 ----------------
+#
+# 重入的判定支点是**行序**：状态扣减在外部转账之前 = CEI 正序 = 安全。
+# 行号必须换算到切片文本内逐行核对，不靠"看起来像"。
+print("\n[57] Solidity 重入与访问控制规则")
+
+_SOL_CEI_OK = '''pragma solidity ^0.8.0;
+contract Vault {
+    mapping(address => uint256) public balances;
+    function withdraw() external {
+        uint256 amt = balances[msg.sender];
+        balances[msg.sender] = 0;
+        (bool ok, ) = msg.sender.call{value: amt}("");
+        require(ok);
+    }
+}'''
+
+_SOL_REENTRANT = '''pragma solidity ^0.8.0;
+contract Vault {
+    mapping(address => uint256) public balances;
+    function withdraw() external {
+        uint256 amt = balances[msg.sender];
+        (bool ok, ) = msg.sender.call{value: amt}("");
+        require(ok);
+        balances[msg.sender] = 0;
+    }
+}'''
+
+_SOL_LOCKED = '''pragma solidity ^0.8.0;
+contract Vault {
+    mapping(address => uint256) public balances;
+    function withdraw() external nonReentrant {
+        uint256 amt = balances[msg.sender];
+        (bool ok, ) = msg.sender.call{value: amt}("");
+        require(ok);
+        balances[msg.sender] = 0;
+    }
+}'''
+
+check("Solidity 重入：CEI 正序（先扣减后外转）→ 判安全",
+      verdict("reentrancy", _SOL_CEI_OK), False)
+check("Solidity 重入：先外转后减余额 → 判漏洞",
+      verdict("reentrancy", _SOL_REENTRANT), True)
+check("Solidity 重入：nonReentrant 修饰符 → 判安全",
+      verdict("reentrancy", _SOL_LOCKED), False)
+
+_SOL_SETOWNER_VUL = '''pragma solidity ^0.8.0;
+contract Ownable {
+    address public owner;
+    function setOwner(address o) external {
+        owner = o;
+    }
+}'''
+
+_SOL_SETOWNER_OK = '''pragma solidity ^0.8.0;
+contract Ownable {
+    address public owner;
+    function setOwner(address o) external onlyOwner {
+        owner = o;
+    }
+}'''
+
+_SOL_DRAIN_VUL = '''pragma solidity ^0.8.0;
+contract Piggy {
+    function drain() external {
+        payable(msg.sender).transfer(address(this).balance);
+    }
+}'''
+
+check("Solidity 访问控制：裸 setOwner → 判漏洞",
+      verdict("access_control", _SOL_SETOWNER_VUL), True)
+check("Solidity 访问控制：onlyOwner 修饰符 → 判安全",
+      verdict("access_control", _SOL_SETOWNER_OK), False)
+check("Solidity 访问控制：无条件转出全部余额 → 判漏洞",
+      verdict("access_control", _SOL_DRAIN_VUL), True)
+
+
+# ---------------- [58] SARIF 2.1.0 导出格式校验 ----------------
+#
+# GitHub Code Scanning 只认三条硬结构：version="2.1.0"、
+# results[].locations[].physicalLocation.artifactLocation.uri（仓库相对）、
+# region.startLine。多跳链路走 codeFlows。
+print("\n[58] SARIF 2.1.0 导出格式校验")
+
+from cli import build_sarif, write_sarif            # noqa: E402
+
+_ENTRIES = [
+    {"file": "src/main/java/demo/XssController.java", "line": 42,
+     "category": "xss", "unit": "XssController.echo",
+     "message": "[XSS] 入口 XssController.echo",
+     "flow": [{"file": "src/main/java/demo/XssController.java", "line": 42,
+               "message": "入口"},
+              {"file": "src/main/resources/templates/xss/other.html", "line": 18,
+               "message": "模板渲染点"}]},
+    {"file": r"src\main\java\demo\DeserController.java", "line": 7,
+     "category": "deserial", "unit": "DeserController.deser",
+     "message": "判定失败（限流/超时），需重跑", "level": "error"},
+]
+_sarif = build_sarif(_ENTRIES, repo=".")
+check("version = 2.1.0", _sarif["version"], "2.1.0")
+check("runs[0].tool.driver.rules 覆盖全部类目",
+      {r["id"] for r in _sarif["runs"][0]["tool"]["driver"]["rules"]},
+      {"XSS", "DESERIAL"})
+_r0 = _sarif["runs"][0]["results"][0]
+check("uri 为仓库相对 POSIX 路径",
+      _r0["locations"][0]["physicalLocation"]["artifactLocation"]["uri"],
+      "src/main/java/demo/XssController.java")
+check("region.startLine 保留真实行号",
+      _r0["locations"][0]["physicalLocation"]["region"]["startLine"], 42)
+check("codeFlows 覆盖入口与渲染点（2 个跳点）",
+      len(_r0["codeFlows"][0]["threadFlows"][0]["locations"]), 2)
+check("Windows 反斜杠路径归一为 POSIX",
+      _sarif["runs"][0]["results"][1]["locations"][0]["physicalLocation"]
+      ["artifactLocation"]["uri"],
+      "src/main/java/demo/DeserController.java")
+check("level 透传（失败样本为 error）",
+      _sarif["runs"][0]["results"][1]["level"], "error")
+
+import json as _json                                # noqa: E402
+check("可 JSON 序列化（round-trip）",
+      _json.loads(_json.dumps(_sarif))["version"], "2.1.0")
+
+import tempfile as _tmod                            # noqa: E402
+_d = Path(_tmod.mkdtemp(prefix="nexus_sarif_"))
+try:
+    n = write_sarif(_d / "out.sarif", _ENTRIES, repo=".")
+    check("write_sarif 落盘并返回条数", n, 2)
+    check("落盘文件可读回且结构完整",
+          _json.loads((_d / "out.sarif").read_text(encoding="utf-8"))["runs"][0]["results"][0]
+          ["ruleId"], "XSS")
+finally:
+    shutil.rmtree(_d, ignore_errors=True)
 
 
 print()

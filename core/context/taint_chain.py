@@ -287,6 +287,196 @@ def _db_directions(text: str, handle: str) -> set[str]:
     return out
 
 
+# ---------------- db 介质：写入方载荷的常量性 ----------------
+#
+# 方向锁只回答"这一侧往库里塞内容吗"，没回答"塞进去的值能不能携带污点"。
+# 真实项目里大量写入方塞的全是数值/状态位（`payStatus = 1`、`goodsId`、
+# 数量、金额）—— 它们在几何上不可能携带 `'` 或 `<script>`，把它们当
+# "存储型 XSS 写入方"只会给只读路由贴上凭空串接证据。
+#
+# 判定口径与 sqli 的"值能不能是 `'`"同源：不问"像不像污点"，只问
+# "这个值有没有可能是运行时进来的文本"。三态：
+#   True  —— 至少一个实参可追到外部输入/不可解析（保守：保留串接）
+#   False —— 每个写入调用的每个实参都能证明是常量（数值/无拼接字面量/
+#            只被常量 setter 填充的实体）
+#   None  —— 有查不出的（不表态，保留串接）
+_NUM_LIT_RE = re.compile(r"^\(?\s*-?\d+(?:\.\d+)?[Ll]?\s*\)?$")
+_CONST_STR_RE = re.compile(r"^\"[^\"]*\"$")
+_NUM_CONV_RE = re.compile(r"^(?:Integer|Long|int|long|Short|Byte)\s*\.\s*"
+                          r"(?:parseInt|parseLong|valueOf)\s*\(")
+# 实体 setter：`item.setPayStatus(1)` —— 实参决定该字段能否携带文本
+_SETTER_CALL_RE = re.compile(r"\b(\w+)\s*\.\s*set([A-Z]\w*)\s*\(")
+
+
+def _call_args_at(text: str, open_idx: int) -> str:
+    """从 `(`（含）开始配平括号，返回括号内的实参文本。"""
+    depth = 0
+    for i in range(open_idx, len(text)):
+        if text[i] == "(":
+            depth += 1
+        elif text[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return text[open_idx + 1: i]
+    return ""
+
+
+def _split_top_args(args: str) -> list[str]:
+    """按顶层逗号切实参（嵌套调用/字符串里的逗号不切）。"""
+    out: list[str] = []
+    depth = 0
+    cur: list[str] = []
+    in_str = False
+    for ch in args:
+        if ch == '"':
+            in_str = not in_str
+        if not in_str:
+            if ch in "([":
+                depth += 1
+            elif ch in ")]":
+                depth -= 1
+            elif ch == "," and depth == 0:
+                out.append("".join(cur))
+                cur = []
+                continue
+        cur.append(ch)
+    tail = "".join(cur)
+    if tail.strip():
+        out.append(tail)
+    return out
+
+
+def _payload_is_text_capable(expr: str, text: str, params: set[str] = frozenset(),
+                             depth: int = 0) -> bool | None:
+    """单个值表达式能否携带运行时文本（三态，None=查不出）。
+
+    常量（数值字面量 / 无拼接字符串字面量 / int 转换）→ False；
+    字符串拼接（任一操作数非常量）/ 客户端形参 / 请求读取 → True；
+    标识符 → 沿赋值链或实体 setter 递归，追不到就 None。
+    """
+    if depth > 4:
+        return None
+    e = expr.strip().rstrip(";")
+    if not e:
+        return None
+    if _NUM_LIT_RE.match(e) or _CONST_STR_RE.match(e):
+        return False
+    if _NUM_CONV_RE.match(e):
+        return False
+    if '"' in e and ("+" in e or "%" in e or ".format(" in e):
+        # 拼接：每个操作数都常量才算常量
+        parts = [p for p in re.split(r"\+", e) if p.strip()]
+        natures = [_payload_is_text_capable(p, text, params, depth + 1) for p in parts]
+        if natures and all(n is False for n in natures):
+            return False
+        return True
+    if re.fullmatch(r"[A-Za-z_]\w*", e):
+        # 客户端可控形参（@RequestParam / @RequestBody 等裸形参）
+        if e in params:
+            return True
+        # 请求读取直接判 True
+        if re.search(rf"{re.escape(e)}\s*=\s*.*(?:getParameter|getHeader|"
+                     r"getInputStream|getReader|@Request\w+)", text):
+            return True
+        # 赋值链：`e = <rhs>`（取最后一处）。注意 `Item item = new Item();`
+        # 的构造链与 `item.setFoo(...)` 的 setter 链**同时存在**——只看构造
+        # 链会把"new 完再塞字符串字段"的实体误判成常量，只看 setter 会把
+        # "构造实参带文本"漏掉。两条链都查得出且全常量才算常量。
+        rhs = None
+        for am in re.finditer(rf"\b{re.escape(e)}\s*=\s*([^=][^;]*);", text):
+            rhs = am.group(1)
+        # 实体：`e.setFoo(...)` 至少一次 → 看全部 setter 实参
+        setters = [m for m in _SETTER_CALL_RE.finditer(text)
+                   if m.group(1) == e]
+        if rhs is not None and setters:
+            n_r = _payload_is_text_capable(rhs, text, params, depth + 1)
+            n_s = []
+            for sm in setters:
+                sargs = _call_args_at(text, text.find("(", sm.end() - 1))
+                n_s.extend(_payload_is_text_capable(a, text, params, depth + 1)
+                           for a in _split_top_args(sargs))
+            natures = ([n_r] if n_r is not None else []) + n_s
+            if natures and all(n is False for n in natures):
+                return False
+            if any(n is True for n in natures):
+                return True
+            return None
+        if rhs is not None:
+            return _payload_is_text_capable(rhs, text, params, depth + 1)
+        if setters:
+            natures = []
+            for sm in setters:
+                args = _call_args_at(text, text.find("(", sm.end() - 1))
+                for a in _split_top_args(args):
+                    natures.append(_payload_is_text_capable(a, text, params, depth + 1))
+            if natures and all(n is False for n in natures):
+                return False
+            if any(n is True for n in natures):
+                return True
+            return None
+        # 形参/字段：查不出来源
+        return None
+    # 方法调用/复杂表达式：实参全常量则常量，否则查不出
+    om = re.match(r"[\w.]+\s*\(", e)
+    if om:
+        args = _call_args_at(e, om.end() - 1)
+        natures = [_payload_is_text_capable(a, text, params, depth + 1)
+                   for a in _split_top_args(args)]
+        if natures and all(n is False for n in natures):
+            return False
+        if any(n is True for n in natures):
+            return True
+    return None
+
+
+# 入口签名的形参（类型非框架注入的 = 客户端可控值）。与
+# rule_detectors._bare_params 同口径，但这里独立实现：
+# taint_chain 是"发现连接"层，不反向依赖判定层。
+_FRAMEWORK_TYPES = {
+    "HttpServletRequest", "HttpServletResponse", "HttpSession", "ServletRequest",
+    "ServletResponse", "Model", "ModelMap", "Locale", "Principal",
+    "BindingResult", "Errors", "UriInfo", "WebRequest", "MultipartFile",
+}
+_PARAM_DECL_RE = re.compile(r"([A-Z]\w*(?:<[^>]*>)?(?:\[\])?)\s+(\w+)\s*(?:,|\)|$)")
+
+
+def _entry_bare_params(text: str) -> set[str]:
+    """入口签名的裸形参名（text 以注解+签名开头；注释已由上层剥离）。"""
+    clean = re.sub(r"@\w+\s*(?:\([^)]*\))?", " ", text)
+    m = re.search(r"[A-Za-z_]\w*\s*\(", clean)
+    if not m:
+        return set()
+    sig = _call_args_at(clean, m.end() - 1)
+    return {name for typ, name in _PARAM_DECL_RE.findall(sig)
+            if typ not in _FRAMEWORK_TYPES}
+
+
+def _db_writer_all_constant(text: str, handle: str) -> bool | None:
+    """写入方交给 `handle` 的载荷是否**全部**可证明为常量/数值。
+
+    False=有任一实参可能携带文本（串接成立）；True=全常量（不构成
+    跨路由污点串接）；None=有查不出的（保守，保留串接）。
+    """
+    params = _entry_bare_params(text)
+    verdicts: list[bool | None] = []
+    for m in re.finditer(rf"\b{re.escape(handle)}\s*\.\s*([A-Za-z_]\w*)\s*\(", text):
+        if _db_direction(m.group(1)) != "w":
+            continue
+        args = _call_args_at(text, m.end() - 1)
+        parts = [a for a in _split_top_args(args) if a.strip()]
+        if not parts:
+            continue
+        for a in parts:
+            verdicts.append(_payload_is_text_capable(a, text, params))
+    if not verdicts:
+        return None
+    if any(v is True for v in verdicts):
+        return False
+    if all(v is False for v in verdicts):
+        return True
+    return None
+
+
 def _resolve_repo_traces(body: str, repo_root, depth: int = 1) -> str:
     """把入口调用的方法解析到定义文件，返回这些方法体的拼接（供扫仓储字段）。
 
@@ -490,6 +680,13 @@ def build_chains(units: list[CodeUnit],
                 r"\.\s*([A-Za-z_]\w*)\s*\(", src) if len(n) >= 3}))[:3]
         for h in found:
             dirs = _db_directions(text, h)
+            if dirs and "w" in dirs:
+                # 载荷常量性：写入方交给该字段的值全部可证明为数值/常量
+                # （状态位、主键回填）→ 几何上携带不了 XSS 污点，
+                # 撤销"写入方"资格，不给只读路由贴凭空串接证据。
+                # None（有查不出的）保守保留串接。
+                if _db_writer_all_constant(text, h) is True:
+                    dirs.discard("w")
             if dirs:
                 db_dir[(h, u.unit_name)] = dirs
                 db_touch.setdefault(("db", h), []).append(u)
