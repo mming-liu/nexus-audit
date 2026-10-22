@@ -4564,7 +4564,19 @@ _AUTHZ_SUBJECT_RE = re.compile(
     r"|\w*[Ss]ession\s*\.\s*getAttribute\s*\("
     r"|@SessionAttribute|@RequestAttribute"
     r"|\bJwtUtils\s*\.|\bjwtUtils\s*\."
-    r"|StpUtil\s*\.\s*getLoginId|SecurityUtils\s*\.\s*getSubject", re.I)
+    r"|StpUtil\s*\.\s*getLoginId|SecurityUtils\s*\.\s*getSubject"
+    # Shiro 体系（RuoYi 实测，Module 23）：BaseController/ShiroUtils 的
+    # 主体获取助手。裸 getSysUser() 只在 Shiro 项目里是主体链
+    # （ShiroUtils.getSysUser → getSubject().getPrincipal()），Java 线
+    # 其余靶场无此命名冲突。
+    r"|ShiroUtils\s*\."
+    r"|\bgetSysUser\s*\(\s*\)", re.I)
+
+# 主体**链式取值**赋给局部变量：`Long userId = ShiroUtils.getSysUser().getUserId();`
+# / `SysUser user = getSysUser();`。供 2g（主体值直接作 Service 实参）使用。
+_AUTHZ_SUBJECT_CHAIN_VAR_RE = re.compile(
+    r"(\w+)\s*=\s*[^;\n]*\b(?:getSysUser\s*\(\s*\)|getSubject\s*\(\s*\)"
+    r"|getPrincipal\s*\(\s*\)|ShiroUtils\s*\.)", re.I)
 
 # 主体**变量名**：`NewBeeMallUserVO user = (NewBeeMallUserVO) httpSession.getAttribute(KEY);`
 # 只有拿到变量名，才能查"它有没有被当作资源定位条件"。
@@ -4757,6 +4769,31 @@ def authz_verdict(source: str) -> bool | None:
                     rf"\b(\w+)\s*\.\s*(?:put|putAll|add)\s*\("
                     rf"\s*\"[^\"]*\"\s*,\s*{key}\s*\)", body):
                 if _container_flows_to_service(body, pm.group(1)):
+                    return False
+
+    # 2g) 主体值经链式取值赋给局部变量，再**直接作为 Service 实参**
+    #     （RuoYi 实测形态，Module 23）：
+    #
+    #         Long userId = ShiroUtils.getSysUser().getUserId();
+    #         noticeReadService.markRead(noticeId, userId);   // 标记"自己"已读
+    #         SysUser user = getSysUser();
+    #         return passwordService.matches(user, password); // 校验"自己"的密码
+    #
+    #     资源操作的主键来自会话主体——markRead 是"把自己标记为已读"，
+    #     checkPassword 是"验证当前会话用户的密码"——没有可被水平越权的
+    #     他人资源键。判 False 需要：① 确有主体获取（has_any_subject）；
+    #     ② 主体链取值赋给局部变量；③ 该变量出现在 Service/Mapper 调用
+    #     实参里。三者缺一会把"客户端 DTO 自带 userId"（checkXxxUnique
+    #     的 user.getUserId()，RuoYi 同文件就有）误当主体——那个不能进
+    #     这条，所以正则只认 getSysUser/getSubject/getPrincipal/ShiroUtils
+    #     这四个可信源，裸 getUserId() 不算。
+    if has_any_subject:
+        subj_local = set(_AUTHZ_SUBJECT_CHAIN_VAR_RE.findall(body))
+        if subj_local:
+            for sm in re.finditer(
+                    r"\b\w*(?:Service|Mapper|Dao|DAO)\s*\.\s*\w+\s*\(([^;]{0,240})",
+                    body):
+                if any(re.search(rf"\b{v}\b", sm.group(1)) for v in subj_local):
                     return False
 
     # 2e) 主体 id 与**查回来的资源**的归属字段做相等比较，且比对为真时终止请求：

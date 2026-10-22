@@ -3633,3 +3633,62 @@ _r70 = _sp70.run([sys.executable, str(Path(__file__).resolve().parent
                                      / "benchmark_nssc.py"), "--strict", "--offline"],
                  capture_output=True, text=True, encoding="utf-8")
 check("M21：nssc 真值表 8 条（含 fixed_2）strict 退出码 0", _r70.returncode, 0)
+
+
+# ---- [71] Module 23：方法级权限注解 + 主体链取值（RuoYi 形态） ----
+_ry_annotated = """// Full-Route: /system/user/list
+    @RequiresPermissions("system:user:list")
+    @PostMapping("/list")
+    @ResponseBody
+    public TableDataInfo list(SysUser user)
+    {
+        List<SysUser> list = userService.selectUserList(user);
+        return getDataTable(list);
+    }
+"""
+check("M23：@RequiresPermissions 垂直授权 → authz False",
+      _verdict("authz", _ry_annotated), False)
+
+_ry_markread = """// Full-Route: /system/notice/markRead
+    @PostMapping("/markRead")
+    @ResponseBody
+    public AjaxResult markRead(Long noticeId)
+    {
+        Long userId = ShiroUtils.getSysUser().getUserId();
+        noticeReadService.markRead(noticeId, userId);
+        return success();
+    }
+"""
+check("M23：主体链取值作 Service 实参（标记自己已读）→ False（2g）",
+      _verdict("authz", _ry_markread), False)
+
+_ry_checkpwd = """// Full-Route: /system/user/profile/checkPassword
+    @GetMapping("/checkPassword")
+    @ResponseBody
+    public boolean checkPassword(String password)
+    {
+        SysUser user = getSysUser();
+        return passwordService.matches(user, password);
+    }
+"""
+check("M23：校验当前会话用户密码（主体对象作实参）→ False（2g）",
+      _verdict("authz", _ry_checkpwd), False)
+
+_ry_dto = """// Full-Route: /system/user/checkLoginNameUnique
+    @PostMapping("/checkLoginNameUnique")
+    @ResponseBody
+    public boolean checkLoginNameUnique(SysUser user)
+    {
+        return userService.checkLoginNameUnique(user);
+    }
+"""
+check("M23：客户端 DTO 直接进 Service 且无主体 → 保持 True（防 2g 放水）",
+      _verdict("authz", _ry_dto), True)
+
+import subprocess as _sp71                                          # noqa: E402
+_r71 = _sp71.run([sys.executable, str(Path(__file__).resolve().parent
+                                     / "benchmark_ruoyi.py"), "--strict", "--offline"],
+                 capture_output=True, text=True, encoding="utf-8")
+check("M23：RuoYi benchmark --strict --offline 退出码 0", _r71.returncode, 0)
+check("M23：RuoYi 跨模块穿透 + 注解语义在线（STRICT PASS）",
+      "STRICT PASS" in (_r71.stdout or ""), True)
