@@ -18,8 +18,12 @@ from core.models import CodeUnit
 IGNORE_DIRS = {".git", "node_modules", "tests", "test", "docs", "examples",
                "example", "venv", ".venv", "__pycache__", "dist", "build"}
 
-# Python 顶层定义：def/class（带缩进捕获以区分类方法）
-DEF_RE = re.compile(r"^(\s*)(async\s+def|def|class)\s+([A-Za-z_]\w*)", re.M)
+# Python 顶层定义：def/class（带缩进捕获以区分类方法）。
+# 缩进只允许行内空白 —— `\s*` 会跨行吞空行，m.start() 落到空行处
+# 导致 start_line 少 2、indent 变成 2，下一个顶层 def 被当成子函数，
+# 符号段一路吞到文件尾（vulpy good/libuser 实测：do_login 的切片因此
+# 混进 user_create 的拼接 sink，参数化版本被判成注入）。
+DEF_RE = re.compile(r"^([ \t]*)(async\s+def|def|class)\s+([A-Za-z_]\w*)", re.M)
 # import 捕获（含别名）
 IMPORT_RE = re.compile(r"^\s*(?:from\s+([\w.]+)\s+import\s+(.+)|import\s+([\w.]+)(?:\s+as\s+(\w+))?)", re.M)
 

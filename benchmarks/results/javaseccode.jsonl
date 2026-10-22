@@ -10,6 +10,7 @@
 {"unit": "Deserialize.rememberMeVul", "route": "/rememberMe/vuln", "category": "deserial", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "Deserialize.rememberMeBlackClassCheck", "route": "/rememberMe/security", "category": "deserial", "real_vuln": true, "truth_src": "doc", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "PathTraversal.getImage", "route": "/path_traversal/vul", "category": "pathtraver", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
+{"unit": "PathTraversal.getImageSec", "route": "/path_traversal/sec", "category": "pathtraver", "real_vuln": false, "truth_src": "route", "flagged": null, "stage": "not_judged", "detail": "规则未覆盖（离线模式）", "elapsed_s": 0.0}
 {"unit": "Rce.yarm", "route": "/vuln/yarm", "category": "deserial", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "Rce.secYarm", "route": "/sec/yarm", "category": "deserial", "real_vuln": false, "truth_src": "route", "flagged": false, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "SpEL.spel_vuln1", "route": "/spel/vuln1", "category": "spel", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
@@ -40,6 +41,7 @@
 {"unit": "SSRF.RestTemplateUrlBanRedirects", "route": "/restTemplate/vuln1", "category": "ssrf", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "SSRF.RestTemplateUrl", "route": "/restTemplate/vuln2", "category": "ssrf", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "SSRF.hutoolHttp", "route": "/hutool/vuln", "category": "ssrf", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
+{"unit": "SSRF.DnsRebind", "route": "/dnsrebind/vuln", "category": "ssrf", "real_vuln": true, "truth_src": "route", "flagged": null, "stage": "not_judged", "detail": "规则未覆盖（离线模式）", "elapsed_s": 0.0}
 {"unit": "URLRedirect.forward", "route": "/forward", "category": "redir", "real_vuln": false, "truth_src": "doc", "flagged": false, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "URLRedirect.sendRedirect_seccode", "route": "/sendRedirect/sec", "category": "redir", "real_vuln": false, "truth_src": "route", "flagged": false, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "XSS.reflect", "route": "/reflect", "category": "xss", "real_vuln": true, "truth_src": "doc", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
@@ -63,5 +65,3 @@
 {"unit": "XXE.XMLReaderVuln", "route": "/XMLReader/vuln", "category": "xxe", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "XXE.XMLReaderSec", "route": "/XMLReader/sec", "category": "xxe", "real_vuln": false, "truth_src": "route", "flagged": false, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "XXE.DocumentHelper", "route": "/DocumentHelper/vuln", "category": "xxe", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
-{"unit": "SSRF.DnsRebind", "route": "/dnsrebind/vuln", "category": "ssrf", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "missing_property", "detail": "Scenario=ssrf=HIT, PropertyCheck=MISSING（采样不一致）", "elapsed_s": 135.0}
-{"unit": "PathTraversal.getImageSec", "route": "/path_traversal/sec", "category": "pathtraver", "real_vuln": false, "truth_src": "route", "flagged": null, "stage": "error", "detail": "", "elapsed_s": 544.6}

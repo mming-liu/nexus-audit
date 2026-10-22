@@ -4929,11 +4929,24 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0) -> bool | Non
         if any(n is True for n in natures):
             return True
         return None
-    if "%s" in e or "'%" in e or '"%' in e:
-        m = re.search(r"%\s*\(?([^;]+)\)?\s*$", e)
-        if m:
+    if "%s" in e or "'%" in e or '"%' in e or re.search(r"\"\s*%\s", e):
+        # 顶层 % 运算符：必须找**字符串字面量之外**的 % —— SQL 里满是
+        # '%s' 占位符，瞎抓第一个 % 会把 `s" % uid` 当成插值列表。
+        in_s = in_d = False
+        last = -1
+        for i, ch in enumerate(e):
+            if ch == '"' and not in_s:
+                in_d = not in_d
+            elif ch == "'" and not in_d:
+                in_s = not in_s
+            elif ch == "%" and not in_s and not in_d:
+                last = i
+        if last != -1:
+            rhs = e[last + 1:].strip()
+            if rhs.startswith("(") and rhs.endswith(")"):
+                rhs = rhs[1:-1]
             natures = [_py_interp_text_capable(a, source, depth)
-                       for a in _split_args(m.group(1))]
+                       for a in _split_args(rhs)]
             if natures and all(n is False for n in natures):
                 return False
             if any(n is True for n in natures):
