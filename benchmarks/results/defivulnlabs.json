@@ -1,0 +1,18 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\DeFiVulnLabs-main",
+  "truth_entries": 9,
+  "resolved": 9,
+  "missing": [],
+  "total_functions": 323,
+  "decided": 3,
+  "correct": 3,
+  "fp": 0,
+  "reverse_fn": 0,
+  "fallback": 6,
+  "safe_denominator": 3,
+  "model": {
+    "model": null,
+    "skipped": "offline",
+    "n_fallback": 6
+  }
+}

@@ -60,3 +60,13 @@ if [ -d reference_repos/smartbugs-curated-main ]; then
   "$PY" benchmarks/benchmark_smartbugs.py --strict --offline > /dev/null
   echo "pre-push: smartbugs 基线通过 ✔"
 fi
+
+# 第 9 靶场（Solidity 0.8.x）：DeFiVulnLabs 成对真值（漏洞合约 + 修复合约
+# 里同名函数各一份）。这是唯一能验证"判据看机制不看名字"的样本 ——
+# smartbugs 的同文件未标注函数只能靠人工判断真值口径，这里真值是成对的。
+# 同时它把 access_control 的漏洞分母从 18 补到 22，越过了记忆条 3 的 20 条线。
+if [ -d reference_repos/DeFiVulnLabs-main ]; then
+  echo "pre-push: DeFiVulnLabs 基线 ..."
+  "$PY" benchmarks/benchmark_defivulnlabs.py --strict --offline > /dev/null
+  echo "pre-push: DeFiVulnLabs 基线通过 ✔"
+fi

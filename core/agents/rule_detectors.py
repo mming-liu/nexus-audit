@@ -5201,11 +5201,29 @@ def _sol_is_readonly(sig: str) -> bool:
     return bool(_SOLIDITY_READONLY_RE.search(sig))
 
 
+def _sol_is_internal_only(sig: str) -> bool:
+    """签名显式声明 internal / private → 外部调不到，攻击面为零。
+
+    重入需要"外部入口 + 外部调用"两个条件，越权需要"外部可调的特权
+    动作"—— 两者都以"函数对外可达"为前提。可见性在编译期固化，属于
+    **编译器强制**的事实，不是提示词能商量的判断。
+
+    为什么必须只看 `)` 之后的尾段：参数名/返回类型里出现 internal 这种
+    词法是可能的（`function f(bool internal_)`），把函数体里的 `internal`
+    当可见性会把带保护的业务函数整片误判 safe。没有显式可见性的老语法
+    （`function foo()`，默认 public）**不在这里排除** —— 默认可达是事实，
+    不能靠"没写"推"不可达"。
+    """
+    tail = sig[sig.find(")") + 1:] if ")" in sig else sig
+    return bool(re.search(r"\b(?:internal|private)\b", tail))
+
+
 def solidity_reentrancy_verdict(source: str) -> bool | None:
     """Solidity 重入：CEI 顺序是逐行可核对的事实。
 
     · 签名带 `nonReentrant`（或体内有重入锁）→ False
     · 只读函数（view/pure/constant）→ False（编译器保证不写状态，无重入窗口）
+    · 显式 internal/private → False（外部调不到，没有入口就没有重入）
     · 所有外部转账调用的行号**严格大于**状态扣减行号 → False（CEI 正序）
     · 外部调用在扣减**之前**且无锁 → True
     · 缺少任一侧证据 → None
@@ -5215,7 +5233,8 @@ def solidity_reentrancy_verdict(source: str) -> bool | None:
     PrivateBank/CashOut、SimpleBank/Collect 这批经典真漏洞全部静默退回。
     """
     func_src, _mod_block = _split_sol_modifier_block(source)
-    if _sol_is_readonly(_sol_signature(func_src)):
+    sig = _sol_signature(func_src)
+    if _sol_is_readonly(sig) or _sol_is_internal_only(sig):
         return False
     if re.search(r"\bnonReentrant\b|locked|entered|_status\s*==\s*1|_reentrancyGuard",
                  func_src):
@@ -5264,8 +5283,9 @@ def solidity_access_verdict(source: str) -> bool | None:
         空实现/确认型 modifier 防不了越权）；
       · 函数体内 `require(msg.sender == …)` → False；
       · `tx.origin ==` **不算**保护（钓鱼反模式，Phishable 正是标注漏洞）；
-      · 构造函数（函数名 == 合约名，0.4.x 无 visibility 时代）写 owner
-        是正常初始化 → 不判；
+      · 只读函数 / 显式 internal·private → False（编译器强制，见下方注释）；
+      · 构造函数（函数名 == 合约名，0.4.x 无 visibility 时代）→ False
+        （部署期由 EVM 执行一次，代码不进运行时字节码，外部永远调不到）；
       · **函数名 != 合约名**（错名构造函数，Rubixi/incorrect_constructor）
         且写 owner 态 / selfdestruct，而没有任何保护 → True；
       · external/public + selfdestruct / 转出 this.balance 且无 msg.sender
@@ -5279,7 +5299,11 @@ def solidity_access_verdict(source: str) -> bool | None:
     # 只读函数（view/pure/constant）：特权操作全都要写状态（转币、销毁、
     # 改 owner、铸币），编译器禁止只读函数写状态 → 确定性 safe。
     # 放在构造函数判断之前：错名构造函数不可能是 view/pure。
-    if _sol_is_readonly(sig):
+    #
+    # internal/private 同理：外部调不到的"特权动作"不构成越权。两条都是
+    # **编译器强制**的事实（Module 19：smartbugs 里 16 条显式 internal
+    # 单元真值全 safe，排除面干净）。
+    if _sol_is_readonly(sig) or _sol_is_internal_only(sig):
         return False
     fname = m.group(1)
     cm = re.search(r"contract:\s*(\S+)", source)
@@ -5327,9 +5351,12 @@ def solidity_access_verdict(source: str) -> bool | None:
         return None
 
     if is_constructor:
-        # 正常构造函数写 owner 是初始化；无 visibility 的老构造函数
-        # 连调用面都没有，不构成越权（真相由函数名==合约名锁定）。
-        return None
+        # 函数名 == 合约名 → 0.4.x 构造函数：部署期由 EVM 执行一次，代码
+        # 不进入运行时字节码，外部**永远调不到**。写 owner 是初始化。
+        # Module 19 从 None 改 False：这是编译器/VM 层的确定性事实，退回
+        # 模型只会让模型在 `function Wallet(...)` 的 assembly 里幻想出越权
+        # （smartbugs 实跑里正是这么误报的）。
+        return False
 
     # 错名构造函数：写 owner 态但函数名 != 合约名 —— 任何人部署后可调
     # 用它把自己变成 owner（Rubixi 的 DynamicPyramid）。

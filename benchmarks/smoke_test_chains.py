@@ -3106,8 +3106,8 @@ _SOL_TRUE_CTOR = '''// contract: MyContract
 function MyContract() public {
     owner = msg.sender;
 }'''
-check("同名构造函数写 owner = 正常初始化 → 不判",
-      verdict("access_control", _SOL_TRUE_CTOR), None)
+check("同名构造函数写 owner = 正常初始化 → 判 safe（Module 19 由 None 收紧）",
+      verdict("access_control", _SOL_TRUE_CTOR), False)
 
 _SOL_TXORIGIN = '''// contract: Phishable
 function withdrawAll(address _recipient) public {
@@ -3373,6 +3373,95 @@ function kill() public {
 }"""
 check("无保护的 selfdestruct 仍判漏洞（越权）",
       verdict("access_control", _SOL66_KILL), True)
+
+
+# ---------------- [67] 外部不可达预筛 + 构造函数，第 9 靶场 DeFiVulnLabs ------#
+# 与 [66] 同一条铁律的第二、三款：**编译器/VM 层的事实不交给模型**。
+#   · 显式 internal / private → 外部调不到，攻击面为零；
+#   · 函数名 == 合约名（0.4.x 构造函数）→ 部署期执行一次、不进运行时字节码。
+# smartbugs 实测：显式 internal 单元 16 条，真值全 safe，排除面干净；
+# 规则层确定性判定 86→101/246，仍 101/101 正确、零误报零判反。
+print("\n[67] 外部不可达预筛：internal/private + 构造函数 → 确定性 safe")
+
+_SOL67_INTERNAL_KILL = """// contract: Wallet
+function kill() internal {
+    selfdestruct(msg.sender);
+}"""
+check("internal + selfdestruct 判 safe（外部调不到）",
+      verdict("access_control", _SOL67_INTERNAL_KILL), False)
+
+_SOL67_PRIVATE_OWNER = """// contract: Vault
+function setOwner(address o) private {
+    owner = o;
+}"""
+check("private 写 owner 判 safe", verdict("access_control", _SOL67_PRIVATE_OWNER), False)
+
+_SOL67_INTERNAL_REENT = """// contract: Bank
+function withdraw(uint amt) internal {
+    if (!msg.sender.call.value(amt)()) { revert(); }
+    balances[msg.sender] -= amt;
+}"""
+check("internal 函数的重入也判 safe（没有入口就没有重入）",
+      verdict("reentrancy", _SOL67_INTERNAL_REENT), False)
+
+# 负向三条：条款不能被"长得像"的东西骗到。
+_SOL67_PARAM = """// contract: Vault
+function setOwner(bool internal_) public {
+    owner = msg.sender;
+}"""
+check("参数名叫 internal_ 不是可见性（public 写 owner 仍判漏洞）",
+      verdict("access_control", _SOL67_PARAM), True)
+
+_SOL67_CTOR = """// contract: Wallet
+function Wallet() public {
+    owner = msg.sender;
+}"""
+check("构造函数写 owner 判 safe（部署期执行一次，外部调不到）",
+      verdict("access_control", _SOL67_CTOR), False)
+
+_SOL67_WRONG_CTOR = """// contract: Rubixi
+function DynamicPyramid() {
+    creator = msg.sender;
+}"""
+check("错名构造函数仍判漏洞（函数名 != 合约名，任何人都能调）",
+      verdict("access_control", _SOL67_WRONG_CTOR), True)
+
+_SOL67_OLD_NO_VIS = """// contract: Rubixi
+function changeOwner(address o) {
+    owner = o;
+}"""
+check("无可见性老语法不判 safe（默认 public 是事实，不能用'没写'推'不可达'）",
+      verdict("access_control", _SOL67_OLD_NO_VIS), True)
+
+# DeFiVulnLabs 真实仓库 E2E：成对 vuln/fixed 真值（第 9 靶场）。
+# 它存在的理由只有一个 —— smartbugs 的 access_control 漏洞分母 18 卡在
+# 记忆条 3 的 20 条线下；成对真值把"判据看机制还是看名字"变成可证伪的问题。
+_DVL = Path(__file__).resolve().parent.parent / "reference_repos" / "DeFiVulnLabs-main"
+if _DVL.exists():
+    from benchmarks.benchmark_defivulnlabs import TRUTH as _DVL_TRUTH
+    _dvl_units = {(Path(u.file_path).name, u.start_line): u
+                  for u in SoliditySlicer(_DVL).extract_entry_units(_DVL / "src" / "test")}
+    _dvl_rows, _dvl_miss = [], 0
+    for _f, _ln, _fn, _cat, _vul, _why in _DVL_TRUTH:
+        _u = _dvl_units.get((_f, _ln))
+        if not _u or _u.unit_name != _fn:
+            _dvl_miss += 1
+            continue
+        _dvl_rows.append((_cat, _vul, verdict(_cat, _u.source_code)))
+    check("DeFiVulnLabs E2E：真值表 9 条全部命中切片（防上游漂移）", _dvl_miss, 0)
+    check("DeFiVulnLabs E2E：零误报（成对 fixed 样本不许判 True）",
+          sum(1 for _c, _t, _g in _dvl_rows if _g is True and not _t), 0)
+    check("DeFiVulnLabs E2E：零判反",
+          sum(1 for _c, _t, _g in _dvl_rows if _g is False and _t), 0)
+    check("DeFiVulnLabs E2E：确定性判定 ≥3 条（0.8.x 语法未击穿词表）",
+          sum(1 for _c, _t, _g in _dvl_rows if _g is not None) >= 3, True)
+    # 成对样本的关键一条：同一函数名，差一条校验，结论必须相反。
+    _pair = {(c, t, g) for c, t, g in _dvl_rows}
+    check("DeFiVulnLabs E2E：成对真值出现双向结论（vul=True 且 fixed=False）",
+          any(g is True for _c, t, g in _dvl_rows if t)
+          and any(g is False for _c, t, g in _dvl_rows if not t), True)
+else:
+    print("  -- DeFiVulnLabs 靶场不在 reference_repos，跳过 E2E（安装见 Module 19）")
 
 
 print()

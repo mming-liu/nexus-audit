@@ -3,9 +3,9 @@
     python benchmarks/run_all.py --offline
 
 顺序跑全部**离线**门禁（不调模型），输出统一 Markdown 计分板：
-  1. smoke_test_chains.py         —— [1]-[66] 判据链路断言
+  1. smoke_test_chains.py         —— [1]-[67] 判据链路断言
   2. export_disputes.py --check   —— 争议登记证据逐字核对
-  3. 8 个靶场规则层 --strict 回归（仓库存在才跑，缺失记 SKIP）
+  3. 9 个靶场规则层 --strict 回归（仓库存在才跑，缺失记 SKIP）
 
 退出码：全部已执行项通过 → 0；任何 FAIL → 1；SKIP 不影响退出码。
 耗时与结果同时写入 benchmarks/results/run_all.md，供 CI 与阶段报告引用。
@@ -24,7 +24,7 @@ OUT = ROOT / "benchmarks" / "results" / "run_all.md"
 
 # (名称, 命令, 前置目录检查, 类别)
 JOBS = [
-    ("冒烟测试 [1]-[66]", ["benchmarks/smoke_test_chains.py"], None, "smoke"),
+    ("冒烟测试 [1]-[67]", ["benchmarks/smoke_test_chains.py"], None, "smoke"),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke"),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target"),
@@ -47,6 +47,12 @@ JOBS = [
     ("smartbugs-curated (Solidity)", ["benchmarks/benchmark_smartbugs.py", "--strict",
                                       "--offline"],
      "reference_repos/smartbugs-curated-main", "target"),
+    # 第 9 靶场（Module 19）：成对 vuln/fixed 真值 + 0.8.x 语法。存在的唯一
+    # 理由是 smartbugs 的 access_control 漏洞分母只有 18（<20 就不许下结论）。
+    # 模型层同样需要网关，离线门禁必须显式 --offline。
+    ("DeFiVulnLabs (Solidity 成对真值)", ["benchmarks/benchmark_defivulnlabs.py",
+                                         "--strict", "--offline"],
+     "reference_repos/DeFiVulnLabs-main", "target"),
 ]
 
 
