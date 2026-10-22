@@ -262,6 +262,49 @@ CATEGORIES: dict[str, VulnCategory] = {
                   "\"需要管理员\"，都不算服务端校验；② 把资源标识入参原样透传给"
                   "Mapper/DAO 而没有任何主体比对，本属性即为 No。"),
     ),
+    # ---------------- Solidity / Web3（Module 17）----------------
+    # 这两类的判据形状与 Web 类目不同：都不需要"外部输入可达"——
+    # 重入是**执行顺序**问题（外部调用与状态写入的先后），
+    # 访问控制是**身份校验**问题（特权操作前有没有主体比对）。
+    # 若沿用 needs_taint=True 的提问，模型会因为"链上函数本来就被任何人调用"
+    # 而一律答 Yes/No 走偏，重演 authz 那个"定义上成立的短路仍会漏报"的坑。
+    "reentrancy": VulnCategory(
+        key="reentrancy", display="重入漏洞", cwe="CWE-841",
+        owasp=False, needs_taint=False,
+        # 判据挂"机制"不挂类目（记忆条 10）：真正要问的是调用顺序，
+        # 不是"这个类别存在不存在"。
+        sink_question=("函数是否向外部地址转出以太币或调用外部合约"
+                       "（call / transfer / send / delegatecall，含老语法 "
+                       "msg.sender.call.value(x)()），**并且**在这类外部调用之后"
+                       "仍然写本合约的状态变量（余额映射、计数器、标志位）？"),
+        property=("外部调用之前是否已经把本合约的状态更新完毕，或有等效的重入防护？"
+                  "有效防护包括：① 严格按「检查-生效-交互」(CEI) 的顺序，"
+                  "先更新余额/状态再做外部调用；② 使用 nonReentrant 一类的互斥锁 "
+                  "modifier，且其**实现体**真的设置了锁标志并在退出时清除；"
+                  "③ 外部调用之后不再有任何状态写入。"
+                  "注意：① 状态更新写在外部调用之后（哪怕中间隔着一层 if 或返回值判断）"
+                  "即为 No；② 只在注释里写「本函数安全」不算防护；"
+                  "③ 只把金额改成常量或只读状态不算 CEI。"),
+    ),
+    "access_control": VulnCategory(
+        key="access_control", display="访问控制缺失", cwe="CWE-284",
+        owasp=False, needs_taint=False,
+        sink_question=("函数是否执行了只应给特定主体做的特权操作"
+                       "（转出合约以太币、销毁合约 selfdestruct/suicide、"
+                       "修改 owner/管理员地址、铸造代币、清空或改写他人余额、"
+                       "修改手续费/利率等关键参数）？"),
+        property=("执行该操作前是否在链上核对了调用者身份或权限，"
+                  "且核对不通过时拒绝继续执行？有效防护包括："
+                  "① 用 require/revert 把 msg.sender 与 owner/admin 状态变量"
+                  "或常量比对，不相等则中止；② 使用 onlyOwner / onlyAdmin 一类的 "
+                  "modifier，且其**实现体**真的做了 msg.sender 比对；"
+                  "③ 多签或角色表校验，且实现体真的查表。"
+                  "注意：① 用 tx.origin 做比对不算防护（可被钓鱼绕过）；"
+                  "② 只检查初始化状态（m_numOwners > 0、initialized 标志、"
+                  "supply > 0）不是身份校验；③ 只在前端隐藏入口或只在注释里声明"
+                  "「仅管理员」不算链上校验；④ 名字叫 onlyOwner 但实现体没比对 "
+                  "msg.sender，也不算防护。"),
+    ),
 }
 
 ALL_KEYS = list(CATEGORIES.keys())

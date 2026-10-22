@@ -3,7 +3,7 @@
     python benchmarks/run_all.py --offline
 
 顺序跑全部**离线**门禁（不调模型），输出统一 Markdown 计分板：
-  1. smoke_test_chains.py         —— [1]-[64] 判据链路断言
+  1. smoke_test_chains.py         —— [1]-[65] 判据链路断言
   2. export_disputes.py --check   —— 争议登记证据逐字核对
   3. 8 个靶场规则层 --strict 回归（仓库存在才跑，缺失记 SKIP）
 
@@ -24,7 +24,7 @@ OUT = ROOT / "benchmarks" / "results" / "run_all.md"
 
 # (名称, 命令, 前置目录检查, 类别)
 JOBS = [
-    ("冒烟测试 [1]-[64]", ["benchmarks/smoke_test_chains.py"], None, "smoke"),
+    ("冒烟测试 [1]-[65]", ["benchmarks/smoke_test_chains.py"], None, "smoke"),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke"),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target"),
@@ -42,7 +42,10 @@ JOBS = [
      "reference_repos/newbee-mall-api-master", "target"),
     ("vulpy (Python)", ["benchmarks/benchmark_vulpy.py", "--strict"],
      "reference_repos/vulpy-master", "target"),
-    ("smartbugs-curated (Solidity)", ["benchmarks/benchmark_smartbugs.py", "--strict"],
+    # smartbugs 的模型层（Module 17）只跑规则退回批，需要真实模型网关；
+    # 总控是**离线**门禁，必须显式 --offline 否则 197 条会开始发请求。
+    ("smartbugs-curated (Solidity)", ["benchmarks/benchmark_smartbugs.py", "--strict",
+                                      "--offline"],
      "reference_repos/smartbugs-curated-main", "target"),
 ]
 

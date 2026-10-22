@@ -1,0 +1,51 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\smartbugs-curated-main",
+  "total_functions": 248,
+  "registered": 246,
+  "safe_denominator": 198,
+  "decided": 49,
+  "correct": 49,
+  "fp": 0,
+  "reverse_fn": 0,
+  "fallback": 197,
+  "disputed": [
+    {
+      "file": "parity_wallet_bug_1.sol",
+      "unit": "kill"
+    },
+    {
+      "file": "parity_wallet_bug_2.sol",
+      "unit": "kill"
+    }
+  ],
+  "model": {
+    "model": "glm-5.3-flash",
+    "n_fallback": 197,
+    "n_valid": 192,
+    "call_failed": 5,
+    "per_category": {
+      "reentrancy": {
+        "n": 113,
+        "tp": 4,
+        "fn": 0,
+        "fp": 5,
+        "tn": 104,
+        "tpr": 1.0,
+        "fpr": 0.046,
+        "tpr_denom": 4,
+        "fpr_denom": 109
+      },
+      "access_control": {
+        "n": 79,
+        "tp": 11,
+        "fn": 0,
+        "fp": 11,
+        "tn": 57,
+        "tpr": 1.0,
+        "fpr": 0.162,
+        "tpr_denom": 11,
+        "fpr_denom": 68
+      }
+    }
+  }
+}

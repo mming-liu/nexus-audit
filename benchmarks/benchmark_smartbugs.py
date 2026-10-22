@@ -37,12 +37,33 @@ vul，其余函数构成**真实 safe 分母**（合成夹具给不出负样本�
 
 safe 负样本**零误报（FPR = 0）**，且判过方向的样本 FN = 0
 （判据宁退 None 不判反）。退回 None 交模型，不阻塞门禁。
+
+## 模型层（Module 17，`--model` / `--offline`）
+
+规则只定论了 49/246，剩下 197 条退回 —— 这些正是模型该接手的部分，
+也是"Solidity 赛道的模型 TPR/FPR"此前完全空白的原因（类目没注册，
+`audit_unit_for` 拿到 `VC.get("reentrancy") is None` 直接空转）。
+
+口径三条：
+
+1. **只跑退回批**。把规则已判对的样本混进来会稀释模型分数，看不出模型贡献；
+2. **空 hypothesis ≠ 调用失败**。空列表是"场景未命中"这个合法结论（TN），
+   `flagged=None` 才是网络/解析失败，单列剔除、绝不折算成"无漏洞"；
+3. **分母不足只记录不下结论**（记忆条 3）。当前退回批 197 条里
+   safe 182 / vul 15：FPR 分母够（分类目 112/70），TPR 分母不够（4/11），
+   所以 TPR 只作为观测值记录，不参与任何"模型可用"的结论。
+
+模型层**不参与 `--strict` 退出码** —— 模型非确定性，拿它做门禁等于把
+随机性写进 CI。离线门禁（run_all / pre-push）必须显式 `--offline`。
 """
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
+import os
 import sys
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -63,12 +84,118 @@ DISPUTED = {
 }
 
 
+async def _model_stage(fallback_rows: list[dict], args) -> list[dict]:
+    """规则退回的样本交模型（只跑退回批 —— 规则已定论的样本不重跑）。
+
+    为什么不重跑全部：模型指标的分母是"规则查不出的那部分"，把规则已判对的
+    样本混进来会把模型分数稀释成规则分数，看不出模型到底贡献了什么。
+
+    三件事必须分开：
+      ① `flagged is None` = 调用失败（网络/超时/解析），**单列剔除**，绝不折算成
+         "无漏洞" —— 否则一次断网会被记成一批漏报；
+      ② 空 hypothesis 列表是"场景未命中"这个**合法结论**，不是失败。旧 harness
+         （hellojavasec）把空的当失败，等于把 TN 全扔了，这里不复制那个坑；
+      ③ 模型不给结论的门禁权：`--strict` 只锁规则层，模型侧只出指标。
+    """
+    from cli import load_dotenv
+    load_dotenv(ROOT / ".env")
+    from core.agents.router import OpenAICompatClient, TwoTierRouter
+    from core.agents.scenario_matcher import ScenarioMatcher
+
+    router = TwoTierRouter(tier1=OpenAICompatClient(model=args.model))
+    matcher = ScenarioMatcher(router=router, max_concurrency=args.concurrency,
+                              code_language="solidity_web3")
+    sem = asyncio.Semaphore(args.concurrency)
+
+    async def one(r: dict) -> dict:
+        async with sem:
+            t0 = time.time()
+            base = {"file": r["file"], "unit": r["unit"].unit_name,
+                    "category": r["category"], "real_vuln": r["real_vuln"]}
+            try:
+                hs = await matcher.audit_unit_for(r["unit"], [r["category"]],
+                                                  "solidity_web3")
+            except Exception as e:                      # 超时 / 熔断 / 连接
+                return {**base, "flagged": None, "detail": f"{type(e).__name__}: {e}"[:160],
+                        "elapsed_s": round(time.time() - t0, 1)}
+            if any("LLM 调用失败" in (h.reasoning_summary or "") for h in hs):
+                return {**base, "flagged": None, "detail": "LLM 调用失败",
+                        "elapsed_s": round(time.time() - t0, 1)}
+            h = hs[0] if hs else None
+            return {**base, "flagged": bool(h.property_missing) if h else False,
+                    "reason": (h.reasoning_summary if h else "场景未命中")[:160],
+                    "elapsed_s": round(time.time() - t0, 1)}
+
+    return list(await asyncio.gather(*(one(r) for r in fallback_rows)))
+
+
+def _report_model(model_rows: list[dict], fallback_rows: list[dict],
+                  model_name: str) -> dict:
+    """按类目分别报 TPR / FPR，分母不足的**只记录不下结论**（记忆条 3）。"""
+    ok = [m for m in model_rows if m["flagged"] is not None]
+    err = len(model_rows) - len(ok)
+    print()
+    print("=" * 72)
+    print(f"模型层（只跑规则退回的 {len(fallback_rows)} 条，有效 {len(ok)} / "
+          f"调用失败 {err}）")
+    print("=" * 72)
+    if err:
+        print(f"! 调用失败 {err} 条已剔除，不计为'无漏洞'（网络问题 ≠ 漏报）")
+    per: dict[str, dict] = {}
+    for cat in CATEGORIES:
+        sub = [m for m in ok if m["category"] == cat]
+        if not sub:
+            continue
+        tp = sum(1 for m in sub if m["flagged"] and m["real_vuln"])
+        fn = sum(1 for m in sub if not m["flagged"] and m["real_vuln"])
+        fp = sum(1 for m in sub if m["flagged"] and not m["real_vuln"])
+        tn = sum(1 for m in sub if not m["flagged"] and not m["real_vuln"])
+        tpr = tp / (tp + fn) if (tp + fn) else None
+        fpr = fp / (fp + tn) if (fp + tn) else None
+        per[cat] = {"n": len(sub), "tp": tp, "fn": fn, "fp": fp, "tn": tn,
+                    "tpr": None if tpr is None else round(tpr, 3),
+                    "fpr": None if fpr is None else round(fpr, 3),
+                    "tpr_denom": tp + fn, "fpr_denom": fp + tn}
+        print(f"\n  {cat}")
+        print(f"    有效判定 {len(sub):3}  TP={tp:<3} FN={fn:<3} FP={fp:<3} TN={tn:<3}")
+        tpr_s = "—" if tpr is None else f"{tpr * 100:.1f}%"
+        fpr_s = "—" if fpr is None else f"{fpr * 100:.1f}%"
+        note = "" if (tp + fn) >= 20 else "  ← 漏洞样本分母 <20，只记录不下结论"
+        print(f"    TPR = {tpr_s}（分母 {tp + fn}）{note}")
+        note2 = "" if (fp + tn) >= 20 else "  ← safe 分母 <20，只记录不下结论"
+        print(f"    FPR = {fpr_s}（分母 {fp + tn}）{note2}")
+    if ok:
+        print("\n  模型误报（safe 判 True）样本：")
+        fps = [m for m in ok if m["flagged"] and not m["real_vuln"]]
+        for m in fps[:15]:
+            print(f"    {m['file'][:46]}:{m['unit']}  {m['category']}"
+                  f"  {m.get('reason', '')[:60]}")
+        if not fps:
+            print("    （无）")
+        print("\n  模型漏报（vul 判 False）样本：")
+        fns = [m for m in ok if not m["flagged"] and m["real_vuln"]]
+        for m in fns[:15]:
+            print(f"    {m['file'][:46]}:{m['unit']}  {m['category']}"
+                  f"  {m.get('reason', '')[:60]}")
+        if not fns:
+            print("    （无）")
+    return {"model": model_name, "n_fallback": len(fallback_rows),
+            "n_valid": len(ok), "call_failed": err, "per_category": per}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("target", nargs="?", default=str(DEFAULT_TARGET))
     ap.add_argument("--strict", action="store_true",
                     help="safe 负样本零误报 + 零判反（CI 门禁）")
     ap.add_argument("--list", action="store_true", help="打印全部判定三元组供抽查")
+    ap.add_argument("--model", default=os.getenv("LLM_MODEL", "glm-5.3-flash"),
+                    help="模型阶段使用的模型名")
+    ap.add_argument("--offline", action="store_true",
+                    help="只跑规则层，不发任何模型请求（CI / pre-push 用）")
+    ap.add_argument("--concurrency", type=int, default=6, help="模型阶段并发数")
+    ap.add_argument("--limit", type=int, default=0,
+                    help="模型阶段最多跑多少条退回样本（0=全部，冒烟用）")
     ap.add_argument("--output",
                     default=str(ROOT / "benchmarks" / "results" / "smartbugs.json"))
     args = ap.parse_args()
@@ -153,6 +280,19 @@ def main():
         for r in disputed_rows:
             print(f"  {r['file']}:{r['unit'].unit_name}  官方真值={r['real_vuln']}")
 
+    # ---------------- 模型层：只跑规则退回的那批 ----------------
+    model_stats = None
+    todo = fallback[:args.limit] if args.limit else fallback
+    if args.offline or not todo:
+        why = "offline" if args.offline else "无退回样本"
+        print(f"\n模型层：跳过（{why}）")
+        model_stats = {"model": None, "skipped": why, "n_fallback": len(fallback)}
+    else:
+        print(f"\n模型层：{args.model} 判定 {len(todo)} 条退回样本"
+              f"（并发 {args.concurrency}）...", flush=True)
+        model_rows = asyncio.run(_model_stage(todo, args))
+        model_stats = _report_model(model_rows, todo, args.model)
+
     out = {
         "target": str(repo),
         "total_functions": total,
@@ -165,6 +305,7 @@ def main():
         "fallback": len(fallback),
         "disputed": [{"file": r["file"], "unit": r["unit"].unit_name}
                      for r in disputed_rows],
+        "model": model_stats,
     }
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(out, ensure_ascii=False, indent=2),
