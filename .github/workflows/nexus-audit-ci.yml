@@ -1,0 +1,37 @@
+name: nexus-audit-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install httpx
+      # 判据链路断言 [1]-[64]：纯本地、不调模型、不需要靶场仓库
+      - name: 冒烟测试
+        run: python benchmarks/smoke_test_chains.py
+      # 争议登记的证据必须逐字对得上源码（防"编造证据"回流）
+      - name: 争议登记核对
+        run: python benchmarks/export_disputes.py --check
+      # 靶场仓库不入 git（reference_repos 被 ignore），CI 上只跑
+      # 不依赖外部仓库的项；全量 strict 门禁由本地 pre-push 承担。
+      - name: 上传 SARIF 报告（pr-scan 自检）
+        run: |
+          mkdir -p results
+          python - <<'PY'
+          # 冒烟已覆盖 build_sarif 的格式断言；此处只做导入级自检，
+          # 确保 CLI 入口在干净环境下可加载（防止 import 期副作用腐烂）。
+          import cli
+          print("cli import OK")
+          PY

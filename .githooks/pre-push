@@ -42,3 +42,19 @@ if [ -d reference_repos/newbee-mall-api-master ]; then
   "$PY" benchmarks/benchmark_newbeemallapi.py --strict > /dev/null
   echo "pre-push: newbee-mall-api 基线通过 ✔"
 fi
+
+# 第 7 靶场（Python）：vulpy bad/good 成对真值。锁住"蓝图路由 +
+# 跨文件 Hop + 参数化 vs 拼接"整条 Python 链路；判据漂移立刻红。
+if [ -d reference_repos/vulpy-master ]; then
+  echo "pre-push: vulpy 基线 ..."
+  "$PY" benchmarks/benchmark_vulpy.py --strict > /dev/null
+  echo "pre-push: vulpy 基线通过 ✔"
+fi
+
+# 第 8 靶场（Solidity）：smartbugs-curated 官方行号真值。锁住"老语法
+# 重入 CEI + modifier 实现体核验 + 错名构造函数"整条 Solidity 链路。
+if [ -d reference_repos/smartbugs-curated-main ]; then
+  echo "pre-push: smartbugs 基线 ..."
+  "$PY" benchmarks/benchmark_smartbugs.py --strict > /dev/null
+  echo "pre-push: smartbugs 基线通过 ✔"
+fi
