@@ -467,7 +467,7 @@ class ScenarioMatcher:
                 except Exception as e:
                     out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=False,
                                               property_missing="",
-                                              reasoning_summary=f"LLM 调用失败：{e}"))
+                                              reasoning_summary=f"LLM 调用失败：{type(e).__name__}: {e}"))
                     continue
             else:
                 try:
@@ -478,7 +478,7 @@ class ScenarioMatcher:
                 except Exception as e:
                     out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=False,
                                               property_missing="",
-                                              reasoning_summary=f"LLM 调用失败：{e}"))
+                                              reasoning_summary=f"LLM 调用失败：{type(e).__name__}: {e}"))
                     continue
             if not hit:
                 continue
@@ -491,7 +491,7 @@ class ScenarioMatcher:
             except Exception as e:
                 out.append(VulnHypothesis(unit=unit, vuln_type=key, scenario_hit=True,
                                           property_missing="",
-                                          reasoning_summary=f"LLM 调用失败：{e}"))
+                                          reasoning_summary=f"LLM 调用失败：{type(e).__name__}: {e}"))
                 continue
             all_votes = s_votes + p_votes
             # 单票模式（默认 votes=1，也是 smartbugs / OWASP 的默认口径）下

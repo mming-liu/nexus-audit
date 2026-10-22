@@ -140,7 +140,11 @@ async def _model_stage(rows: list[dict], args) -> list[dict]:
                 return {**base, "flagged": None, "detail": f"{type(e).__name__}: {e}"[:160],
                         "elapsed_s": round(time.time() - t0, 1)}
             if any("LLM 调用失败" in (h.reasoning_summary or "") for h in hs):
-                return {**base, "flagged": None, "detail": "LLM 调用失败",
+                # 带上原始异常：只写"调用失败"会让 call_failed 变成无法
+                # 分类的黑箱（Module 19 之前 5 条全是这个状况）。
+                return {**base, "flagged": None,
+                        "detail": next(h.reasoning_summary for h in hs
+                                       if "LLM 调用失败" in h.reasoning_summary)[:200],
                         "elapsed_s": round(time.time() - t0, 1)}
             h = hs[0] if hs else None
             return {**base, "flagged": bool(h.property_missing) if h else False,
@@ -184,14 +188,19 @@ def _print_block(title: str, sub: list[dict]) -> dict:
 def _report_model(model_rows: list[dict], model_name: str, scope: str) -> dict:
     """按类目分别报 TPR / FPR，分母不足的**只记录不下结论**（记忆条 3）。"""
     ok = [m for m in model_rows if m["flagged"] is not None]
-    err = len(model_rows) - len(ok)
+    err_rows = [m for m in model_rows if m["flagged"] is None]
+    err = len(err_rows)
     print()
     print("=" * 72)
     print(f"模型层（scope={scope}，送审 {len(model_rows)} 条，有效 {len(ok)} / "
           f"调用失败 {err}）")
     print("=" * 72)
     if err:
-        print(f"! 调用失败 {err} 条已剔除，不计为'无漏洞'（网络问题 ≠ 漏报）")
+        print(f"! 调用失败 {err} 条已剔除，不计为'无漏洞'（网络问题 ≠ 漏报）。"
+              f"逐条原因：")
+        for m in err_rows:
+            print(f"    {m['file'][:46]}:{m['unit']}  {m['category']}  "
+                  f"{str(m.get('detail', ''))[:110]}")
 
     per_all = _print_block("全体受测样本", ok)
     fb = [m for m in ok if m["rule"] is None]
@@ -215,7 +224,12 @@ def _report_model(model_rows: list[dict], model_name: str, scope: str) -> dict:
         if not fns:
             print("    （无）")
     out = {"model": model_name, "scope": scope, "n_sent": len(model_rows),
-           "n_valid": len(ok), "call_failed": err, "per_category": per_all}
+           "n_valid": len(ok), "call_failed": err, "per_category": per_all,
+           # 失败样本连原因一起落盘：不写进 json 的话，下一轮只能看到
+           # "5 条失败"这个数字，没法判断是超时、熔断还是解析问题。
+           "call_failed_rows": [{k: m.get(k) for k in ("file", "unit", "category",
+                                                       "detail")}
+                                for m in err_rows]}
     if per_fb:
         out["fallback_subset"] = per_fb
     return out
