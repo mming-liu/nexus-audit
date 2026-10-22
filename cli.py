@@ -974,6 +974,7 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
     report: list[str] = ["# 补丁自检（Python 参数化 / Solidity CEI）", ""]
     if py:
         n += _fix_python_sqli(repo, py, report)
+        n += _fix_python_deserial(repo, py, report)
     if sol:
         n += _fix_solidity_reentrancy(repo, sol, report)
     if rest:
@@ -1043,6 +1044,91 @@ def _py_parametrize_call(node) -> object | None:
     new_args = [_ast.Constant(value=sql),
                 _ast.Tuple(elts=list(values), ctx=_ast.Load())]
     return _ast.Call(func=call.func, args=new_args, keywords=[])
+
+
+def _fix_python_deserial(repo: Path, targets: list, lines: list) -> int:
+    """Python yaml.load → yaml.safe_load 补丁（Module 25，第 6 类确定性修复）。
+
+    只对 deserial 判 True 且源码里有 `yaml.load(` 的单元动手。ast 定位
+    `Call(func=Attribute(attr='load'))`，改名 `safe_load` 并丢弃 Loader
+    实参（safe_load 不收 Loader kwarg）。重切片 + 重跑 deserial 规则
+    自检，与 py-sqli 补丁同一套闭环；pickle 没有等价安全 API，不生成
+    补丁（宁可不修也不产坏补丁）。
+    """
+    import ast as _ast
+    from core.agents.rule_detectors import verdict as rule_verdict
+
+    fixed = 0
+    for u in targets:
+        if rule_verdict("deserial", u.source_code) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        try:
+            tree = _ast.parse(original)
+        except SyntaxError:
+            continue
+        edits: list[tuple[int, int, int, int, str]] = []
+        has_load = False
+        for node in _ast.walk(tree):
+            if not (isinstance(node, _ast.Call)
+                    and isinstance(node.func, _ast.Attribute)
+                    and node.func.attr == "load"
+                    and isinstance(node.func.value, _ast.Name)
+                    and node.func.value.id == "yaml"):
+                continue
+            has_load = True
+            # `load` → `safe_load`（只改属性名那段，yaml 对象保持原样）
+            edits.append((node.func.value.end_lineno, node.func.value.end_col_offset,
+                          node.func.end_lineno, node.func.end_col_offset,
+                          ".safe_load"))
+            # 丢弃 Loader 实参：safe_load 不收 kwarg，留着会 TypeError
+            for kw in node.keywords:
+                edits.append((kw.lineno, kw.col_offset,
+                              kw.end_lineno, kw.end_col_offset, ""))
+        if not has_load:
+            continue
+        src_lines = original.splitlines(keepends=True)
+        ok = True
+        for l1, c1, l2, c2, new in sorted(edits, reverse=True):
+            if l1 != l2:
+                ok = False          # Loader 跨行的形态交给人工，不产坏补丁
+                break
+            src_lines[l1 - 1] = src_lines[l1 - 1][:c1] + new + src_lines[l1 - 1][c2:]
+        if not ok:
+            continue
+        patched = "".join(src_lines)
+        try:
+            _ast.parse(patched)      # 补丁必须仍是合法 Python
+        except SyntaxError:
+            continue
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.slicer.web_treesitter import WebTreeSitterSlicer
+            u2 = next((x for x in WebTreeSitterSlicer(repo).extract_entry_units()
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = rule_verdict("deserial", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [py-deserial] {u.unit_name}（`{f.name}`）", "```diff",
+                      *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 deserial 规则 → False"
+                      "（safe_load 值域锁死在基础类型）。", ""]
+        else:
+            lines += [f"## [py-deserial] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
 
 
 def _fix_python_sqli(repo: Path, targets: list, lines: list) -> int:

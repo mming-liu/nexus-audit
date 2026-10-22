@@ -3809,3 +3809,47 @@ _r72 = _sp72.run([sys.executable, str(Path(__file__).resolve().parent
 check("M24：pygoat benchmark --strict --offline 退出码 0", _r72.returncode, 0)
 check("M24：pygoat 作者指名 9/9 全 True（STRICT PASS）",
       "STRICT PASS" in (_r72.stdout or ""), True)
+
+
+# ---- [73] Module 25：yaml.load → safe_load 补丁自检闭环 ----
+from cli import _fix_python_deserial as _fpd73                  # noqa: E402
+_T73 = Path(_tmd72.mkdtemp(prefix="nexus_t73_"))
+try:
+    (_T73 / "app.py").write_text(
+        "import yaml\n"
+        "from flask import Flask, request\n"
+        "app = Flask(__name__)\n"
+        "@app.route('/upload', methods=['POST'])\n"
+        "def upload_yaml():\n"
+        "    data = yaml.load(request.files['f'].stream, Loader=yaml.Loader)\n"
+        "    return str(data)\n", encoding="utf-8")
+    _u73 = [x for x in WebTreeSitterSlicer(_T73).extract_entry_units()
+            if x.unit_name == "upload_yaml"]
+    check("M25：补丁前 deserial 判 True", _verdict("deserial", _u73[0].source_code), True)
+    _rep73: list = []
+    _n73 = _fpd73(_T73, _u73, _rep73)
+    check("M25：yaml 补丁自检通过（重切片 + 规则翻 False）", _n73, 1)
+    check("M25：报告含 diff", any("```diff" in x for x in _rep73), True)
+    _orig73 = ("import yaml\n"
+               "from flask import Flask, request\n"
+               "app = Flask(__name__)\n"
+               "@app.route('/upload', methods=['POST'])\n"
+               "def upload_yaml():\n"
+               "    data = yaml.load(request.files['f'].stream, Loader=yaml.Loader)\n"
+               "    return str(data)\n")
+    check("M25：文件字节级还原", (_T73 / "app.py").read_text(encoding="utf-8"), _orig73)
+    # 无 yaml.load 的单元不动手
+    (_T73 / "app.py").write_text(
+        "import pickle, base64\n"
+        "from flask import Flask, request\n"
+        "app = Flask(__name__)\n"
+        "@app.route('/u2', methods=['POST'])\n"
+        "def u2():\n"
+        "    return str(pickle.loads(base64.b64decode(request.form['d'])))\n",
+        encoding="utf-8")
+    _u73b = [x for x in WebTreeSitterSlicer(_T73).extract_entry_units()
+             if x.unit_name == "u2"]
+    _rep73b: list = []
+    check("M25：pickle 无等价安全 API，不生成补丁", _fpd73(_T73, _u73b, _rep73b), 0)
+finally:
+    shutil.rmtree(_T73, ignore_errors=True)
