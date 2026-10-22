@@ -2,6 +2,11 @@
 
 按《AI 自动化漏洞挖掘：商业化与代码落地完整执行计划》初始化的四层解耦工程骨架。
 
+当前覆盖 **Java / Python / Solidity** 三条赛道：规则层先做确定性判定（编译器/VM
+能证明的事实不交给模型），模型只接手规则判不了的部分；11 个真实外部靶场全部接
+`--strict` 离线门禁，`pre-push` 与 `run_all.py` 各有一道（见
+[多语言靶场](#多语言靶场11-个仓库全部离线门禁)）。
+
 ## 目录结构
 
 ```text
@@ -39,12 +44,17 @@ nexus-audit/
 | `core/context/config_resolver.py` | 解析 .properties/.yaml/.json，把代码里引用的配置键回填进切片 |
 | `core/context/java_impl_resolver.py` | MyBatis 注解/XML、接口实现体的跨文件证据（`#{}` vs `${}` 的真值在这里） |
 | `core/context/taint_chain.py` | 跨路由串接：按介质+键名把「写入点」与「读取点」配对，存储型 XSS 靠它判定 |
-| `core/agents/vuln_categories.py` | 17 类漏洞的 Scenario/Property 定义（11 类 OWASP + 6 类 Java 生态） |
-| `core/agents/rule_detectors.py` | 客观事实的确定性判定（8 类已规则化），先于 LLM 执行 |
+| `core/agents/vuln_categories.py` | 20 类漏洞的 Scenario/Property 定义（11 类 OWASP + Java 生态 + Python Web + Solidity 链上） |
+| `core/agents/rule_detectors.py` | 客观事实的确定性判定（17 类已有判据入口，先于 LLM 执行） |
 | `benchmarks/benchmark_owasp.py` | OWASP Benchmark 跑分（TPR/FPR/Score，含断点续跑与误差归因） |
 | `benchmarks/benchmark_javaseccode.py` | 真实项目（java-sec-code）评测，真值取自路由命名 + 作者注释 |
+| `benchmarks/benchmark_vulpy.py` | Python Web 靶场（bad/good 成对真值），`--strict` 零退回门禁 |
+| `benchmarks/benchmark_smartbugs.py` | Solidity 靶场（官方行号真值），`--scope all` 出模型 TPR/FPR |
+| `benchmarks/benchmark_defivulnlabs.py` | Solidity 成对 vuln/fixed 真值（0.8.x），真值表按行号匹配防漂移 |
+| `benchmarks/run_all.py` | 一键跑全部离线门禁，输出 Markdown 计分板 |
+| `benchmarks/export_disputes.py` | 争议登记核对：每条口径分歧的证据必须逐字对上源码 |
 | `benchmarks/check_stability.py` | 判定稳定性复测：同一输入连问 N 次，测抖动率 |
-| `benchmarks/smoke_test_chains.py` | 串接与 redir/xss/ssrf 规则的分支自检（不调模型，秒级） |
+| `benchmarks/smoke_test_chains.py` | 判据链路断言 `[1]`-`[68]`（不调模型，秒级） |
 | `benchmarks/ab_votes.py` | 采样策略一致性 A/B：两种策略各跑 2 轮，比两轮之间的翻转数 |
 | `benchmarks/offline_baseline.py` | 对照组：纯 sink 关键词匹配 |
 
@@ -63,6 +73,38 @@ python benchmarks/benchmark_owasp.py --categories sqli,xss --no-rules
 
 口径：`Score = TPR − FPR`（OWASP 官方）。调用失败的样本会被标记并剔除，
 不计入分数 —— 否则限流会被伪装成极低的误报率。
+
+## 多语言靶场：11 个仓库、全部离线门禁
+
+```bash
+# 一键跑全部（不调模型，约 1 分钟；任一靶场 strict 失败即退出非零）
+python benchmarks/run_all.py --offline
+
+# 单个靶场（模型层默认关闭，--offline 是门禁用的显式口径）
+python benchmarks/benchmark_smartbugs.py --strict --offline
+python benchmarks/benchmark_defivulnlabs.py --strict --offline
+python benchmarks/benchmark_vulpy.py --strict
+```
+
+| 语言 | 靶场 | 真值来源 | 门禁 |
+|---|---|---|---|
+| Java | OWASP Benchmark（2740 例） | 官方 `expectedresults` | A=0 / B=0 |
+| Java | java-sec-code / Hello-Java-Sec / JavaSecLab / micro_service_seclab | 路由命名 + 作者注释 | `--strict` |
+| Java | newbee-mall / newbee-mall-api | 路由 + 实体/签名 | 穿透基线 |
+| Solidity | damn-vulnerable-defi | 挑战说明 | 不出 Score，锁链路 |
+| Python | vulpy（bad/ vs good/） | **成对代码 diff** | 零误报 / 零静默放行 / 零退回 |
+| Solidity | smartbugs-curated | 官方行号 `vulnerabilities.json` | safe 零误报、零判反 |
+| Solidity | DeFiVulnLabs | **成对 vuln/fixed，按行号标定** | 零误报 / 零判反 / 真值表全命中 |
+
+三条口径贯穿所有靶场：
+
+1. **兜底只能 `return None`** —— 判不了就退回，不许把"不确定"伪装成 True/False；
+2. **模型层不进 `--strict`** —— 模型非确定性不能当门禁，只出指标；
+   调用失败样本单列剔除（带原始异常），绝不折算成"无漏洞"；
+3. **分母 < 20 只记录不下结论**（TPR/FPR 都是），`Score = TPR − FPR`。
+
+`pre-push` 会依次跑九道靶场门禁 + 冒烟 + 争议核对；CI 上没有靶场仓库，
+因此全量 strict 由本地钩子承担（见 `.githooks/pre-push`）。
 
 ## 真实项目评测（比 Benchmark 更能说明问题）
 
