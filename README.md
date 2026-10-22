@@ -91,7 +91,7 @@ python benchmarks/benchmark_vulpy.py --strict
 | Java | OWASP Benchmark（2740 例） | 官方 `expectedresults` | A=0 / B=0 |
 | Java | java-sec-code / Hello-Java-Sec / JavaSecLab / micro_service_seclab | 路由命名 + 作者注释 | `--strict` |
 | Java | newbee-mall / newbee-mall-api | 路由 + 实体/签名 | 穿透基线 |
-| Solidity | damn-vulnerable-defi | 挑战说明 | 不出 Score，锁链路 |
+| Solidity | damn-vulnerable-defi | 无真值（经济逻辑漏洞） | 健壮性抽检：切片 164 单元、True ≤8 |
 | Python | vulpy（bad/ vs good/） | **成对代码 diff** | 零误报 / 零静默放行 / 零退回 |
 | Solidity | smartbugs-curated | 官方行号 `vulnerabilities.json` | safe 零误报、零判反 |
 | Solidity | DeFiVulnLabs | **成对 vuln/fixed，按行号标定** | 零误报 / 零判反 / 真值表全命中 |

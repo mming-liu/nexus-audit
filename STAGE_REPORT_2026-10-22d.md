@@ -14,6 +14,7 @@
 | 3 | 5 条 call_failed 未分类 | 把原始异常带进 detail，两条靶场都落盘 `call_failed_rows` | 关闭 |
 | 4 | 只读预筛之外的"外部不可达"函数仍在送审 | `internal`/`private`/构造函数三款编译器事实进规则层，规则 86→101 | 关闭 |
 | 5 | vulpy（Python 第 7 靶场）只有规则层，模型层空白 | 加 `--model` 端到端口径，6/6 跑通（分母 3，只记录） | 关闭 |
+| 6 | dvdefi 从没进过 run_all / pre-push，等于没有回归保护 | 加 `--sanity` 健壮性抽检（切片 164 单元 + 判定面上限） | 关闭 |
 
 ---
 
@@ -140,10 +141,15 @@ parity_wallet_bug_1.sol:initWallet    access_control  证据核验失败：输�
 
 ---
 
-## 7. 顺带补上：Python 赛道的模型层空白
+## 7. 顺带补上两处空洞
 
-排查"还有没有遗留"时发现：vulpy（第 7 靶场）**只有规则层，没有模型阶段** ——
-Python 的模型 TPR/FPR 一直是空白，和 Solidity 在 Module 17 之前的状态一样。
+排查"还有没有遗留"时，用 `grep -c ScenarioMatcher benchmarks/*.py` 和各靶场
+是否出现在门禁脚本里做了一次交叉核对，发现两处从来没被列进待办、但确实空着。
+
+### 7.1 Python 赛道的模型层
+
+vulpy（第 7 靶场）**只有规则层，没有模型阶段** —— Python 的模型 TPR/FPR 一直
+是空白，和 Solidity 在 Module 17 之前的状态一样。
 
 补法不同于 smartbugs：vulpy 登记 6 条、规则 6/6 全判，**没有退回批**可交模型。
 所以给 `--model`（opt-in）做**端到端口径**：模型独立再判这 6 条。
@@ -155,6 +161,27 @@ Python 的模型 TPR/FPR 一直是空白，和 Solidity 在 Module 17 之前的�
 opt-in 而非默认开启：默认开启会让 run_all / pre-push 每次发 6 条请求，
 而 6 条样本撑不起任何比率结论。
 
+### 7.2 dvdefi 一直没有门禁
+
+`benchmark_dvdf_llm.py` 是纯 LLM 脚本（没有 `--offline`/`--strict`），既不在
+`run_all` 也不在 `pre-push` —— 整个靶场没有回归保护。
+
+不能照抄 strict：dvdefi 的 19 个挑战是**经济逻辑漏洞**（预言机操纵、闪贷治理、
+价格偏差、记账不变量），我们没有这些类目的判据，硬标真值等于让模型猜。
+
+新增 `benchmark_dvdefi_sanity.py --sanity`，锁两条**确定性**的形态：
+
+| 断言 | 当前值 | 防什么 |
+|---|---|---|
+| 切片单元 ≥ 150 | 164 | 切片器在 0.8.x + OZ 继承链上退化（别的靶场合约更简单，看不出来） |
+| 判 True ≤ 8 条 | 1 | 判据回归导致误报爆发（比"FPR 涨 2%"更早更响） |
+| 判 False ≥ 80 条 | 189 | 判定面塌陷（规则整体失效） |
+| `naive-receiver:flashLoan` 仍判重入 | True | CEI 行序解析退化 |
+
+那唯一一条 True 是站得住的：`flashLoan` 第 50 行 `weth.transfer(...)` 外转、
+第 51 行 `totalDeposits -= amount` 扣减 —— CEI 确实是反的（该挑战官方漏洞点是
+"未校验 msg.sender"，这是同一函数里的另一个真实问题）。规则只看机制。
+
 ---
 
 ## 8. 回归
@@ -165,7 +192,7 @@ opt-in 而非默认开启：默认开启会让 run_all / pre-push 每次发 6 �
 | OWASP 全量 2740 | **A=0 / B=0**，规则层判定 1352 条（与 Module 18 逐类目一致） |
 | smartbugs `--strict --offline` | PASS，101/101 正确，safe 零误报、零判反 |
 | DeFiVulnLabs `--strict --offline` | PASS，9/9 真值命中，3/3 正确 |
-| `run_all.py --offline` | 12 PASS / 0 FAIL / 0 SKIP |
+| `run_all.py --offline` | 13 PASS / 0 FAIL / 0 SKIP |
 | pre-push | 九道靶场门禁 + 冒烟 + 争议核对全绿 |
 
 Java 侧零影响（改的是 Solidity 分支，OWASP 逐类目数字与上一轮完全一致，不是
@@ -180,6 +207,7 @@ Java 侧零影响（改的是 Solidity 分支，OWASP 逐类目数字与上一�
 - [x] call_failed 未分类 → 带原始异常 + 落盘
 - [x] 未登记靶场 → DeFiVulnLabs 进 run_all / pre-push / CI 注释
 - [x] Python 模型层空白 → vulpy `--model` 端到端口径跑通（6/6，分母 3 只记录）
+- [x] dvdefi 无回归门禁 → `--sanity` 健壮性抽检接入 run_all（13 PASS）
 
 **没有"下轮再说"的条目。** 有两件事属于数据源/模型能力边界，不是待办：
 

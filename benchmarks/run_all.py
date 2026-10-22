@@ -5,7 +5,7 @@
 顺序跑全部**离线**门禁（不调模型），输出统一 Markdown 计分板：
   1. smoke_test_chains.py         —— [1]-[68] 判据链路断言
   2. export_disputes.py --check   —— 争议登记证据逐字核对
-  3. 9 个靶场规则层 --strict 回归（仓库存在才跑，缺失记 SKIP）
+  3. 10 项靶场回归（9 个 --strict + dvdefi 健壮性抽检；缺仓库记 SKIP）
 
 退出码：全部已执行项通过 → 0；任何 FAIL → 1；SKIP 不影响退出码。
 耗时与结果同时写入 benchmarks/results/run_all.md，供 CI 与阶段报告引用。
@@ -53,6 +53,12 @@ JOBS = [
     ("DeFiVulnLabs (Solidity 成对真值)", ["benchmarks/benchmark_defivulnlabs.py",
                                          "--strict", "--offline"],
      "reference_repos/DeFiVulnLabs-main", "target"),
+    # dvdefi 是**经济逻辑漏洞**靶场（预言机操纵 / 闪贷治理 / 价格偏差），我们
+    # 没有对应类目与判据 —— 它不产 TPR/FPR，只做健壮性抽检：切片不退化
+    # （164 单元）+ 判定面不爆炸（True ≤8）。防的是"改坏了没人知道"。
+    ("damn-vulnerable-defi (健壮性抽检)", ["benchmarks/benchmark_dvdefi_sanity.py",
+                                          "--sanity"],
+     "reference_repos/damn-vulnerable-defi-master", "target"),
 ]
 
 
