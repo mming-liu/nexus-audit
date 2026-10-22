@@ -3318,6 +3318,63 @@ check("多票 2:1 仍按多数判漏洞",
       bool(_m65_multi[0].property_missing) if _m65_multi else None, True)
 
 
+# ---------------- [66] 只读函数确定性预筛（view/pure/constant）--------------#
+# 编译器强制的事实，不是提示词建议：view/constant 不许写状态，pure 连读都不许。
+# 于是两类漏洞都能确定性排除 —— 重入需要"外部调用后写状态"的窗口，
+# 越权需要"写状态的特权动作"，只读函数两个都做不到。
+# smartbugs 退回批实测：37/182 条 safe 属于这一类（access_control 20 /
+# reentrancy 17），规则覆盖率 49→86，模型 FPR 分母随之变干净。
+print("\n[66] 只读函数预筛：view/pure/constant → 确定性 safe")
+
+_SOL66_VIEW = """// contract: EtherBank
+function getBalance(address user) constant returns(uint) {
+    return balances[user];
+}"""
+check("constant 函数判 safe（重入）", verdict("reentrancy", _SOL66_VIEW), False)
+check("constant 函数判 safe（越权）", verdict("access_control", _SOL66_VIEW), False)
+
+_SOL66_PURE = """// contract: Token
+function supportsToken() external pure returns(bytes32) {
+    return keccak256("ERC223");
+}"""
+check("pure 函数判 safe（重入）", verdict("reentrancy", _SOL66_PURE), False)
+
+_SOL66_MULTILINE = """// contract: Vault
+function peek()
+    public
+    view
+    returns (uint)
+{
+    return total;
+}"""
+check("多行签名里的 view 也认", verdict("reentrancy", _SOL66_MULTILINE), False)
+
+# 负向两条：条款不能把会改状态的函数一起吞掉，
+# 也不能被函数名里的子串（preview 里的 view）误伤。
+_SOL66_MUT = """// contract: Bank
+function withdraw(uint amt) public {
+    if (!msg.sender.call.value(amt)()) { revert(); }
+    balances[msg.sender] -= amt;
+}"""
+check("会改状态的函数仍判漏洞（不能被条款吞掉）",
+      verdict("reentrancy", _SOL66_MUT), True)
+
+_SOL66_SUBSTR = """// contract: Bank
+function preview(uint amt) public {
+    if (!msg.sender.call.value(amt)()) { revert(); }
+    balances[msg.sender] -= amt;
+}"""
+check("函数名含 view 子串不误判只读（词边界）",
+      verdict("reentrancy", _SOL66_SUBSTR), True)
+
+_SOL66_KILL = """// contract: Wallet
+function kill() public {
+    selfdestruct(msg.sender);
+}"""
+check("无保护的 selfdestruct 仍判漏洞（越权）",
+      verdict("access_control", _SOL66_KILL), True)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

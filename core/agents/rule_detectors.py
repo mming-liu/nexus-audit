@@ -4840,10 +4840,21 @@ def _looks_solidity(source: str) -> bool:
         return True
     # 函数级切片（smartbugs 逐函数审计）：文件头不在切片里，
     # 靠"Solidity 签名 + Solidity 专属词法"识别。Java/Python 都没有
-    # `uint` / `payable` / `msg.sender` / `mapping`。
+    # `function` 关键字，这一条是硬门槛；后一条只是佐证。
+    #
+    # Module 18 补词表：原先只认 uint/address/payable/msg.sender/selfdestruct/
+    # mapping(/require(，于是 `function supportsToken() external pure
+    # returns(bytes32)` 这种**一个都没有**的切片被判成"不是 Solidity"，
+    # verdict 直接退 None —— 与 Module 13 那个"函数级切片恒 False"是同一类
+    # 静默漏斗。真实靶场里它侥幸没暴露，是因为切片首行注释 `// contract: X`
+    # 命中上面那条正则；换句话说，判据靠注释在撑。现在把类型/修饰符
+    # 词表补齐，去掉这个依赖。
     return bool(re.search(r"\bfunction\s+\w+\s*\([^)]*\)", source)
-                and re.search(r"\b(?:uint\d*|address|payable|msg\s*\.\s*sender|"
-                              r"selfdestruct|mapping\s*\(|require\s*\()", source))
+                and re.search(r"\b(?:uint\d*|int\d*|address|bytes\d*|string|bool|payable"
+                              r"|msg\s*\.\s*sender|tx\s*\.\s*origin|block\s*\."
+                              r"|selfdestruct|keccak256|mapping\s*\(|require\s*\("
+                              r"|external|public|internal|private|view|pure|constant)\b",
+                              source))
 
 
 def _py_func_params(source: str) -> set[str]:
@@ -5170,10 +5181,31 @@ def _sol_signature(source: str) -> str:
     return source[m.start(): brace if brace != -1 else len(source)]
 
 
+# 只读函数标记（Module 18）。`constant` 是 0.4.x 的写法，`view`/`pure` 是
+# 0.4.16 之后；三个都是**编译器强制**的限制，不是注释或约定：
+#   view/constant → 函数体不得修改状态（写状态变量直接编译不过）
+#   pure          → 连读状态都不许
+# 于是它能确定性排除两类漏洞，不需要问模型：
+#   · 重入：受害者必须在外部调用**之后**写状态才有可重入的窗口，
+#     不写状态就没有这个窗口；
+#   · 越权：特权操作（转币/销毁/改 owner/铸币）全都是状态写入，
+#     只读函数做不了这些事。
+# 这条按「能确定性判定的不交 LLM」归到规则层，而不是往提示词里加排除条款 ——
+# 提示词是**建议**，编译器是**事实**。实测这一条收掉 smartbugs 退回批里
+# 37/182 条 safe（access_control 20 / reentrancy 17），全部真值 safe。
+_SOLIDITY_READONLY_RE = re.compile(r"\b(?:constant|view|pure)\b")
+
+
+def _sol_is_readonly(sig: str) -> bool:
+    """签名段带 constant/view/pure → 编译器保证不改状态。"""
+    return bool(_SOLIDITY_READONLY_RE.search(sig))
+
+
 def solidity_reentrancy_verdict(source: str) -> bool | None:
     """Solidity 重入：CEI 顺序是逐行可核对的事实。
 
     · 签名带 `nonReentrant`（或体内有重入锁）→ False
+    · 只读函数（view/pure/constant）→ False（编译器保证不写状态，无重入窗口）
     · 所有外部转账调用的行号**严格大于**状态扣减行号 → False（CEI 正序）
     · 外部调用在扣减**之前**且无锁 → True
     · 缺少任一侧证据 → None
@@ -5183,6 +5215,8 @@ def solidity_reentrancy_verdict(source: str) -> bool | None:
     PrivateBank/CashOut、SimpleBank/Collect 这批经典真漏洞全部静默退回。
     """
     func_src, _mod_block = _split_sol_modifier_block(source)
+    if _sol_is_readonly(_sol_signature(func_src)):
+        return False
     if re.search(r"\bnonReentrant\b|locked|entered|_status\s*==\s*1|_reentrancyGuard",
                  func_src):
         return False
@@ -5242,6 +5276,11 @@ def solidity_access_verdict(source: str) -> bool | None:
     m = re.search(r"function\s+([A-Za-z_]\w*)", sig)
     if not m:
         return None
+    # 只读函数（view/pure/constant）：特权操作全都要写状态（转币、销毁、
+    # 改 owner、铸币），编译器禁止只读函数写状态 → 确定性 safe。
+    # 放在构造函数判断之前：错名构造函数不可能是 view/pure。
+    if _sol_is_readonly(sig):
+        return False
     fname = m.group(1)
     cm = re.search(r"contract:\s*(\S+)", source)
     contract_name = cm.group(1) if cm else ""
