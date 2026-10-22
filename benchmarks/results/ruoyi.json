@@ -14,20 +14,9 @@
   "fallback": 5,
   "unannotated_true": [
     "SysJobController.java:SysJobController.queryCronExpression",
-    "SysConfigController.java:SysConfigController.checkConfigKeyUnique",
-    "SysDeptController.java:SysDeptController.checkDeptNameUnique",
-    "SysDictTypeController.java:SysDictTypeController.checkDictTypeUnique",
     "SysDictTypeController.java:SysDictTypeController.selectDictTree",
-    "SysMenuController.java:SysMenuController.checkMenuNameUnique",
     "SysMenuController.java:SysMenuController.selectMenuTree",
     "SysNoticeController.java:SysNoticeController.view",
-    "SysPostController.java:SysPostController.checkPostNameUnique",
-    "SysPostController.java:SysPostController.checkPostCodeUnique",
-    "SysRoleController.java:SysRoleController.authDataScope",
-    "SysRoleController.java:SysRoleController.checkRoleNameUnique",
-    "SysRoleController.java:SysRoleController.checkRoleKeyUnique",
-    "SysUserController.java:SysUserController.checkLoginNameUnique",
-    "SysUserController.java:SysUserController.checkPhoneUnique",
-    "SysUserController.java:SysUserController.checkEmailUnique"
+    "SysRoleController.java:SysRoleController.authDataScope"
   ]
 }

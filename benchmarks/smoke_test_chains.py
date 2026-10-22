@@ -3853,3 +3853,61 @@ try:
     check("M25：pickle 无等价安全 API，不生成补丁", _fpd73(_T73, _u73b, _rep73b), 0)
 finally:
     shutil.rmtree(_T73, ignore_errors=True)
+
+
+# ---- [74] Module 28：authz 2h 只读唯一性校验豁免 ----
+check("M28：checkXxxUnique 存在性校验 → False（2h）",
+      _verdict("authz", '''
+// Full-Route: /system/user/checkLoginNameUnique
+@PostMapping("/checkLoginNameUnique")
+@ResponseBody
+public boolean checkLoginNameUnique(SysUser user)
+{
+    return userService.checkLoginNameUnique(user);
+}
+'''), False)
+check("M28：body 含其它 Service 调用（实体读取）→ 不豁免仍 True",
+      _verdict("authz", '''
+// Full-Route: /system/menu/selectMenuTree/{menuId}
+@GetMapping("/selectMenuTree/{menuId}")
+public String selectMenuTree(@PathVariable("menuId") Long menuId, ModelMap mmap)
+{
+    mmap.put("menu", menuService.selectMenuById(menuId));
+    return prefix + "/tree";
+}
+'''), True)
+check("M28：check*Unique 但伴随写操作 → 不豁免",
+      _verdict("authz", '''
+@PostMapping("/checkAndSave")
+@ResponseBody
+public boolean checkAndSave(SysUser user)
+{
+    boolean ok = userService.checkLoginNameUnique(user);
+    if (ok) {
+        userService.insertUser(user);
+    }
+    return ok;
+}
+'''), True)
+check("M28：非 Unique 命名（checkCronExpressionIsValid）→ 不豁免",
+      _verdict("authz", '''
+@GetMapping("/queryCronExpression")
+@ResponseBody
+public AjaxResult queryCronExpression(String cronExpression)
+{
+    if (jobService.checkCronExpressionIsValid(cronExpression))
+    {
+        List<String> dateList = CronUtils.getRecentTriggerTime(cronExpression);
+        return success(dateList);
+    }
+    return error("表达式无效");
+}
+'''), True)
+
+import subprocess as _sp74                                          # noqa: E402
+_r74 = _sp74.run([sys.executable, str(Path(__file__).resolve().parent
+                                     / "benchmark_ruoyi.py"), "--strict", "--offline"],
+                 capture_output=True, text=True, encoding="utf-8")
+check("M28：RuoYi benchmark --strict --offline 退出码 0", _r74.returncode, 0)
+check("M28：RuoYi 无注解 True 面 16 → 5（11 条 check*Unique 被 2h 消解）",
+      "无注解且判 True 的入口 5 条" in (_r74.stdout or ""), True)

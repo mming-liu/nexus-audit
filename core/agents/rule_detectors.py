@@ -4849,6 +4849,29 @@ def authz_verdict(source: str) -> bool | None:
                 if any(re.search(rf"\b{v}\b", sm.group(1)) for v in subj_local):
                     return False
 
+    # 2h) 只读唯一性校验助手（RuoYi checkXxxUnique 实测形态，Module 28）：
+    #
+    #         @PostMapping("/checkLoginNameUnique")
+    #         public boolean checkLoginNameUnique(SysUser user) {
+    #             return userService.checkLoginNameUnique(user);
+    #         }
+    #
+    #     返回值只是 boolean 存在性（"0"/"1" 语义），不回显数据库实体详情、
+    #     不执行写操作——前端表单重复性提示，水平越权面为零。判 False 需要
+    #     三个可核对的事实缺一不可：① 入口签名返回 boolean；② body 无写
+    #     操作（insert/update/delete/save/remove/add）；③ 对 Service/Mapper
+    #     的**全部**调用都是 check*Unique 形态——有一条别的 Service 调用
+    #     （如 selectMenuById、checkCronExpressionIsValid）就不豁免，
+    #     那些是未标注授权的实体读取面，维持 True 单列供人工复核。
+    if (re.search(r"public\s+boolean\s+\w+\s*\(", source)
+            and not re.search(r"\b(?:insert|delete|update|save|remove|add)"
+                              r"\w*\s*\(", body, re.I)
+            and re.search(r"\w*(?:Service|Mapper|Dao|DAO)\s*\.\s*"
+                          r"check\w*Unique\s*\(", body)
+            and not re.search(r"\w*(?:Service|Mapper|Dao|DAO)\s*\.\s*"
+                              r"(?!check\w*Unique\b)\w+\s*\(", body)):
+        return False
+
     # 2e) 主体 id 与**查回来的资源**的归属字段做相等比较，且比对为真时终止请求：
     #
     #         MallUserAddress addr = service.getMallUserAddressById(addressId);
