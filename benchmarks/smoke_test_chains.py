@@ -3979,3 +3979,69 @@ _r75 = _sp75.run([sys.executable, str(Path(__file__).resolve().parent
 check("M29：eladmin-mp benchmark --strict --offline 退出码 0", _r75.returncode, 0)
 check("M29：@el.check 53/53 全 False（STRICT PASS）",
       "STRICT PASS" in (_r75.stdout or ""), True)
+
+
+# ---- [76] Module 30：Solidity 三大确定性规则 ----
+check("M30：tx.origin 鉴权（require 恒等）→ True",
+      _verdict("access_control", '''
+function transfer(address payable _to, uint _amount) public {
+    require(tx.origin == owner, "Not owner");
+    (bool sent, ) = _to.call{value: _amount}("");
+    require(sent, "Failed");
+}
+'''), True)
+check("M30：tx.origin 与 msg.sender 并存 → msg.sender 保护优先判 False",
+      _verdict("access_control", '''
+function transfer(address payable _to, uint _amount) public {
+    require(msg.sender == owner, "Not owner");
+    require(tx.origin == owner, "Not owner");
+    _to.transfer(_amount);
+}
+'''), False)
+check("M30：任意 from 的 transferFrom（无保护）→ True",
+      _verdict("access_control", '''
+function transferFrom(address from, address to, uint256 tokenId) public {
+    _transfer(from, to, tokenId);
+}
+'''), True)
+check("M30：transferFrom 带 _isApprovedOrOwner 保护 → False",
+      _verdict("access_control", '''
+function transferFrom(address from, address to, uint256 tokenId) public {
+    require(_isApprovedOrOwner(_msgSender(), tokenId), "not owner");
+    _transfer(from, to, tokenId);
+}
+'''), False)
+check("M30：unchecked call 裸调用 → True",
+      _verdict("unchecked_low_level_calls", '''
+function withdraw(uint amount) public {
+    owner.send(amount);
+}
+'''), True)
+check("M30：unchecked call 内联 if 检查 → False",
+      _verdict("unchecked_low_level_calls", '''
+function refund() public {
+    if (!msg.sender.call.value(msg.value)()) { throw; }
+}
+'''), False)
+check("M30：同一函数混合 checked + unchecked 调用点 → True（0x5249 形态）",
+      _verdict("unchecked_low_level_calls", '''
+function transfer() returns (bool) {
+    contract_address.call("register", "CentraToken");
+    if (!contract_address.call(bytes4(keccak256("transfer")), c2, k)) return false;
+    return true;
+}
+'''), True)
+check("M30：if 语句体里的调用不是条件检查（finalize 判反教训）→ True",
+      _verdict("unchecked_low_level_calls", '''
+function finalize() external {
+    if (block.number <= fundingEndBlock) throw;
+    if (msg.sender == owner)
+    owner.send(this.balance);
+}
+'''), True)
+check("M30：赋值但从不检查返回值 → True",
+      _verdict("unchecked_low_level_calls", '''
+function pay(address to) public {
+    bool ok = to.call.value(1 ether)("");
+}
+'''), True)

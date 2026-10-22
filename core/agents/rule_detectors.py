@@ -5611,6 +5611,13 @@ def solidity_access_verdict(source: str) -> bool | None:
     # only_uninitialized 只查 m_numOwners）也**不算**保护 —— 把状态门
     # 当保护会把 initWallet 判反，方向错误比退回恶劣得多。
     protected = bool(_SOLIDITY_MSGSENDER_CHECK_RE.search(func_src))
+    if not protected and re.search(
+            r"require\s*\(\s*\w*[Ii]sApprovedOrOwner\b"
+            r"|require\s*\(\s*_?msgSender\s*\(\s*\)", func_src):
+        # 所有权/审批校验（ERC721 fixed 形态：require(_isApprovedOrOwner(
+        # _msgSender(), tokenId))）——调用者身份进入了授权判定，机制与
+        # msg.sender 恒等检查等价（Module 30）。
+        protected = True
     if not protected and mod_block:
         for mb in re.finditer(r"modifier\s+[A-Za-z_]\w*[^{]*\{(.*)", mod_block, re.S):
             body = mb.group(1)
@@ -5625,6 +5632,27 @@ def solidity_access_verdict(source: str) -> bool | None:
                 break
     if protected:
         return False
+
+    # M30 之 1）tx.origin 鉴权反模式：require/if 里拿 tx.origin 做恒等
+    # 校验且函数内没有任何 msg.sender 保护 → 确定性 True（作者指名口径：
+    # DeFiVulnLabs txorigin.sol、smartbugs phishable/mycontract）。放行
+    # 到这里说明 protected 已排除——两者并存时 msg.sender 校验优先
+    # （真实的"双保险"写法不是漏洞）。
+    if re.search(r"(?:require|if)\s*\([^;]{0,120}?\btx\s*\.\s*origin\s*==",
+                 func_src):
+        return True
+
+    # M30 之 2）任意 from 的 transferFrom / _transfer：签名收 `address from`
+    # 形参、函数体把它直转出去（token.transferFrom(from, ...) 或
+    # _transfer(from, ...)），且无任何保护 → 确定性 True（DeFiVulnLabs
+    # NFT-transfer.sol 的 VulnerableERC721；成对 fixed 有
+    # require(_isApprovedOrOwner(...))，已在 protected 分支判 False）。
+    # 注意触发条件要求 from 来自**本函数形参**——调用别处变量的
+    # transferFrom 是普通 ERC20 用法，不构成"任意 from"。
+    if re.search(r"address\s+(?:payable\s+)?_?from\b", sig) and re.search(
+            r"\b(?:transferFrom|_transfer|_safeTransfer)\s*\(\s*_?from\s*[,)]",
+            func_src):
+        return True
 
     # 危险动作（只看函数自身源码）
     danger = bool(_SOLIDITY_SELFDESTRUCT_RE.search(func_src))
@@ -5661,6 +5689,60 @@ def solidity_access_verdict(source: str) -> bool | None:
         if re.search(r"\b(?:external|public)\b", sig):
             return True
     return None
+
+
+def solidity_unchecked_call_verdict(source: str) -> bool | None:
+    """Solidity 未检查底层调用返回值（Module 30，smartbugs
+    unchecked_low_level_calls 类目）。
+
+    判据挂机制，**按调用点逐个判**（同一函数可能混合 checked/unchecked
+    两个调用点——0x5249 的 transfer 正是这样，官方真值只标 unchecked
+    那一行；任一调用点未检查即 True，全部检查完才 False）：
+      · 内联消费 `if (x.call{...}(...))` / `require(x.send(...))` → checked；
+      · 返回值赋给变量且该变量被 require/if 消费 → checked；
+      · 赋值但从不检查 / 裸调用（fire-and-forget）→ unchecked；
+      · 没有底层调用 → None（不归本类目管）。
+    """
+    func_src, _mod = _split_sol_modifier_block(source)
+    sites = list(re.finditer(
+        r"\.\s*call\s*(?:\{|\.|\()|\.\s*send\s*\(", func_src))
+    if not sites:
+        return None
+    any_unchecked = False
+    for m in sites:
+        stmt_start = max(func_src.rfind(";", 0, m.start()),
+                         func_src.rfind("{", 0, m.start()),
+                         func_src.rfind("}", 0, m.start())) + 1
+        end = func_src.find(";", m.start())
+        stmt = func_src[stmt_start: end + 1 if end >= 0 else len(func_src)]
+        # 行注释用**等长空白**替换（保偏移量）：语句头可能是注释
+        # （TownCrier request 实测），直接 strip 会把 if 头顶进噪声。
+        stmt = re.sub(r"//[^\n]*", lambda mm: " " * len(mm.group(0)), stmt)
+        # 内联消费的语义：调用点位于控制关键字（if/require/...）的**条件
+        # 括号平衡区间内**才算被检查。`if (cond) owner.send(...)` 的调用
+        # 是 if 的语句体，不在条件里 —— 未检查（finalize 实测判反教训）。
+        in_cond = False
+        cm2 = re.match(r"\s*(?:if|require|assert|while|for)\s*\(", stmt)
+        if cm2:
+            depth, j, cond_open = 0, cm2.end() - 1, None
+            for j in range(cm2.end() - 1, len(stmt)):
+                if stmt[j] == "(":
+                    depth += 1
+                elif stmt[j] == ")":
+                    depth -= 1
+                    if depth == 0:
+                        cond_open = (cm2.end() - 1, j)
+                        break
+            if cond_open and cond_open[0] < (m.start() - stmt_start) < cond_open[1]:
+                in_cond = True
+        if in_cond:
+            continue                                    # 条件内消费 → checked
+        am = re.match(r"\(?\s*(?:bool|var)\s+(\w+)", stmt)
+        if am and re.search(rf"(?:require|if)\s*\([^;]*\b{am.group(1)}\b",
+                            func_src):
+            continue                                    # 赋值且被检查 → checked
+        any_unchecked = True
+    return True if any_unchecked else False
 
 
 
@@ -5753,6 +5835,11 @@ def verdict(category: str, source: str) -> bool | None:
     if category in ("access_control", "broken_access"):
         if _looks_solidity(source):
             return solidity_access_verdict(source)
+        return None
+
+    if category == "unchecked_low_level_calls":
+        if _looks_solidity(source):
+            return solidity_unchecked_call_verdict(source)
         return None
 
     return None

@@ -4,15 +4,15 @@
   "resolved": 9,
   "missing": [],
   "total_functions": 323,
-  "decided": 3,
-  "correct": 3,
+  "decided": 6,
+  "correct": 6,
   "fp": 0,
   "reverse_fn": 0,
-  "fallback": 6,
+  "fallback": 3,
   "safe_denominator": 3,
   "model": {
     "model": null,
     "skipped": "offline",
-    "n_fallback": 6
+    "n_fallback": 3
   }
 }
