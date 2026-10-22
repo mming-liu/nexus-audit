@@ -79,3 +79,11 @@ if [ -d reference_repos/not-so-smart-contracts-master ]; then
   "$PY" benchmarks/benchmark_nssc.py --strict --offline > /dev/null
   echo "pre-push: not-so-smart-contracts 基线通过 ✔"
 fi
+
+# 第 11 靶场（Module 22/23）：RuoYi 企业级多模块——跨 Maven 子模块穿透 +
+# @RequiresPermissions 注解语义 + ${params.dataScope} 切面覆写事实。
+if [ -d reference_repos/RuoYi-master ]; then
+  echo "pre-push: RuoYi 基线 ..."
+  "$PY" benchmarks/benchmark_ruoyi.py --strict --offline > /dev/null
+  echo "pre-push: RuoYi 基线通过 ✔"
+fi

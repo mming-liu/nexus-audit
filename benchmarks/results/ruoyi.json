@@ -1,0 +1,33 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\RuoYi-master",
+  "total_units": 305,
+  "cross_module_hop_units": 174,
+  "truth_rows": 164,
+  "authz_annotation_rows": 159,
+  "authz_annotated_false": 159,
+  "datascope_rows": 5,
+  "missing": [],
+  "decided": 159,
+  "correct": 159,
+  "fp": 0,
+  "reverse_fn": 0,
+  "fallback": 5,
+  "unannotated_true": [
+    "SysJobController.java:SysJobController.queryCronExpression",
+    "SysConfigController.java:SysConfigController.checkConfigKeyUnique",
+    "SysDeptController.java:SysDeptController.checkDeptNameUnique",
+    "SysDictTypeController.java:SysDictTypeController.checkDictTypeUnique",
+    "SysDictTypeController.java:SysDictTypeController.selectDictTree",
+    "SysMenuController.java:SysMenuController.checkMenuNameUnique",
+    "SysMenuController.java:SysMenuController.selectMenuTree",
+    "SysNoticeController.java:SysNoticeController.view",
+    "SysPostController.java:SysPostController.checkPostNameUnique",
+    "SysPostController.java:SysPostController.checkPostCodeUnique",
+    "SysRoleController.java:SysRoleController.authDataScope",
+    "SysRoleController.java:SysRoleController.checkRoleNameUnique",
+    "SysRoleController.java:SysRoleController.checkRoleKeyUnique",
+    "SysUserController.java:SysUserController.checkLoginNameUnique",
+    "SysUserController.java:SysUserController.checkPhoneUnique",
+    "SysUserController.java:SysUserController.checkEmailUnique"
+  ]
+}
