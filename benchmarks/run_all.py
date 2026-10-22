@@ -1,79 +1,91 @@
-"""一键多语言基准总控面板（Module 15）。
+"""一键多语言基准总控面板（Module 15 建，Module 26 加并发与计分板）。
 
-    python benchmarks/run_all.py --offline
+    python benchmarks/run_all.py --offline            # 顺序执行
+    python benchmarks/run_all.py --offline --jobs 4   # 多进程并发
 
-顺序跑全部**离线**门禁（不调模型），输出统一 Markdown 计分板：
+跑全部**离线**门禁（不调模型），输出统一 Markdown 计分板：
   1. smoke_test_chains.py         —— [1]-[73] 判据链路断言
   2. export_disputes.py --check   —— 争议登记证据逐字核对
   3. 13 项靶场回归（12 个 --strict + dvdefi 健壮性抽检；缺仓库记 SKIP）
 
+并发语义（--jobs N）：各靶场脚本相互独立、只读各自目录、只写各自的
+results/*.json，天然可并行；冒烟与争议核对仍保持串行（快且是其余
+一切的前置）。快速失败语义保留：任何 FAIL 后不再**启动**新作业。
+
+额外产出 benchmarks/results/SCOREBOARD.md：汇总全靶场
+覆盖率 / 正确率 / A·B 方向错误（读各 results/*.json 的规则层字段），
+供阶段报告与 CI 摘要引用。只在全绿时刷新——红着的时候不许换墙上的数。
+
 退出码：全部已执行项通过 → 0；任何 FAIL → 1；SKIP 不影响退出码。
-耗时与结果同时写入 benchmarks/results/run_all.md，供 CI 与阶段报告引用。
 """
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 import time
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PY = sys.executable
 OUT = ROOT / "benchmarks" / "results" / "run_all.md"
+SCOREBOARD = ROOT / "benchmarks" / "results" / "SCOREBOARD.md"
 
-# (名称, 命令, 前置目录检查, 类别)
+# (名称, 命令, 前置目录检查, 类别, 可并发)
+#   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
 JOBS = [
-    ("冒烟测试 [1]-[73]", ["benchmarks/smoke_test_chains.py"], None, "smoke"),
-    ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke"),
+    ("冒烟测试 [1]-[73]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
+    ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke", False),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
-     "reference_repos/BenchmarkJava-master", "target"),
+     "reference_repos/BenchmarkJava-master", "target", True),
     ("java-sec-code", ["benchmarks/benchmark_javaseccode.py", "--offline"],
-     "reference_repos/java-sec-code", "target"),
+     "reference_repos/java-sec-code", "target", True),
     ("Hello-Java-Sec", ["benchmarks/benchmark_hellojavasec.py", "--offline"],
-     "reference_repos/Hello-Java-Sec-master", "target"),
+     "reference_repos/Hello-Java-Sec-master", "target", True),
     ("JavaSecLab", ["benchmarks/benchmark_javaseclab.py", "--offline"],
-     "reference_repos/JavaSecLab-main", "target"),
+     "reference_repos/JavaSecLab-main", "target", True),
     ("micro_service_seclab", ["benchmarks/benchmark_msseclab.py", "--offline"],
-     "reference_repos/micro_service_seclab-main", "target"),
+     "reference_repos/micro_service_seclab-main", "target", True),
     ("newbee-mall", ["benchmarks/benchmark_newbeemall.py", "--strict"],
-     "reference_repos/newbee-mall-master", "target"),
+     "reference_repos/newbee-mall-master", "target", True),
     ("newbee-mall-api", ["benchmarks/benchmark_newbeemallapi.py", "--strict"],
-     "reference_repos/newbee-mall-api-master", "target"),
+     "reference_repos/newbee-mall-api-master", "target", True),
     ("vulpy (Python)", ["benchmarks/benchmark_vulpy.py", "--strict"],
-     "reference_repos/vulpy-master", "target"),
+     "reference_repos/vulpy-master", "target", True),
     # smartbugs 的模型层（Module 17）只跑规则退回批，需要真实模型网关；
     # 总控是**离线**门禁，必须显式 --offline 否则 197 条会开始发请求。
     ("smartbugs-curated (Solidity)", ["benchmarks/benchmark_smartbugs.py", "--strict",
                                       "--offline"],
-     "reference_repos/smartbugs-curated-main", "target"),
+     "reference_repos/smartbugs-curated-main", "target", True),
     # 第 9 靶场（Module 19）：成对 vuln/fixed 真值 + 0.8.x 语法。存在的唯一
     # 理由是 smartbugs 的 access_control 漏洞分母只有 18（<20 就不许下结论）。
     # 模型层同样需要网关，离线门禁必须显式 --offline。
     ("DeFiVulnLabs (Solidity 成对真值)", ["benchmarks/benchmark_defivulnlabs.py",
                                          "--strict", "--offline"],
-     "reference_repos/DeFiVulnLabs-main", "target"),
+     "reference_repos/DeFiVulnLabs-main", "target", True),
     # dvdefi 是**经济逻辑漏洞**靶场（预言机操纵 / 闪贷治理 / 价格偏差），我们
     # 没有对应类目与判据 —— 它不产 TPR/FPR，只做健壮性抽检：切片不退化
     # （164 单元）+ 判定面不爆炸（True ≤8）。防的是"改坏了没人知道"。
     ("damn-vulnerable-defi (健壮性抽检)", ["benchmarks/benchmark_dvdefi_sanity.py",
                                           "--sanity"],
-     "reference_repos/damn-vulnerable-defi-master", "target"),
+     "reference_repos/damn-vulnerable-defi-master", "target", True),
     # 第 10 靶场（Module 20）：Trail of Bits 官方漏洞集，补 access_control 分母
     # 裕度。真值只收 README 指名条目（honeypots 是陷阱口径，不收）。
     ("not-so-smart-contracts (Solidity)", ["benchmarks/benchmark_nssc.py",
                                            "--strict", "--offline"],
-     "reference_repos/not-so-smart-contracts-master", "target"),
+     "reference_repos/not-so-smart-contracts-master", "target", True),
     # 第 11 靶场（Module 22/23）：RuoYi 企业级多模块。锁跨 Maven 子模块
     # 穿透（Hop 证据 ≥100 单元）与 @RequiresPermissions 注解语义；真实
     # 验证 ${params.dataScope} 被 @DataScope 切面 clear+overwrite，不是 SQLi。
     ("RuoYi (Java 多模块)", ["benchmarks/benchmark_ruoyi.py", "--strict", "--offline"],
-     "reference_repos/RuoYi-master", "target"),
+     "reference_repos/RuoYi-master", "target", True),
     # 第 12 靶场（Module 24/25）：pygoat 20 个 Flask lab。逼出 SymbolIndexer
     # 同名符号覆盖修复（50→119 单元）与 Python deserial/pathtraver/xxe 判据。
     ("pygoat (Python Flask labs)", ["benchmarks/benchmark_pygoat.py", "--strict",
                                     "--offline"],
-     "reference_repos/pygoat-master", "target"),
+     "reference_repos/pygoat-master", "target", True),
 ]
 
 
@@ -88,33 +100,133 @@ def run_job(name: str, cmd: list[str]) -> tuple[str, float, str]:
     return ("PASS" if ok else "FAIL"), dt, tail
 
 
+def _run_parallel(jobs: list[tuple[str, list[str]]], jobs_n: int) -> dict[str, tuple[str, float, str]]:
+    """并发跑作业。快速失败：首个 FAIL 后不再启动新作业。"""
+    results: dict[str, tuple[str, float, str]] = {}
+    with ProcessPoolExecutor(max_workers=jobs_n) as ex:
+        futures = [(name, ex.submit(run_job, name, cmd)) for name, cmd in jobs]
+        running = list(futures)
+        failed = False
+        idx = 0
+        in_flight: list[tuple[str, object]] = []
+        while idx < len(running) or in_flight:
+            while idx < len(running) and len(in_flight) < jobs_n and not failed:
+                in_flight.append(running[idx])
+                idx += 1
+            if not in_flight:
+                break
+            name, fut = in_flight.pop(0)
+            if failed:
+                results[name] = ("SKIP", 0.0, "快速失败：前序门禁 FAIL")
+                continue
+            status, dt, tail = fut.result()
+            results[name] = (status, dt, tail)
+            if status == "FAIL":
+                failed = True
+    return results
+
+
+def build_scoreboard() -> str:
+    """从各靶场的 results/*.json 汇总规则层计分板。
+
+    白名单制：只收**字段完备的真值型靶场**（单元数/判定/判对/误报/判反
+    五个标量齐全）。Hello-Java-Sec 等脚本的 json 不产这套字段——硬凑
+    出来就是一列 0，宁可少一行也不放假数字。只报**规则层**（离线可
+    复现），模型层字段一律不进计分板——模型非确定性，写上去就是让
+    随机数上墙。ab_* 实验文件与 smartbugs_model（模型层副本）不进总数。
+    """
+    r = ROOT / "benchmarks" / "results"
+    out = ["# nexus-audit 全语言计分板（规则层·离线可复现）", "",
+           f"生成时间：{time.strftime('%Y-%m-%d %H:%M:%S')}", "",
+           "| 靶场 | 单元 | 规则判定 | 判对 | 误报 | 判反 | 覆盖率 |",
+           "|---|---|---|---|---|---|---|"]
+
+    WHITELIST = [
+        ("smartbugs-curated (Solidity)", "smartbugs.json", "total_functions"),
+        ("DeFiVulnLabs (Solidity)", "defivulnlabs.json", "total_functions"),
+        ("not-so-smart-contracts (Solidity)", "nssc.json", "total_functions"),
+        ("vulpy (Python)", "vulpy.json", "total_units"),
+        ("RuoYi (Java 多模块)", "ruoyi.json", "total_units"),
+        ("pygoat (Python Flask labs)", "pygoat.json", "total_units"),
+    ]
+    total_fp = total_rev = 0
+    for label, fname, unit_key in WHITELIST:
+        j = r / fname
+        if not j.exists():
+            continue
+        d = json.loads(j.read_text(encoding="utf-8"))
+        units = d.get(unit_key, 0)
+        decided = d.get("decided", 0)
+        correct = d.get("correct", 0)
+        fp = d.get("fp", 0)
+        rev = d.get("reverse_fn", 0)
+        if not all(isinstance(x, (int, float)) for x in (units, decided, correct, fp, rev)):
+            continue                      # 字段不完备的行不硬凑
+        cov = f"{decided / units * 100:.0f}%" if units else "—"
+        out.append(f"| {label} | {units} | {decided} | {correct} | {fp} | {rev} | {cov} |")
+        total_fp += fp
+        total_rev += rev
+    out += ["", f"**计分板靶场合计：误报 {total_fp} · 判反 {total_rev}"
+            f"（A/B 方向错误 = {total_fp + total_rev}）**",
+            "", "> 模型层数字（TPR/FPR）不进计分板：非确定性，离线不可复现。",
+            "> Java 教学靶场（OWASP/java-sec-code/Hello-Java-Sec/JavaSecLab/"
+            "msseclab/newbee 双库）的 json 不产本表五字段，数字见各自脚本输出。", ""]
+    return "\n".join(out)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--offline", action="store_true", default=True,
                     help="只跑离线项（当前全部作业均为离线）")
+    ap.add_argument("--jobs", type=int, default=1,
+                    help="并发进程数（≥2 启用并发，默认顺序执行）")
     ap.add_argument("--output", default=str(OUT))
     args = ap.parse_args()
 
     rows: list[tuple[str, str, float, str]] = []
     print("=" * 72)
-    print("nexus-audit 全量离线门禁")
+    print("nexus-audit 全量离线门禁" +
+          (f"（--jobs {args.jobs}）" if args.jobs > 1 else ""))
     print("=" * 72)
-    for name, cmd, need, _kind in JOBS:
+
+    parallel_jobs: list[tuple[str, list[str]]] = []
+    serial: list[tuple[str, list[str]]] = []
+    for name, cmd, need, _kind, parallel in JOBS:
         if need and not (ROOT / need).exists():
             rows.append((name, "SKIP", 0.0, f"缺少 {need}"))
             print(f"  SKIP  {name}（缺少 {need}）")
             continue
+        if parallel and args.jobs > 1:
+            parallel_jobs.append((name, cmd))
+        else:
+            serial.append((name, cmd))
+
+    # 串行段（冒烟/核对；未开并发时的一切靶场也在这段）
+    failed = False
+    for name, cmd in serial:
+        if failed:
+            rows.append((name, "SKIP", 0.0, "快速失败：前序门禁 FAIL"))
+            continue
         print(f"  RUN   {name} ...", flush=True)
         status, dt, tail = run_job(name, cmd)
         rows.append((name, status, dt, tail))
-        mark = "✔" if status == "PASS" else "✘"
-        print(f"    {mark} {status}  {dt:.1f}s  {tail[:80]}")
+        print(f"    {'✔' if status == 'PASS' else '✘'} {status}  {dt:.1f}s  {tail[:80]}")
         if status == "FAIL":
-            break                      # 快速失败：第一个门禁红了就停
+            failed = True
+
+    # 并发段
+    if parallel_jobs and not failed:
+        print(f"  并发执行 {len(parallel_jobs)} 项（workers={args.jobs}）...", flush=True)
+        t0 = time.monotonic()
+        for name, (status, dt, tail) in _run_parallel(parallel_jobs, args.jobs).items():
+            rows.append((name, status, dt, tail))
+            print(f"    {'✔' if status == 'PASS' else '✘'} {status}  {dt:.1f}s  {name} | {tail[:60]}")
+        print(f"    并发段耗时 {time.monotonic() - t0:.1f}s")
 
     out_lines = [
         "# nexus-audit 离线门禁计分板", "",
-        f"生成时间：{time.strftime('%Y-%m-%d %H:%M:%S')}", "",
+        f"生成时间：{time.strftime('%Y-%m-%d %H:%M:%S')}"
+        + (f"（--jobs {args.jobs}）" if args.jobs > 1 else ""), "",
         "| 门禁 | 结果 | 耗时 | 尾行 |", "|---|---|---|---|",
     ]
     for name, status, dt, tail in rows:
@@ -127,6 +239,12 @@ def main():
     Path(args.output).write_text("\n".join(out_lines), encoding="utf-8")
     print(f"\n计分板写入 {args.output}")
     print(f"合计：{n_pass} PASS / {n_fail} FAIL / {n_skip} SKIP")
+
+    # SCOREBOARD：只有全绿才刷新（红着的时候不许换墙上的数）
+    if n_fail == 0:
+        SCOREBOARD.write_text(build_scoreboard(), encoding="utf-8")
+        print(f"全语言计分板写入 {SCOREBOARD}")
+
     sys.exit(1 if n_fail else 0)
 
 

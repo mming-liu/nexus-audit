@@ -3,9 +3,11 @@
   "total_units": 119,
   "truth_rows": 9,
   "missing": [],
-  "caught": 9,
+  "decided": 9,
+  "correct": 9,
+  "fp": 0,
+  "reverse_fn": 0,
   "fallback": [],
-  "reverse_fn": [],
   "stray_true": [],
   "false_judgements": 298,
   "disputed": [

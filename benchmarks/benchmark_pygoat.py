@@ -168,9 +168,13 @@ def main() -> int:
     out = {
         "target": str(repo), "total_units": len(units),
         "truth_rows": len(rows), "missing": missing,
-        "caught": sum(1 for r in rows if r["rv"] is True),
+        # 计分板五标量（Module 26）：真值行即判定分母——本靶场门禁要求
+        # 真值行 100% 判 True，所以 decided=真值数、correct=caught。
+        "decided": len(rows),
+        "correct": sum(1 for r in rows if r["rv"] is True),
+        "fp": len(stray_true),
+        "reverse_fn": len(reverse_fn),
         "fallback": [f"{r['lab']}:{r['uname']}" for r in fallback],
-        "reverse_fn": [f"{r['lab']}:{r['uname']}" for r in reverse_fn],
         "stray_true": [f"{d}:{n} ({c})" for d, n, c in stray_true],
         "false_judgements": n_false,
         "disputed": [{"lab": l, "unit": u, "cat": c, "why": w}
