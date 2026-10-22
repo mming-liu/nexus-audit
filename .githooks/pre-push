@@ -70,3 +70,12 @@ if [ -d reference_repos/DeFiVulnLabs-main ]; then
   "$PY" benchmarks/benchmark_defivulnlabs.py --strict --offline > /dev/null
   echo "pre-push: DeFiVulnLabs 基线通过 ✔"
 fi
+
+# 第 10 靶场（Solidity）：not-so-smart-contracts（Trail of Bits 官方漏洞集）。
+# 补 access_control 分母裕度（smartbugs 18 + DeFiVulnLabs 2 + nssc 4+）。
+# 真值只收 README 指名条目；honeypots 是陷阱口径不收。离线门禁 --offline。
+if [ -d reference_repos/not-so-smart-contracts-master ]; then
+  echo "pre-push: not-so-smart-contracts 基线 ..."
+  "$PY" benchmarks/benchmark_nssc.py --strict --offline > /dev/null
+  echo "pre-push: not-so-smart-contracts 基线通过 ✔"
+fi

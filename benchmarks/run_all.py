@@ -3,9 +3,9 @@
     python benchmarks/run_all.py --offline
 
 顺序跑全部**离线**门禁（不调模型），输出统一 Markdown 计分板：
-  1. smoke_test_chains.py         —— [1]-[68] 判据链路断言
+  1. smoke_test_chains.py         —— [1]-[69] 判据链路断言
   2. export_disputes.py --check   —— 争议登记证据逐字核对
-  3. 10 项靶场回归（9 个 --strict + dvdefi 健壮性抽检；缺仓库记 SKIP）
+  3. 11 项靶场回归（10 个 --strict + dvdefi 健壮性抽检；缺仓库记 SKIP）
 
 退出码：全部已执行项通过 → 0；任何 FAIL → 1；SKIP 不影响退出码。
 耗时与结果同时写入 benchmarks/results/run_all.md，供 CI 与阶段报告引用。
@@ -24,7 +24,7 @@ OUT = ROOT / "benchmarks" / "results" / "run_all.md"
 
 # (名称, 命令, 前置目录检查, 类别)
 JOBS = [
-    ("冒烟测试 [1]-[68]", ["benchmarks/smoke_test_chains.py"], None, "smoke"),
+    ("冒烟测试 [1]-[69]", ["benchmarks/smoke_test_chains.py"], None, "smoke"),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke"),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target"),
@@ -59,6 +59,11 @@ JOBS = [
     ("damn-vulnerable-defi (健壮性抽检)", ["benchmarks/benchmark_dvdefi_sanity.py",
                                           "--sanity"],
      "reference_repos/damn-vulnerable-defi-master", "target"),
+    # 第 10 靶场（Module 20）：Trail of Bits 官方漏洞集，补 access_control 分母
+    # 裕度。真值只收 README 指名条目（honeypots 是陷阱口径，不收）。
+    ("not-so-smart-contracts (Solidity)", ["benchmarks/benchmark_nssc.py",
+                                           "--strict", "--offline"],
+     "reference_repos/not-so-smart-contracts-master", "target"),
 ]
 
 

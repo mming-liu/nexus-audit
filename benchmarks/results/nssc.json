@@ -1,0 +1,18 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\not-so-smart-contracts-master",
+  "truth_entries": 7,
+  "resolved": 7,
+  "missing": [],
+  "total_functions": 208,
+  "decided": 6,
+  "correct": 6,
+  "fp": 0,
+  "reverse_fn": 0,
+  "fallback": 1,
+  "safe_denominator": 2,
+  "model": {
+    "model": null,
+    "skipped": "offline",
+    "n_fallback": 1
+  }
+}

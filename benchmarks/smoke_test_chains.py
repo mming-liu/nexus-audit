@@ -3505,3 +3505,66 @@ if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
     sys.exit(1)
 print("CHAIN SMOKE TEST PASS ✔")
+
+# ---- [69] nssc 第 10 靶场：README 指名真值 + 机制断言 ----
+# 切片器形态：签名没用修饰符时，切片里**没有**修饰符体（README 的漏洞点）
+_nssc_src_changeowner = """// contract: Unprotected
+function changeOwner(address _newOwner) 
+    public
+{
+    owner = _newOwner;
+}
+"""
+check("nssc：无保护 changeOwner 判 True（机制：写状态无身份校验）",
+      _verdict("access_control", _nssc_src_changeowner), True)
+
+_nssc_src_fixed = """// contract: Unprotected
+function changeOwner_fixed(address _newOwner) 
+    public 
+    onlyowner
+{
+    owner = _newOwner;
+}
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyowner { require(msg.sender==owner); _; }
+"""
+
+_nssc_ctor = """
+contract Rubixi{
+    address public owner;
+    function DynamicPyramid() { owner = msg.sender; }
+}
+"""
+check("nssc：挂上 onlyowner 的 changeOwner_fixed 判 False（修饰符体真比对 msg.sender）",
+      _verdict("access_control", _nssc_src_fixed), False)
+
+check("nssc：错名构造函数 DynamicPyramid 判 True（0.4.x 落运行时字节码）",
+      _verdict("access_control", _nssc_ctor), True)
+
+_nssc_reent = """
+contract Reentrance {
+    mapping (address => uint) userBalance;
+    function withdrawBalance(){
+        if( ! (msg.sender.call.value(userBalance[msg.sender])() ) ){ throw; }
+        userBalance[msg.sender] = 0;
+    }
+    function withdrawBalance_fixed(){
+        uint amount = userBalance[msg.sender];
+        userBalance[msg.sender] = 0;
+        if( ! (msg.sender.call.value(amount)() ) ){ throw; }
+    }
+}
+"""
+check("nssc：call.value 后写状态判 True（违反 CEI）",
+      _verdict("reentrancy", _nssc_reent.split("withdrawBalance_fixed")[0]), True)
+check("nssc：先扣减后 call 判 False（成对修复样本）",
+      _verdict("reentrancy", "contract X {" + _nssc_reent.split("withdrawBalance_fixed")[1]
+               .split("\n", 1)[1]), False)
+
+import subprocess as _sp69                                          # noqa: E402
+_r69 = _sp69.run([sys.executable, str(Path(__file__).resolve().parent
+                                     / "benchmark_nssc.py"), "--strict", "--offline"],
+                 capture_output=True, text=True, encoding="utf-8")
+check("nssc benchmark --strict --offline 退出码 0", _r69.returncode, 0)
+check("nssc benchmark 真值表全命中（STRICT PASS）",
+      "STRICT PASS" in (_r69.stdout or ""), True)
