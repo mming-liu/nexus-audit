@@ -77,6 +77,9 @@ TRUTH: list[tuple[str, int, str, str, bool, str]] = [
      "README 攻击场景原型：call.value 外转后写 userBalance=0 —— 违反 CEI"),
     ("reentrancy/Reentrancy.sol", 23, "withdrawBalance_fixed", "reentrancy", False,
      "源码注释指名修复：state has to be changed before the call —— 成对真值"),
+    ("reentrancy/Reentrancy.sol", 33, "withdrawBalance_fixed_2", "reentrancy", False,
+     "源码注释指名：send() and transfer() are safe against reentrancy —— "
+     "2300 gas 津贴，VM 层重入不可能（Module 21 规则早退，曾为真误报）"),
 ]
 
 

@@ -3083,6 +3083,49 @@ _DIAG_SINK_RES: dict[str, re.Pattern[str]] = {
 }
 
 
+def build_solidity_diagnostic(category: str, code: str,
+                              *, line_offset: int = 0) -> str:
+    """Solidity 退回批的"静态前筛已核实事实"注释头（Module 21）。
+
+    只写**确定性事实**（函数名/合约名关系、签名可见性、modifier 定义体
+    是否在切片内），不写倾向性结论 —— 判定仍归模型。特别地，"modifier
+    定义体不在切片内"是模型视野的真实边界：不写它，模型会把"名字叫
+    onlyOwner"当保护或当缺失，两个方向都在幻想。返回空串表示没有值得
+    移交的事实，调用方不拼头。
+    """
+    func_src, mod_block = _split_sol_modifier_block(code)
+    sig = _sol_signature(func_src)
+    if not sig:
+        return ""
+    facts: list[str] = []
+    fm = re.search(r"function\s+([A-Za-z_]\w*)", sig)
+    cm = re.search(r"contract:\s*(\S+)", code)
+    tail = sig[sig.find(")") + 1:] if ")" in sig else sig
+    vis = [v for v in ("external", "public", "internal", "private", "view",
+                       "pure", "payable", "constant")
+           if re.search(rf"\b{v}\b", tail)]
+    _VIS_KW = {"external", "public", "internal", "private", "view", "pure",
+               "payable", "constant", "returns", "virtual", "override"}
+    named = [w for w in re.findall(r"\b([A-Za-z_]\w*)\b", tail) if w not in _VIS_KW]
+    mod_missing = bool(named) and not mod_block
+    no_vis = not vis
+    # 发射纪律：模型自己看得见的事不重复移交。只有"模型看不到或易错"的
+    # 事实才值得拼头：① 构造函数关系（0.4.x 语义）；② modifier 体缺失
+    # （模型视野的真实边界）；③ 老语法无显式可见性（默认 public 的语义）。
+    # 纯 external/public 声明 + 无其它事实 → 空串，不拼无意义头。
+    if rel_eq := bool(fm and cm and cm.group(1) != "?"
+                      and fm.group(1) == cm.group(1)):
+        facts.append("函数名==合约名（0.4.x 构造函数，部署期执行一次，不进运行时字节码）")
+    if mod_missing:
+        facts.append(f"签名引用 modifier {', '.join(named[:3])} 但定义体不在切片内（无法核验实现）")
+    if no_vis:
+        facts.append("签名无显式可见性（老语法默认 public，外部可达）")
+    if not facts:
+        return ""
+    return (f"// [静态前筛已核实事实] {' | '.join(facts)}"
+            "（注释行不可作为证据引用，请独立判断）")
+
+
 def build_rule_diagnostic(category: str, code: str,
                           *, line_offset: int = 0) -> str:
     """为退回 None 的 (类目, 切片) 生成一行"静态前筛已核实事实"注释头。
@@ -5239,11 +5282,27 @@ def solidity_reentrancy_verdict(source: str) -> bool | None:
     if re.search(r"\bnonReentrant\b|locked|entered|_status\s*==\s*1|_reentrancyGuard",
                  func_src):
         return False
-    ext_lines = []
-    for m in re.finditer(r"\.\s*call\s*\{[^}]*value:|\.send\s*\(|\.transfer\s*\("
-                         r"|\.\s*call\s*\.\s*value\s*\(|\.\s*call\s*\.\s*gas\s*\(",
+    # 外部调用分类：硬外转（可携带任意 gas，回调能重入）vs 津贴外转。
+    # `.transfer(x)` / `.send(x)` 单参形态是 address 内建方法 —— EVM 固定
+    # 只给 2300 gas 津贴，fallback 连发起一次新的外部调用都不够，重入在
+    # VM 层就不可能（nssc Reentrancy.sol 注释指名："send() and transfer()
+    # are safe against reentrancy"）。双参 `.transfer(to, amount)` 是
+    # ERC20/777 token 调用 —— 777 有 tokensReceived 钩子，**不是**津贴
+    # 形态，照旧进 CEI 行序判定。
+    ext_calls: list[tuple[int, str]] = []
+    for m in re.finditer(r"\.\s*call\s*\{[^}]*value:|\.send\s*\(\s*[^(),]*\)"
+                         r"|\.transfer\s*\(\s*[^(),]*\)"
+                         r"|\.\s*call\s*\.\s*value\s*\(|\.\s*call\s*\.\s*gas\s*\("
+                         r"|\.send\s*\(|\.transfer\s*\(",
                          func_src):
-        ext_lines.append(func_src[:m.start()].count("\n") + 1)
+        text = m.group(0)
+        if re.search(r"\bcall\b", text):
+            kind = "hard"
+        elif re.fullmatch(r"\.\s*(?:send|transfer)\s*\(\s*[^(),]*\)", text):
+            kind = "stipend"
+        else:
+            kind = "token"          # 多参 transfer/send：ERC20/777，可回调
+        ext_calls.append((func_src[:m.start()].count("\n") + 1, kind))
     # 状态扣减：映射/变量减法与清零（`balances[x] -=` / `acc.balance = 0`）。
     # 扣减只认函数自身源码 —— 修饰符定义块里的同名赋值不是本函数的 CEI 证据。
     ded_lines = []
@@ -5252,8 +5311,16 @@ def solidity_reentrancy_verdict(source: str) -> bool | None:
         line = func_src.splitlines()[ln - 1]
         if re.search(r"[Bb]alance|[Dd]eposit|shares|stake|funds|credit|[Cc]redit", line):
             ded_lines.append(ln)
-    if not ext_lines or not ded_lines:
+    if not ext_calls or not ded_lines:
         return None
+    hard = [ln for ln, k in ext_calls if k == "hard"]
+    token = [ln for ln, k in ext_calls if k == "token"]
+    stipend = [ln for ln, k in ext_calls if k == "stipend"]
+    if not hard and not token and stipend:
+        # 全部外转都是津贴形态：VM 层重入不可能，CEI 行序无关紧要。
+        # （Module 21：nssc 探针抓出的真误报 withdrawBalance_fixed_2。）
+        return False
+    ext_lines = sorted(hard + token + stipend)
     if min(ext_lines) > max(ded_lines):
         return False                    # 先扣减后外转：CEI 正序
     if max(ext_lines) < min(ded_lines):

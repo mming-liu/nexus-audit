@@ -3568,3 +3568,68 @@ _r69 = _sp69.run([sys.executable, str(Path(__file__).resolve().parent
 check("nssc benchmark --strict --offline 退出码 0", _r69.returncode, 0)
 check("nssc benchmark 真值表全命中（STRICT PASS）",
       "STRICT PASS" in (_r69.stdout or ""), True)
+
+
+# ---- [70] Module 21：2300 gas 津贴早退 + Solidity 事实诊断头 ----
+_nssc_fixed2 = """// contract: Reentrance
+function withdrawBalance_fixed_2(){
+    msg.sender.transfer(userBalance[msg.sender]);
+    userBalance[msg.sender] = 0;
+}
+"""
+check("M21：msg.sender.transfer 后写状态判 False（2300 gas 津贴，VM 层重入不可能）",
+      _verdict("reentrancy", _nssc_fixed2), False)
+
+_nssc_fixed2_send = """// contract: X
+function refund(address payable to){
+    uint amt = credits[to];
+    to.send(amt);
+    credits[to] = 0;
+}
+"""
+check("M21：单参 .send 同样津贴形态 → False",
+      _verdict("reentrancy", _nssc_fixed2_send), False)
+
+_nssc_erc777 = """// contract: X
+function claim(){
+    _mints[account] = 0;
+    token.transfer(account, amount);
+}
+"""
+check("M21：双参 token.transfer（ERC20/777）不吃津贴豁免，照旧退 None",
+      _verdict("reentrancy", _nssc_erc777), None)
+
+_nssc_call_after = """// contract: X
+function evil(){
+    msg.sender.transfer(1);
+    msg.sender.call.value(2)();
+    balances[msg.sender] = 0;
+}
+"""
+check("M21：津贴与硬外转混合 → 仍按 CEI 行序判 True",
+      _verdict("reentrancy", _nssc_call_after), True)
+
+from core.agents.rule_detectors import build_solidity_diagnostic as _bsd
+_d70_named = """// contract: X
+function withdrawAll() public onlyowner {
+    msg.sender.transfer(address(this).balance);
+}
+"""
+_h70 = _bsd("access_control", _d70_named)
+check("M21：诊断头——modifier 体不在切片内要写明（模型视野边界）",
+      "定义体不在切片内" in _h70 and _h70.startswith("// "), True)
+_d70_clean = """// contract: X
+function f() public {
+    owner = msg.sender;
+}
+"""
+check("M21：诊断头——无事实移交时返回空串（不拼无意义头）",
+      _bsd("access_control", _d70_clean), "")
+check("M21：诊断头带不可引证声明（Cite-Before-Verdict 兼容）",
+      "不可作为证据引用" in _h70, True)
+
+import subprocess as _sp70                                          # noqa: E402
+_r70 = _sp70.run([sys.executable, str(Path(__file__).resolve().parent
+                                     / "benchmark_nssc.py"), "--strict", "--offline"],
+                 capture_output=True, text=True, encoding="utf-8")
+check("M21：nssc 真值表 8 条（含 fixed_2）strict 退出码 0", _r70.returncode, 0)

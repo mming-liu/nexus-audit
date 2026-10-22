@@ -25,7 +25,7 @@ from typing import Callable, Sequence
 from core.agents import vuln_categories as VC
 from core.agents.router import TwoTierRouter, extract_json
 # 只借一个事实判定函数（入口有没有外部输入），无反向依赖
-from core.agents.rule_detectors import has_external_input, build_rule_diagnostic
+from core.agents.rule_detectors import has_external_input, build_rule_diagnostic, build_solidity_diagnostic
 from core.models import CodeUnit, VulnHypothesis
 
 SYSTEM_MESSAGE = (
@@ -449,7 +449,13 @@ class ScenarioMatcher:
             # 不重复注入。注释行不是可引用证据，Cite-Before-Verdict 会拒绝。
             code = unit.source_code
             if "静态前筛已核实事实" not in code:
-                hdr = build_rule_diagnostic(key, code, line_offset=1)
+                # Java 走"输入行/sink 行"事实头；Solidity 走编译器/合约
+                # 事实头（函数名-合约名关系、可见性、modifier 体是否在
+                # 切片内）。两者都只报事实不下结论，注释行进不了引证。
+                if (language or self.code_language) == "solidity_web3":
+                    hdr = build_solidity_diagnostic(key, code, line_offset=1)
+                else:
+                    hdr = build_rule_diagnostic(key, code, line_offset=1)
                 if hdr:
                     code = hdr + "\n" + code
             # Step 1: Scenario（配置型缺陷走不要求污点可达的模板）
