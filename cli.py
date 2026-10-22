@@ -976,8 +976,10 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_python_sqli(repo, py, report)
         n += _fix_python_deserial(repo, py, report)
     if sol:
+        n += _fix_solidity_txorigin(repo, sol, report)
         n += _fix_solidity_reentrancy(repo, sol, report)
     if rest:
+        n += _fix_mp_concat(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
     if n:
         out = Path(out_path)
@@ -1262,6 +1264,127 @@ def _fix_solidity_reentrancy(repo: Path, targets: list, lines: list) -> int:
                       "> 同时改变了失败语义 —— 需人工确认回滚路径。", ""]
         else:
             lines += [f"## [sol-reentrancy] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
+def _fix_solidity_txorigin(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 7 类（Module 31）：权限校验里的 `tx.origin ==` 改 `msg.sender ==`。
+
+    只替换入口行区间内的 `tx.origin`；重切片 + 重跑 access_control 规则
+    翻 False 才算自检通过，finally 字节级还原。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if "tx.origin" not in src:
+            continue
+        if rule_verdict("access_control", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        file_lines = original.splitlines(keepends=True)
+        patched_lines = list(file_lines)
+        changed = False
+        for i in range(max(0, u.start_line - 1), min(u.end_line, len(patched_lines))):
+            if re.search(r"\btx\s*\.\s*origin\b", patched_lines[i]):
+                new = re.sub(r"\btx\s*\.\s*origin\b", "msg.sender",
+                             patched_lines[i])
+                if new != patched_lines[i]:
+                    patched_lines[i] = new
+                    changed = True
+        if not changed:
+            continue
+        patched = "".join(patched_lines)
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.slicer.web3_slither import SoliditySlicer
+            u2 = next((x for x in SoliditySlicer(repo).extract_entry_units(repo)
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = rule_verdict("access_control", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [sol-txorigin] {u.unit_name}（`{f.name}`）", "```diff",
+                      *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 access_control 规则 → False。",
+                      "> tx.origin → msg.sender：钓鱼调用里 msg.sender 是攻击者",
+                      "> 自身，无法再冒充外部交易的发起人。", ""]
+        else:
+            lines += [f"## [sol-txorigin] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
+_MP_CONCAT_RE = re.compile(
+    r'(\.apply|\.last)\s*\(\s*"([^"]*)"\s*\+\s*([A-Za-z_]\w*)'
+    r'(?:\s*\+\s*"([^"]*)")?\s*\)')
+
+
+def _fix_mp_concat(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 8 类（Module 31）：MyBatis-Plus 拼接出口改占位符绑定。
+
+    `.apply("col = '" + x + "'")` → `.apply("col = '{0}'", x)`；
+    `.last("limit " + p)` → `.last("limit {0}", p)`。只处理单变量拼接，
+    多变量/含函数调用的形态交人工。自检同前：重切片 + 重跑 sqli 规则。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if not re.search(r"\.(?:apply|last)\s*\(", src):
+            continue
+        if rule_verdict("sqli", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        file_lines = original.splitlines(keepends=True)
+        patched_lines = list(file_lines)
+        changed = False
+        for i in range(max(0, u.start_line - 1), min(u.end_line, len(patched_lines))):
+            new = _MP_CONCAT_RE.sub(
+                lambda mm: f'{mm.group(1)}("{mm.group(2)}{{0}}'
+                           f'{mm.group(4) or ""}", {mm.group(3)})',
+                patched_lines[i])
+            if new != patched_lines[i]:
+                patched_lines[i] = new
+                changed = True
+        if not changed:
+            continue
+        patched = "".join(patched_lines)
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            u2 = _reslice_for_fix(repo, u.unit_name)
+            v2 = rule_verdict("sqli", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [mp-concat] {u.unit_name}（`{f.name}`）", "```diff",
+                      *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 sqli 规则 → False（{0} 占位符",
+                      "> 由 Wrapper 预编译绑定，与 .eq 同语义）。", ""]
+        else:
+            lines += [f"## [mp-concat] {u.unit_name}（`{f.name}`）",
                       f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
     return fixed
 

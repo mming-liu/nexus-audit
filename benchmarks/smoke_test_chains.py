@@ -4045,3 +4045,61 @@ function pay(address to) public {
     bool ok = to.call.value(1 ether)("");
 }
 '''), True)
+
+
+# ---- [77] Module 31：--fix 第 7/8 类补丁自检闭环 ----
+from cli import _fix_solidity_txorigin as _fst77                 # noqa: E402
+from cli import _fix_mp_concat as _fmc77                         # noqa: E402
+_T77 = Path(_tmd72.mkdtemp(prefix="nexus_t77_"))
+try:
+    # 第 7 类：Solidity tx.origin → msg.sender
+    (_T77 / "Wallet.sol").write_text(
+        "pragma solidity ^0.8.0;\n"
+        "contract Wallet {\n"
+        "    address public owner;\n"
+        "    constructor() { owner = msg.sender; }\n"
+        "    function transfer(address payable _to, uint _amount) public {\n"
+        "        require(tx.origin == owner, \"Not owner\");\n"
+        "        _to.transfer(_amount);\n"
+        "    }\n"
+        "}\n", encoding="utf-8")
+    from core.slicer.web3_slither import SoliditySlicer as _S77
+    _u77 = [x for x in _S77(_T77).extract_entry_units(_T77)
+            if x.unit_name == "transfer"]
+    check("M31：补丁前 access_control 判 True",
+          _verdict("access_control", _u77[0].source_code), True)
+    _rep77: list = []
+    _n77 = _fst77(_T77, _u77, _rep77)
+    check("M31：tx.origin 补丁自检通过（重切片 + 翻 False）", _n77, 1)
+    check("M31：tx.origin 补丁报告含 diff", any("```diff" in x for x in _rep77), True)
+    _orig77 = (_T77 / "Wallet.sol").read_text(encoding="utf-8")
+    check("M31：Solidity 文件字节级还原", "tx.origin" in _orig77
+          and "msg.sender == owner" not in _orig77, True)
+
+    # 第 8 类：MyBatis-Plus .apply 拼接 → 占位符绑定
+    _mp77 = _T77 / "mpapp"
+    _mp77.mkdir()
+    (_mp77 / "UserController.java").write_text(
+        "package a;\n"
+        "import org.springframework.web.bind.annotation.*;\n"
+        "public class UserController {\n"
+        "    private UserService userService;\n"
+        "    @GetMapping(\"/find\")\n"
+        "    public Object find(String name) {\n"
+        "        QueryWrapper<User> qw = new QueryWrapper<>();\n"
+        "        qw.apply(\"name = '\" + name + \"'\");\n"
+        "        return userService.list(qw);\n"
+        "    }\n"
+        "}\n", encoding="utf-8")
+    _u77b = [x for x in JavaSlicer(_mp77).extract_entry_units()
+             if "find" in x.unit_name]
+    check("M31：补丁前 sqli 判 True（拼接出口）",
+          _verdict("sqli", _u77b[0].source_code), True)
+    _rep77b: list = []
+    _n77b = _fmc77(_mp77, _u77b, _rep77b)
+    check("M31：.apply 补丁自检通过（重切片 + 翻 False）", _n77b, 1)
+    _orig77b = (_mp77 / "UserController.java").read_text(encoding="utf-8")
+    check("M31：Java 文件字节级还原", "name = '" in _orig77b
+          and "{0}" not in _orig77b, True)
+finally:
+    shutil.rmtree(_T77, ignore_errors=True)
