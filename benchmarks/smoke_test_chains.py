@@ -3224,6 +3224,100 @@ finally:
     shutil.rmtree(_T64B, ignore_errors=True)
 
 
+# ---------------- [65] Solidity 模型阶段：类目注册 + 端到端三态（mock）--------#
+# smartbugs 的 197 条退回样本此前无处可去：`VC.get("reentrancy")` 返回 None，
+# audit_unit_for 直接空转 —— 模型阶段"跑了但什么都没问"。这里锁三件事：
+#   ① 两个 Solidity 类目已注册，且 needs_taint=False（重入/权限都不问入参可达）、
+#      owasp=False（不得漏进 OWASP 2740 的默认类目范围）；
+#   ② 提示词里带真正区分得开的判据（"外部调用之后"、tx.origin 不算、初始化状态不算）；
+#   ③ 端到端只有 property 回答变化就能翻转结论 —— 证明判据链挂在属性上，
+#      不是模型碰巧答对。全程 mock，零网络。
+print("\n[65] Solidity 模型阶段：类目注册 / 提示词判据 / 端到端三态（mock）")
+
+import asyncio as _aio65                                     # noqa: E402
+from core.agents import vuln_categories as _VC65             # noqa: E402
+from core.agents.vuln_categories import OWASP_KEYS as _OK65   # noqa: E402
+from core.agents.scenario_matcher import ScenarioMatcher as _SM65  # noqa: E402
+
+_R65 = _VC65.get("reentrancy")
+_A65 = _VC65.get("access_control")
+check("reentrancy 类目已注册", _R65 is not None, True)
+check("access_control 类目已注册", _A65 is not None, True)
+check("reentrancy 不要求入参可达", getattr(_R65, "needs_taint", None), False)
+check("access_control 不要求入参可达", getattr(_A65, "needs_taint", None), False)
+check("Solidity 类目不进 OWASP 默认范围",
+      [k for k in ("reentrancy", "access_control") if k in _OK65], [])
+check("reentrancy 判据问的是调用顺序",
+      "外部调用之后" in (_R65.sink_question if _R65 else ""), True)
+check("access_control 判据排除 tx.origin",
+      "tx.origin" in (_A65.property if _A65 else ""), True)
+check("access_control 判据排除初始化状态门",
+      "初始化" in (_A65.property if _A65 else ""), True)
+
+# 同一份代码，只让 property 的回答变化 → 结论必须随之翻转。
+_SOL65 = ("function withdraw(uint amt) public {\n"
+          "    if (!msg.sender.call.value(amt)()) { revert(); }\n"
+          "    balances[msg.sender] -= amt;\n"
+          "}")
+_UNIT65 = CodeUnit(file_path="Smoke65.sol", language=Language.SOLIDITY_WEB3,
+                   unit_name="withdraw", start_line=1, end_line=4,
+                   source_code=_SOL65)
+_SEEN65: list[str] = []
+
+
+def _mock65(prop_says: str):
+    def _f(messages):
+        prompt = messages[-1]["content"]
+        _SEEN65.append(prompt)
+        if "protective property is PRESENT" in prompt:   # Property 步
+            return ('{"protected": "%s", "evidence_line": '
+                    '"    balances[msg.sender] -= amt;"}' % prop_says)
+        return ('{"hit": "yes", "evidence_line": '
+                '"    if (!msg.sender.call.value(amt)()) { revert(); }"}')
+    return _f
+
+
+_m65_bad = _aio65.run(_SM65(llm=_mock65("no"), code_language="solidity_web3")
+                      .audit_unit_for(_UNIT65, ["reentrancy"], "solidity_web3"))
+check("property=No → 判漏洞（CEI 反序）",
+      bool(_m65_bad[0].property_missing) if _m65_bad else None, True)
+_m65_ok = _aio65.run(_SM65(llm=_mock65("yes"), code_language="solidity_web3")
+                     .audit_unit_for(_UNIT65, ["reentrancy"], "solidity_web3"))
+check("property=Yes → 不判漏洞（唯一变量是属性回答）",
+      bool(_m65_ok[0].property_missing) if _m65_ok else None, False)
+check("提示词按 Solidity 语言围栏渲染",
+      any("```solidity" in p for p in _SEEN65), True)
+check("Solidity 提示词不含 Java 围栏",
+      any("```java" in p for p in _SEEN65), False)
+
+# 单票 vs 多票的"采样不一致"标签：默认 votes=1 时票箱是空的，空票箱不可能
+# 不一致。这条是 smartbugs 模型层实跑抓出来的 —— 192 条理由全被这个标签污染。
+check("单票模式不标采样不一致",
+      "采样不一致" in (_m65_bad[0].reasoning_summary if _m65_bad else ""), False)
+
+_ALT65 = {"n": 0}
+
+
+def _mock65_alt(messages):
+    prompt = messages[-1]["content"]
+    if "protective property is PRESENT" in prompt:
+        _ALT65["n"] += 1
+        ans = "No" if _ALT65["n"] % 2 else "Yes"          # 交替 → 票面必然不同
+        return ('{"protected": "%s", "evidence_line": '
+                '"    balances[msg.sender] -= amt;"}' % ans)
+    return ('{"hit": "yes", "evidence_line": '
+            '"    if (!msg.sender.call.value(amt)()) { revert(); }"}')
+
+
+_m65_multi = _aio65.run(_SM65(llm=_mock65_alt, code_language="solidity_web3",
+                              property_votes=3)
+                        .audit_unit_for(_UNIT65, ["reentrancy"], "solidity_web3"))
+check("多票票面不同 → 标采样不一致",
+      "采样不一致" in (_m65_multi[0].reasoning_summary if _m65_multi else ""), True)
+check("多票 2:1 仍按多数判漏洞",
+      bool(_m65_multi[0].property_missing) if _m65_multi else None, True)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

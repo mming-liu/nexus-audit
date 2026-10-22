@@ -494,7 +494,16 @@ class ScenarioMatcher:
                                           reasoning_summary=f"LLM 调用失败：{e}"))
                 continue
             all_votes = s_votes + p_votes
-            unanimous = bool(all_votes) and len(set(all_votes)) == 1
+            # 单票模式（默认 votes=1，也是 smartbugs / OWASP 的默认口径）下
+            # 票箱本来就是空的 —— 空票箱不可能是"不一致"。原先写成
+            # `bool(all_votes) and len(set(...))==1`，单票时恒 False，
+            # 于是每条判定都带上"（采样不一致）"，读日志的人会以为模型
+            # 自我矛盾，其实是这个标签在说谎（Module 17 模型层实跑抓出：
+            # 197 条里 192 条理由全是"采样不一致"）。只有真投了 ≥2 票
+            # 且票面不同，才配叫不一致。
+            multi_vote = len(all_votes) > 1
+            unanimous = multi_vote and len(set(all_votes)) == 1
+            inconsistent = multi_vote and not unanimous
             # 有一轮说"不安全"才判漏洞，但票数越悬殊置信度越低：
             # 3:0 给 0.7，2:1 给 0.45 —— 后者应当优先送人工复核而不是直接采信。
             if protected:
@@ -507,7 +516,7 @@ class ScenarioMatcher:
                 property_missing="" if protected else cat.property,
                 reasoning_summary=(f"Scenario={key}=HIT, PropertyCheck="
                                    f"{'PRESENT' if protected else 'MISSING'}"
-                                   f"{'' if unanimous else '（采样不一致）'}"),
+                                   f"{'（采样不一致）' if inconsistent else ''}"),
                 confidence=conf,
                 votes=all_votes,
             ))
