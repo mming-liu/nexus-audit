@@ -18,7 +18,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install httpx
-      # 判据链路断言 [1]-[67]：纯本地、不调模型、不需要靶场仓库
+      # 判据链路断言 [1]-[68]：纯本地、不调模型、不需要靶场仓库
       # （靶场 E2E 断言会在 reference_repos 缺失时自动跳过）
       - name: 冒烟测试
         run: python benchmarks/smoke_test_chains.py

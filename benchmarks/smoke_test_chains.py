@@ -3464,6 +3464,42 @@ else:
     print("  -- DeFiVulnLabs 靶场不在 reference_repos，跳过 E2E（安装见 Module 19）")
 
 
+# ---------------- [68] vulpy 模型层：opt-in + 三态聚合口径 -------------------#
+# Python 赛道此前只有规则层（6/6 全判，没有退回批），模型层是空白。补成
+# **端到端口径**：模型独立再判这 6 条，指标只记录不下结论（vul 分母 3）。
+# 这里锁的是聚合本身：三态必须分开数（命中/方向错/调用失败），失败绝不
+# 折算成"无漏洞"，方向错必须单独计数而不是混进 FP。
+print("\n[68] vulpy 模型层：opt-in 开关 + 三态聚合")
+
+from benchmarks.benchmark_vulpy import _report_model as _vulpy_report  # noqa: E402
+
+_vulpy_rows = [
+    {"side": "bad", "unit": "do_login", "category": "sqli", "real_vuln": True,
+     "flagged": True},                                    # TP
+    {"side": "good", "unit": "do_login", "category": "sqli", "real_vuln": False,
+     "flagged": False},                                   # TN
+    {"side": "good", "unit": "do_chpasswd_post", "category": "sqli",
+     "real_vuln": False, "flagged": True},                # FP（方向错）
+    {"side": "bad", "unit": "do_key_create", "category": "sqli", "real_vuln": True,
+     "flagged": None, "detail": "RuntimeError: 模型返回空内容"},   # 调用失败
+]
+_vs = _vulpy_report(_vulpy_rows, "mock-model")
+check("vulpy 模型层：TP 计数", _vs["tp"], 1)
+check("vulpy 模型层：TN 计数", _vs["tn"], 1)
+check("vulpy 模型层：FP 计数（方向错单列）", _vs["fp"], 1)
+check("vulpy 模型层：调用失败单列、不折算成无漏洞",
+      (_vs["call_failed"], _vs["fn"]), (1, 0))
+check("vulpy 模型层：失败样本落盘带原因",
+      "模型返回空内容" in (_vs["call_failed_rows"][0]["detail"] or ""), True)
+
+import subprocess as _sp68                                          # noqa: E402
+_h68 = _sp68.run([sys.executable, str(Path(__file__).resolve().parent
+                                      / "benchmark_vulpy.py"), "--help"],
+                 capture_output=True, text=True, encoding="utf-8")
+check("vulpy 模型层是 opt-in（--model 存在，默认不发请求）",
+      "--model" in _h68.stdout, True)
+
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
