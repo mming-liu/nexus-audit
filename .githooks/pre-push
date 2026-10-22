@@ -95,3 +95,10 @@ if [ -d reference_repos/pygoat-master ]; then
   "$PY" benchmarks/benchmark_pygoat.py --strict --offline > /dev/null
   echo "pre-push: pygoat 基线通过 ✔"
 fi
+
+# 第 15 靶场（Module 29）：eladmin-mp——@el.check 注解语义 + MyBatis-Plus 判据
+if [ -d reference_repos/eladmin-mp-master ]; then
+  echo "pre-push: eladmin-mp 基线 ..."
+  "$PY" benchmarks/benchmark_eladminmp.py --strict --offline > /dev/null
+  echo "pre-push: eladmin-mp 基线通过 ✔"
+fi

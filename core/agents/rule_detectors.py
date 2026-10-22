@@ -845,6 +845,17 @@ SQLI_JDBCTEMPLATE_RE = re.compile(
     r"\.\s*(?:queryForMap|queryForList|queryForObject|queryForRowSet|"
     r"update|batchUpdate)\s*\(", re.I)
 SQLI_PREPARE_RE = re.compile(r"\.\s*prepare(?:Statement|Call)\s*\(\s*([^;]{0,300})", re.I | re.S)
+# MyBatis-Plus 条件构造器（Module 29）：参数化条件方法 vs 拼接出口。
+# `.apply("/.last("/.inSql("/.orderBySql(" 是 Wrapper 的显式 SQL 拼接出口，
+# 实参含拼接或裸变量即注入面；`.eq/.like/...` 则由框架参数化。
+_MP_WRAPPER_RE = re.compile(
+    r"\.(?:eq|ne|like|notLike|in|notIn|between|notBetween|gt|ge|lt|le|"
+    r"allEq|apply|last|inSql|orderBySql|orderBy\w+)\s*\(")
+_MP_CONCAT_EXIT_RE = re.compile(
+    r"\.(?:apply|last|inSql|orderBySql)\s*\("
+    # 前导填充必须与实参字符同类排除引号：否则 `"name = {0}", name` 这种
+    # 占位符绑定会把整段字符串吞进填充、再拿第二实参的裸变量凑成"拼接"。
+    r"[^()\"]*(?:\"[^\"]*\"\s*\+|\+\s*\"|[^()\"]*\b[a-z_]\w+\b)")
 # JPA 的手写查询入口：`entityManager.createQuery(jpql)` / `createNativeQuery(sql)`。
 # 它就是 JPQL 世界的 `prepareStatement` —— 传进去的是**语句文本**，不是参数，
 # 所以判据与 prepareStatement 完全同构：先回溯源变量，再看文本里有没有拼接。
@@ -946,7 +957,6 @@ def _mybatis_text(source: str) -> str:
 def sqli_verdict(source: str) -> bool | None:
     body = entry_body(source)
     impl = _impl_segment(source)
-
     # C) 白名单过滤优先：入参被全串白名单约束过，后续拼接不构成注入。
     #    这里曾经要求"必须同时出现 sqlFilter/checkSql/isValidOrder 这几个名字之一"，
     #    等于把判据绑死在某几个函数名上。Hello-Java-Sec 的 JDBC.safe5 用的是
@@ -964,6 +974,15 @@ def sqli_verdict(source: str) -> bool | None:
     if _jpa_derived_query_safe(source):
         return False
 
+    # C3) MyBatis-Plus 条件构造器（Module 29，eladmin-mp 靶场形态）：
+    #     拼接出口 `.apply("col = '" + x + "'")` / `.last("limit " + p)` /
+    #     `.inSql(...)` 实参含拼接或裸变量 → True（显式 SQL 拼接出口）。
+    #     置于 MyBatis 判定之前：拼接出口是显式注入面，优先级高于 ${}/#{}
+    #     的其它证据。False 侧（纯参数化 Wrapper）在 B 之后收口（C4），
+    #     避免与集合方法 `.in(`、MyBatis ${} 判定互相打架。
+    if _MP_CONCAT_EXIT_RE.search(body):
+        return True
+
     # B) MyBatis：只有能确认用的是 ${} 还是 #{} 才判
     mb = _mybatis_text(source)
     if MYBATIS_DOLLAR_RE.search(mb):
@@ -975,6 +994,17 @@ def sqli_verdict(source: str) -> bool | None:
             return False
         return True
     if MYBATIS_HASH_RE.search(mb) and not SQLI_JDBC_SINK_RE.search(body):
+        return False
+
+    # C4) MyBatis-Plus 纯参数化 Wrapper（Module 29 False 侧）：走到这里说明
+    #     没有 MyBatis ${}/#{证据、没有 JDBC sink，body 里只有条件构造器的
+    #     参数化方法（.eq/.like/...）——查询由框架参数化，判 False。
+    #     放在 B 之后是刻意的：集合方法 `.in(` 与 Wrapper `.in(` 同貌，
+    #     只有排除了 MyBatis 证据链后才允许这条收 False。
+    if _MP_WRAPPER_RE.search(body) and not (
+            SQLI_CREATE_STMT_RE.search(body)
+            or SQLI_JDBCTEMPLATE_RE.search(body)
+            or SQLI_JDBC_SINK_RE.search(body)):
         return False
     # 语句是纯固定文本（无任何占位符），调用也不带实参 → 没有注入面。
     # 切片器会在 Mapper 语句下方标注「无外部占位符（语句为固定文本）」，
@@ -4749,6 +4779,12 @@ def authz_verdict(source: str) -> bool | None:
     #    建立；把 `login(loginName, password)` 的入参当成"直查资源"是口径错误。
     #    logout 不在此列（"使用身份"≠"建立身份"，见正则上方注释）。
     if _AUTHZ_AUTHN_ROUTE_RE.search(body):
+        return None
+
+    # 0b) @AnonymousAccess 显式匿名声明（eladmin-mp 形态，Module 29）：
+    #     作者把接口设计为匿名可达，"未授权访问"是设计意图不是缺陷——
+    #     与登录入口同语义，不做授权判定，退 None。
+    if "@AnonymousAccess" in source:
         return None
 
     # 1) 声明式校验：`@PreAuthorize("hasRole('ADMIN')")` 这类。

@@ -1,0 +1,21 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\eladmin-mp-master",
+  "total_units": 65,
+  "truth_rows": 53,
+  "decided": 53,
+  "correct": 53,
+  "fp": 0,
+  "reverse_fn": 0,
+  "fallback": 0,
+  "unannotated_true": [
+    "AliPayController.java:AliPayController.toPayAsPc",
+    "AliPayController.java:AliPayController.toPayAsWeb",
+    "VerifyController.java:VerifyController.resetEmail",
+    "VerifyController.java:VerifyController.resetPass",
+    "VerifyController.java:VerifyController.validated",
+    "GenConfigController.java:GenConfigController.queryGenConfig",
+    "GeneratorController.java:GeneratorController.queryTables",
+    "GeneratorController.java:GeneratorController.queryColumns",
+    "GeneratorController.java:GeneratorController.generatorCode"
+  ]
+}

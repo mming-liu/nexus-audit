@@ -3674,15 +3674,16 @@ _ry_checkpwd = """// Full-Route: /system/user/profile/checkPassword
 check("M23：校验当前会话用户密码（主体对象作实参）→ False（2g）",
       _verdict("authz", _ry_checkpwd), False)
 
-_ry_dto = """// Full-Route: /system/user/checkLoginNameUnique
-    @PostMapping("/checkLoginNameUnique")
+_ry_dto = """// Full-Route: /system/user/profile
+    @GetMapping("/profile")
     @ResponseBody
-    public boolean checkLoginNameUnique(SysUser user)
+    public AjaxResult profile(SysUser user)
     {
-        return userService.checkLoginNameUnique(user);
+        return AjaxResult.success(userService.selectUserProfile(user));
     }
 """
-check("M23：客户端 DTO 直接进 Service 且无主体 → 保持 True（防 2g 放水）",
+check("M23：客户端 DTO 直接进 Service 且无主体 → 保持 True（防 2g 放水；"
+      "check*Unique 形态已被 2h 单独豁免，见 [74]）",
       _verdict("authz", _ry_dto), True)
 
 import subprocess as _sp71                                          # noqa: E402
@@ -3911,3 +3912,70 @@ _r74 = _sp74.run([sys.executable, str(Path(__file__).resolve().parent
 check("M28：RuoYi benchmark --strict --offline 退出码 0", _r74.returncode, 0)
 check("M28：RuoYi 无注解 True 面 16 → 5（11 条 check*Unique 被 2h 消解）",
       "无注解且判 True 的入口 5 条" in (_r74.stdout or ""), True)
+
+
+# ---- [75] Module 29：MyBatis-Plus Wrapper 判据 + @el.check/@AnonymousAccess ----
+check("M29：Wrapper 拼接出口 .apply 带拼接 → True",
+      _verdict("sqli", '''
+// Full-Route: /api/users
+@GetMapping("/users")
+public Object users(String name) {
+    QueryWrapper<User> qw = new QueryWrapper<>();
+    qw.apply("name = '" + name + "'");
+    return userService.list(qw);
+}
+'''), True)
+check("M29：Wrapper 拼接出口 .last 带裸变量 → True",
+      _verdict("sqli", '''
+@GetMapping("/page")
+public Object page(Integer page) {
+    QueryWrapper<User> qw = new QueryWrapper<>();
+    qw.eq("status", 1);
+    qw.last("limit " + page);
+    return userService.list(qw);
+}
+'''), True)
+check("M29：纯参数化 Wrapper（.eq/.like）→ False（C4）",
+      _verdict("sqli", '''
+@GetMapping("/search")
+public Object search(String name) {
+    QueryWrapper<User> qw = new QueryWrapper<>();
+    qw.like("name", name).eq("deleted", 0);
+    return userService.list(qw);
+}
+'''), False)
+check("M29：占位符绑定 .apply(\"col = {0}\", x) → False（非拼接出口）",
+      _verdict("sqli", '''
+@GetMapping("/find")
+public Object find(String name) {
+    QueryWrapper<User> qw = new QueryWrapper<>();
+    qw.apply("name = {0}", name);
+    return userService.list(qw);
+}
+'''), False)
+check("M29：@el.check EL 权限注解 → False",
+      _verdict("authz", '''
+// Full-Route: /api/users
+@PreAuthorize("@el.check('user:list')")
+@GetMapping("/users")
+public ResponseEntity<Object> users() {
+    return new ResponseEntity<>(userService.queryAll(), HttpStatus.OK);
+}
+'''), False)
+check("M29：@AnonymousAccess 显式匿名声明 → None（不做授权判定）",
+      _verdict("authz", '''
+// Full-Route: /auth/code
+@AnonymousAccess
+@GetMapping("/code")
+public ResponseEntity<Object> code() {
+    return verificationCodeService.getCode();
+}
+'''), None)
+
+import subprocess as _sp75                                          # noqa: E402
+_r75 = _sp75.run([sys.executable, str(Path(__file__).resolve().parent
+                                     / "benchmark_eladminmp.py"), "--strict", "--offline"],
+                 capture_output=True, text=True, encoding="utf-8")
+check("M29：eladmin-mp benchmark --strict --offline 退出码 0", _r75.returncode, 0)
+check("M29：@el.check 53/53 全 False（STRICT PASS）",
+      "STRICT PASS" in (_r75.stdout or ""), True)

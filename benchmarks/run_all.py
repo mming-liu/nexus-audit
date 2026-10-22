@@ -86,6 +86,12 @@ JOBS = [
     ("pygoat (Python Flask labs)", ["benchmarks/benchmark_pygoat.py", "--strict",
                                     "--offline"],
      "reference_repos/pygoat-master", "target", True),
+    # 第 15 靶场（Module 29）：eladmin-mp。Spring Security 自定义 EL 权限
+    # （@PreAuthorize("@el.check(...)") 53 条垂直授权声明）+ MyBatis-Plus
+    # Wrapper 判据（拼接出口 True / 纯参数化 False，机制由冒烟 [75] 锁定）。
+    ("eladmin-mp (MyBatis-Plus)", ["benchmarks/benchmark_eladminmp.py", "--strict",
+                                   "--offline"],
+     "reference_repos/eladmin-mp-master", "target", True),
 ]
 
 
