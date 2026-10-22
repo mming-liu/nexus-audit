@@ -100,7 +100,7 @@ class WebTreeSitterSlicer:
                 if name in visited:
                     continue
                 visited.add(name)
-                code = indexer.get_symbol_code(name)
+                code = indexer.get_symbol_code(name, prefer_file=u.file_path)
                 if not code or not (code.get("source") or "").strip():
                     continue
                 segments.append((code["file_path"], code["start_line"],

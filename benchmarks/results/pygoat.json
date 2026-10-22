@@ -1,0 +1,19 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\pygoat-master",
+  "total_units": 119,
+  "truth_rows": 9,
+  "missing": [],
+  "caught": 9,
+  "fallback": [],
+  "reverse_fn": [],
+  "stray_true": [],
+  "false_judgements": 298,
+  "disputed": [
+    {
+      "lab": "xss_lab",
+      "unit": "lab1/lab2/lab3",
+      "cat": "xss",
+      "why": "作者：Reflects unescaped user input；视图层走 render_template（Jinja2 自动转义），真实 sink 在模板文件的 |safe —— 与本工具 xss 类目'输入是否原样进入响应体'口径不同，不收"
+    }
+  ]
+}

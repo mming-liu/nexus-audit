@@ -3692,3 +3692,120 @@ _r71 = _sp71.run([sys.executable, str(Path(__file__).resolve().parent
 check("M23：RuoYi benchmark --strict --offline 退出码 0", _r71.returncode, 0)
 check("M23：RuoYi 跨模块穿透 + 注解语义在线（STRICT PASS）",
       "STRICT PASS" in (_r71.stdout or ""), True)
+
+
+# ---- [72] Module 24：切片器同名符号覆盖 + Python 判据补口 ----
+import tempfile as _tmd72
+# 同名符号覆盖：两个"应用"各定义 index，整库切片不许丢
+_d72 = Path(_tmd72.mkdtemp(prefix="nexus_pysym_"))
+(_d72 / "a").mkdir(); (_d72 / "b").mkdir()
+(_d72 / "a" / "app.py").write_text(
+    'from flask import Flask\napp = Flask("a")\n'
+    '@app.route("/a")\ndef index():\n    return "A"\n', encoding="utf-8")
+(_d72 / "b" / "app.py").write_text(
+    'from flask import Flask\napp = Flask("b")\n'
+    '@app.route("/b")\ndef index():\n    return "B"\n', encoding="utf-8")
+_u72 = WebTreeSitterSlicer(_d72).extract_entry_units()
+check("M24：同名符号共存（两应用各一个 index）", len(_u72), 2)
+check("M24：同名符号来自不同文件",
+      len({u.file_path for u in _u72}), 2)
+
+# 赋值链：hop 段同名赋值不遮蔽入口；sink 同段赋值可见
+_src72 = '''// contract: X
+def lab():
+    username = request.form.get("username", "")
+    sql = (
+        f"SELECT * FROM users WHERE username='{username}'"
+    )
+    return cursor.execute(sql)
+
+// ---- 跨文件辅助方法实现（入口方法调用的外部方法，按跳展开）----
+// 来自 models.py:1 [Hop 1]
+class User:
+    username = db.Column(db.String(80))
+'''
+check("M24：hop 段同名赋值不遮蔽入口（入口 request.form 赋值优先）",
+      _verdict("sqli", _src72), True)
+
+_hop72 = '''def get_user(uid):
+    return dao_fetch(uid)
+
+// ---- 跨文件辅助方法实现（入口方法调用的外部方法，按跳展开）----
+// 来自 dao.py:1 [Hop 1]
+def dao_fetch(uid):
+    sql = "SELECT * FROM users WHERE id = " + uid
+    return cursor.execute(sql)
+'''
+check("M24：sink 所在段的赋值链可见（多跳不因区域修复退化）",
+      _verdict("sqli", _hop72), True)
+
+# 关键字实参不是赋值
+_kw72 = '''def run():
+    sql = "SELECT 1"
+    cursor.execute(handler(sql=sql))
+'''
+check("M24：关键字实参不算赋值（守恒：常量 sql 保持 False）",
+      _verdict("sqli", _kw72), False)
+_kw72b = '''def run():
+    sql = "SELECT * FROM users WHERE id = " + request.args.get("id", "")
+    cursor.execute(handler(sql=sql))
+'''
+check("M24：关键字实参不算赋值（污染：真拼接仍 True）",
+      _verdict("sqli", _kw72b), True)
+
+# Python deserial：pickle / yaml 三态（Module 25 判据，pygoat 需要）
+check("M25：pickle.loads → True", _verdict("deserial", '''
+def f():
+    data = request.form.get("d", "")
+    user = pickle.loads(base64.b64decode(data))
+'''), True)
+check("M25：yaml.load 无 SafeLoader → True", _verdict("deserial", '''
+def f():
+    data = yaml.load(file.stream, Loader=yaml.Loader)
+'''), True)
+check("M25：yaml.load + SafeLoader → False", _verdict("deserial", '''
+def f():
+    data = yaml.load(file.stream, Loader=yaml.SafeLoader)
+'''), False)
+check("M25：yaml.safe_load → False", _verdict("deserial", '''
+def f():
+    data = yaml.safe_load(request.data)
+'''), False)
+
+# pathtraver：os.path.join(常量, 输入) 不防遍历；send_from_directory 是防护
+check("M24：open(os.path.join(常量, 输入)) → True（join 不清洗 ..）",
+      _verdict("pathtraver", '''
+def lab1():
+    file = request.form.get("blog", "")
+    file_path = os.path.join(os.path.dirname(__file__), file)
+    with open(file_path, "r") as f:
+        return f.read()
+'''), True)
+check("M24：send_from_directory → False（Flask 专门防遍历 API）",
+      _verdict("pathtraver", '''
+def serve_file(filename):
+    return send_from_directory("static", filename, as_attachment=True)
+'''), False)
+
+# xxe：feature_external_ges 一行定案
+check("M24：setFeature(feature_external_ges, True) + request 输入 → True",
+      _verdict("xxe", '''
+def xxe_parse():
+    data = request.data.decode("utf-8")
+    parser = make_parser()
+    parser.setFeature(feature_external_ges, True)
+    doc = parseString(data, parser=parser)
+'''), True)
+check("M24：defusedxml → False", _verdict("xxe", '''
+def parse():
+    data = request.data.decode("utf-8")
+    doc = defusedxml.ElementTree.fromstring(data)
+'''), False)
+
+import subprocess as _sp72                                          # noqa: E402
+_r72 = _sp72.run([sys.executable, str(Path(__file__).resolve().parent
+                                     / "benchmark_pygoat.py"), "--strict", "--offline"],
+                 capture_output=True, text=True, encoding="utf-8")
+check("M24：pygoat benchmark --strict --offline 退出码 0", _r72.returncode, 0)
+check("M24：pygoat 作者指名 9/9 全 True（STRICT PASS）",
+      "STRICT PASS" in (_r72.stdout or ""), True)

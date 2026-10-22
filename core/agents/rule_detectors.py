@@ -582,6 +582,31 @@ def deserial_verdict(source: str) -> bool | None:
     # fastjson 单独一条：同一行代码在两个版本上是两个结论。
     if _FASTJSON_SINK_RE.search(body):
         return _fastjson_verdict(source, body)
+    # Python 分支（Module 25，pygoat 实测）：pickle/yaml 是 Python 生态的
+    # 反序列化入口，判据挂 API 语义：
+    #   · pickle.loads/load / dill.loads —— 标准库无内置防护，外部数据即
+    #     任意对象构造（OWASP 反序列化速查表口径）→ True；
+    #   · yaml.unsafe_load / full_load → True（FullLoader 有过 CVE-2020-14343
+    #     前科，不与版本挂钩就当不可信）；
+    #   · yaml.load(x, Loader=...SafeLoader) 全部调用都带 SafeLoader → False；
+    #   · 只有 yaml.safe_load → False（值域锁死在基础类型）。
+    # 都没有才走下面的 Java 流程 —— 两套 API 名字不相交，不会互相误吞。
+    if re.search(r"\bpickle\s*\.\s*loads?\s*\(|\bcpickle\s*\.\s*loads?\s*\("
+                 r"|\bdill\s*\.\s*loads?\s*\("
+                 r"|\byaml\s*\.\s*(?:unsafe_load|full_load)\s*\(", body):
+        return True
+    yl = list(re.finditer(r"\byaml\s*\.\s*load\s*\(", body))
+    if yl:
+        saw_safe = False
+        for m in yl:
+            args = _balanced_cond(body, m.end()) or ""
+            if re.search(r"Loader\s*=\s*(?:yaml\s*\.\s*)?SafeLoader\b", args):
+                saw_safe = True
+            else:
+                return True
+        return False if saw_safe else None
+    if re.search(r"\byaml\s*\.\s*safe_load\s*\(", body):
+        return False
     # 只有当**入口体自己**把外部数据交给反序列化 API 时才判；
     # 体里没有 sink 就说明反序列化发生在别处（helper），交给 LLM。
     #
@@ -756,6 +781,21 @@ XXE_OTHER_SAFE_RE = re.compile(
 
 def xxe_verdict(source: str) -> bool | None:
     body = entry_body(source)
+    # Python 分支（Module 24，pygoat 实测）：xml.sax 的外部实体开关是
+    # 解析器事实 —— `setFeature(feature_external_ges, True)` 就是把 XXE
+    # 打开的那一行；defusedxml / 显式 False / lxml 的 resolve_entities=False
+    # 是关掉的那一行。纯常量 XML（无 request 输入）不在此下结论。
+    if re.search(r"\bmake_parser\s*\(|\bparseString\s*\("
+                 r"|\betree\s*\.\s*(?:fromstring|parse)\s*\("
+                 r"|\bfromstring\s*\("
+                 r"|\blxml\b", body):
+        if re.search(r"\bdefusedxml\b|feature_external_ges\s*,\s*False"
+                     r"|resolve_entities\s*=\s*False|no_network\s*=\s*True", body):
+            return False
+        if re.search(r"feature_external_ges\s*,\s*True", body) \
+                and re.search(r"\brequest\s*\.", body):
+            return True
+        return None
     if not XXE_SINK_RE.search(body):
         return None                    # 入口体里没有 XML 解析 sink，交回 LLM
 
@@ -4359,6 +4399,19 @@ def pathtraver_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not body:
         return None
+    # Python 分支（Module 24，pygoat 实测）：裸 `open(path)` / `send_file`
+    # 的路径若来自 request 输入且无清洗 → True。os.path.join(常量, 输入)
+    # **不**清洗 `..` 与绝对路径（输入以 / 开头时 join 直接丢弃前缀）——
+    # "有常量前缀"不构成防护。清洗只认 secure_filename / basename；
+    # send_from_directory 是 Flask 专门防遍历的 API（越界即 404）→ safe。
+    # Image.open 这类方法调用不算（ lookbehind 排除 `.open(`）。
+    if re.search(r"(?<![\w.])open\s*\(|\bsend_file\s*\(", body):
+        if re.search(r"\b(?:secure_filename|os\.path\.basename)\s*\(", body):
+            return False
+        if re.search(r"\brequest\s*\.\s*(?:form|args|values|files|cookies)\b", body):
+            return True
+    if not body:
+        return None
     sink_in = body
     if not PATH_SINK_RE.search(body):
         # 入口体没命中 sink 时**不能直接判安全** —— sink 往往在同文件的私有
@@ -4984,7 +5037,7 @@ def python_sqli_verdict(source: str) -> bool | None:
             saw_safe = True            # 带参数元组/字典 → 参数化
             continue
         sql = parts[0].strip()
-        nat = _py_value_text_capable(sql, source)
+        nat = _py_value_text_capable(sql, source, pos=m.start())
         if nat is True:
             return True
         if nat is False:
@@ -4992,13 +5045,54 @@ def python_sqli_verdict(source: str) -> bool | None:
     return False if saw_safe else None
 
 
-def _py_value_text_capable(expr: str, source: str, depth: int = 0) -> bool | None:
+def _py_entry_region(source: str) -> str:
+    """入口方法自身区域：跨文件辅助/证据/配置段之前（Module 24）。
+
+    赋值链只在该区域内追。pygoat 实测反例：切片后段带着 User 模型类，
+    `username = db.Column(...)` 会把入口的
+    `username = request.form.get(...)` 遮蔽成 None —— "最后一次赋值
+    wins" 的约定只在入口体内部成立，辅助段里同名赋值是**别的函数**的
+    局部变量，不是这条链的事实。
+    """
+    for marker in ("// ---- 跨文件辅助", "// ---- 跨文件证据", "// ---- 相关配置"):
+        i = source.find(marker)
+        if i >= 0:
+            source = source[:i]
+    return source
+
+
+def _py_local_region(source: str, pos: int) -> str:
+    """sink 所在函数的局部区域（Module 24 修正版）。
+
+    从 sink 位置向上找最近的段标记（`// ----` 头或 `// 来自 x:N [Hop n]`），
+    区域从标记之后开始到 sink 为止；sink 在入口体里则从头开始。
+    两个反例一起解：
+      · pygoat：sink 在入口体，hop 段的 User 模型 `username = db.Column(...)`
+        不得遮蔽入口的 `request.form` 赋值（段在 sink 之后，天然排除）；
+      · 多跳：sink 在 dao 的 Hop 2 段里，`sql = "..."` 赋值就在同段——
+        只看入口区域会把它切掉（冒烟 [62] 的真实回归）。
+    """
+    starts = [m.start() for m in re.finditer(r"// ----|// 来自 ", source)
+              if m.start() < pos]
+    seg = starts[-1] if starts else 0
+    return source[seg:pos]
+
+
+def _py_value_text_capable(expr: str, source: str, depth: int = 0,
+                           pos: int | None = None) -> bool | None:
     """SQL 文本表达式能否携带运行时值（三态）。None=查不出，保守不判。"""
     if depth > 3:
         return None
     e = expr.strip()
     if not e:
         return None
+    # 顶层括号包裹（pygoat 实测：`sql_query = (\n  f"SELECT ... {x}"\n)`，
+    # 长表达式按 PEP 8 折行是最常见的写法）—— 剥到最内层再走正常分支。
+    while e.startswith("(") and e.endswith(")"):
+        inner = _balanced_cond(e, 1)
+        if inner is None or inner.strip() != e[1:-1].strip():
+            break
+        e = e[1:-1].strip()
     # 纯字面量（无任何插值/拼接痕迹）。Python 字符串单双引号都合法 ——
     # vulpy 的 `request.form.get('username')` 里实参就是单引号字面量，
     # 只认双引号会让"实参是常量"判成 None（实测 bad 侧真漏洞因此丢判）。
@@ -5063,10 +5157,40 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0) -> bool | Non
         return None
     # 裸变量：沿赋值链追；追不到时看它是不是**函数形参** ——
     # 形参就是客户端可控值（多跳切片里 dao.fetch(uid) 的 uid 正是这种）。
+    # 裸变量：沿赋值链追；追不到时看它是不是**函数形参** ——
+    # 形参就是客户端可控值（多跳切片里 dao.fetch(uid) 的 uid 正是这种）。
     if re.fullmatch(r"[A-Za-z_]\w*", e):
+        region = _py_local_region(source, pos) if pos is not None \
+            else _py_entry_region(source)
+        lines = region.split("\n")
+        pat = re.compile(rf"^[ \t]*{re.escape(e)}\s*=[^=]")
         rhs = None
-        for am in re.finditer(rf"^\s*{re.escape(e)}\s*=\s*(.+)$", source, re.M):
-            rhs = am.group(1)
+        d = 0
+        i = 0
+        while i < len(lines):
+            ln = lines[i]
+            if d == 0:
+                m = pat.match(ln)
+                if m:
+                    # 语句级赋值（括号深度 0 处）才作数：多行调用里的
+                    # 关键字实参 `sql_query=sql_query,` 与赋值同貌，
+                    # pygoat 实测会把右值遮成 'ql_query,'。
+                    # 从 '=' 之后吃到括号配平（PEP 8 多行右值）。
+                    buf = [ln[m.end():]]
+                    dd = ln.count("(") + ln.count("[") - ln.count(")") - ln.count("]")
+                    j = i + 1
+                    while dd > 0 and j < len(lines):
+                        buf.append(lines[j])
+                        dd += lines[j].count("(") + lines[j].count("[") \
+                            - lines[j].count(")") - lines[j].count("]")
+                        j += 1
+                    rhs = "\n".join(buf).strip()
+                    i = j
+                    continue
+            d += ln.count("(") + ln.count("[") - ln.count(")") - ln.count("]")
+            if d < 0:
+                d = 0
+            i += 1
         if rhs is not None:
             return _py_value_text_capable(rhs, source, depth + 1)
         if re.search(rf"(?m)^\s*(?:async\s+)?def\s+\w*\s*\([^)]*\b{re.escape(e)}\b",
@@ -5083,8 +5207,15 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0) -> bool | Non
     mm = re.match(r"[\w.]+\s*\(", e)
     if mm:
         args = _balanced_cond(e, mm.end())
+        # 关键字实参取值：`f(sql=sql)` 的值域跟 `sql` 走，不是跟着字面名
+        # "sql=sql" 走（pygoat 实测：kwargs 形态在真实代码里常见）。
+        parts2 = []
+        for a in _split_args(args or ""):
+            a = a.strip()
+            km = re.match(r"[A-Za-z_]\w*\s*=\s*(.+)$", a, re.S)
+            parts2.append(km.group(1).strip() if km else a)
         natures = [_py_interp_text_capable(a, source, depth + 1)
-                   for a in _split_args(args or "")]
+                   for a in parts2]
         if natures and all(n is False for n in natures):
             return False
         if any(n is True for n in natures):
@@ -5100,8 +5231,9 @@ def _py_interp_text_capable(expr: str, source: str, depth: int = 0) -> bool | No
     if re.fullmatch(r"(?:int|float)\(([^()]*)\)", e):
         return False                      # int()/float() 转换锁死值域
     if re.fullmatch(r"[A-Za-z_]\w*", e):
+        region = _py_entry_region(source)
         rhs = None
-        for am in re.finditer(rf"^\s*{re.escape(e)}\s*=\s*(.+)$", source, re.M):
+        for am in re.finditer(rf"^[ \t]*{re.escape(e)}\s*=\s*(.+)$", region, re.M):
             rhs = am.group(1)
         if rhs is not None:
             return _py_value_text_capable(rhs, source, depth + 1)
@@ -5187,7 +5319,7 @@ def python_cmdi_verdict(source: str) -> bool | None:
         if is_list and not has_shell_true:
             safe = True                   # 列表传参：参数边界由 execve 保证
             continue
-        nat = _py_value_text_capable(first, source)
+        nat = _py_value_text_capable(first, source, pos=m.start())
         if nat is True:
             tainted = True
         elif nat is None and _py_func_params(source):

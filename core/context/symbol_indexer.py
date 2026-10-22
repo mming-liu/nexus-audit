@@ -95,8 +95,13 @@ class SymbolIndexer:
                 if start_line - 1 <= d_start <= start_line:
                     decorators.append(dm.group(0).strip())
             # 相对/绝对文件标识
+            # Module 24：键改为 name -> **列表**。此前 setdefault(name) 首见
+            # 即占，多应用仓库（pygoat 20 个 Flask lab 都有 index/lab1/
+            # health_check）整库切片时后面的文件被静默丢弃——50 个单元
+            # 掩盖了 20 个应用。列表语义下 get_symbol_code 仍取首个
+            # （与旧行为一致），调用方可传 prefer_file 优先同文件命中。
             key = name
-            self.symbol_table.setdefault(key, {
+            self.symbol_table.setdefault(key, []).append({
                 "file": str(file), "start": start_line, "end": end_line,
                 "kind": "class" if kind == "class" else "function",
                 "decorators": decorators, "indent": indent,
@@ -104,18 +109,27 @@ class SymbolIndexer:
 
     # ---------- 查询接口（对应第2层工具） ----------
 
-    def get_symbol_code(self, symbol_name: str) -> dict | None:
+    def get_symbol_code(self, symbol_name: str, *, prefer_file: str | None = None) -> dict | None:
         """返回 {name, file_path, source, decorators}，未命中返回 None。
 
         支持：
-          1. 精确符号名
+          1. 精确符号名（同名符号多文件共存时，prefer_file 优先同文件）
           2. 裁剪到 class 下方法（如 Service.get_item -> Service + get_item）
           3. import 别名还原（from service import Service as FlowService）
         """
         if not self._built:
             self.build()
-        # 直接命中
-        sym = self.symbol_table.get(symbol_name)
+
+        def _pick(cands: list[dict]) -> dict | None:
+            if not cands:
+                return None
+            if prefer_file:
+                for c in cands:
+                    if Path(c["file"]).name == Path(prefer_file).name:
+                        return c
+            return cands[0]
+
+        sym = _pick(self.symbol_table.get(symbol_name, []))
         if sym is None and "." in symbol_name:
             cls_name, method_name = symbol_name.rsplit(".", 1)
             # 别名还原
@@ -124,7 +138,7 @@ class SymbolIndexer:
                 symbol_name = f"{alias['orig']}.{method_name}"
             # 类下方法
             for name in (symbol_name, f"{method_name}"):
-                cand = self.symbol_table.get(method_name)
+                cand = _pick(self.symbol_table.get(method_name, []))
                 if cand is not None:
                     sym = cand
                     break
@@ -132,7 +146,7 @@ class SymbolIndexer:
             # 别名还原（不带点）
             alias = self.imports.get(symbol_name)
             if alias:
-                sym = self.symbol_table.get(alias["orig"])
+                sym = _pick(self.symbol_table.get(alias["orig"], []))
         if sym is None:
             return None
         return self._read_symbol(sym)
@@ -173,19 +187,20 @@ class SymbolIndexer:
     def to_code_units(self) -> list[CodeUnit]:
         """把带路由装饰器的符号转成第一层 CodeUnit（含 called_symbols）。"""
         units = []
-        for name, sym in self.symbol_table.items():
-            if not sym["decorators"]:
-                continue
-            data = self._read_symbol(sym)
-            if not data:
-                continue
-            called = self._extract_called_symbols(data["source"])
-            units.append(CodeUnit(
-                file_path=sym["file"], language=self.language, unit_name=name,
-                start_line=sym["start"], end_line=sym["end"],
-                decorators_or_modifiers=sym["decorators"],
-                called_symbols=called, source_code=data["source"],
-            ))
+        for name, syms in self.symbol_table.items():
+            for sym in syms:
+                if not sym["decorators"]:
+                    continue
+                data = self._read_symbol(sym)
+                if not data:
+                    continue
+                called = self._extract_called_symbols(data["source"])
+                units.append(CodeUnit(
+                    file_path=sym["file"], language=self.language, unit_name=name,
+                    start_line=sym["start"], end_line=sym["end"],
+                    decorators_or_modifiers=sym["decorators"],
+                    called_symbols=called, source_code=data["source"],
+                ))
         return units
 
     @staticmethod

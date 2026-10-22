@@ -87,3 +87,11 @@ if [ -d reference_repos/RuoYi-master ]; then
   "$PY" benchmarks/benchmark_ruoyi.py --strict --offline > /dev/null
   echo "pre-push: RuoYi 基线通过 ✔"
 fi
+
+# 第 12 靶场（Module 24/25）：pygoat——Python Flask labs 全集 + 切片器
+# 同名符号覆盖回归锁（50→119 单元）。
+if [ -d reference_repos/pygoat-master ]; then
+  echo "pre-push: pygoat 基线 ..."
+  "$PY" benchmarks/benchmark_pygoat.py --strict --offline > /dev/null
+  echo "pre-push: pygoat 基线通过 ✔"
+fi
