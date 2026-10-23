@@ -4151,3 +4151,62 @@ function executeOperation(
     IERC20(USDa).safeTransfer(address(lendingPool), amounts);
 }
 '''), False)
+
+# ---- [80] Module 36：ERC777 钩子回调 sink + 权限映射成员检查 ----
+# DeFiVulnLabs ERC777-reentrancy.sol claim：token.transfer（双参，777 钩子
+# 可回调）在 `_mints[account] += amount` 状态累加**之前** —— CEI 反序，
+# tokensReceived 回调里可重入 claim。
+_erc777_claim = '''
+function claim(address account, uint256 amount) public returns (bool) {
+    require(_mints[account] + amount <= maxMintsPerAddress,
+            "Exceeds max mints per address");
+    token.transfer(account, amount);
+    _mints[account] += amount; // Do not follow check-effect-interaction
+    return true;
+}
+'''
+check("M36：ERC777 claim 外转先于映射累加 → True",
+      _verdict("reentrancy", _erc777_claim), True)
+check("M36：CEI 正序（先累加后双参 transfer）→ False",
+      _verdict("reentrancy", '''
+function claim_fixed(address account, uint256 amount) public returns (bool) {
+    _mints[account] += amount;
+    token.transfer(account, amount);
+    return true;
+}
+'''), False)
+# 权限映射成员检查（430 桶榜首确定性子簇）：msg.sender 作映射键非零判定
+# 与恒等检查机制等价；余额比较（右侧是数量）不算鉴权。
+check("M36：modifier 里 require(owners[msg.sender] != 0) → False",
+      _verdict("access_control", '''
+function deleteOwner(address _owner) onlyOwner external returns (bool) {
+    owners[_owner] = 0;
+}
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner() {
+    require(owners[msg.sender] != 0);
+    _;
+}
+'''), False)
+check("M36：裸真值 require(approvedPlayers[msg.sender]) → False",
+      _verdict("access_control", '''
+function joinGame() onlyPlayers public {
+    selfdestruct(msg.sender);
+}
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyPlayers() {
+    require(approvedPlayers[msg.sender]);
+    _;
+}
+'''), False)
+check("M36：余额比较 balances[msg.sender] >= x 不是鉴权 → 不判 False",
+      _verdict("access_control", '''
+function poke(address to) gated public {
+    balances[to] += 1;
+}
+// ---- 修饰符定义（本合约，供核验）----
+modifier gated() {
+    require(balances[msg.sender] >= _value);
+    _;
+}
+'''), None)

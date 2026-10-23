@@ -5531,13 +5531,19 @@ def solidity_reentrancy_verdict(source: str) -> bool | None:
         else:
             kind = "token"          # 多参 transfer/send：ERC20/777，可回调
         ext_calls.append((func_src[:m.start()].count("\n") + 1, kind))
-    # 状态扣减：映射/变量减法与清零（`balances[x] -=` / `acc.balance = 0`）。
+    # 状态扣减/累加：映射/变量减法与清零（`balances[x] -=` / `acc.balance = 0`）。
     # 扣减只认函数自身源码 —— 修饰符定义块里的同名赋值不是本函数的 CEI 证据。
     ded_lines = []
-    for m in re.finditer(r"^\s*[\w\[\]\.]+\s*(?:-=|\s*=\s*0\s*;)", func_src, re.M):
+    # 映射索引写（`x[k] += / -= / = 0`）：Solidity 映射不可能是局部变量，
+    # 索引写必然是状态变更 —— 机制层证据，不依赖命名关键词
+    # （M36：ERC777 claim 的 `_mints[account] += amount`，mints 不在
+    # 旧关键词表里，导致唯一真值退回）。
+    for m in re.finditer(r"^\s*[\w\[\]\.]+\[[^\]]*\]\s*(?:\+=|-=)\s*[^;]+;|"
+                         r"^\s*[\w\[\]\.]+\s*(?:-=|\s*=\s*0\s*;)", func_src, re.M):
         ln = func_src[:m.start()].count("\n") + 1
         line = func_src.splitlines()[ln - 1]
-        if re.search(r"[Bb]alance|[Dd]eposit|shares|stake|funds|credit|[Cc]redit", line):
+        if re.search(r"[Bb]alance|[Dd]eposit|shares|stake|funds|credit|[Cc]redit"
+                     r"|\[[^\]]*\]\s*(?:\+=|-=)", line):
             ded_lines.append(ln)
     if not ext_calls or not ded_lines:
         return None
@@ -5568,6 +5574,17 @@ _SOLIDITY_MSGSENDER_CHECK_RE = re.compile(
     r"require\s*\(\s*(?:msg\s*\.\s*sender\s*==|msg\s*\.\s*sender\s*!=|\w+\s*==\s*msg\s*\.\s*sender)"
     r"|assert\s*\(\s*msg\s*\.\s*sender\s*=="
     r"|if\s*\(\s*msg\s*\.\s*sender\s*!=\s*\w+\s*\)\s*(?:revert|throw|return)")
+# 权限映射成员检查（M36，430 桶榜首确定性子簇）：msg.sender 作映射键且
+# 做"非零成员"判定 —— `owners[msg.sender] != 0` / 裸真值
+# `require(approvedPlayers[msg.sender])` / 连接词前缀
+# `require(owners[msg.sender] && ...)`。调用者身份进入了授权判定，机制
+# 与恒等检查等价。**余额比较不算**（`balances[msg.sender] >= _value`
+# 是资金充足性检查，右侧是数量不是成员资格）——所以只认 `)` 结尾、
+# `!= 0 / != address(0)`、或 `&&` 连接三种形态，任何 `< > <= >=` 关系
+# 比较都不匹配。
+_SOLIDITY_MSGSENDER_MEMBER_RE = re.compile(
+    r"(?:require|assert|if)\s*\(\s*\w+\s*\[\s*msg\s*\.\s*sender\s*\]\s*"
+    r"(?:\)|!=\s*(?:0|address\s*\(\s*0\s*\))|&&)")
 
 
 def solidity_access_verdict(source: str) -> bool | None:
@@ -5610,7 +5627,8 @@ def solidity_access_verdict(source: str) -> bool | None:
     # tx.origin 不算保护（钓鱼反模式）；纯状态门 modifier（parity 的
     # only_uninitialized 只查 m_numOwners）也**不算**保护 —— 把状态门
     # 当保护会把 initWallet 判反，方向错误比退回恶劣得多。
-    protected = bool(_SOLIDITY_MSGSENDER_CHECK_RE.search(func_src))
+    protected = bool(_SOLIDITY_MSGSENDER_CHECK_RE.search(func_src)
+                     or _SOLIDITY_MSGSENDER_MEMBER_RE.search(func_src))
     if not protected and re.search(
             r"require\s*\(\s*\w*[Ii]sApprovedOrOwner\b"
             r"|require\s*\(\s*_?msgSender\s*\(\s*\)", func_src):
@@ -5621,7 +5639,8 @@ def solidity_access_verdict(source: str) -> bool | None:
     if not protected and mod_block:
         for mb in re.finditer(r"modifier\s+[A-Za-z_]\w*[^{]*\{(.*)", mod_block, re.S):
             body = mb.group(1)
-            if _SOLIDITY_MSGSENDER_CHECK_RE.search(body):
+            if (_SOLIDITY_MSGSENDER_CHECK_RE.search(body)
+                    or _SOLIDITY_MSGSENDER_MEMBER_RE.search(body)):
                 protected = True
                 break
             # modifier 里的门形态是 `if (msg.sender == owner) _;` ——

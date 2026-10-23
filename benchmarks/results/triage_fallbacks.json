@@ -8,7 +8,7 @@
     "reentrancy/缺 Sink": 1276,
     "access_control/缺 Sink": 768,
     "xss/缺 Sink": 271,
-    "access_control/含未知安全包装": 432,
+    "access_control/含未知安全包装": 422,
     "authz/缺 Source": 8,
     "authz/缺 Sink": 1668,
     "pathtraver/缺 Sink": 27,
@@ -23,11 +23,11 @@
     "authz/含未知安全包装": 4,
     "access_control/跨文件链路未闭合": 1,
     "deserial/跨文件链路未闭合": 2,
-    "reentrancy/含未知安全包装": 170,
+    "reentrancy/含未知安全包装": 162,
     "sqli/含未知安全包装": 5,
     "xss/缺 Source": 48,
     "ssrf/含未知安全包装": 1,
-    "reentrancy/缺 Source": 56,
+    "reentrancy/缺 Source": 55,
     "cmdi/缺 Source": 2
   },
   "per_bench": {
@@ -118,8 +118,8 @@
       "xxe/缺 Sink": 841,
       "reentrancy/缺 Sink": 418,
       "access_control/缺 Sink": 126,
-      "reentrancy/含未知安全包装": 125,
-      "access_control/含未知安全包装": 255,
+      "reentrancy/含未知安全包装": 119,
+      "access_control/含未知安全包装": 247,
       "access_control/缺 Source": 40,
       "deserial/缺 Source": 5,
       "reentrancy/缺 Source": 28,
@@ -132,10 +132,10 @@
       "deserial/缺 Sink": 318,
       "ssrf/缺 Sink": 323,
       "xxe/缺 Sink": 323,
-      "reentrancy/缺 Source": 23,
+      "reentrancy/缺 Source": 22,
       "access_control/缺 Source": 48,
       "reentrancy/缺 Sink": 202,
-      "access_control/含未知安全包装": 78,
+      "access_control/含未知安全包装": 76,
       "access_control/缺 Sink": 110,
       "deserial/缺 Source": 2,
       "reentrancy/含未知安全包装": 14,
@@ -150,7 +150,7 @@
       "deserial/缺 Sink": 200,
       "ssrf/缺 Sink": 203,
       "xxe/缺 Sink": 203,
-      "reentrancy/含未知安全包装": 29,
+      "reentrancy/含未知安全包装": 27,
       "access_control/含未知安全包装": 63,
       "reentrancy/缺 Sink": 87,
       "reentrancy/缺 Source": 5,
@@ -655,9 +655,9 @@
     "smartbugs/access_control/含未知安全包装": [
       "FibonacciBalance.sol:withdraw",
       "multiowned_vulnerable.sol:newOwner",
-      "multiowned_vulnerable.sol:deleteOwner",
-      "multiowned_vulnerable.sol:withdrawAll",
-      "parity_wallet_bug_1.sol:initMultiowned"
+      "parity_wallet_bug_1.sol:initMultiowned",
+      "parity_wallet_bug_1.sol:revoke",
+      "parity_wallet_bug_1.sol:changeOwner"
     ],
     "smartbugs/access_control/缺 Source": [
       "parity_wallet_bug_1.sol:initWallet",
@@ -731,7 +731,7 @@
       "Delegatecall.sol:testDelegatecall",
       "ecrecover.sol:testecRecover",
       "empty-loop.sol:testVulnSignatureValidation",
-      "ERC777-reentrancy.sol:claim"
+      "fee-on-transfer.sol:testVulnFeeOnTransfer"
     ],
     "DeFiVulnLabs/access_control/缺 Source": [
       "ApproveScam.sol:testApproveScam",

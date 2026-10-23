@@ -10,11 +10,11 @@
 | authz/缺 Sink | 1668 |
 | reentrancy/缺 Sink | 1276 |
 | access_control/缺 Sink | 768 |
-| access_control/含未知安全包装 | 432 |
+| access_control/含未知安全包装 | 422 |
 | xss/缺 Sink | 271 |
-| reentrancy/含未知安全包装 | 170 |
+| reentrancy/含未知安全包装 | 162 |
 | access_control/缺 Source | 115 |
-| reentrancy/缺 Source | 56 |
+| reentrancy/缺 Source | 55 |
 | xss/缺 Source | 48 |
 | deserial/含未知安全包装 | 33 |
 | pathtraver/含未知安全包装 | 28 |
