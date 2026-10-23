@@ -4553,6 +4553,74 @@ check("M47：stamp 绑定靶场与 bench 名（换 bench 即换缓存槽）",
        and len(repo_fingerprint(_jsl90)) == 64),
       True)
 
+# ---- [91] Module 48：--fix 第 11/12 类补丁器 E2E ----
+import tempfile as _tf91                                       # noqa: E402
+import cli as _cli91                                          # noqa: E402
+from core.slicer.web3_slither import SoliditySlicer as _SS91   # noqa: E402
+from core.slicer.web_treesitter import WebTreeSitterSlicer as _WS91   # noqa: E402
+_sol91 = '''// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Unprotected {
+    address owner;
+    constructor() public { owner = msg.sender; }
+    modifier onlyOwner() {
+        require(msg.sender == owner);
+        _;
+    }
+    function changeOwner(address newOwner) public {
+        owner = newOwner;
+    }
+}
+'''
+_py91 = '''import yaml
+from flask import Flask
+
+app = Flask(__name__)
+
+
+@app.route("/config")
+def load_config(path):
+    with open(path) as fh:
+        return yaml.load(fh)
+'''
+_d91 = _tf91.mkdtemp(prefix="m48_")
+try:
+    (_Path91 := Path(_d91))
+    _Path91.joinpath("Unprotected.sol").write_text(_sol91, encoding="utf-8")
+    _Path91.joinpath("loader.py").write_text(_py91, encoding="utf-8")
+    _s_before91 = _Path91.joinpath("Unprotected.sol").read_text(encoding="utf-8")
+    _p_before91 = _Path91.joinpath("loader.py").read_text(encoding="utf-8")
+    _su91 = [u for u in _SS91(_Path91).extract_entry_units(_Path91)
+             if u.unit_name == "changeOwner"]
+    _pu91 = [u for u in _WS91(_Path91).extract_entry_units()
+             if u.unit_name == "load_config"]
+    _rep91: list = []
+    _n91 = _cli91._fix_solidity_onlyowner(_Path91, _su91, _rep91)
+    _n91 += _cli91._fix_python_yaml(_Path91, _pu91, _rep91)
+    check("M48：第 11 类 onlyOwner 补丁自检通过（重切片翻 False）",
+          _n91, 2)
+    check("M48：补丁后文件字节级还原（Solidity + Python）",
+          (_Path91.joinpath("Unprotected.sol").read_text(encoding="utf-8")
+           == _s_before91,
+           _Path91.joinpath("loader.py").read_text(encoding="utf-8")
+           == _p_before91),
+          (True, True))
+    check("M48：补丁报告含两类标记（sol-onlyowner / py-yaml）",
+          (any("sol-onlyowner" in x for x in _rep91),
+           any("py-yaml" in x for x in _rep91)),
+          (True, True))
+finally:
+    shutil.rmtree(_d91, ignore_errors=True)
+_sp91 = subprocess.run(
+    [sys.executable, str(Path(__file__).resolve().parent.parent / "cli.py"),
+     "doctor"], capture_output=True, text=True)
+check("M48：doctor 补丁器清单升到 12 类且全绿",
+      (_sp91.returncode == 0
+       and _sp91.stdout.count("_fix_") >= 12
+       and "共 19 类" in _sp91.stdout),
+      True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

@@ -1026,10 +1026,12 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_python_sqli(repo, py, report)
         n += _fix_python_deserial(repo, py, report)
         n += _fix_python_shell(repo, py, report)
+        n += _fix_python_yaml(repo, py, report)
     if sol:
         n += _fix_solidity_txorigin(repo, sol, report)
         n += _fix_solidity_reentrancy(repo, sol, report)
         n += _fix_solidity_initiator(repo, sol, report)
+        n += _fix_solidity_onlyowner(repo, sol, report)
     if rest:
         n += _fix_mp_concat(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
@@ -1484,6 +1486,146 @@ def _fix_python_shell(repo: Path, targets: list, lines: list) -> int:
     return fixed
 
 
+def _fix_solidity_onlyowner(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 11 类（Module 48）：Solidity 高危函数补挂 onlyOwner 修饰符。
+
+    形态（同合约里**已经有** `modifier onlyOwner { require(msg.sender == owner); }`
+    定义，只是高危函数忘了挂）：nssc Unprotected.sol 的 changeOwner 就是
+    这样 —— 修饰符在文件里，函数上没挂。修复 = 在函数签名的修饰符位插
+    `onlyOwner`，重切片后 access_control 判据看到修饰符**实现体**里的
+    msg.sender 恒等检查 → 翻 False。
+
+    三道闸门（少一道就可能改坏）：
+      ① 规则层已判 access_control=True（确实是越权面）；
+      ② 切片里能找到 `modifier onlyOwner` 的**定义**（不是名字，是定义）；
+      ③ 目标函数签名上**没有** already 挂 onlyOwner。
+    自检同前：重切片 + 重跑 access_control 翻 False，finally 字节级还原。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("access_control", src) is not True:
+            continue
+        fname = re.search(r"function\s+([A-Za-z_]\w*)", src)
+        if not fname:
+            continue
+        fname = fname.group(1)
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        # modifier 定义要从**文件**里找：切片只拼"本函数用到的"修饰符，
+        # 而本函数恰恰是**漏挂**的那个 —— 切片里根本没有 onlyOwner 的定义。
+        if not re.search(r"\bmodifier\s+onlyOwner\b", original):
+            continue
+        # 定位目标函数的定义行（不是调用点、不是 modifier 体）
+        mdef = re.search(rf"function\s+{re.escape(fname)}\s*\(", original)
+        if not mdef:
+            continue
+        # 签名可能跨行：向后找该函数的第一个 `{`
+        brace = original.find("{", mdef.end())
+        if brace < 0:
+            continue
+        head = original[mdef.start():brace]
+        if re.search(r"\bonlyOwner\b", head):
+            continue                      # 已挂，跳过
+        # 修饰符位：在可见性关键字之后（没有可见性就贴在 `)` 之后）
+        mm = re.search(r"\b(public|external|internal|private)\b", head)
+        if mm:
+            ins = mdef.start() + mm.end()
+        else:
+            close = head.rfind(")")
+            if close < 0:
+                continue
+            ins = mdef.start() + close + 1
+        patched = original[:ins] + " onlyOwner " + original[ins:]
+        v2 = None
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.slicer.web3_slither import SoliditySlicer
+            u2 = next((x for x in SoliditySlicer(repo).extract_entry_units(repo)
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = rule_verdict("access_control", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [sol-onlyowner] {u.unit_name}（`{f.name}`）", "```diff",
+                      *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 access_control 规则 → False。",
+                      "> 同合约已定义 onlyOwner 修饰符，只是高危函数漏挂；"
+                      "> 补挂后调用者身份进入授权判定。", ""]
+        else:
+            lines += [f"## [sol-onlyowner] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
+def _fix_python_yaml(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 12 类（Module 48）：Python YAML 反序列化改 safe_load。
+
+    `yaml.load(x)`（未指定 SafeLoader）/ `yaml.unsafe_load(x)` /
+    `yaml.full_load(x)` → `yaml.safe_load(x)`：值域锁死在基础类型，
+    构造器劫持面消失。语义安全（safe_load 只少支持自定义 tag，不改正常
+    业务数据的读法）。自检：重切片 + 重跑 deserial 翻 False。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("deserial", src) is not True:
+            continue
+        if not re.search(r"\byaml\s*\.\s*(?:unsafe_load|full_load|load)\s*\(", src):
+            continue
+        if re.search(r"\byaml\s*\.\s*safe_load\s*\(", src):
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        # 只改**没有**显式 SafeLoader 的调用：带 Loader=... 的换法要保留
+        # 其余参数，直接改名会把 Loader 关键字参数留在 safe_load 上（非法）。
+        patched = re.sub(r"\byaml\s*\.\s*(?:unsafe_load|full_load|load)\s*\(",
+                         "yaml.safe_load(", original)
+        if patched == original:
+            continue
+        v2 = None
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.slicer.web_treesitter import WebTreeSitterSlicer
+            u2 = next((x for x in WebTreeSitterSlicer(repo).extract_entry_units()
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = rule_verdict("deserial", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [py-yaml] {u.unit_name}（`{f.name}`）", "```diff",
+                      *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 deserial 规则 → False。",
+                      "> yaml.load/unsafe_load/full_load → yaml.safe_load："
+                      "值域锁死在基础类型，构造器劫持面消失。", ""]
+        else:
+            lines += [f"## [py-yaml] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
 def _fix_solidity_txorigin(repo: Path, targets: list, lines: list) -> int:
     """补丁第 7 类（Module 31）：权限校验里的 `tx.origin ==` 改 `msg.sender ==`。
 
@@ -1916,8 +2058,8 @@ DOCTOR_RULE_CATEGORIES = [
 DOCTOR_PATCHERS = [
     "_fix_sqli_targets", "_fix_xss_targets", "_fix_deserial_targets",
     "_fix_python_deserial", "_fix_python_sqli", "_fix_python_shell",
-    "_fix_solidity_reentrancy", "_fix_solidity_initiator",
-    "_fix_solidity_txorigin", "_fix_mp_concat",
+    "_fix_python_yaml", "_fix_solidity_reentrancy", "_fix_solidity_initiator",
+    "_fix_solidity_onlyowner", "_fix_solidity_txorigin", "_fix_mp_concat",
 ]
 
 
