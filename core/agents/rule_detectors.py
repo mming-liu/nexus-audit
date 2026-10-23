@@ -5682,6 +5682,93 @@ _SOLIDITY_MSGSENDER_MEMBER_RE = re.compile(
     r"(?:\)|!=\s*(?:0|address\s*\(\s*0\s*\))|&&)")
 
 
+# ---- M44：调用者自域状态写（Caller-Scoped State Mutation）----
+#
+# 静态盲点：普通用户态业务函数（transfer/approve/deposit/withdraw）
+# 既不是 view/pure，也不带 onlyOwner，但它们改的只是 balances[msg.sender]
+# 或 allowance[msg.sender][...] —— **调用者自己名下的槽位**，不是合约级
+# 特权操作（改 owner / selfdestruct / 提走全合约 ETH / 改全局费率）。
+# 早退判 False 不用模型就能再砍一大截退回桶。
+#
+# 判据挂"值位置"不挂名字：外转金额必须绑定自域槽位。形参金额形态
+# （msg.sender.transfer(amount)）**不满足** —— 金额可能来自合约整体
+# 资产（smartbugs wallet_04_confused_sign：require(amount >= balances
+# [msg.sender]) 比较方向写反，任何人可提走合约里的钱 —— 官方 access_control
+# 真值行，反查命中这条时整条规则直接作废）。
+_SOL_PRIV_SINK_RE = re.compile(
+    r"\bselfdestruct\s*\(|\bsuicide\s*\(|\bdelegatecall\s*\(|"
+    r"\btransferOwnership\s*\(|"
+    r"\b(?:owner|creator|admin|paused|frozen|locked)\b\s*=(?!=)", re.I)
+_SOL_DRAIN_RE = re.compile(
+    r"\.\s*(?:transfer|send)\s*\([^;]*(?:address\s*\(\s*this\s*\)|\bthis)\s*\.\s*balance"
+    r"|\.\s*call\s*\{[^}]*\}\s*\([^;]*(?:address\s*\(\s*this\s*\)|\bthis)\s*\.\s*balance",
+    re.S)
+# 状态写：映射索引写 / 标量写。前面有类型词的是局部声明（先剥掉）
+_SOL_ASSIGN_RE = re.compile(
+    r"(?<![=!<>+\-*/%&|^])((?:[A-Za-z_]\w*(?:\s*\[\s*[^\]]*\s*\])*)|(?:[A-Za-z_]\w*))"
+    r"\s*(\+=|-=|\*=|/=|=(?!=))\s*([^;]*);")
+_SOL_LOCAL_DECL_RE = re.compile(
+    r"\b(?:uint\d*|int\d*|address|bool|bytes\d*|bytes32|string|var|"
+    r"mapping\s*\([^)]*\))\s+(\w+)\s*=\s*")
+_SOL_EXT_OUT_RE = re.compile(
+    r"\.\s*(?:transfer|send)\s*\(([^;()]*)\)"
+    r"|\.\s*call\s*\{\s*value\s*:\s*([^;{}]*)\}"
+    r"|\.\s*call\s*\.\s*value\s*\(([^;()]*)\)")
+_SOL_SELF_SLOT_RE = re.compile(r"\w\s*\[\s*msg\s*\.\s*sender\s*\]")
+# 资金充足性校验：槽位 >= 数量 或 数量 <= 槽位
+_SOL_BAL_GUARD_RE = re.compile(
+    r"\w\s*\[\s*msg\s*\.\s*sender\s*\]\s*>=\s*"
+    r"|\w\s*<=\s*\w+\s*\[\s*msg\s*\.\s*sender\s*\]")
+
+
+def _sol_self_scoped_safe(func_src: str) -> bool:
+    """函数只改调用者自己名下的槽位 → 不是管理端接口 → 确定性 safe。
+
+    三档全部要求"无特权 Sink"（selfdestruct / delegatecall / owner 类
+    标量覆写 / 全合约余额排空）：
+      A 纯自域写    —— 所有状态写键均为 msg.sender，无外转；
+      B 自域外转    —— 外转金额绑定自域槽位（取回自己的钱，CEI 正序形态）；
+      C 对等转账    —— 写 recipient 键，且有 msg.sender 侧资金充足性校验。
+
+    判 False 的前提是"这个类目上无越权"。对等转账缺余额校验（可凭空造币）
+    或外转金额来自形参/合约整体 → 不满足，退回 None 交模型。
+    """
+    body = re.sub(r"/\*.*?\*/", "", func_src, flags=re.S)
+    body = re.sub(r"//[^\n]*", "", body)
+    if _SOL_PRIV_SINK_RE.search(body) or _SOL_DRAIN_RE.search(body):
+        return False
+    # 局部变量绑定自域槽位（档 B 的"金额取自自己的槽位"）
+    local_self = {m.group(1) for m in
+                  re.finditer(r"\b(\w+)\s*=\s*\w+\s*\[\s*msg\s*\.\s*sender\s*\]",
+                              body)}
+    # 剥掉局部声明的赋值目标（它们不是状态写）
+    body = _SOL_LOCAL_DECL_RE.sub("", body)
+    # 外转：金额实参必须绑定自域槽位
+    for m in _SOL_EXT_OUT_RE.finditer(body):
+        arg = next((g for g in m.groups() if g), "")
+        if _SOL_SELF_SLOT_RE.search(arg):
+            continue
+        if any(re.search(rf"\b{re.escape(v)}\b", arg) for v in local_self):
+            continue
+        return False                     # 金额来自形参/合约整体 → 非自域
+    writes = _SOL_ASSIGN_RE.findall(body)
+    if not writes:
+        return False
+    for lhs, _op, _rhs in writes:
+        if "[" not in lhs:
+            return False                 # 标量状态写（全局会计变量）→ 非自域
+        key = lhs[lhs.index("[") + 1:].split("]")[0].strip()
+        if re.search(r"msg\s*\.\s*sender", key):
+            continue                     # 自域槽位
+        # 他域写：只允许"对等转账"（recipient 键）且有资金充足性校验
+        if not re.search(r"^(?:to|_to|recipient|_recipient|dst|receiver)$",
+                         key):
+            return False
+        if not _SOL_BAL_GUARD_RE.search(body):
+            return False
+    return True
+
+
 def solidity_access_verdict(source: str) -> bool | None:
     """Solidity 访问控制（Module 13 按 smartbugs 真实合约重写）。
 
@@ -5782,6 +5869,13 @@ def solidity_access_verdict(source: str) -> bool | None:
                      r"address\s*\(\s*this\s*\)", func_src):
             return False
         return True
+
+    # M44：调用者自域状态写 —— 普通用户态业务函数（transfer/approve/
+    # deposit/withdraw 自取）不是管理端接口，access_control 维度确定性
+    # safe。放在 True 优先分支之后：tx.origin / 任意 from / 借贷回调
+    # 缺 initiator 都有明确的 True 语义，不能被"自域"覆盖。
+    if _sol_self_scoped_safe(func_src):
+        return False
 
     # 危险动作（只看函数自身源码）
     danger = bool(_SOLIDITY_SELFDESTRUCT_RE.search(func_src))

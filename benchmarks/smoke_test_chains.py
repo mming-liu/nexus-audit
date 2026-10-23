@@ -4380,6 +4380,52 @@ check("M42：doctor 规则注册表 19 类全 OK",
       _sp86.stdout.count("  [OK]") >= 19
       and "共 19 类" in _sp86.stdout, True)
 
+# ---- [87] Module 44：调用者自域状态写早退（access_control）----
+from core.agents.rule_detectors import solidity_access_verdict as _ac87   # noqa: E402
+check("M44：自域三档判 False（纯自域/自取外转/对等转账+余额校验）",
+      (_ac87("function approve(address spender, uint amount) external returns (bool) {"
+             " allowance[msg.sender][spender] = amount; return true; }"),
+       _ac87("function withdraw() external { uint refund = refunds[msg.sender];"
+             " refunds[msg.sender] = 0; msg.sender.send(refund); }"),
+       _ac87("function transfer(address recipient, uint amount) external returns (bool) {"
+             " require(balanceOf[msg.sender] >= amount);"
+             " balanceOf[msg.sender] -= amount;"
+             " balanceOf[recipient] += amount; return true; }")),
+      (False, False, False))
+check("M44：形参金额外转不判 False（wallet_04 比较方向写反=真漏洞）",
+      _ac87("function withdraw(uint256 amount) public {"
+            " require(amount >= balances[msg.sender]);"
+            " msg.sender.transfer(amount);"
+            " balances[msg.sender] -= amount; }"),
+      None)
+check("M44：特权写/selfdestruct/tx.origin 仍判 True（自域不得覆盖真漏洞）",
+      (_ac87("function steal() public { owner = msg.sender; balances[msg.sender] += 1; }"),
+       _ac87("function kill() public { selfdestruct(payable(msg.sender)); }"),
+       _ac87("function withdrawAll() public { tx.origin.transfer(address(this).balance); }")),
+      (True, True, True))
+# 反向核验：smartbugs 官方 access_control 漏洞行无一落进自域早退
+import json as _json87                                              # noqa: E402
+from core.slicer.web3_slither import SoliditySlicer as _sl87       # noqa: E402
+_sb87 = Path(__file__).resolve().parent.parent / "reference_repos" / "smartbugs-curated-main"
+_meta87 = _json87.loads((_sb87 / "vulnerabilities.json").read_text(encoding="utf-8"))
+_lines87 = {(e["path"], ln) for e in _meta87 for v in e.get("vulnerabilities", [])
+            if v.get("category") == "access_control" for ln in v.get("lines", [])}
+_bad87 = []
+for _u87 in _sl87(_sb87 / "dataset" / "access_control").extract_entry_units(
+        _sb87 / "dataset" / "access_control"):
+    _rel87 = "dataset/access_control/" + Path(_u87.file_path).name
+    if not [ln for p, ln in _lines87
+            if p == _rel87 and _u87.start_line <= ln <= _u87.end_line]:
+        continue
+    if _ac87(_u87.source_code or "") is False:
+        _bad87.append(f"{_rel87}:{_u87.start_line}")
+check("M44：smartbugs 官方 access_control 漏洞行零判反",
+      _bad87, [])
+check("M44：退回桶下压（access_control/含未知安全包装 422 → <400）",
+      _json87.loads((Path(__file__).resolve().parent.parent / "benchmarks" / "results"
+                     / "triage_fallbacks.json").read_text(encoding="utf-8"))
+      ["total"]["access_control/含未知安全包装"] < 400, True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
