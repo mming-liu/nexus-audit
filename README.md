@@ -3,9 +3,12 @@
 按《AI 自动化漏洞挖掘：商业化与代码落地完整执行计划》初始化的四层解耦工程骨架。
 
 当前覆盖 **Java / Python / Solidity** 三条赛道：规则层先做确定性判定（编译器/VM
-能证明的事实不交给模型），模型只接手规则判不了的部分；11 个真实外部靶场全部接
-`--strict` 离线门禁，`pre-push` 与 `run_all.py` 各有一道（见
-[多语言靶场](#多语言靶场11-个仓库全部离线门禁)）。
+能证明的事实不交给模型），模型只接手规则判不了的部分；**17 个真实外部靶场**全部接
+`--strict` 离线门禁，`pre-push` 与 `run_all.py`（20 项）各有一道（见
+[多语言靶场](#多语言靶场17-个仓库全部离线门禁)）。
+
+开工前可跑只读自检：`python cli.py doctor` —— 依赖就位 / 19 类规则注册表
+verdict 路由全覆盖 / 缓存指纹算法稳定 / 10 类补丁器就位，四段报告，exit 0 即全部就绪。
 
 ## 目录结构
 
@@ -74,7 +77,7 @@ python benchmarks/benchmark_owasp.py --categories sqli,xss --no-rules
 口径：`Score = TPR − FPR`（OWASP 官方）。调用失败的样本会被标记并剔除，
 不计入分数 —— 否则限流会被伪装成极低的误报率。
 
-## 多语言靶场：11 个仓库、全部离线门禁
+## 多语言靶场：17 个仓库、全部离线门禁
 
 ```bash
 # 一键跑全部（不调模型，约 1 分钟；任一靶场 strict 失败即退出非零）
@@ -91,10 +94,16 @@ python benchmarks/benchmark_vulpy.py --strict
 | Java | OWASP Benchmark（2740 例） | 官方 `expectedresults` | A=0 / B=0 |
 | Java | java-sec-code / Hello-Java-Sec / JavaSecLab / micro_service_seclab | 路由命名 + 作者注释 | `--strict` |
 | Java | newbee-mall / newbee-mall-api | 路由 + 实体/签名 | 穿透基线 |
-| Solidity | damn-vulnerable-defi | 无真值（经济逻辑漏洞） | 健壮性抽检：切片 164 单元、True ≤8 |
+| Java | mall（Spring Boot 电商） | 作者指名 + MBG `Example` 参数化机制 | `--strict` 全库零 True |
+| Java | RuoYi | `dataScope` 切面口径 | `--strict` |
 | Python | vulpy（bad/ vs good/） | **成对代码 diff** | 零误报 / 零静默放行 / 零退回 |
-| Solidity | smartbugs-curated | 官方行号 `vulnerabilities.json` | safe 零误报、零判反 |
-| Solidity | DeFiVulnLabs | **成对 vuln/fixed，按行号标定** | 零误报 / 零判反 / 真值表全命中 |
+| Python | pygoat | 20 lab 真值表 | `--strict` |
+| Python | VAmPI（Connexion/OpenAPI） | 路由 + BOLA 机制口径 | `--strict` |
+| Solidity | damn-vulnerable-defi | 无真值（经济逻辑漏洞） | 健壮性抽检：切片 164 单元、True ≤8 |
+| Solidity | smartbugs-curated | 官方行号 `vulnerabilities.json` | safe 零误报、零判反（parity kill 记 DISPUTED） |
+| Solidity | DeFiVulnLabs | **成对 vuln/fixed，按行号标定** | 零误报 / 零判反 / 真值表全命中（9/9 满贯） |
+| Solidity | nssc | 作者注释**指名**漏洞（honeypots 是陷阱口径不收） | 真值 (file, start_line) 精确匹配 |
+| Solidity | dvdefi（形态抽检） | — | 抽检基线 |
 
 三条口径贯穿所有靶场：
 
@@ -103,8 +112,12 @@ python benchmarks/benchmark_vulpy.py --strict
    调用失败样本单列剔除（带原始异常），绝不折算成"无漏洞"；
 3. **分母 < 20 只记录不下结论**（TPR/FPR 都是），`Score = TPR − FPR`。
 
-`pre-push` 会依次跑九道靶场门禁 + 冒烟 + 争议核对；CI 上没有靶场仓库，
+`pre-push` 会依次跑 13 段靶场门禁 + 冒烟 + 争议核对 + 覆盖地板门禁；CI 上没有靶场仓库，
 因此全量 strict 由本地钩子承担（见 `.githooks/pre-push`）。
+
+规则层现状：**19 类判据入口**（`rule_detectors.verdict()` 统一路由，空源码必须
+退 None）+ **10 类确定性补丁器**（命中→补丁→重切片→规则翻 False→finally 字节级
+还原的自检闭环，`--fix` 触发）。冒烟断言 `[1]`-`[86]` 共 510+ 项，秒级不调模型。
 
 ## 真实项目评测（比 Benchmark 更能说明问题）
 

@@ -4366,6 +4366,20 @@ check("M41：floor 值与 results/*.json 的 decided 一致（同源校验）",
           if (Path(__file__).resolve().parent.parent / "benchmarks"
               / "results" / f"{n}.json").exists()), True)
 
+# ---- [86] Module 42：doctor 子命令自检 ----
+import subprocess                                            # noqa: E402
+_sp86 = subprocess.run(
+    [sys.executable, str(Path(__file__).resolve().parent.parent / "cli.py"),
+     "doctor"], capture_output=True, text=True)
+check("M42：doctor exit 0（依赖/规则表/指纹/补丁器全就绪）",
+      _sp86.returncode, 0)
+check("M42：doctor 输出含四段自检 + PASS 尾标",
+      all(s in _sp86.stdout for s in
+          ("[1/4]", "[2/4]", "[3/4]", "[4/4]", "PASS")), True)
+check("M42：doctor 规则注册表 19 类全 OK",
+      _sp86.stdout.count("  [OK]") >= 19
+      and "共 19 类" in _sp86.stdout, True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

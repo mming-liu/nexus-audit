@@ -13,10 +13,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import difflib
+import importlib
 import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 from core.agents.router import TwoTierRouter
@@ -1857,10 +1859,86 @@ def load_dotenv(path: str | Path = ".env") -> None:
             os.environ.setdefault(k.strip(), v.strip())
 
 
+DOCTOR_RULE_CATEGORIES = [
+    "crypto", "hash", "weakrand", "securecookie", "cors", "deserial", "spel",
+    "xxe", "sqli", "redir", "xss", "ssrf", "cmdi", "pathtraver", "xpathi",
+    "authz", "reentrancy", "access_control", "unchecked_low_level_calls",
+]
+
+DOCTOR_PATCHERS = [
+    "_fix_sqli_targets", "_fix_xss_targets", "_fix_deserial_targets",
+    "_fix_python_deserial", "_fix_python_sqli", "_fix_python_shell",
+    "_fix_solidity_reentrancy", "_fix_solidity_initiator",
+    "_fix_solidity_txorigin", "_fix_mp_concat",
+]
+
+
+def cmd_doctor(args) -> int:
+    """只读自检：依赖 / 规则注册表 / 缓存指纹 / 补丁器就位。exit 0 = 全部就绪。"""
+    ok = True
+
+    print("== [1/4] 依赖就位 ==")
+    print(f"  [OK] python {sys.version.split()[0]}")
+    for name in ["httpx", "tree_sitter(可选·缺省正则降级)", "pyyaml(可选)", "slither(可选)"]:
+        try:
+            importlib.import_module(name.split("(")[0])
+            print(f"  [OK] {name}")
+        except Exception as e:  # noqa: BLE001
+            label = "提示(可选)" if "(可选" in name else "缺失"
+            print(f"  [{label}] {name}: {type(e).__name__}: {e}")
+            if "(可选" not in name:
+                ok = False
+
+    print("== [2/4] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
+    from core.agents import rule_detectors
+    for cat in DOCTOR_RULE_CATEGORIES:
+        try:
+            r = rule_detectors.verdict(cat, "")
+            if r is not None:
+                print(f"  [FAIL] {cat}: 空源码返回了 {r!r}（应 None）")
+                ok = False
+            else:
+                print(f"  [OK] {cat}")
+        except Exception as e:  # noqa: BLE001
+            print(f"  [FAIL] {cat}: 路由异常 {type(e).__name__}: {e}")
+            ok = False
+    print(f"  共 {len(DOCTOR_RULE_CATEGORIES)} 类，全部走 verdict() 路由")
+    print("== [3/4] 缓存指纹自检 ==")
+    try:
+        from benchmarks.diag_owasp_sqli_fp import _slicer_fingerprint
+        fp1, fp2 = _slicer_fingerprint(), _slicer_fingerprint()
+        if fp1 and fp1 == fp2:
+            print(f"  [OK] sha256={fp1[:16]}…（两次调用一致）")
+        else:
+            print(f"  [FAIL] fp1={fp1!r} fp2={fp2!r}")
+            ok = False
+    except Exception as e:  # noqa: BLE001
+        print(f"  [FAIL] 指纹不可用: {type(e).__name__}: {e}")
+        ok = False
+
+    print("== [4/4] 补丁器就位（10 类）==")
+    for fn_name in DOCTOR_PATCHERS:
+        fn = globals().get(fn_name)
+        if callable(fn):
+            print(f"  [OK] {fn_name}")
+        else:
+            print(f"  [FAIL] {fn_name} 不存在")
+            ok = False
+    if callable(globals().get("_verify_fixes_any")):
+        print("  [OK] _verify_fixes_any（自检闭环入口）")
+    else:
+        print("  [FAIL] _verify_fixes_any 不存在")
+        ok = False
+
+    print("doctor:", "PASS（全部就绪）" if ok else "FAIL（存在缺失项）")
+    return 0 if ok else 1
+
+
 def main():
     load_dotenv(Path(__file__).resolve().parent / ".env")
     parser = argparse.ArgumentParser(prog="nexus-audit", description="AI 自动化漏洞挖掘审计框架")
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("doctor", help="依赖/规则注册表/缓存指纹/补丁器就位自检（只读）")
     p_scan = sub.add_parser("scan", help="全量扫描目标仓库")
     p_scan.add_argument("repo_path")
     p_scan.add_argument("--offline", action="store_true", help="离线演示模式（不调用 LLM API）")
@@ -1901,6 +1979,8 @@ def main():
     args = parser.parse_args()
     if args.command == "scan":
         cmd_scan(args)
+    elif args.command == "doctor":
+        sys.exit(cmd_doctor(args))
     else:
         cmd_pr_scan(args)
 
