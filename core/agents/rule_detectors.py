@@ -5654,6 +5654,21 @@ def solidity_access_verdict(source: str) -> bool | None:
             func_src):
         return True
 
+    # M34：借贷池回调缺 initiator 校验（DeFiVulnLabs Flashloan-flaw 精准
+    # 收割，M33 退回池榜首可证子簇）。`executeOperation` 是 Aave flashLoan
+    # 的协议回调接口（机制形态：external 回调 + initiator/receiver 形参，
+    # 与 receive() 同类的"协议强制入口"）。回调由池子直调，"这笔闪贷是谁
+    # 发起的"只能由合约自己核验——
+    #   · require(<initiator> == address(this)) → False（成对修复形态）；
+    #   · 无 initiator 比较 → True（任何人可直调回调把借出资产转走，
+    #     作者注释：Missing flash loan initiator check）。
+    if fname == "executeOperation" and re.search(
+            r"address\s+(?:payable\s+)?_?initiator\b", sig):
+        if re.search(r"require\s*\([^;]*\b_?initiator\s*==\s*"
+                     r"address\s*\(\s*this\s*\)", func_src):
+            return False
+        return True
+
     # 危险动作（只看函数自身源码）
     danger = bool(_SOLIDITY_SELFDESTRUCT_RE.search(func_src))
     owner_write = bool(_SOLIDITY_OWNERISH_RE.search(func_src)) \

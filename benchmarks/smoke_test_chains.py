@@ -4125,3 +4125,29 @@ check("M32：单 chunk 全量判定与分片聚合逐位一致",
       _ec78(_t78) == [(_n, _c, _v, _r) for (_n, _c, _v, _r) in _ec78(_t78)], True)
 check("M32：分片聚合的 verdict 值正确（None/False/True）",
       [r[3] for r in _ec78(_t78)], [None, False, True])
+
+
+# ---- [79] Module 34：借贷池回调 initiator 校验精准收割 ----
+check("M34：executeOperation 无 initiator 校验 → True",
+      _verdict("access_control", '''
+function executeOperation(
+    uint256 amounts,
+    address receiverAddress,
+    address _initiator,
+    bytes calldata data
+) external {
+    IERC20(USDa).safeTransfer(address(lendingPool), amounts);
+}
+'''), True)
+check("M34：executeOperation 带 require(initiator == address(this)) → False",
+      _verdict("access_control", '''
+function executeOperation(
+    uint256 amounts,
+    address receiverAddress,
+    address _initiator,
+    bytes calldata data
+) external {
+    require(_initiator == address(this), "Unauthorized");
+    IERC20(USDa).safeTransfer(address(lendingPool), amounts);
+}
+'''), False)
