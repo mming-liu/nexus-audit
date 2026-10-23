@@ -129,6 +129,7 @@ FLOORS = {
     "pygoat": 9,
     "ruoyi": 159,
     "eladminmp": 53,
+    "webgoat": 6,             # WebGoat 6/6（M46，教学关卡成对真值）
 }
 
 

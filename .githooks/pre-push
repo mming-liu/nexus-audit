@@ -117,6 +117,13 @@ if [ -d reference_repos/mall-main ]; then
   echo "pre-push: mall 基线通过 ✔"
 fi
 
+# 第 18 靶场（Module 46）：WebGoat——教学关卡成对真值
+if [ -d reference_repos/WebGoat-master ]; then
+  echo "pre-push: WebGoat 基线 ..."
+  "$PY" benchmarks/benchmark_webgoat.py --strict > /dev/null
+  echo "pre-push: WebGoat 基线通过 ✔"
+fi
+
 # 覆盖地板门禁（Module 41）：确定性命中数下限
 echo "pre-push: 覆盖地板门禁 ..."
 "$PY" benchmarks/triage_fallbacks.py --check-floor > /dev/null

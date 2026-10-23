@@ -108,6 +108,13 @@ JOBS = [
     # 覆盖率下滑（新退回路径）没人拦 —— 这里锁各靶场确定性命中数下限。
     ("覆盖地板门禁", ["benchmarks/triage_fallbacks.py", "--check-floor"],
      None, "smoke", False),
+    # 第 21 项（Module 46）：WebGoat。教学关卡成对真值（攻击关 vs 修复关，
+    # 同库同构）。逼出 sqli 的"整句 SQL 由用户控制"判据（executeQuery(query)
+    # 形参直传，非拼接形态）—— 这一整类经典注入此前全退 None。
+    # 只登记口径一致的 sqli 关卡：pathtraversal/xxe/ssrf/idor 四门课程
+    # 经探针判定为口径冲突或 sink 跨文件不可判，一律不登记。
+    ("WebGoat (教学关卡成对真值)", ["benchmarks/benchmark_webgoat.py", "--strict"],
+     "reference_repos/WebGoat-master", "target", True),
 ]
 
 
@@ -173,6 +180,7 @@ def build_scoreboard() -> str:
         ("eladmin-mp (MyBatis-Plus)", "eladminmp.json", "total_units"),
         ("VAmPI (Connexion/OpenAPI)", "vampi.json", "total_units"),
         ("mall (生产级多模块对照)", "mall.json", "total_units"),
+        ("WebGoat (教学关卡成对真值)", "webgoat.json", "total_units"),
     ]
     total_fp = total_rev = 0
     for label, fname, unit_key in WHITELIST:

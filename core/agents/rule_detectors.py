@@ -954,6 +954,134 @@ def _mybatis_text(source: str) -> str:
     return "\n".join(parts)
 
 
+# A1) 整句 SQL 由用户控制（Module 46，WebGoat 形态）
+#
+#     statement.executeQuery(query) —— query 是 String 形参（@RequestParam），
+#     **整句 SQL** 由攻击者给。这不是"拼接"形态，而是比拼接更彻底的形态：
+#     之前的 JDBC 分支只在 SQLI_CONCAT_RE 命中（看到 `+` 拼接）时才给结论，
+#     于是"整句可控"这一整类经典注入全部退回 None（WebGoat SqlInjection
+#     Lesson2/3/4/5 等 10 余个关卡实测全退）。
+#
+#     判据（挂机制不挂名字）：
+#       ① sink 是 JDBC 执行方法（executeQuery/executeUpdate/execute）；
+#       ② 实参是**标识符**（不是 SQL 字面量、不含 ? 占位符）；
+#       ③ 该实参是所在方法的 **String 型形参**（数字型形参注入不了 ——
+#          Spring/JDBC 已把入参解析成 int）；
+#       ④ 该形参的值确实来自外部输入：它是入口的用户输入形参
+#          （@RequestParam/@PathVariable/@RequestBody/@RequestHeader），
+#          或它所在方法被入口以"用户输入形参"调用（一跳）。
+#
+#     ④ 是关键闸门：没有它，形如 `helper(String fixed)` 里 executeQuery(fixed)
+#     会被误判成注入。
+_SQLI_WHOLE_STMT_SINK_RE = re.compile(
+    r"\.\s*(?:executeQuery|executeUpdate|execute)\s*\(\s*([A-Za-z_]\w*)\s*\)")
+_USER_INPUT_ANN_RE = re.compile(
+    r"@(?:RequestParam|PathVariable|RequestBody|RequestHeader|CookieValue|"
+    r"ModelAttribute|RequestPart)\b")
+_NUMERIC_JAVA_TYPE_RE = re.compile(
+    r"\b(?:int|long|short|byte|float|double|Integer|Long|Short|Byte|Float|"
+    r"Double|BigInteger|BigDecimal)\b")
+_JAVA_METHOD_SIG_RE = re.compile(
+    r"(?:^|\n)[ \t]*(?:@\w+(?:\([^()]*\))?[ \t]*\n[ \t]*)*"
+    r"(?:public|protected|private|static|final|synchronized|abstract|native|"
+    r"default|strictfp|\s)+[\w<>\[\],\.\s]*?\b(\w+)\s*\(([^)]*)\)"
+    r"\s*(?:throws\s+[\w,\.\s]+)?\s*\{")
+
+
+def _java_method_segments(source: str) -> list[tuple[str, str, str, int]]:
+    """切出 (方法名, 签名, 方法体, 体起始偏移) 列表。
+
+    只用正则切方法头 + 括号配平找体尾 —— 不引 Java 解析器（依赖树里没有），
+    也不做完整语法分析：判据只需要"这个 sink 落在哪个方法的形参域里"。
+    """
+    segs: list[tuple[str, str, str, int]] = []
+    for m in _JAVA_METHOD_SIG_RE.finditer(source):
+        name, sig = m.group(1), m.group(2)
+        # 找方法体的括号配平
+        start = source.find("{", m.end() - 1)
+        if start < 0:
+            continue
+        depth = 0
+        end = len(source)
+        for i in range(start, len(source)):
+            if source[i] == "{":
+                depth += 1
+            elif source[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+        segs.append((name, sig, source[start:end], start))
+    return segs
+
+
+def _sql_stmt_whole_user_controlled(source: str) -> bool | None:
+    """整句 SQL 由外部输入控制 → True；证据不足 → None。"""
+    segs = _java_method_segments(source)
+    if not segs:
+        return None
+    entry_name = ""
+    for name, _sig, _body, _off in segs:
+        entry_name = name
+        break                       # 切片里第一个方法通常是入口
+    # 入口的用户输入形参
+    entry_user_params: set[str] = set()
+    entry_has_request = False
+    for name, sig, _b, off in segs:
+        if name != entry_name:
+            continue
+        if re.search(r"HttpServletRequest", sig):
+            entry_has_request = True
+        # HTTP 入口判定：方法体之前最近的一个注解里有没有 @*Mapping。
+        # Spring MVC 的**默认参数绑定**事实：HTTP 入口方法上没加注解的
+        # String 形参，按参数名从请求参数取值（WebGoat SqlInjectionLesson5
+        # 的 `completed(String query)` 就是这种 —— 攻击者整句可控）。
+        # 只有确认是 HTTP 入口才敢用这条，否则内部方法的无注解形参会被误当输入。
+        head = source[max(0, off - 400):off]
+        is_http_entry = bool(re.search(
+            r"@(?:Get|Post|Put|Delete|Patch|Request)Mapping\b", head))
+        for pm in re.finditer(r"(@\w+(?:\([^()]*\))?\s*)*([\w<>\[\],\.\s]+?)\s+(\w+)\s*(?:,|$)",
+                             sig):
+            ann, ty, pname = pm.group(1) or "", pm.group(2) or "", pm.group(3)
+            if _NUMERIC_JAVA_TYPE_RE.search(ty):
+                continue
+            if _USER_INPUT_ANN_RE.search(ann):
+                entry_user_params.add(pname)
+            elif is_http_entry and re.search(r"\bString\b", ty):
+                entry_user_params.add(pname)
+    if not entry_user_params:
+        return None
+    for m in _SQLI_WHOLE_STMT_SINK_RE.finditer(source):
+        arg = m.group(1)
+        # 定位 sink 所在方法段
+        host = None
+        for name, sig, body, off in segs:
+            if off <= m.start() < off + len(body):
+                host = (name, sig, body, off)
+                break
+        if host is None:
+            continue
+        hname, hsig, hbody, hoff = host
+        ptypes = _param_decl_types(hsig)
+        if arg not in ptypes:
+            continue                  # 实参不是本段形参（局部变量/字段）
+        ty = ptypes.get(arg, "")
+        if _NUMERIC_JAVA_TYPE_RE.search(ty):
+            return False             # 数字型形参：注入不了
+        if hname == entry_name:
+            if arg in entry_user_params:
+                return True
+            continue
+        # 一跳：该辅助方法被入口以"用户输入形参"调用
+        for cm in re.finditer(rf"(?<![.\w]){re.escape(hname)}\s*\(([^){{]{{0,200}})\)",
+                              source):
+            cargs = cm.group(1)
+            for cm2 in re.finditer(r"([A-Za-z_]\w*)", cargs):
+                if cm2.group(1) in entry_user_params:
+                    return True
+    return None
+
+
 def sqli_verdict(source: str) -> bool | None:
     body = entry_body(source)
     impl = _impl_segment(source)
@@ -1110,6 +1238,13 @@ def sqli_verdict(source: str) -> bool | None:
         if "?" in arg:
             return False
         return None
+    # A1) 整句 SQL 由用户控制：sink 实参是 String 型用户输入形参。
+    # 放在所有既有分支**之后**：拼接形态/参数化形态的结论一律优先，
+    # 本分支只接管"本来会退 None"的整句可控场景（只认 True，不覆盖
+    # 任何 False —— 覆盖 False 就是把参数化查询判成有漏洞，方向反了）。
+    whole = _sql_stmt_whole_user_controlled(source)
+    if whole is True:
+        return True
     return None
 
 

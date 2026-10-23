@@ -4352,9 +4352,9 @@ check("M40：Python 字节级还原",
 # ---- [85] Module 41：覆盖地板门禁 ----
 import json                                                        # noqa: E402
 import triage_fallbacks as _tri41                                 # noqa: E402
-check("M41：地板表覆盖 9 个真值靶场且下限为正",
+check("M41：地板表覆盖 10 个真值靶场且下限为正",
       (len(_tri41.FLOORS), all(v > 0 for v in _tri41.FLOORS.values())),
-      (9, True))
+      (10, True))
 check("M41：--check-floor 全绿态通过（exit 0）",
       _sp81.run([sys.executable, str(Path(__file__).resolve().parent
                  / "triage_fallbacks.py"), "--check-floor"],
@@ -4476,6 +4476,48 @@ check("M45：文件名带源文件前缀（同名函数不互相覆盖）",
       (True, True, True))
 check("M45：cli.py scan --emit-poc 端到端可跑（DeFiVulnLabs 10 条命中全自检通过）",
       _sp88.returncode, 0)
+
+# ---- [89] Module 46：WebGoat 第 18 靶场 + 整句 SQL 可控判据 ----
+import subprocess as _sp89_mod                                  # noqa: E402
+_sp89 = _sp89_mod.run(
+    [sys.executable, str(Path(__file__).resolve().parent.parent / "benchmarks"
+                         / "benchmark_webgoat.py"), "--strict"],
+    capture_output=True, text=True)
+check("M46：WebGoat 基准 STRICT PASS（6 条成对真值零误报零判反）",
+      _sp89.returncode, 0)
+check("M46：整句 SQL 可控判 True（executeQuery(形参直传)）",
+      _verdict("sqli", """
+// Full-Route: /t/whole
+@PostMapping("/whole")
+public String whole(@RequestParam String query) {
+    return stmt.executeQuery(query);
+}
+"""), True)
+check("M46：参数化查询仍判 False（整句可控分支不得覆盖 ? 占位符）",
+      _verdict("sqli", """
+// Full-Route: /t/prep
+@GetMapping("/prep")
+public String prep(String id) {
+    PreparedStatement ps = conn.prepareStatement("select * from u where id=?");
+    ps.setString(1, id);
+    return "ok";
+}
+"""), False)
+check("M46：无注解 String 形参的 HTTP 入口仍判 True（Spring 默认绑定）",
+      _verdict("sqli", """
+// Full-Route: /t/default
+@PostMapping("/default")
+public String defaultBind(String query) {
+    return stmt.executeQuery(query);
+}
+"""), True)
+check("M46：非 HTTP 入口的同形态不判 True（无路由注解不认默认绑定）",
+      _verdict("sqli", """
+// Full-Route: /t/inner
+public String helper(String query) {
+    return stmt.executeQuery(query);
+}
+"""), None)
 
 print()
 if FAILS:

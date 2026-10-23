@@ -1,0 +1,66 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\WebGoat-master",
+  "total_units": 179,
+  "truth_entries": 6,
+  "decided": 6,
+  "correct": 6,
+  "fp": 0,
+  "reverse_fn": 0,
+  "none": 0,
+  "rows": [
+    {
+      "file": "Servers.java",
+      "unit": "Servers.sort",
+      "start_line": 43,
+      "category": "sqli",
+      "truth": true,
+      "rule": true,
+      "why": "prepareStatement(\"... order by \" + column)：column 是 @RequestParam"
+    },
+    {
+      "file": "SqlInjectionLesson13.java",
+      "unit": "SqlInjectionLesson13.completed",
+      "start_line": 41,
+      "category": "sqli",
+      "truth": false,
+      "rule": false,
+      "why": "prepareStatement(\"... where ip = ? and hostname = ?\") + setString 绑定"
+    },
+    {
+      "file": "SqlInjectionLesson2.java",
+      "unit": "SqlInjectionLesson2.completed",
+      "start_line": 40,
+      "category": "sqli",
+      "truth": true,
+      "rule": true,
+      "why": "statement.executeQuery(query)：query 是 @RequestParam 形参，整句可控"
+    },
+    {
+      "file": "SqlInjectionLesson3.java",
+      "unit": "SqlInjectionLesson3.completed",
+      "start_line": 35,
+      "category": "sqli",
+      "truth": true,
+      "rule": true,
+      "why": "statement.executeUpdate(query)：整句可控（写型注入）"
+    },
+    {
+      "file": "SqlInjectionLesson4.java",
+      "unit": "SqlInjectionLesson4.completed",
+      "start_line": 36,
+      "category": "sqli",
+      "truth": true,
+      "rule": true,
+      "why": "statement.executeUpdate(query)：整句可控（写型注入）"
+    },
+    {
+      "file": "SqlInjectionLesson5.java",
+      "unit": "SqlInjectionLesson5.completed",
+      "start_line": 53,
+      "category": "sqli",
+      "truth": true,
+      "rule": true,
+      "why": "completed(String query) 无注解形参：Spring 默认按名绑定请求参数，整句可控"
+    }
+  ]
+}
