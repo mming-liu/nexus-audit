@@ -42,6 +42,10 @@ class SoliditySlicer:
     def extract_entry_units(self, repo_path: str | Path) -> List[CodeUnit]:
         repo = Path(repo_path)
         units: List[CodeUnit] = []
+        # Module 39：仓库级合约索引（两阶段切片的前提）。跨文件父合约的
+        # modifier 实现体只有先扫全库才知道在哪 —— `contract X is Ownable`
+        # 的 Ownable 可能在同文件，也可能在 import 的另一个 .sol 里。
+        parent_index = self._build_parent_index(repo)
         for sol in repo.rglob("*.sol"):
             if any(p in self.IGNORE for p in sol.parts):
                 continue
@@ -115,12 +119,37 @@ class SoliditySlicer:
                 used = set(re.findall(r"\b([A-Za-z_]\w*)\b", vis))
                 extra = [seg for _ms, _me, mname, seg in mod_spans
                          if mname in used]
+                # Module 39：签名用了 modifier 但**本合约没有定义** ——
+                # 只能来自父合约（`contract X is Ownable` 的 onlyOwner）。
+                # 沿继承链到父合约文件里抓实现体贴进证据段，铁律 17
+                # "看实现体不看名字"才能跨文件成立；抓不到就保持缺证，
+                # 判定层按缺证退 None（不许只凭名字判安全）。
+                local_mods = {mname for _s, _e, mname, _g in mod_spans}
+                missing = [n for n in used if n not in local_mods]
+                if missing and contract:
+                    inherited = self._inherited_mods(contract, missing,
+                                                     parent_index)
+                    if inherited:
+                        extra.append(
+                            "// ---- 父合约继承证据 ["
+                            + ", ".join(f"{c}.{n}" for c, n, _s in inherited)
+                            + "] ----\n"
+                            + "\n".join(seg for _c, _n, seg in inherited))
                 # 合约名写进切片首行注释：函数级切片没有文件头，
                 # "函数名 == 合约名 → 构造函数"的判定只能靠它。
                 src = f"// contract: {contract or '?'}\n" + src
                 if extra:
-                    src = (src + "\n// ---- 修饰符定义（本合约，供核验）----\n"
-                           + "\n".join(extra))
+                    # 只有「本合约」modifier 段才用本合约段头；继承证据
+                    # 段自带 `// ---- 父合约继承证据 [...] ----` 段头，
+                    # 空的本合约头会误导核验（Module 39 实测空段头）。
+                    local = [s for s in extra if not s.startswith("// ---- 父合约")]
+                    inh = [s for s in extra if s.startswith("// ---- 父合约")]
+                    parts = []
+                    if local:
+                        parts.append("// ---- 修饰符定义（本合约，供核验）----\n"
+                                     + "\n".join(local))
+                    parts.extend(inh)
+                    src = src + "\n" + "\n".join(parts)
                 units.append(CodeUnit(
                     file_path=str(sol), language=Language.SOLIDITY_WEB3,
                     unit_name=name, start_line=start_line, end_line=end_line,
@@ -129,6 +158,69 @@ class SoliditySlicer:
         return units
 
     IGNORE = {"node_modules", "lib", "test/helpers"}
+
+    # ---- Module 39：跨文件父合约继承索引 ----
+
+    def _build_parent_index(self, repo: Path) -> dict:
+        """扫全库 .sol：合约名 → (is 继承列表, {modifier名: 实现体})。
+
+        只做正则级事实提取（合约头 is 子句 + modifier 括号配平体），
+        与 extract_entry_units 的本文件解析同正则口径，两遍结果一致。
+        索引失败静默降级为空 —— 继承证据是增强项，不能拖垮切片。
+        """
+        idx: dict[str, tuple[list[str], dict[str, str]]] = {}
+        try:
+            for sol in repo.rglob("*.sol"):
+                if any(p in self.IGNORE for p in sol.parts):
+                    continue
+                try:
+                    text = sol.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                mods: dict[str, str] = {}
+                for mm in re.finditer(
+                        r"\bmodifier\s+([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*[^{;]*\{",
+                        text):
+                    depth = 0
+                    for i2 in range(mm.end() - 1, len(text)):
+                        if text[i2] == "{":
+                            depth += 1
+                        elif text[i2] == "}":
+                            depth -= 1
+                            if depth == 0:
+                                mods[mm.group(1)] = mm.group(0) + text[mm.end():i2]
+                                break
+                for cm in re.finditer(
+                        r"\bcontract\s+([A-Za-z_]\w*)\s*(?:is\s+([\w\s,.\-]+))?\s*\{",
+                        text):
+                    bases = [b.strip() for b in (cm.group(2) or "").split(",")
+                             if b.strip()]
+                    idx[cm.group(1)] = (bases, mods)
+        except Exception:
+            return {}
+        return idx
+
+    def _inherited_mods(self, contract: str, missing: list[str],
+                        idx: dict, _seen: set | None = None
+                        ) -> list[tuple[str, str, str]]:
+        """沿 is 继承链（BFS，防环）抓父合约里缺失 modifier 的实现体。
+        返回 [(父合约名, modifier名, 实现体)]。"""
+        if _seen is None:
+            _seen = set()
+        if contract in _seen or contract not in idx:
+            return []
+        _seen.add(contract)
+        bases, mods = idx[contract]
+        out: list[tuple[str, str, str]] = []
+        want = set(missing)
+        for n in want:
+            if n in mods:
+                out.append((contract, n, mods[n]))
+        rest = want - {n for _, n, _ in out}
+        if rest:
+            for b in bases:
+                out.extend(self._inherited_mods(b, sorted(rest), idx, _seen))
+        return out
 
     @staticmethod
     def _calls(src: str) -> list[str]:

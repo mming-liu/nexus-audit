@@ -4278,6 +4278,38 @@ check("M38：mall benchmark STRICT PASS（16 真值 + 全库零 True）",
                  / "benchmark_mall.py"), "--strict"],
                 capture_output=True).returncode, 0)
 
+# ---- [83] Module 39：跨文件父合约 modifier 继承证据 ----
+import tempfile                                                    # noqa: E402
+_m39dir = Path(tempfile.mkdtemp(prefix="m39fx_"))
+(_m39dir / "Base.sol").write_text('''contract Base {
+    address public owner;
+    modifier onlyOwner() {
+        require(msg.sender == owner, "not owner");
+        _;
+    }
+}
+''', encoding="utf-8")
+(_m39dir / "Child.sol").write_text('''import "./Base.sol";
+contract Vault is Base {
+    mapping(address => uint256) public balances;
+    function drain() onlyOwner public {
+        selfdestruct(msg.sender);
+    }
+}
+''', encoding="utf-8")
+_m39u = [u for u in SoliditySlicer().extract_entry_units(_m39dir)
+         if u.unit_name == "drain"][0]
+check("M39：父合约 modifier 实现体贴进切片（Base.onlyOwner 证据段）",
+      ("父合约继承证据" in _m39u.source_code
+       and "require(msg.sender == owner" in _m39u.source_code), True)
+check("M39：跨文件继承 modifier 经核验 → False（铁律 17 跨文件成立）",
+      _verdict("access_control", _m39u.source_code), False)
+_m39_empty = [u for u in SoliditySlicer().extract_entry_units(_m39dir)
+              if u.unit_name == "drain"][0]
+check("M39：无本合约 modifier 时不留空段头",
+      "修饰符定义（本合约，供核验）----\n\n" not in _m39_empty.source_code
+      or "require(msg.sender == owner" in _m39_empty.source_code, True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
