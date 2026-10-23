@@ -1,0 +1,875 @@
+{
+  "total": {
+    "sqli/缺 Sink": 1804,
+    "cmdi/缺 Sink": 1933,
+    "deserial/缺 Sink": 1882,
+    "ssrf/缺 Sink": 1934,
+    "xxe/缺 Sink": 1935,
+    "reentrancy/缺 Sink": 1276,
+    "access_control/缺 Sink": 768,
+    "xss/缺 Sink": 271,
+    "access_control/含未知安全包装": 432,
+    "authz/缺 Source": 8,
+    "authz/缺 Sink": 1668,
+    "pathtraver/缺 Sink": 27,
+    "deserial/含未知安全包装": 33,
+    "pathtraver/含未知安全包装": 28,
+    "pathtraver/缺 Source": 9,
+    "deserial/缺 Source": 14,
+    "access_control/缺 Source": 115,
+    "xxe/缺 Source": 2,
+    "xss/含未知安全包装": 18,
+    "authz/跨文件链路未闭合": 3,
+    "authz/含未知安全包装": 4,
+    "access_control/跨文件链路未闭合": 1,
+    "deserial/跨文件链路未闭合": 2,
+    "reentrancy/含未知安全包装": 170,
+    "sqli/含未知安全包装": 5,
+    "xss/缺 Source": 48,
+    "ssrf/含未知安全包装": 1,
+    "reentrancy/缺 Source": 56,
+    "cmdi/缺 Source": 2
+  },
+  "per_bench": {
+    "RuoYi": {
+      "sqli/缺 Sink": 284,
+      "cmdi/缺 Sink": 305,
+      "deserial/缺 Sink": 298,
+      "ssrf/缺 Sink": 304,
+      "xxe/缺 Sink": 303,
+      "reentrancy/缺 Sink": 305,
+      "access_control/缺 Sink": 252,
+      "xss/缺 Sink": 152,
+      "access_control/含未知安全包装": 33,
+      "authz/缺 Source": 8,
+      "authz/缺 Sink": 105,
+      "pathtraver/缺 Sink": 10,
+      "deserial/含未知安全包装": 5,
+      "pathtraver/含未知安全包装": 2,
+      "pathtraver/缺 Source": 1,
+      "deserial/缺 Source": 2,
+      "access_control/缺 Source": 19,
+      "xxe/缺 Source": 2,
+      "xss/含未知安全包装": 1,
+      "authz/跨文件链路未闭合": 3,
+      "authz/含未知安全包装": 1,
+      "access_control/跨文件链路未闭合": 1
+    },
+    "eladmin-mp": {
+      "sqli/缺 Sink": 47,
+      "xss/含未知安全包装": 5,
+      "cmdi/缺 Sink": 65,
+      "deserial/缺 Sink": 35,
+      "ssrf/缺 Sink": 65,
+      "xxe/缺 Sink": 65,
+      "reentrancy/缺 Sink": 63,
+      "access_control/缺 Sink": 63,
+      "authz/含未知安全包装": 3,
+      "pathtraver/含未知安全包装": 18,
+      "deserial/含未知安全包装": 26,
+      "pathtraver/缺 Sink": 7,
+      "xss/缺 Sink": 23,
+      "deserial/跨文件链路未闭合": 2,
+      "reentrancy/含未知安全包装": 2,
+      "sqli/含未知安全包装": 5,
+      "access_control/含未知安全包装": 2,
+      "pathtraver/缺 Source": 2,
+      "deserial/缺 Source": 2
+    },
+    "vulpy": {
+      "authz/缺 Sink": 30,
+      "pathtraver/缺 Sink": 4,
+      "xss/缺 Sink": 18,
+      "cmdi/缺 Sink": 35,
+      "deserial/缺 Sink": 35,
+      "ssrf/缺 Sink": 34,
+      "xxe/缺 Sink": 35,
+      "reentrancy/缺 Sink": 35,
+      "access_control/缺 Sink": 35,
+      "sqli/缺 Sink": 11,
+      "xss/缺 Source": 3,
+      "xss/含未知安全包装": 9
+    },
+    "pygoat": {
+      "sqli/缺 Sink": 95,
+      "authz/缺 Sink": 166,
+      "cmdi/缺 Sink": 165,
+      "deserial/缺 Sink": 160,
+      "ssrf/缺 Sink": 164,
+      "xxe/缺 Sink": 165,
+      "reentrancy/缺 Sink": 166,
+      "access_control/缺 Sink": 165,
+      "xss/缺 Sink": 76,
+      "pathtraver/含未知安全包装": 8,
+      "xss/含未知安全包装": 3,
+      "pathtraver/缺 Source": 6,
+      "xss/缺 Source": 45,
+      "pathtraver/缺 Sink": 5,
+      "deserial/含未知安全包装": 1,
+      "ssrf/含未知安全包装": 1,
+      "access_control/含未知安全包装": 1
+    },
+    "smartbugs": {
+      "sqli/缺 Sink": 841,
+      "authz/缺 Sink": 841,
+      "cmdi/缺 Sink": 841,
+      "deserial/缺 Sink": 836,
+      "ssrf/缺 Sink": 841,
+      "xxe/缺 Sink": 841,
+      "reentrancy/缺 Sink": 418,
+      "access_control/缺 Sink": 126,
+      "reentrancy/含未知安全包装": 125,
+      "access_control/含未知安全包装": 255,
+      "access_control/缺 Source": 40,
+      "deserial/缺 Source": 5,
+      "reentrancy/缺 Source": 28,
+      "xss/缺 Sink": 2
+    },
+    "DeFiVulnLabs": {
+      "sqli/缺 Sink": 323,
+      "authz/缺 Sink": 323,
+      "cmdi/缺 Sink": 319,
+      "deserial/缺 Sink": 318,
+      "ssrf/缺 Sink": 323,
+      "xxe/缺 Sink": 323,
+      "reentrancy/缺 Source": 23,
+      "access_control/缺 Source": 48,
+      "reentrancy/缺 Sink": 202,
+      "access_control/含未知安全包装": 78,
+      "access_control/缺 Sink": 110,
+      "deserial/缺 Source": 2,
+      "reentrancy/含未知安全包装": 14,
+      "cmdi/缺 Source": 2,
+      "pathtraver/缺 Sink": 1,
+      "deserial/含未知安全包装": 1
+    },
+    "nssc": {
+      "sqli/缺 Sink": 203,
+      "authz/缺 Sink": 203,
+      "cmdi/缺 Sink": 203,
+      "deserial/缺 Sink": 200,
+      "ssrf/缺 Sink": 203,
+      "xxe/缺 Sink": 203,
+      "reentrancy/含未知安全包装": 29,
+      "access_control/含未知安全包装": 63,
+      "reentrancy/缺 Sink": 87,
+      "reentrancy/缺 Source": 5,
+      "access_control/缺 Source": 8,
+      "access_control/缺 Sink": 17,
+      "deserial/缺 Source": 3
+    }
+  },
+  "samples": {
+    "RuoYi/sqli/缺 Sink": [
+      "SysJobController.java:SysJobController.job",
+      "SysJobController.java:SysJobController.list",
+      "SysJobController.java:SysJobController.export",
+      "SysJobController.java:SysJobController.remove",
+      "SysJobController.java:SysJobController.detail"
+    ],
+    "RuoYi/cmdi/缺 Sink": [
+      "SysJobController.java:SysJobController.job",
+      "SysJobController.java:SysJobController.list",
+      "SysJobController.java:SysJobController.export",
+      "SysJobController.java:SysJobController.remove",
+      "SysJobController.java:SysJobController.detail"
+    ],
+    "RuoYi/deserial/缺 Sink": [
+      "SysJobController.java:SysJobController.job",
+      "SysJobController.java:SysJobController.list",
+      "SysJobController.java:SysJobController.export",
+      "SysJobController.java:SysJobController.remove",
+      "SysJobController.java:SysJobController.detail"
+    ],
+    "RuoYi/ssrf/缺 Sink": [
+      "SysJobController.java:SysJobController.job",
+      "SysJobController.java:SysJobController.list",
+      "SysJobController.java:SysJobController.export",
+      "SysJobController.java:SysJobController.remove",
+      "SysJobController.java:SysJobController.detail"
+    ],
+    "RuoYi/xxe/缺 Sink": [
+      "SysJobController.java:SysJobController.job",
+      "SysJobController.java:SysJobController.list",
+      "SysJobController.java:SysJobController.export",
+      "SysJobController.java:SysJobController.remove",
+      "SysJobController.java:SysJobController.detail"
+    ],
+    "RuoYi/reentrancy/缺 Sink": [
+      "SysJobController.java:SysJobController.job",
+      "SysJobController.java:SysJobController.list",
+      "SysJobController.java:SysJobController.export",
+      "SysJobController.java:SysJobController.remove",
+      "SysJobController.java:SysJobController.detail"
+    ],
+    "RuoYi/access_control/缺 Sink": [
+      "SysJobController.java:SysJobController.job",
+      "SysJobController.java:SysJobController.list",
+      "SysJobController.java:SysJobController.export",
+      "SysJobController.java:SysJobController.remove",
+      "SysJobController.java:SysJobController.changeStatus"
+    ],
+    "RuoYi/xss/缺 Sink": [
+      "SysJobController.java:SysJobController.list",
+      "SysJobController.java:SysJobController.export",
+      "SysJobController.java:SysJobController.remove",
+      "SysJobController.java:SysJobController.detail",
+      "SysJobController.java:SysJobController.changeStatus"
+    ],
+    "RuoYi/access_control/含未知安全包装": [
+      "SysJobController.java:SysJobController.detail",
+      "SysJobController.java:SysJobController.edit",
+      "SysJobLogController.java:SysJobLogController.jobLog",
+      "SysJobLogController.java:SysJobLogController.detail",
+      "SysOperlogController.java:SysOperlogController.detail"
+    ],
+    "RuoYi/authz/缺 Source": [
+      "SysJobController.java:SysJobController.checkCronExpressionIsValid",
+      "SysDictTypeController.java:SysDictTypeController.treeData",
+      "SysIndexController.java:SysIndexController.lockscreen",
+      "SysIndexController.java:SysIndexController.switchSkin",
+      "SysIndexController.java:SysIndexController.main"
+    ],
+    "RuoYi/authz/缺 Sink": [
+      "SysJobController.java:SysJobController.cron",
+      "GenController.java:GenController.createTable",
+      "CommonController.java:CommonController.fileDownload",
+      "CommonController.java:CommonController.uploadFile",
+      "CommonController.java:CommonController.uploadFiles"
+    ],
+    "RuoYi/pathtraver/缺 Sink": [
+      "GenController.java:GenController.importTableSave",
+      "GenController.java:GenController.editSave",
+      "GenController.java:GenController.preview",
+      "GenController.java:GenController.download",
+      "GenController.java:GenController.batchGenCode"
+    ],
+    "RuoYi/deserial/含未知安全包装": [
+      "GenController.java:GenController.download",
+      "CommonController.java:CommonController.fileDownload",
+      "CommonController.java:CommonController.uploadFile",
+      "CommonController.java:CommonController.uploadFiles",
+      "SysProfileController.java:SysProfileController.updateAvatar"
+    ],
+    "RuoYi/pathtraver/含未知安全包装": [
+      "GenController.java:GenController.genCode",
+      "CommonController.java:CommonController.fileDownload"
+    ],
+    "RuoYi/pathtraver/缺 Source": [
+      "CommonController.java:CommonController.resourceDownload"
+    ],
+    "RuoYi/deserial/缺 Source": [
+      "CommonController.java:CommonController.resourceDownload",
+      "DemoFormController.java:DemoFormController.upload"
+    ],
+    "RuoYi/access_control/缺 Source": [
+      "CacheController.java:CacheController.cache",
+      "CacheController.java:CacheController.getCacheNames",
+      "CacheController.java:CacheController.getCacheKeys",
+      "CacheController.java:CacheController.getCacheValue",
+      "ServerController.java:ServerController.server"
+    ],
+    "RuoYi/xxe/缺 Source": [
+      "ServerController.java:ServerController.server",
+      "SysLoginController.java:SysLoginController.ajaxLogin"
+    ],
+    "RuoYi/xss/含未知安全包装": [
+      "SysCaptchaController.java:SysCaptchaController.getKaptchaImage"
+    ],
+    "RuoYi/authz/跨文件链路未闭合": [
+      "SysIndexController.java:SysIndexController.menuStyle",
+      "TestController.java:TestController.update",
+      "TestController.java:TestController.delete"
+    ],
+    "RuoYi/authz/含未知安全包装": [
+      "SysLoginController.java:SysLoginController.login"
+    ],
+    "RuoYi/access_control/跨文件链路未闭合": [
+      "TestController.java:TestController.update"
+    ],
+    "eladmin-mp/sqli/缺 Sink": [
+      "AliPayController.java:AliPayController.toPayAsPc",
+      "AliPayController.java:AliPayController.toPayAsWeb",
+      "AliPayController.java:AliPayController.notify",
+      "LocalStorageController.java:LocalStorageController.exportFile",
+      "LocalStorageController.java:LocalStorageController.uploadPicture"
+    ],
+    "eladmin-mp/xss/含未知安全包装": [
+      "AliPayController.java:AliPayController.toPayAsPc",
+      "AliPayController.java:AliPayController.toPayAsWeb",
+      "AliPayController.java:AliPayController.notify",
+      "DeployController.java:DeployController.uploadDeploy",
+      "GeneratorController.java:GeneratorController.generatorCode"
+    ],
+    "eladmin-mp/cmdi/缺 Sink": [
+      "AliPayController.java:AliPayController.toPayAsPc",
+      "AliPayController.java:AliPayController.toPayAsWeb",
+      "AliPayController.java:AliPayController.notify",
+      "LocalStorageController.java:LocalStorageController.exportFile",
+      "LocalStorageController.java:LocalStorageController.uploadPicture"
+    ],
+    "eladmin-mp/deserial/缺 Sink": [
+      "AliPayController.java:AliPayController.toPayAsPc",
+      "AliPayController.java:AliPayController.toPayAsWeb",
+      "AliPayController.java:AliPayController.notify",
+      "DeptController.java:DeptController.getDeptSuperior",
+      "DictController.java:DictController.queryAllDict"
+    ],
+    "eladmin-mp/ssrf/缺 Sink": [
+      "AliPayController.java:AliPayController.toPayAsPc",
+      "AliPayController.java:AliPayController.toPayAsWeb",
+      "AliPayController.java:AliPayController.notify",
+      "LocalStorageController.java:LocalStorageController.exportFile",
+      "LocalStorageController.java:LocalStorageController.uploadPicture"
+    ],
+    "eladmin-mp/xxe/缺 Sink": [
+      "AliPayController.java:AliPayController.toPayAsPc",
+      "AliPayController.java:AliPayController.toPayAsWeb",
+      "AliPayController.java:AliPayController.notify",
+      "LocalStorageController.java:LocalStorageController.exportFile",
+      "LocalStorageController.java:LocalStorageController.uploadPicture"
+    ],
+    "eladmin-mp/reentrancy/缺 Sink": [
+      "AliPayController.java:AliPayController.toPayAsPc",
+      "AliPayController.java:AliPayController.toPayAsWeb",
+      "AliPayController.java:AliPayController.notify",
+      "LocalStorageController.java:LocalStorageController.exportFile",
+      "LocalStorageController.java:LocalStorageController.uploadPicture"
+    ],
+    "eladmin-mp/access_control/缺 Sink": [
+      "AliPayController.java:AliPayController.toPayAsPc",
+      "AliPayController.java:AliPayController.toPayAsWeb",
+      "AliPayController.java:AliPayController.notify",
+      "LocalStorageController.java:LocalStorageController.exportFile",
+      "LocalStorageController.java:LocalStorageController.uploadPicture"
+    ],
+    "eladmin-mp/authz/含未知安全包装": [
+      "AliPayController.java:AliPayController.notify",
+      "AuthController.java:AuthController.getUserInfo",
+      "GeneratorController.java:GeneratorController.syncColumn"
+    ],
+    "eladmin-mp/pathtraver/含未知安全包装": [
+      "LocalStorageController.java:LocalStorageController.exportFile",
+      "S3StorageController.java:S3StorageController.exportS3Storage",
+      "DeptController.java:DeptController.exportDept",
+      "DictController.java:DictController.exportDict",
+      "JobController.java:JobController.exportJob"
+    ],
+    "eladmin-mp/deserial/含未知安全包装": [
+      "LocalStorageController.java:LocalStorageController.exportFile",
+      "LocalStorageController.java:LocalStorageController.uploadPicture",
+      "S3StorageController.java:S3StorageController.exportS3Storage",
+      "DeptController.java:DeptController.exportDept",
+      "DictController.java:DictController.exportDict"
+    ],
+    "eladmin-mp/pathtraver/缺 Sink": [
+      "LocalStorageController.java:LocalStorageController.uploadPicture",
+      "S3StorageController.java:S3StorageController.downloadS3Storage",
+      "RoleController.java:RoleController.getRoleLevel",
+      "UserController.java:UserController.updateUserAvatar",
+      "VerifyController.java:VerifyController.resetEmail"
+    ],
+    "eladmin-mp/xss/缺 Sink": [
+      "LocalStorageController.java:LocalStorageController.uploadPicture",
+      "S3StorageController.java:S3StorageController.downloadS3Storage",
+      "DeptController.java:DeptController.getDeptSuperior",
+      "DictDetailController.java:DictDetailController.getDictDetailMaps",
+      "DictDetailController.java:DictDetailController.deleteDictDetail"
+    ],
+    "eladmin-mp/deserial/跨文件链路未闭合": [
+      "S3StorageController.java:S3StorageController.downloadS3Storage",
+      "UserController.java:UserController.updateUserAvatar"
+    ],
+    "eladmin-mp/reentrancy/含未知安全包装": [
+      "VerifyController.java:VerifyController.resetEmail",
+      "VerifyController.java:VerifyController.resetPass"
+    ],
+    "eladmin-mp/sqli/含未知安全包装": [
+      "QuartzJobController.java:QuartzJobController.exportQuartzJob",
+      "QuartzJobController.java:QuartzJobController.exportQuartzJobLog",
+      "QuartzJobController.java:QuartzJobController.queryQuartzJobLog",
+      "QuartzJobController.java:QuartzJobController.updateQuartzJobStatus",
+      "QuartzJobController.java:QuartzJobController.executionQuartzJob"
+    ],
+    "eladmin-mp/access_control/含未知安全包装": [
+      "DatabaseController.java:DatabaseController.uploadDatabase",
+      "DeployController.java:DeployController.uploadDeploy"
+    ],
+    "eladmin-mp/pathtraver/缺 Source": [
+      "SysLogController.java:SysLogController.exportLog",
+      "SysLogController.java:SysLogController.exportErrorLog"
+    ],
+    "eladmin-mp/deserial/缺 Source": [
+      "SysLogController.java:SysLogController.exportLog",
+      "SysLogController.java:SysLogController.exportErrorLog"
+    ],
+    "vulpy/authz/缺 Sink": [
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_post_create",
+      "mod_api.py:do_post_create",
+      "mod_csp.py:do_main"
+    ],
+    "vulpy/pathtraver/缺 Sink": [
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_post_create",
+      "mod_api.py:do_post_create"
+    ],
+    "vulpy/xss/缺 Sink": [
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_create"
+    ],
+    "vulpy/cmdi/缺 Sink": [
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_create"
+    ],
+    "vulpy/deserial/缺 Sink": [
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_create"
+    ],
+    "vulpy/ssrf/缺 Sink": [
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_create"
+    ],
+    "vulpy/xxe/缺 Sink": [
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_create"
+    ],
+    "vulpy/reentrancy/缺 Sink": [
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_create"
+    ],
+    "vulpy/access_control/缺 Sink": [
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_key_create",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_list",
+      "mod_api.py:do_post_create"
+    ],
+    "vulpy/sqli/缺 Sink": [
+      "mod_api.py:do_post_create",
+      "mod_csp.py:do_main",
+      "mod_csp.py:do_main",
+      "mod_hello.py:do_hello",
+      "mod_hello.py:do_hello"
+    ],
+    "vulpy/xss/缺 Source": [
+      "mod_csp.py:do_main",
+      "mod_csp.py:do_main",
+      "mod_user.py:do_chpasswd_get"
+    ],
+    "vulpy/xss/含未知安全包装": [
+      "mod_mfa.py:do_mfa_enable",
+      "mod_mfa.py:do_mfa_enable",
+      "mod_user.py:do_create",
+      "mod_user.py:do_create",
+      "mod_user.py:do_login"
+    ],
+    "pygoat/sqli/缺 Sink": [
+      "admin.py:LabCategoryMappingAdmin",
+      "tests.py:test_start_without_docker_returns_503",
+      "tests.py:test_start_failure_removes_container",
+      "tests.py:test_running_challenge_is_reused",
+      "tests.py:test_missing_challenge_container_is_replaced"
+    ],
+    "pygoat/authz/缺 Sink": [
+      "admin.py:LabCategoryMappingAdmin",
+      "tests.py:test_start_uses_docker_sdk_and_docker_assigned_port",
+      "tests.py:test_start_without_docker_returns_503",
+      "tests.py:test_start_failure_removes_container",
+      "tests.py:test_running_challenge_is_reused"
+    ],
+    "pygoat/cmdi/缺 Sink": [
+      "admin.py:LabCategoryMappingAdmin",
+      "tests.py:test_start_uses_docker_sdk_and_docker_assigned_port",
+      "tests.py:test_start_without_docker_returns_503",
+      "tests.py:test_start_failure_removes_container",
+      "tests.py:test_running_challenge_is_reused"
+    ],
+    "pygoat/deserial/缺 Sink": [
+      "admin.py:LabCategoryMappingAdmin",
+      "tests.py:test_start_uses_docker_sdk_and_docker_assigned_port",
+      "tests.py:test_start_without_docker_returns_503",
+      "tests.py:test_start_failure_removes_container",
+      "tests.py:test_running_challenge_is_reused"
+    ],
+    "pygoat/ssrf/缺 Sink": [
+      "admin.py:LabCategoryMappingAdmin",
+      "tests.py:test_start_uses_docker_sdk_and_docker_assigned_port",
+      "tests.py:test_start_without_docker_returns_503",
+      "tests.py:test_start_failure_removes_container",
+      "tests.py:test_running_challenge_is_reused"
+    ],
+    "pygoat/xxe/缺 Sink": [
+      "admin.py:LabCategoryMappingAdmin",
+      "tests.py:test_start_uses_docker_sdk_and_docker_assigned_port",
+      "tests.py:test_start_without_docker_returns_503",
+      "tests.py:test_start_failure_removes_container",
+      "tests.py:test_running_challenge_is_reused"
+    ],
+    "pygoat/reentrancy/缺 Sink": [
+      "admin.py:LabCategoryMappingAdmin",
+      "tests.py:test_start_uses_docker_sdk_and_docker_assigned_port",
+      "tests.py:test_start_without_docker_returns_503",
+      "tests.py:test_start_failure_removes_container",
+      "tests.py:test_running_challenge_is_reused"
+    ],
+    "pygoat/access_control/缺 Sink": [
+      "admin.py:LabCategoryMappingAdmin",
+      "tests.py:test_start_uses_docker_sdk_and_docker_assigned_port",
+      "tests.py:test_start_without_docker_returns_503",
+      "tests.py:test_start_failure_removes_container",
+      "tests.py:test_running_challenge_is_reused"
+    ],
+    "pygoat/xss/缺 Sink": [
+      "tests.py:test_start_uses_docker_sdk_and_docker_assigned_port",
+      "tests.py:test_start_without_docker_returns_503",
+      "tests.py:test_start_failure_removes_container",
+      "tests.py:test_running_challenge_is_reused",
+      "tests.py:test_dead_challenge_container_is_replaced"
+    ],
+    "pygoat/pathtraver/含未知安全包装": [
+      "app.py:register",
+      "app.py:lab2",
+      "app.py:process_image",
+      "app.py:lab",
+      "app.py:lab"
+    ],
+    "pygoat/xss/含未知安全包装": [
+      "app.py:register",
+      "app.py:login",
+      "app.py:create_blog"
+    ],
+    "pygoat/pathtraver/缺 Source": [
+      "signals.py:on_completion_saved",
+      "app.py:health_check",
+      "app.py:health_check",
+      "app.py:health_check",
+      "app.py:lab"
+    ],
+    "pygoat/xss/缺 Source": [
+      "app.py:index",
+      "app.py:index",
+      "main.py:index",
+      "app.py:index",
+      "app.py:index"
+    ],
+    "pygoat/pathtraver/缺 Sink": [
+      "app.py:index",
+      "app.py:upload_yaml",
+      "app.py:lab",
+      "app.py:api_use_package",
+      "app.py:serve_file"
+    ],
+    "pygoat/deserial/含未知安全包装": [
+      "app.py:lab3"
+    ],
+    "pygoat/ssrf/含未知安全包装": [
+      "app.py:scan_code"
+    ],
+    "pygoat/access_control/含未知安全包装": [
+      "app.py:transfer"
+    ],
+    "smartbugs/sqli/缺 Sink": [
+      "arbitrary_location_write_simple.sol:PushBonusCode",
+      "arbitrary_location_write_simple.sol:PopBonusCode",
+      "arbitrary_location_write_simple.sol:UpdateBonusCodeAt",
+      "arbitrary_location_write_simple.sol:Destroy",
+      "FibonacciBalance.sol:withdraw"
+    ],
+    "smartbugs/authz/缺 Sink": [
+      "arbitrary_location_write_simple.sol:PushBonusCode",
+      "arbitrary_location_write_simple.sol:PopBonusCode",
+      "arbitrary_location_write_simple.sol:UpdateBonusCodeAt",
+      "arbitrary_location_write_simple.sol:Destroy",
+      "FibonacciBalance.sol:withdraw"
+    ],
+    "smartbugs/cmdi/缺 Sink": [
+      "arbitrary_location_write_simple.sol:PushBonusCode",
+      "arbitrary_location_write_simple.sol:PopBonusCode",
+      "arbitrary_location_write_simple.sol:UpdateBonusCodeAt",
+      "arbitrary_location_write_simple.sol:Destroy",
+      "FibonacciBalance.sol:withdraw"
+    ],
+    "smartbugs/deserial/缺 Sink": [
+      "arbitrary_location_write_simple.sol:PushBonusCode",
+      "arbitrary_location_write_simple.sol:PopBonusCode",
+      "arbitrary_location_write_simple.sol:UpdateBonusCodeAt",
+      "arbitrary_location_write_simple.sol:Destroy",
+      "FibonacciBalance.sol:withdraw"
+    ],
+    "smartbugs/ssrf/缺 Sink": [
+      "arbitrary_location_write_simple.sol:PushBonusCode",
+      "arbitrary_location_write_simple.sol:PopBonusCode",
+      "arbitrary_location_write_simple.sol:UpdateBonusCodeAt",
+      "arbitrary_location_write_simple.sol:Destroy",
+      "FibonacciBalance.sol:withdraw"
+    ],
+    "smartbugs/xxe/缺 Sink": [
+      "arbitrary_location_write_simple.sol:PushBonusCode",
+      "arbitrary_location_write_simple.sol:PopBonusCode",
+      "arbitrary_location_write_simple.sol:UpdateBonusCodeAt",
+      "arbitrary_location_write_simple.sol:Destroy",
+      "FibonacciBalance.sol:withdraw"
+    ],
+    "smartbugs/reentrancy/缺 Sink": [
+      "arbitrary_location_write_simple.sol:PushBonusCode",
+      "arbitrary_location_write_simple.sol:PopBonusCode",
+      "arbitrary_location_write_simple.sol:UpdateBonusCodeAt",
+      "arbitrary_location_write_simple.sol:Destroy",
+      "FibonacciBalance.sol:setStart"
+    ],
+    "smartbugs/access_control/缺 Sink": [
+      "arbitrary_location_write_simple.sol:PushBonusCode",
+      "arbitrary_location_write_simple.sol:PopBonusCode",
+      "arbitrary_location_write_simple.sol:UpdateBonusCodeAt",
+      "FibonacciBalance.sol:setStart",
+      "FibonacciBalance.sol:setFibonacci"
+    ],
+    "smartbugs/reentrancy/含未知安全包装": [
+      "FibonacciBalance.sol:withdraw",
+      "incorrect_constructor_name1.sol:withdraw",
+      "incorrect_constructor_name2.sol:withdraw",
+      "incorrect_constructor_name3.sol:withdraw",
+      "mapping_write.sol:withdraw"
+    ],
+    "smartbugs/access_control/含未知安全包装": [
+      "FibonacciBalance.sol:withdraw",
+      "multiowned_vulnerable.sol:newOwner",
+      "multiowned_vulnerable.sol:deleteOwner",
+      "multiowned_vulnerable.sol:withdrawAll",
+      "parity_wallet_bug_1.sol:initMultiowned"
+    ],
+    "smartbugs/access_control/缺 Source": [
+      "parity_wallet_bug_1.sol:initWallet",
+      "parity_wallet_bug_1.sol:Wallet",
+      "parity_wallet_bug_2.sol:initDaylimit",
+      "parity_wallet_bug_2.sol:initWallet",
+      "BECToken.sol:transfer"
+    ],
+    "smartbugs/deserial/缺 Source": [
+      "parity_wallet_bug_1.sol:create",
+      "parity_wallet_bug_2.sol:create",
+      "spank_chain_payment.sol:recoverSigner",
+      "spank_chain_payment.sol:_isContained",
+      "0x663e4229142a27f00bafb5d087e1e730648314c3.sol:_memcpy"
+    ],
+    "smartbugs/reentrancy/缺 Source": [
+      "BECToken.sol:transfer",
+      "send_loop.sol:refundAll",
+      "reentrancy_bonus.sol:withdrawReward",
+      "spank_chain_payment.sol:consensusCloseChannel",
+      "governmental_survey.sol:resetInvestment"
+    ],
+    "smartbugs/xss/缺 Sink": [
+      "0x663e4229142a27f00bafb5d087e1e730648314c3.sol:_isValidMatingPair",
+      "0x663e4229142a27f00bafb5d087e1e730648314c3.sol:_currentPrice"
+    ],
+    "DeFiVulnLabs/sqli/缺 Sink": [
+      "ApproveScam.sol:testApproveScam",
+      "ApproveScam.sol:transfer",
+      "ApproveScam.sol:approve",
+      "ApproveScam.sol:transferFrom",
+      "ApproveScam.sol:mint"
+    ],
+    "DeFiVulnLabs/authz/缺 Sink": [
+      "ApproveScam.sol:testApproveScam",
+      "ApproveScam.sol:transfer",
+      "ApproveScam.sol:approve",
+      "ApproveScam.sol:transferFrom",
+      "ApproveScam.sol:mint"
+    ],
+    "DeFiVulnLabs/cmdi/缺 Sink": [
+      "ApproveScam.sol:testApproveScam",
+      "ApproveScam.sol:transfer",
+      "ApproveScam.sol:approve",
+      "ApproveScam.sol:transferFrom",
+      "ApproveScam.sol:mint"
+    ],
+    "DeFiVulnLabs/deserial/缺 Sink": [
+      "ApproveScam.sol:testApproveScam",
+      "ApproveScam.sol:transfer",
+      "ApproveScam.sol:approve",
+      "ApproveScam.sol:transferFrom",
+      "ApproveScam.sol:mint"
+    ],
+    "DeFiVulnLabs/ssrf/缺 Sink": [
+      "ApproveScam.sol:testApproveScam",
+      "ApproveScam.sol:transfer",
+      "ApproveScam.sol:approve",
+      "ApproveScam.sol:transferFrom",
+      "ApproveScam.sol:mint"
+    ],
+    "DeFiVulnLabs/xxe/缺 Sink": [
+      "ApproveScam.sol:testApproveScam",
+      "ApproveScam.sol:transfer",
+      "ApproveScam.sol:approve",
+      "ApproveScam.sol:transferFrom",
+      "ApproveScam.sol:mint"
+    ],
+    "DeFiVulnLabs/reentrancy/缺 Source": [
+      "ApproveScam.sol:testApproveScam",
+      "Delegatecall.sol:testDelegatecall",
+      "ecrecover.sol:testecRecover",
+      "empty-loop.sol:testVulnSignatureValidation",
+      "ERC777-reentrancy.sol:claim"
+    ],
+    "DeFiVulnLabs/access_control/缺 Source": [
+      "ApproveScam.sol:testApproveScam",
+      "Delegatecall.sol:testDelegatecall",
+      "ecrecover.sol:testecRecover",
+      "ecrecover.sol:transfer",
+      "empty-loop.sol:testVulnSignatureValidation"
+    ],
+    "DeFiVulnLabs/reentrancy/缺 Sink": [
+      "ApproveScam.sol:transfer",
+      "ApproveScam.sol:approve",
+      "ApproveScam.sol:transferFrom",
+      "ApproveScam.sol:mint",
+      "ApproveScam.sol:burn"
+    ],
+    "DeFiVulnLabs/access_control/含未知安全包装": [
+      "ApproveScam.sol:transfer",
+      "ApproveScam.sol:approve",
+      "ApproveScam.sol:transferFrom",
+      "ApproveScam.sol:mint",
+      "ApproveScam.sol:burn"
+    ],
+    "DeFiVulnLabs/access_control/缺 Sink": [
+      "Array-deletion.sol:setUp",
+      "Array-deletion.sol:testArrayDeletion",
+      "Array-deletion.sol:testFixedArrayDeletion",
+      "Array-deletion.sol:deleteElement",
+      "Array-deletion.sol:deleteElement"
+    ],
+    "DeFiVulnLabs/deserial/缺 Source": [
+      "Backdoor-assembly.sol:referee",
+      "SignatureReplayNBA.sol:verify"
+    ],
+    "DeFiVulnLabs/reentrancy/含未知安全包装": [
+      "DOS.sol:claimThrone",
+      "empty-loop.sol:withdraw",
+      "fee-on-transfer.sol:withdraw",
+      "fee-on-transfer.sol:withdraw",
+      "Flashloan-flaw.sol:flashLoan"
+    ],
+    "DeFiVulnLabs/cmdi/缺 Source": [
+      "gas-price.sol:executeTransfer",
+      "gas-price.sol:_nativeTransferExec"
+    ],
+    "DeFiVulnLabs/pathtraver/缺 Sink": [
+      "Slippage-deadline.sol:testswapTokensWithMaxDeadline"
+    ],
+    "DeFiVulnLabs/deserial/含未知安全包装": [
+      "TransientStorageMisuse.t.sol:SwapCallback"
+    ],
+    "nssc/sqli/缺 Sink": [
+      "auction.sol:bid",
+      "auction.sol:bid",
+      "auction.sol:withdraw",
+      "list_dos.sol:refundDos",
+      "list_dos.sol:withdraw"
+    ],
+    "nssc/authz/缺 Sink": [
+      "auction.sol:bid",
+      "auction.sol:bid",
+      "auction.sol:withdraw",
+      "list_dos.sol:refundDos",
+      "list_dos.sol:withdraw"
+    ],
+    "nssc/cmdi/缺 Sink": [
+      "auction.sol:bid",
+      "auction.sol:bid",
+      "auction.sol:withdraw",
+      "list_dos.sol:refundDos",
+      "list_dos.sol:withdraw"
+    ],
+    "nssc/deserial/缺 Sink": [
+      "auction.sol:bid",
+      "auction.sol:bid",
+      "auction.sol:withdraw",
+      "list_dos.sol:refundDos",
+      "list_dos.sol:withdraw"
+    ],
+    "nssc/ssrf/缺 Sink": [
+      "auction.sol:bid",
+      "auction.sol:bid",
+      "auction.sol:withdraw",
+      "list_dos.sol:refundDos",
+      "list_dos.sol:withdraw"
+    ],
+    "nssc/xxe/缺 Sink": [
+      "auction.sol:bid",
+      "auction.sol:bid",
+      "auction.sol:withdraw",
+      "list_dos.sol:refundDos",
+      "list_dos.sol:withdraw"
+    ],
+    "nssc/reentrancy/含未知安全包装": [
+      "auction.sol:bid",
+      "list_dos.sol:withdraw",
+      "Reentrancy.sol:if",
+      "ReentrancyExploit.sol:deposit",
+      "incorrect_constructor.sol:withdraw"
+    ],
+    "nssc/access_control/含未知安全包装": [
+      "auction.sol:bid",
+      "auction.sol:bid",
+      "auction.sol:withdraw",
+      "list_dos.sol:withdraw",
+      "coin.sol:transfer"
+    ],
+    "nssc/reentrancy/缺 Sink": [
+      "auction.sol:bid",
+      "coin.sol:owned",
+      "coin.sol:transferOwnership",
+      "coin.sol:TokenERC20",
+      "coin.sol:transfer"
+    ],
+    "nssc/reentrancy/缺 Source": [
+      "list_dos.sol:refundDos",
+      "list_dos.sol:refundSafe",
+      "ReentrancyExploit.sol:launch_attack",
+      "ReentrancyExploit.sol:if",
+      "SpankChain_Payment.sol:consensusCloseChannel"
+    ],
+    "nssc/access_control/缺 Source": [
+      "list_dos.sol:refundDos",
+      "list_dos.sol:refundSafe",
+      "WalletLibrary.sol:initWallet",
+      "WalletLibrary.sol:Wallet",
+      "DAO.sol:transferWithoutReward"
+    ],
+    "nssc/access_control/缺 Sink": [
+      "coin.sol:TokenERC20",
+      "coin.sol:MyAdvancedToken",
+      "Alice.sol:set",
+      "Alice.sol:set_fixed",
+      "integer_overflow_1.sol:add"
+    ],
+    "nssc/deserial/缺 Source": [
+      "WalletLibrary.sol:create",
+      "SpankChain_Payment.sol:recoverSigner",
+      "SpankChain_Payment.sol:_isContained"
+    ]
+  }
+}
