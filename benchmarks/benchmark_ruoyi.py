@@ -49,7 +49,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from core.agents.rule_detectors import verdict as rule_verdict  # noqa: E402
-from core.slicer.java_servlet import JavaSlicer                  # noqa: E402
+from core.slicer.java_servlet import JavaSlicer
+from benchmarks.slice_cache import cached_units                  # noqa: E402
 
 DEFAULT_TARGET = ROOT / "reference_repos" / "RuoYi-master"
 
@@ -82,6 +83,8 @@ def main() -> int:
     ap.add_argument("--strict", action="store_true",
                     help="真值表零误报 + 跨模块 Hop 断言（CI 门禁）")
     ap.add_argument("--list", action="store_true", help="打印逐条判定")
+    ap.add_argument("--no-cache", action="store_true",
+                        help="M47：强制冷切片（绕过温缓存）")
     ap.add_argument("--output", default=str(ROOT / "benchmarks" / "results" / "ruoyi.json"))
     args = ap.parse_args()
 
@@ -91,7 +94,9 @@ def main() -> int:
               f"https://codeload.github.com/yangzongzhuan/RuoYi/zip/refs/heads/master）")
         return 2
 
-    units = JavaSlicer(repo).extract_entry_units()
+    units = cached_units(repo, "ruoyi",
+                         lambda: JavaSlicer(repo).extract_entry_units(),
+                         no_cache=getattr(args, "no_cache", False))
     print("RuoYi 结果（企业级多模块 + MyBatis 动态数据权限）")
     print("=" * 72)
     print(f"切出入口 {len(units)} 个")

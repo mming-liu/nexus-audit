@@ -10,6 +10,8 @@ reports/
 cache/
 reference_repos/*
 !reference_repos/.gitkeep
+# M47 切片温缓存（本地派生数据，随靶场内容与 slicer 源码自动失效）
+benchmarks/results/.slice_cache/
 .DS_Store
 .pytest_cache/
 .vscode/

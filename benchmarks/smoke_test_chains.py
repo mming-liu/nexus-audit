@@ -4519,6 +4519,40 @@ public String helper(String query) {
 }
 """), None)
 
+# ---- [90] Module 47：SHA-256 切片温缓存 ----
+from benchmarks.slice_cache import (cached_units, repo_fingerprint,     # noqa: E402
+                                   slicer_fingerprint, cache_stamp)
+from core.slicer.java_servlet import JavaSlicer as _JS90               # noqa: E402
+_jsl90 = Path(__file__).resolve().parent.parent / "reference_repos" / "JavaSecLab-main"
+_warm90 = cached_units(_jsl90, "smoke_javaseclab",
+                       lambda: _JS90(_jsl90).extract_entry_units(),
+                       no_cache=False, verbose=False)
+_cold90 = cached_units(_jsl90, "smoke_javaseclab",
+                       lambda: _JS90(_jsl90).extract_entry_units(),
+                       no_cache=True, verbose=False)
+check("M47：温缓存与冷切片的 units 列表逐位一致（数量/键/源码）",
+      (len(_warm90) == len(_cold90) > 0
+       and [(u.file_path, u.unit_name, u.start_line, u.source_code)
+            for u in _warm90]
+       == [(u.file_path, u.unit_name, u.start_line, u.source_code)
+           for u in _cold90]),
+      True)
+from core.agents.rule_detectors import verdict as _vd90               # noqa: E402
+check("M47：温缓存与冷切片的判定结果逐位一致",
+      [_vd90(c, u.source_code or "") for u in _warm90
+       for c in ("sqli", "authz", "xss")]
+      == [_vd90(c, u.source_code or "") for u in _cold90
+          for c in ("sqli", "authz", "xss")],
+      True)
+check("M47：切片器源码指纹是内容哈希（64 位 sha256，与靶场指纹不同源）",
+      (len(slicer_fingerprint()) == 64
+       and slicer_fingerprint() != repo_fingerprint(_jsl90)),
+      True)
+check("M47：stamp 绑定靶场与 bench 名（换 bench 即换缓存槽）",
+      (cache_stamp(_jsl90, "x") != cache_stamp(_jsl90, "y")
+       and len(repo_fingerprint(_jsl90)) == 64),
+      True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

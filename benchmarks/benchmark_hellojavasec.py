@@ -47,7 +47,8 @@ sys.path.insert(0, str(ROOT))
 
 from core.agents.rule_detectors import verdict as rule_verdict      # noqa: E402
 from core.models import base_unit_name                          # noqa: E402
-from core.slicer.java_servlet import JavaSlicer                      # noqa: E402
+from core.slicer.java_servlet import JavaSlicer
+from benchmarks.slice_cache import cached_units                      # noqa: E402
 
 DEFAULT_TARGET = ROOT / "reference_repos" / "Hello-Java-Sec-master"
 
@@ -204,12 +205,16 @@ def main():
     ap.add_argument("--offline", action="store_true", help="只跑确定性规则，不调模型")
     ap.add_argument("--model", default="longcat-2.5-preview-free")
     ap.add_argument("--concurrency", type=int, default=4)
+    ap.add_argument("--no-cache", action="store_true",
+                        help="M47：强制冷切片（绕过温缓存）")
     ap.add_argument("--output", default=str(ROOT / "benchmarks" / "results" / "hellojavasec.json"))
     args = ap.parse_args()
 
     repo = Path(args.target)
     print(f"靶场：{repo}")
-    units = JavaSlicer(repo).extract_entry_units()
+    units = cached_units(repo, "hellojavasec",
+                         lambda: JavaSlicer(repo).extract_entry_units(),
+                         no_cache=getattr(args, "no_cache", False))
     print(f"[1/3] 切出入口 {len(units)} 个")
 
     rows, unknown = [], []

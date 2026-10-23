@@ -47,7 +47,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from core.agents.rule_detectors import verdict as rule_verdict   # noqa: E402
-from core.slicer.java_servlet import JavaSlicer                  # noqa: E402
+from core.slicer.java_servlet import JavaSlicer
+from benchmarks.slice_cache import cached_units                  # noqa: E402
 
 DEFAULT_TARGET = ROOT / "reference_repos" / "mall-main"
 
@@ -90,8 +91,11 @@ TRUTH: dict[tuple[str, str, int], tuple[str, bool, str]] = {
 }
 
 
-def run(target: Path, strict: bool, out: Path | None) -> int:
-    units = JavaSlicer(target).extract_entry_units()
+def run(target: Path, strict: bool, out: Path | None,
+        no_cache: bool = False) -> int:
+    units = cached_units(target, "mall",
+                         lambda: JavaSlicer(target).extract_entry_units(),
+                         no_cache=no_cache)
     print("mall 结果（生产级项目对照面：零误报门禁）")
     print("=" * 72)
     print(f"切片单元 {len(units)}（多模块跨文件 Hop）")
@@ -158,8 +162,10 @@ def main() -> int:
     ap.add_argument("--strict", action="store_true")
     ap.add_argument("--out", default=str(ROOT / "benchmarks" / "results"
                                           / "mall.json"))
+    ap.add_argument("--no-cache", action="store_true",
+                    help="M47：强制冷切片（绕过温缓存）")
     a = ap.parse_args()
-    return run(Path(a.target), a.strict, Path(a.out))
+    return run(Path(a.target), a.strict, Path(a.out), a.no_cache)
 
 
 if __name__ == "__main__":
