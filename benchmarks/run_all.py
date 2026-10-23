@@ -4,7 +4,7 @@
     python benchmarks/run_all.py --offline --jobs 4   # 多进程并发
 
 跑全部**离线**门禁（不调模型），输出统一 Markdown 计分板：
-  1. smoke_test_chains.py         —— [1]-[73] 判据链路断言
+  1. smoke_test_chains.py         —— [1]-[93] 判据链路断言
   2. export_disputes.py --check   —— 争议登记证据逐字核对
   3. 13 项靶场回归（12 个 --strict + dvdefi 健壮性抽检；缺仓库记 SKIP）
 
@@ -36,7 +36,7 @@ SCOREBOARD = ROOT / "benchmarks" / "results" / "SCOREBOARD.md"
 # (名称, 命令, 前置目录检查, 类别, 可并发)
 #   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
 JOBS = [
-    ("冒烟测试 [1]-[79]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
+    ("冒烟测试 [1]-[93]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke", False),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target", True),
