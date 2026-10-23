@@ -104,6 +104,10 @@ JOBS = [
     # 以及 _interface_index 列表化 / _pick_impl 后缀匹配（铁律 24 同构坑）。
     ("mall (生产级多模块对照)", ["benchmarks/benchmark_mall.py", "--strict"],
      "reference_repos/mall-main", "target", True),
+    # 第 20 项（Module 41）：覆盖地板门禁。strict 只锁误报/判反，
+    # 覆盖率下滑（新退回路径）没人拦 —— 这里锁各靶场确定性命中数下限。
+    ("覆盖地板门禁", ["benchmarks/triage_fallbacks.py", "--check-floor"],
+     None, "smoke", False),
 ]
 
 

@@ -115,6 +115,53 @@ def iter_units(bench: str):
         yield from SoliditySlicer(repo).extract_entry_units(repo)
 
 
+# Module 41：覆盖地板门禁。各真值靶场**确定性命中数**（rule_verdict 非
+# None 的真值条目）的下限 —— 防止规则改动引入新的退回路径把覆盖率静默
+# 打下来（"跑过"≠"绿着"：strict 只锁误报/判反，覆盖率下滑不拦截）。
+# 基线取自 2026-10-23 全绿态 results/*.json 的 decided 字段。
+FLOORS = {
+    "defivulnlabs": 9,      # DeFiVulnLabs 9/9 满贯（M36）
+    "nssc": 7,              # nssc 7/8（1 条真值按口径退模型）
+    "smartbugs": 177,
+    "vampi": 7,             # VAmPI 7/7（M37）
+    "mall": 16,             # mall 16/16（M38）
+    "vulpy": 6,
+    "pygoat": 9,
+    "ruoyi": 159,
+    "eladminmp": 53,
+}
+
+
+def check_floor() -> int:
+    """读各 results/*.json 的 decided，跌破 FLOORS 非零退出。
+
+    判定挂文件不挂脚本：json 是各 benchmark 自己写的，门禁只看结果
+    指标 —— 脚本内部实现怎么改都不影响门禁语义。"""
+    print("覆盖地板门禁（--check-floor）：")
+    bad = []
+    for name, floor in sorted(FLOORS.items()):
+        j = ROOT / "benchmarks" / "results" / f"{name}.json"
+        if not j.exists():
+            print(f"  SKIP  {name:14}（无 {name}.json）")
+            continue
+        d = json.loads(j.read_text(encoding="utf-8"))
+        decided = d.get("decided")
+        if not isinstance(decided, (int, float)):
+            print(f"  SKIP  {name:14}（json 无 decided 字段）")
+            continue
+        status = "OK " if decided >= floor else "LOW"
+        print(f"  {status}  {name:14} decided={decided}  地板={floor}")
+        if decided < floor:
+            bad.append((name, decided, floor))
+    if bad:
+        print(f"\n覆盖地板跌破 {len(bad)} 项：{bad}")
+        print("覆盖率静默下滑 —— 查最近的规则/切片改动（铁律：退回 None")
+        print("是'退回'不是漏报，但覆盖率暗降必须显式可见）。")
+        return 1
+    print(f"\n{len(FLOORS)} 项地板全部达标 ✔")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="退回池五分类剖析（只读）")
     ap.add_argument("--json", default=str(ROOT / "benchmarks" / "results" /
@@ -122,7 +169,12 @@ def main() -> int:
     ap.add_argument("--md", default=str(ROOT / "benchmarks" / "results" /
                                         "triage_fallbacks.md"))
     ap.add_argument("--limit-samples", type=int, default=5)
+    ap.add_argument("--check-floor", action="store_true",
+                    help="覆盖地板门禁：确定性命中数跌破 FLOORS 即非零退出")
     args = ap.parse_args()
+
+    if args.check_floor:
+        return check_floor()
 
     out: dict = {}
     samples: dict = defaultdict(list)

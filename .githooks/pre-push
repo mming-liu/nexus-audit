@@ -116,3 +116,8 @@ if [ -d reference_repos/mall-main ]; then
   "$PY" benchmarks/benchmark_mall.py --strict > /dev/null
   echo "pre-push: mall 基线通过 ✔"
 fi
+
+# 覆盖地板门禁（Module 41）：确定性命中数下限
+echo "pre-push: 覆盖地板门禁 ..."
+"$PY" benchmarks/triage_fallbacks.py --check-floor > /dev/null
+echo "pre-push: 覆盖地板门禁通过 ✔"

@@ -4349,6 +4349,23 @@ check("M40：Python 字节级还原",
       "shlex" not in (_m40dir / "app_ping.py").read_text(encoding="utf-8"),
       True)
 
+# ---- [85] Module 41：覆盖地板门禁 ----
+import json                                                        # noqa: E402
+import triage_fallbacks as _tri41                                 # noqa: E402
+check("M41：地板表覆盖 9 个真值靶场且下限为正",
+      (len(_tri41.FLOORS), all(v > 0 for v in _tri41.FLOORS.values())),
+      (9, True))
+check("M41：--check-floor 全绿态通过（exit 0）",
+      _sp81.run([sys.executable, str(Path(__file__).resolve().parent
+                 / "triage_fallbacks.py"), "--check-floor"],
+                capture_output=True).returncode, 0)
+check("M41：floor 值与 results/*.json 的 decided 一致（同源校验）",
+      all(json.loads((Path(__file__).resolve().parent.parent
+          / "benchmarks" / "results" / f"{n}.json").read_text(encoding="utf-8"))
+          .get("decided") >= v for n, v in _tri41.FLOORS.items()
+          if (Path(__file__).resolve().parent.parent / "benchmarks"
+              / "results" / f"{n}.json").exists()), True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
