@@ -3,11 +3,11 @@
   "total_functions": 641,
   "registered": 639,
   "safe_denominator": 525,
-  "decided": 175,
-  "correct": 175,
+  "decided": 177,
+  "correct": 177,
   "fp": 0,
   "reverse_fn": 0,
-  "fallback": 464,
+  "fallback": 462,
   "disputed": [
     {
       "file": "parity_wallet_bug_1.sol",
@@ -21,6 +21,6 @@
   "model": {
     "model": null,
     "skipped": "offline",
-    "n_fallback": 464
+    "n_fallback": 462
   }
 }

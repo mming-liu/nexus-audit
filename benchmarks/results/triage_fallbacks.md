@@ -7,13 +7,13 @@
 | cmdi/缺 Sink | 1933 |
 | deserial/缺 Sink | 1882 |
 | sqli/缺 Sink | 1804 |
-| authz/缺 Sink | 1668 |
+| authz/缺 Sink | 1666 |
 | reentrancy/缺 Sink | 1276 |
-| access_control/缺 Sink | 768 |
+| access_control/缺 Sink | 769 |
 | access_control/含未知安全包装 | 422 |
 | xss/缺 Sink | 271 |
 | reentrancy/含未知安全包装 | 162 |
-| access_control/缺 Source | 115 |
+| access_control/缺 Source | 114 |
 | reentrancy/缺 Source | 55 |
 | xss/缺 Source | 48 |
 | deserial/含未知安全包装 | 33 |
