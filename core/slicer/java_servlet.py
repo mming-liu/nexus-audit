@@ -414,6 +414,12 @@ class JavaSlicer:
             stem = Path(h.file).stem.lower()
             if var and stem.startswith(var.lower()):
                 return 0
+            # mall 前缀包形态：变量 productCategoryService ↔
+            # PmsProductCategoryServiceImpl（stem 是 `pms` + var）。
+            # 后缀比对能唯一区分同貌接口：pmsproductattributecategoryservice
+            # 不以 productcategoryservice 结尾，不会误配（Module 38 实测）。
+            if var and stem.removesuffix("impl").endswith(var.lower()):
+                return 0
             return 1
         return sorted(hits, key=rank)[0]
 
@@ -617,12 +623,26 @@ class JavaSlicer:
         iface_hits: list[str] = []
         if top:
             iidx = self._interface_index()
+            cur = getattr(self, "_current_file", None)
             for name in sorted(calls - _visited):
-                hit = iidx.get(name)
-                if hit is None:
+                hits = iidx.get(name) or []
+                if not hits:
                     continue
-                ipath, idecl = hit
-                if Path(ipath).resolve() == getattr(self, "_current_file", None):
+                # 同名多接口：优先取与入口同 Maven 模块（路径共享
+                # `mall-xxx/` 一级工程目录）的声明 —— 跨模块同名方法的
+                # 接口头是别的调用方的证据，贴错模块的声明会误导判定。
+                def _rank(h):
+                    ipath, _ = h
+                    if cur:
+                        pm = Path(cur).parts[: -3]
+                        pi = Path(ipath).parts[:-3]
+                        shared = len(set(pm) & set(pi))
+                    else:
+                        shared = 0
+                    return -shared
+                ipath, idecl = sorted(hits, key=_rank)[0]
+                if Path(ipath).resolve() == (Path(cur).resolve()
+                                             if cur else None):
                     continue
                 iface_hits.append(f"// 来自 {Path(ipath).name}\n{idecl}")
                 if len(iface_hits) >= 3:
@@ -746,7 +766,13 @@ class JavaSlicer:
                                    seg, re.S)
                     if not mm:
                         continue
-                    idx.setdefault(mm.group(1), (str(java), head + "\n" + seg + ";\n}"))
+                    # Module 38：name -> **列表**。此前 setdefault 首见即占，
+                    # mall 的 `getList` 被 OmsOrderDao 抢占后
+                    # PmsProductCategoryService.getList 永远进不了索引，
+                    # Hop 展开断链 → 整个模块静默退回（铁律 24 同构坑）。
+                    # 消费点按"与入口同 Maven 模块"优先挑选。
+                    idx.setdefault(mm.group(1), []).append(
+                        (str(java), head + "\n" + seg + ";\n}"))
         self._iidx = idx
         return idx
 
@@ -804,7 +830,40 @@ class JavaSlicer:
                 continue
             units.extend(self._slice_file(java, text))
         self._attach_chains(units)
+        self._mark_global_authz(root, units)
         return units
+
+    # 仓库级全局鉴权的机器标记（Module 38，mall 形态）。铁律 4 的反面：
+    # "入口体没鉴权就判漏洞"是高频陷阱 —— mall-admin 的所有 controller
+    # 都没有方法级注解，但 Spring Security 的 JwtAuthenticationTokenFilter
+    # 经 addFilterBefore 统一拦截认证（未登录 401）。过滤器是仓库级事实，
+    # 单文件视角看不到，必须在整库切片后统一标记。判定层看到标记就不再
+    # 把"无主体的形参直查"判成 True（降 None）—— 认证已由过滤器强制，
+    # 是否还有水平/垂直越权留给过滤器配置级别的分析，不归 controller
+    # 逐方法判定管。
+    # 标记**不能**用 `// ---- ...` 形态 —— 那是 entry_body 的分隔注释，
+    # 会把入口体截成空（实测 M38 首跑 body len 0）。用方括号标签。
+    _GLOBAL_AUTHZ_MARK = ("// [global-authz] Spring Security 过滤器统一认证"
+                          "（JwtAuthenticationTokenFilter / addFilterBefore）")
+
+    def _mark_global_authz(self, root: Path, units: List[CodeUnit]) -> None:
+        """仓库里存在 JWT 过滤器注册（addFilterBefore + *Filter 类）时，
+        给全部入口单元的切片头打机器标记。检测失败静默跳过。"""
+        try:
+            for java in root.rglob("*.java"):
+                try:
+                    text = java.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                if ("addFilterBefore" in text
+                        and "JwtAuthenticationTokenFilter" in text):
+                    for u in units:
+                        src = u.source_code or ""
+                        if src and self._GLOBAL_AUTHZ_MARK not in src:
+                            u.source_code = self._GLOBAL_AUTHZ_MARK + "\n" + src
+                    return
+        except Exception:
+            pass
 
     def _attach_chains(self, units: List[CodeUnit]) -> None:
         """为每个入口补「跨路由串接证据」：本方法写进介质的键，被谁读走了。

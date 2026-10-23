@@ -98,6 +98,12 @@ JOBS = [
     ("VAmPI (Connexion/OpenAPI)", ["benchmarks/benchmark_vampi.py", "--strict",
                                    "--offline"],
      "reference_repos/VAmPI-main", "target", True),
+    # 第 17 靶场（Module 38）：mall。生产级项目对照面——零误报门禁：
+    # 全库 246 单元零 True。逼出仓库级全局鉴权豁免（[global-authz] 标记）、
+    # getCurrentMember 主体链（2g-2）、MBG Example 参数化判据（sqli C2b），
+    # 以及 _interface_index 列表化 / _pick_impl 后缀匹配（铁律 24 同构坑）。
+    ("mall (生产级多模块对照)", ["benchmarks/benchmark_mall.py", "--strict"],
+     "reference_repos/mall-main", "target", True),
 ]
 
 
@@ -162,6 +168,7 @@ def build_scoreboard() -> str:
         ("pygoat (Python Flask labs)", "pygoat.json", "total_units"),
         ("eladmin-mp (MyBatis-Plus)", "eladminmp.json", "total_units"),
         ("VAmPI (Connexion/OpenAPI)", "vampi.json", "total_units"),
+        ("mall (生产级多模块对照)", "mall.json", "total_units"),
     ]
     total_fp = total_rev = 0
     for label, fname, unit_key in WHITELIST:

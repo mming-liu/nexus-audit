@@ -4229,6 +4229,55 @@ check("M37：VAmPI benchmark STRICT PASS（7 真值零误报零判反零退回�
                  / "benchmark_vampi.py"), "--strict", "--offline"],
                 capture_output=True).returncode, 0)
 
+# ---- [82] Module 38：全局鉴权豁免 + getCurrentMember 主体链 + MBG Example ----
+check("M38：getCurrentMember().getId() 作 Service 实参 → False（2g-2）",
+      _verdict("authz", '''
+    @RequestMapping(value = "/list", method = RequestMethod.GET)
+    public CommonResult list() {
+        List<OmsCartItem> l = cartItemService.list(
+            memberService.getCurrentMember().getId());
+        return CommonResult.success(l);
+    }
+'''), False)
+check("M38：全局鉴权标记下无主体形参直查 → 不判 True（豁免降 None）",
+      _verdict("authz", "// [global-authz] Spring Security 过滤器统一认证\n" + '''
+    @RequestMapping(value = "/update/{id}", method = RequestMethod.POST)
+    public CommonResult update(@PathVariable Long id) {
+        int count = productService.update(id, param);
+        return CommonResult.success(count);
+    }
+'''), None)
+check("M38：MBG Example setOrderByClause 字面量 → False（C2b）",
+      _verdict("sqli", '''
+    public CommonResult getList(@PathVariable Long parentId) {
+        return CommonResult.success(service.getList(parentId, 5, 1));
+    }
+// ---- 跨文件辅助方法实现 ----
+// 来自 PmsProductCategoryServiceImpl.java
+    public List<PmsProductCategory> getList(Long parentId, Integer pageSize, Integer pageNum) {
+        PmsProductCategoryExample example = new PmsProductCategoryExample();
+        example.setOrderByClause("sort desc");
+        return categoryMapper.selectByExample(example);
+    }
+'''), False)
+check("M38：MBG Example setOrderByClause 变量 → True（C2b 拼接出口）",
+      _verdict("sqli", '''
+    public CommonResult getList(@PathVariable Long parentId, String order) {
+        return CommonResult.success(service.getList(order));
+    }
+// ---- 跨文件辅助方法实现 ----
+// 来自 PmsProductCategoryServiceImpl.java
+    public List<PmsProductCategory> getList(String order) {
+        PmsProductCategoryExample example = new PmsProductCategoryExample();
+        example.setOrderByClause(order);
+        return categoryMapper.selectByExample(example);
+    }
+'''), True)
+check("M38：mall benchmark STRICT PASS（16 真值 + 全库零 True）",
+      _sp81.run([sys.executable, str(Path(__file__).resolve().parent
+                 / "benchmark_mall.py"), "--strict"],
+                capture_output=True).returncode, 0)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

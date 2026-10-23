@@ -1,0 +1,155 @@
+{
+  "total_units": 246,
+  "decided": 16,
+  "correct": 16,
+  "fp": 0,
+  "reverse_fn": 0,
+  "none": 0,
+  "global_true": 0,
+  "rows": [
+    {
+      "file": "HomeController.java",
+      "unit": "HomeController.getProductCateList",
+      "start_line": 45,
+      "category": "sqli",
+      "truth": false,
+      "rule": false,
+      "why": "selectByExample + orderByClause 字面量"
+    },
+    {
+      "file": "HomeController.java",
+      "unit": "HomeController.recommendProductList",
+      "start_line": 36,
+      "category": "sqli",
+      "truth": false,
+      "rule": false,
+      "why": "selectByExample + orderByClause 字面量"
+    },
+    {
+      "file": "OmsCartItemController.java",
+      "unit": "OmsCartItemController.clear",
+      "start_line": 99,
+      "category": "authz",
+      "truth": false,
+      "rule": false,
+      "why": "clear(getCurrentMember().getId())"
+    },
+    {
+      "file": "OmsCartItemController.java",
+      "unit": "OmsCartItemController.delete",
+      "start_line": 88,
+      "category": "authz",
+      "truth": false,
+      "rule": false,
+      "why": "delete(getCurrentMember().getId(), ids)"
+    },
+    {
+      "file": "OmsCartItemController.java",
+      "unit": "OmsCartItemController.list",
+      "start_line": 41,
+      "category": "authz",
+      "truth": false,
+      "rule": false,
+      "why": "cartItemService.list(getCurrentMember().getId())"
+    },
+    {
+      "file": "OmsCartItemController.java",
+      "unit": "OmsCartItemController.listPromotion",
+      "start_line": 49,
+      "category": "authz",
+      "truth": false,
+      "rule": false,
+      "why": "listPromotion(getCurrentMember().getId(), cartIds)"
+    },
+    {
+      "file": "OmsCartItemController.java",
+      "unit": "OmsCartItemController.updateQuantity",
+      "start_line": 57,
+      "category": "authz",
+      "truth": false,
+      "rule": false,
+      "why": "updateQuantity(id, getCurrentMember().getId(), q)"
+    },
+    {
+      "file": "OmsOrderController.java",
+      "unit": "OmsOrderController.detail",
+      "start_line": 70,
+      "category": "sqli",
+      "truth": false,
+      "rule": false,
+      "why": "selectByExample + orderByClause 字面量"
+    },
+    {
+      "file": "OmsPortalOrderController.java",
+      "unit": "OmsPortalOrderController.list",
+      "start_line": 75,
+      "category": "sqli",
+      "truth": false,
+      "rule": false,
+      "why": "selectByExample + orderByClause 字面量"
+    },
+    {
+      "file": "PmsBrandController.java",
+      "unit": "PmsBrandController.getList",
+      "start_line": 28,
+      "category": "sqli",
+      "truth": false,
+      "rule": false,
+      "why": "selectByExample + orderByClause 字面量"
+    },
+    {
+      "file": "PmsPortalProductController.java",
+      "unit": "PmsPortalProductController.search",
+      "start_line": 35,
+      "category": "sqli",
+      "truth": false,
+      "rule": false,
+      "why": "selectByExample + orderByClause 字面量"
+    },
+    {
+      "file": "PmsProductAttributeController.java",
+      "unit": "PmsProductAttributeController.getList",
+      "start_line": 32,
+      "category": "sqli",
+      "truth": false,
+      "rule": false,
+      "why": "selectByExample + orderByClause 字面量"
+    },
+    {
+      "file": "PmsProductCategoryController.java",
+      "unit": "PmsProductCategoryController.getList",
+      "start_line": 55,
+      "category": "sqli",
+      "truth": false,
+      "rule": false,
+      "why": "selectByExample + orderByClause 字面量（跨模块 Hop）"
+    },
+    {
+      "file": "SmsCouponController.java",
+      "unit": "SmsCouponController.getItem",
+      "start_line": 71,
+      "category": "sqli",
+      "truth": false,
+      "rule": false,
+      "why": "selectByExample + orderByClause 字面量"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.getItem",
+      "start_line": 125,
+      "category": "sqli",
+      "truth": false,
+      "rule": false,
+      "why": "selectByExample + orderByClause 字面量"
+    },
+    {
+      "file": "UmsMemberCouponController.java",
+      "unit": "UmsMemberCouponController.listCart",
+      "start_line": 68,
+      "category": "authz",
+      "truth": false,
+      "rule": false,
+      "why": "listCart(getCurrentMember().getId())"
+    }
+  ]
+}

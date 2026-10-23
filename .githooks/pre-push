@@ -109,3 +109,10 @@ if [ -d reference_repos/VAmPI-main ]; then
   "$PY" benchmarks/benchmark_vampi.py --strict --offline > /dev/null
   echo "pre-push: VAmPI 基线通过 ✔"
 fi
+
+# 第 17 靶场（Module 38）：mall——生产级项目对照面（全库零 True）
+if [ -d reference_repos/mall-main ]; then
+  echo "pre-push: mall 基线 ..."
+  "$PY" benchmarks/benchmark_mall.py --strict > /dev/null
+  echo "pre-push: mall 基线通过 ✔"
+fi

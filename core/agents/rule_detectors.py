@@ -983,6 +983,26 @@ def sqli_verdict(source: str) -> bool | None:
     if _MP_CONCAT_EXIT_RE.search(body):
         return True
 
+    # C2b) MyBatis Generator Example 参数化（Module 38，mall 形态）：
+    #     `XxxMapper.selectByExample(new XxxExample())` 是 MBG 生成的
+    #     安全查询载体 —— andXxx(constraint, value) 全部走 #{} 预编译
+    #     绑定，唯一的字符串替换出口是 XML 里的 `${orderByClause}`。
+    #     于是机制判据精确对准这一个出口：
+    #       · setOrderByClause(实参) 有一个是**非字符串字面量** → True
+    #         （形参/变量拼进 ORDER BY，${} 直替 —— 经典注入面）；
+    #       · 全部是字面量（`"sort desc"`）且切片无 JDBC sink → False
+    #         （Example 条件绑定参数化，无注入面）。
+    #     只看切片里真有 selectByExample 调用 + Example 构造 —— 接口
+    #     声明段不算数（ MallExample 只是个 POJO 名字，查询载体事实在
+    #     impl 段）。放 C3 之后：显式拼接出口优先级最高。
+    if re.search(r"selectByExample\s*\(", source) and re.search(
+            r"Example\s*\(\s*\)", source):
+        for m in re.finditer(r"setOrderByClause\s*\(([^;]*)\)", source):
+            if not re.fullmatch(r'\s*"[^"]*"\s*', m.group(1)):
+                return True
+        if not SQLI_JDBC_SINK_RE.search(source):
+            return False
+
     # B) MyBatis：只有能确认用的是 ${} 还是 #{} 才判
     mb = _mybatis_text(source)
     if MYBATIS_DOLLAR_RE.search(mb):
@@ -4660,6 +4680,13 @@ _AUTHZ_SUBJECT_RE = re.compile(
 _AUTHZ_SUBJECT_CHAIN_VAR_RE = re.compile(
     r"(\w+)\s*=\s*[^;\n]*\b(?:getSysUser\s*\(\s*\)|getSubject\s*\(\s*\)"
     r"|getPrincipal\s*\(\s*\)|ShiroUtils\s*\.)", re.I)
+# Module 38：Spring Security 服务端取主体（mall-portal 形态）——
+# `memberService.getCurrentMember().getId()` 直接作 Service 实参。
+# getCurrentMember 实现里是 SecurityContextHolder 取当前用户（服务端
+# 事实，客户端伪造不了），机制与 getSysUser/getPrincipal 同类。链式
+# 取值（无局部变量）时 2g 的"赋局部变量"落空，需单独认直接实参形态。
+_AUTHZ_MEMBER_CHAIN_RE = re.compile(
+    r"\bgetCurrentMember\s*\(\s*\)\s*\.\s*get\w*[Ii]d\s*\(\s*\)")
 
 # 主体**变量名**：`NewBeeMallUserVO user = (NewBeeMallUserVO) httpSession.getAttribute(KEY);`
 # 只有拿到变量名，才能查"它有没有被当作资源定位条件"。
@@ -4885,6 +4912,19 @@ def authz_verdict(source: str) -> bool | None:
                 if any(re.search(rf"\b{v}\b", sm.group(1)) for v in subj_local):
                     return False
 
+    # 2g-2) Spring Security 服务端主体链直接作实参（mall-portal 形态，
+    #     Module 38）：`memberService.getCurrentMember().getId()` 作为
+    #     Service 实参 —— 资源操作的主键来自服务端会话主体，没有可被
+    #     水平越权的他人资源键。getCurrentMember 的实现（mall-security
+    #     UserService）从 SecurityContextHolder 取当前登录用户，客户端
+    #     伪造不了 —— 机制与 2g 的四个可信源同类，只是链式直接进实参、
+    #     没有局部变量中转，2g 的"赋局部变量"形态接不住。
+    for sm in re.finditer(
+            r"\b\w*(?:Service|Mapper|Dao|DAO)\s*\.\s*\w+\s*\(([^;]{0,240})",
+            body):
+        if _AUTHZ_MEMBER_CHAIN_RE.search(sm.group(1)):
+            return False
+
     # 2h) 只读唯一性校验助手（RuoYi checkXxxUnique 实测形态，Module 28）：
     #
     #         @PostMapping("/checkLoginNameUnique")
@@ -4959,6 +4999,14 @@ def authz_verdict(source: str) -> bool | None:
     params = _bare_params(params_sig)
     if params and not has_any_subject and _AUTHZ_RESOURCE_RE.search(body) \
             and not _AUTHZ_GLOBAL_GUARD_RE.search(source):
+        # 4-豁免）仓库级全局鉴权机器标记（Module 38）：切片头有
+        # "全局鉴权：Spring Security 过滤器统一认证"标记时，认证由
+        # JwtAuthenticationTokenFilter 统一强制 —— controller 逐方法
+        # 的"无主体形参直查"不再构成"未授权访问"结论，降 None。
+        # （mall-admin 全部 controller 都无方法级注解，但未登录请求在
+        # 过滤器层就被 401；不豁免会把整个安全的生产级项目判成漏洞。）
+        if "[global-authz]" in source:
+            return None
         for m in _AUTHZ_RESOURCE_RE.finditer(body):
             args = _balanced_cond(body, m.end())
             if args is None:
