@@ -48,30 +48,58 @@ def load_truth() -> dict[str, tuple[str, bool]]:
     return truth
 
 
+# ---- Module 32：分片并行（ProcessPoolExecutor） ----
+# 每个 chunk 自带（name, cat, is_vul, 源码），worker 无共享状态（Windows
+# spawn 语义干净，也不必把整份 units dict pickle 给每个 initializer）。
+# 汇总永远在主进程按 sorted(truth) 原序做 —— 输出与串行版**逐位一致**
+# （A/B 名单顺序、逐类目计数、合计数都是纯聚合，与分片大小无关）。
+
+
+def _eval_chunk(chunk: list[tuple[str, str, bool, str]]) -> list[tuple[str, str, bool, int]]:
+    from core.agents import rule_detectors as R
+    out = []
+    for name, cat, is_vul, src in chunk:
+        out.append((name, cat, is_vul, R.verdict(cat, src)))
+    return out
+
+
 def main() -> None:
-    units = load_units(False)
+    import argparse
+    from concurrent.futures import ProcessPoolExecutor
+    import time
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--workers", type=int, default=os.cpu_count() or 4,
+                    help="并行 worker 数（默认 CPU 核数；1 = 串行）")
+    args = ap.parse_args()
+
+    t0 = time.monotonic()
+    units = load_units(False, workers=args.workers)
+    t_slice = time.monotonic() - t0
     truth = load_truth()
+
+    # 原序任务表（与旧版逐条循环同一顺序）
+    tasks: list[tuple[str, str, bool, str]] = []
+    for name, (cat, is_vul) in sorted(truth.items()):
+        hit = [k for k in units if name in k]
+        if not hit:
+            continue
+        tasks.append((name, cat, is_vul, units[pick_unit(units, name)]))
+
+    if args.workers > 1:
+        batch = max(1, len(tasks) // (args.workers * 4) or 1)
+        chunks = [tasks[i:i + batch] for i in range(0, len(tasks), batch)]
+        with ProcessPoolExecutor(max_workers=args.workers) as ex:
+            results = [row for ch in ex.map(_eval_chunk, chunks) for row in ch]
+    else:
+        results = _eval_chunk(tasks)
 
     fn_rule: list[tuple[str, str]] = []     # A) vul → False
     fp_rule: list[tuple[str, str]] = []     # B) safe → True
     per_cat: dict[str, list[int]] = {}
     resolved = 0
 
-    for name, (cat, is_vul) in sorted(truth.items()):
-        hit = [k for k in units if name in k]
-        if not hit:
-            continue
-        # 同一个用例类里有 doGet + doPost 两个入口，必须**锁定 doPost**：
-        # 真值标注的就是 doPost 那条链路（doGet 通常只是转发/页面壳）。
-        #
-        # 这里原来写 `units[hit[0]]`，靠 dict 的插入顺序偶然拿到 doPost
-        # （旧切片器按方法体长度倒序收集，doPost 更长所以排前面）。切片器
-        # 改成按源码顺序输出后 doGet 排到了前面，A 方向凭空冒出 264 条
-        # "静默放行" —— 全是量错对象造成的**假回归**。
-        # 结论：凡"用 `in` 找入口"的地方都要写清命中的是哪一条（本文件
-        # 第 34 条经验的又一次现形）。
-        src = units[pick_unit(units, name)]
-        verdict = R.verdict(cat, src)
+    for name, cat, is_vul, verdict in results:
         c = per_cat.setdefault(cat, [0, 0, 0, 0])   # [vul_t, vul_none, safe_f, safe_true]
         if is_vul:
             if verdict is False:
@@ -90,6 +118,8 @@ def main() -> None:
             else:
                 pass
 
+    print(f"（--workers {args.workers}，切片+verdict 共 "
+          f"{time.monotonic() - t0:.1f}s，其中切片 {t_slice:.1f}s）")
     print("=== 危险方向 A：vul 被规则判 False（静默放行） ===")
     for name, cat in fn_rule:
         print(f"  {name}  {cat}")

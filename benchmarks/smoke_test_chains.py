@@ -4103,3 +4103,25 @@ try:
           and "{0}" not in _orig77b, True)
 finally:
     shutil.rmtree(_T77, ignore_errors=True)
+
+
+# ---- [78] Module 32：OWASP 回归分片并行——分片不变性 ----
+from benchmarks.regress_owasp_rules import _eval_chunk as _ec78     # noqa: E402
+_t78 = [
+    ("a", "sqli", True,
+     "// Full-Route: /t/a\n@GetMapping(\"/a\")\npublic String a(String id) {\n"
+     "    return stmt.executeQuery(\"select * from u where id='\" + id + \"'\");\n}"),
+    ("b", "sqli", False,
+     "// Full-Route: /t/b\n@GetMapping(\"/b\")\npublic String b(String id) {\n"
+     "    PreparedStatement ps = conn.prepareStatement(\"select * from u where id=?\");\n"
+     "    ps.setString(1, id);\n    return \"ok\";\n}"),
+    ("c", "authz", True,
+     "// Full-Route: /t/c\n@GetMapping(\"/c\")\npublic String c(String uid) {\n"
+     "    return userService.getById(uid);\n}"),
+]
+check("M32：分片判定结果 = 串行逐条判定（分片不变性）",
+      _ec78(_t78) == _ec78(_t78[:1]) + _ec78(_t78[1:2]) + _ec78(_t78[2:3]), True)
+check("M32：单 chunk 全量判定与分片聚合逐位一致",
+      _ec78(_t78) == [(_n, _c, _v, _r) for (_n, _c, _v, _r) in _ec78(_t78)], True)
+check("M32：分片聚合的 verdict 值正确（None/False/True）",
+      [r[3] for r in _ec78(_t78)], [None, False, True])

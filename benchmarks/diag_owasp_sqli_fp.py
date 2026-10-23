@@ -95,7 +95,25 @@ def pick_unit(units: dict[str, str], case: str) -> str:
     return (post or hit or [""])[0]
 
 
-def load_units(refresh: bool = False) -> dict[str, str]:
+def _slice_shard(repo: str, files: list) -> list:
+    """M32：worker 侧只做逐文件切片（_slice_file 每文件独立）。
+
+    跨文件语义（_attach_chains / 符号索引增强）**只允许在主进程对合并后
+    的全量单元做** —— 分片内做会把跨文件证据切碎，A/B 方向就会假回归。
+    """
+    from core.slicer.java_servlet import JavaSlicer
+    s = JavaSlicer(repo)
+    out = []
+    for java in files:
+        from core.context.java_impl_resolver import _read_cached
+        text = _read_cached(java)
+        if not text:
+            continue
+        out.extend(s._slice_file(java, text))
+    return out
+
+
+def load_units(refresh: bool = False, workers: int = 1) -> dict[str, str]:
     fp = _slicer_fingerprint()
     stamp = CACHE + ".fp"
     if not refresh and os.path.exists(CACHE) and os.path.exists(stamp):
@@ -104,7 +122,23 @@ def load_units(refresh: bool = False) -> dict[str, str]:
                 with open(CACHE, "rb") as fh:
                     return pickle.load(fh)
     slicer = JavaSlicer(REPO)
-    units = {u.unit_name: u.source_code for u in slicer.extract_entry_units()}
+    if workers > 1:
+        # 冷缓存重建是 12 分钟级的真热点（verdict 只有 2.4s）。按
+        # _iter_java_files() 的原始顺序分片 → 并行逐文件切片 → 主进程
+        # 按原序合并 → 全量 _attach_chains。合并顺序 = 串行顺序，
+        # units dict 插入序逐位一致。
+        from concurrent.futures import ProcessPoolExecutor
+        files = list(slicer._iter_java_files())
+        batch = max(1, len(files) // (workers * 4) or 1)
+        shards = [files[i:i + batch] for i in range(0, len(files), batch)]
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            unit_list = [u for part in ex.map(_slice_shard,
+                                              [REPO] * len(shards), shards)
+                         for u in part]
+        slicer._attach_chains(unit_list)
+    else:
+        unit_list = slicer.extract_entry_units()
+    units = {u.unit_name: u.source_code for u in unit_list}
     os.makedirs(os.path.dirname(CACHE), exist_ok=True)
     with open(CACHE, "wb") as fh:
         pickle.dump(units, fh)
