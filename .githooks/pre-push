@@ -102,3 +102,10 @@ if [ -d reference_repos/eladmin-mp-master ]; then
   "$PY" benchmarks/benchmark_eladminmp.py --strict --offline > /dev/null
   echo "pre-push: eladmin-mp 基线通过 ✔"
 fi
+
+# 第 16 靶场（Module 37）：VAmPI——Connexion/OpenAPI 路由 + JWT 主体链
+if [ -d reference_repos/VAmPI-main ]; then
+  echo "pre-push: VAmPI 基线 ..."
+  "$PY" benchmarks/benchmark_vampi.py --strict --offline > /dev/null
+  echo "pre-push: VAmPI 基线通过 ✔"
+fi

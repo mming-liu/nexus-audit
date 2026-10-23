@@ -92,6 +92,12 @@ JOBS = [
     ("eladmin-mp (MyBatis-Plus)", ["benchmarks/benchmark_eladminmp.py", "--strict",
                                    "--offline"],
      "reference_repos/eladmin-mp-master", "target", True),
+    # 第 16 靶场（Module 37）：VAmPI。Connexion/OpenAPI 路由通道
+    # （operationId → 零装饰器函数）+ JWT 主体链判据（decode_auth_token →
+    # resp['sub']），机制由冒烟 [81] 锁定。
+    ("VAmPI (Connexion/OpenAPI)", ["benchmarks/benchmark_vampi.py", "--strict",
+                                   "--offline"],
+     "reference_repos/VAmPI-main", "target", True),
 ]
 
 
@@ -155,6 +161,7 @@ def build_scoreboard() -> str:
         ("RuoYi (Java 多模块)", "ruoyi.json", "total_units"),
         ("pygoat (Python Flask labs)", "pygoat.json", "total_units"),
         ("eladmin-mp (MyBatis-Plus)", "eladminmp.json", "total_units"),
+        ("VAmPI (Connexion/OpenAPI)", "vampi.json", "total_units"),
     ]
     total_fp = total_rev = 0
     for label, fname, unit_key in WHITELIST:

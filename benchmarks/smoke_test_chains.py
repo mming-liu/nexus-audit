@@ -3501,10 +3501,8 @@ check("vulpy 模型层是 opt-in（--model 存在，默认不发请求）",
 
 
 print()
-if FAILS:
-    print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
-    sys.exit(1)
-print("CHAIN SMOKE TEST PASS ✔")
+# （汇总在文件最末尾 —— [69] 起的区块都在本行之后追加，
+#   中途放汇总会让末尾断言的 FAIL 不影响退出码。）
 
 # ---- [69] nssc 第 10 靶场：README 指名真值 + 机制断言 ----
 # 切片器形态：签名没用修饰符时，切片里**没有**修饰符体（README 的漏洞点）
@@ -4210,3 +4208,29 @@ modifier gated() {
     _;
 }
 '''), None)
+
+# ---- [81] Module 37：Connexion/OpenAPI 路由通道 + JWT 主体链 ----
+_routes81 = WebTreeSitterSlicer._connexion_routes(
+    Path("reference_repos/VAmPI-main"))
+check("M37：OpenAPI operationId 解析（14 路由，module.func → 路由）",
+      (len(_routes81),
+       _routes81.get(("api_views/users.py", "get_by_username")),
+       _routes81.get(("api_views/books.py", "get_by_title"))),
+      (14, "get /users/v1/{username}", "get /books/v1/{book_title}"))
+_vampi_units = WebTreeSitterSlicer(
+    Path("reference_repos/VAmPI-main")).extract_entry_units()
+_vampi_names = {u.unit_name for u in _vampi_units}
+check("M37：14 个 Connexion 入口全切出（零装饰器函数进切片）",
+      (len(_vampi_units), "update_password" in _vampi_names,
+       "delete_user" in _vampi_names), (14, True, True))
+import subprocess as _sp81                                          # noqa: E402
+check("M37：VAmPI benchmark STRICT PASS（7 真值零误报零判反零退回）",
+      _sp81.run([sys.executable, str(Path(__file__).resolve().parent
+                 / "benchmark_vampi.py"), "--strict", "--offline"],
+                capture_output=True).returncode, 0)
+
+print()
+if FAILS:
+    print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
+    sys.exit(1)
+print("CHAIN SMOKE TEST PASS ✔")

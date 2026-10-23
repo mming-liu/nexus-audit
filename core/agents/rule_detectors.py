@@ -5395,6 +5395,11 @@ _PY_SUBJECT_RE = re.compile(
     r"Depends\s*\(\s*get_current_user\s*\)|@login_required|@jwt_required|"
     r"\bcurrent_user\b|\bg\s*\.\s*user\b|\brequest\s*\.\s*user\b|"
     r"get_jwt_identity\s*\(|@requires_auth", re.I)
+# Module 37：JWT 主体链第二形态（VAmPI）。Connexion/OpenAPI 无装饰器，
+# 主体经 `User.decode_auth_token(token)` 解出 claim 再取 `resp['sub']`
+# 作查询键 —— 机制与 get_jwt_identity 完全同类（"是谁"由 token 决定）。
+_PY_SUBJECT_RE_JWT = re.compile(
+    r"\bdecode_auth_token\s*\(|\[\s*['\"]sub['\"]\s*\]", re.I)
 _PY_OWNERSHIP_RE = re.compile(
     r"current_user\s*\.\s*id\s*==|==\s*current_user\s*\.\s*id|"
     r"current_user\s*\.\s*id\s*!=|!=\s*current_user\s*\.\s*id|"
@@ -5408,14 +5413,56 @@ def python_authz_verdict(source: str) -> bool | None:
     """Python Authz：FastAPI `Depends(get_current_user)` / Flask
     `@login_required` + 归属比对（current_user.id 参与查询或比较）→ False；
     路由形参直接查改删且无任何主体 → True；其余退 None。"""
-    has_subject = _PY_SUBJECT_RE.search(source) is not None
+    has_subject = (_PY_SUBJECT_RE.search(source) is not None
+                   or _PY_SUBJECT_RE_JWT.search(source) is not None)
     if has_subject:
         if _PY_OWNERSHIP_RE.search(source):
             return False
+        # Module 37 a) admin 门（VAmPI delete_user 形态）：主体链取到
+        # 当前用户后，特权动作之前有 `user.admin` 真值检查 —— 调用者
+        # 身份进入了授权判定，机制上等价于 ownership 比对 → False。
+        if re.search(r"\bif\s+(?:not\s+)?[\w.]+\.admin\s*:|\bif\s+[\w.]+\.admin\b",
+                     source):
+            return False
+        # Module 37 b) 资源形参直写（BOLA 写路径，VAmPI update_password
+        # vuln 分支）：主体链虽然在场，但写/删操作的目标记录由 **URL
+        # 资源形参** 定位（filter_by(attr=形参) 或 delete_xxx(形参)），
+        # 主体没有参与目标定位 —— 谁登录的都能改别人的 → True。
+        # 只读形参查询不算写路径（那是 get_by_username 的只读 BOLA，
+        # 由下方无主体分支覆盖）。
+        params = _py_func_params(source)
+        res_params = {p for p in params
+                      if re.search(r"(?:id|no|name|key|slug|uuid)$", p)}
+        for p in res_params:
+            if re.search(rf"filter_by\s*\([^)]*=\s*{p}\b", source) and re.search(
+                    r"\.\s*(?:password|email|admin|balance)\s*=[^=]"
+                    r"|\bdelete\w*\s*\(\s*[^)]*\b" + p + r"\b", source):
+                return True
         # 有主体但方法体看不出比对：主体可能下沉到 Service —— 不表态
         if re.search(r"(?:service|repo|dao|crud|manager|store)\s*\.\s*\w+\s*\(",
                      source, re.I):
             return None
+        # Module 37 b2) 成对双形态只读 BOLA（get_by_title 形态）：同一
+        # 切片里既有主体键查询（filter_by(user=user / username=resp['sub'])
+        # —— fixed 分支）又有 **URL 资源形参**直接定位目标的查询
+        # （filter_by(book_title=str(形参)) —— vuln 分支），且无 admin 门。
+        # 这是作者指名的 vuln 开关双形态：形参定位绕过了主体归属 → True。
+        # （资源形参不在任何查询里、只有主体键查询的单元不命中 ——
+        # 那是 me/update_email 的"查自己"形态，走下方 c 分支 False。）
+        # 值位置精确判定：形参必须是查询的**值**（`= 形参` / `= str(形参)`
+        # / 位置实参），键名同名不算（update_email 的 filter_by(username=
+        # resp['sub']) 左边键名与形参同名，但值是主体取值 —— 不命中）。
+        for p in params:
+            if re.search(rf"filter(?:_by)?\s*\([^)]*(?:=\s*str\s*\(\s*{p}\b"
+                         rf"|=\s*{p}\b|\(\s*{p}\b|,\s*{p}\b)", source):
+                return True
+        # Module 37 c) 主体键 ORM 查询（me/update_email 形态）：JWT 主体
+        # 取值（resp['sub']）直接作 filter_by 查询键 —— 查的就是"谁登录
+        # 谁的记录"，写也只能写自己 → False（铁律 12：主体链取值作
+        # Service/ORM 实参 → False）。
+        if _PY_SUBJECT_RE_JWT.search(source) and re.search(
+                r"filter_by\s*\([^)]*=\s*\w+\[\s*['\"]sub['\"]\s*\]", source):
+            return False
         return None
     params = _py_func_params(source)
     resource_params = {p for p in params

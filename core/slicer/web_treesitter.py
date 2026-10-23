@@ -65,7 +65,76 @@ class WebTreeSitterSlicer:
                     if any(any(k in d.lower() for k in route_kw) for d in u.decorators_or_modifiers)]
         for u in filtered:
             self._expand_helpers(indexer, u)
+        if not filtered:
+            # Module 37：Connexion/OpenAPI 通道。装饰器位为空不代表没有
+            # 路由 —— Connexion 把路由声明放在 openapi*.yml 的 operationId
+            # 里，函数本体零装饰器。仅当仓库里真有含 operationId 的 yml
+            # 才启用（不影响其它靶场的现有切片）。
+            filtered = self._connexion_entries(indexer)
+            for u in filtered:
+                self._expand_helpers(indexer, u)
         return filtered
+
+    @staticmethod
+    def _connexion_routes(repo_path: Path) -> dict[tuple[str, str], str]:
+        """解析 openapi*.yml：operationId → (module, func) 与 method+path。
+
+        零依赖手写解析（venv 无 pyyaml）：OpenAPI 的 paths 层级是固定的
+        `  /path:` → `    method:` → `      operationId:`，按缩进状态机跟
+        踪即可，不需要完整 YAML。返回 {(module, func): "get /users/v1"}。
+        """
+        routes: dict[tuple[str, str], str] = {}
+        for yml in sorted(repo_path.rglob("*.yml")):
+            try:
+                text = yml.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if "operationId" not in text:
+                continue
+            cur_path = cur_method = ""
+            for line in text.splitlines():
+                m = re.match(r"^  (/\S*):\s*$", line)
+                if m:
+                    cur_path, cur_method = m.group(1), ""
+                    continue
+                m = re.match(r"^    (get|post|put|delete|patch):\s*$", line)
+                if m:
+                    cur_method = m.group(1)
+                    continue
+                m = re.match(r"^\s*operationId:\s*([\w.]+)\s*$", line)
+                if m and cur_method:
+                    # operationId: api_views.users.get_by_username
+                    # 模块路径 = 去掉末段函数名 → api_views/users.py
+                    parts = m.group(1).split(".")
+                    if len(parts) >= 2:
+                        func = parts[-1]
+                        module = "/".join(parts[:-1]) + ".py"
+                        routes[(module, func)] = f"{cur_method} {cur_path}"
+        return routes
+
+    def _connexion_entries(self, indexer: SymbolIndexer) -> List["CodeUnit"]:
+        """把 yml 路由表对回符号表里的同名函数，产出带 connexion: 标记的
+        CodeUnit。按 (module 相对路径, func) 精确匹配（铁律 10 的 pick
+        语义：路由声明本身就是唯一入口点名，重名函数不收）。"""
+        repo = self.repo_path or indexer.repo_path
+        routes = self._connexion_routes(Path(repo))
+        if not routes:
+            return []
+        if not indexer._built:
+            indexer.build()
+        out: List[CodeUnit] = []
+        for name, syms in indexer.symbol_table.items():
+            for sym in syms:
+                rel = Path(sym["file"]).as_posix()
+                hit = next((v for k, v in routes.items()
+                            if k[1] == name and rel.endswith(k[0])), None)
+                if hit is None:
+                    continue
+                unit = indexer.make_code_unit(
+                    sym, [f"connexion:{hit}"], name=name)
+                if unit:
+                    out.append(unit)
+        return out
 
     # ---------------- 多跳展开 ----------------
 

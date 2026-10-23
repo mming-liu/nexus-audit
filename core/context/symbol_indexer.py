@@ -184,6 +184,29 @@ class SymbolIndexer:
 
     # ---------- 与 CodeUnit 对接 ----------
 
+    def make_code_unit(self, sym: dict, decorators: list[str], name: str = "") -> CodeUnit | None:
+        """把符号表条目转成 CodeUnit（Module 37：Connexion/OpenAPI 通道）。
+
+        Connexion 的路由不在 Python 装饰器里，而在 openapi*.yml 的
+        `operationId: api_views.users.get_by_username` —— 函数本体没有任何
+        装饰器，`to_code_units` 永远看不见。调用方解析 yml 得到
+        (module, func, method, path) 后用本方法造单元，
+        decorators_or_modifiers 填 `connexion:<method> <path>` 保留路由
+        证据（与 Flask `@app.route` 同一契约位）。
+        """
+        if not self._built:
+            self.build()
+        data = self._read_symbol(sym)
+        if not data:
+            return None
+        return CodeUnit(
+            file_path=sym["file"], language=self.language,
+            unit_name=name or sym.get("name", ""), start_line=sym["start"],
+            end_line=sym["end"], decorators_or_modifiers=decorators,
+            called_symbols=self._extract_called_symbols(data["source"]),
+            source_code=data["source"],
+        )
+
     def to_code_units(self) -> list[CodeUnit]:
         """把带路由装饰器的符号转成第一层 CodeUnit（含 called_symbols）。"""
         units = []

@@ -1,0 +1,73 @@
+{
+  "total_units": 14,
+  "decided": 7,
+  "correct": 7,
+  "fp": 0,
+  "reverse_fn": 0,
+  "none": 0,
+  "rows": [
+    {
+      "file": "books.py",
+      "unit": "add_new_book",
+      "start_line": 17,
+      "category": "authz",
+      "truth": false,
+      "rule": false,
+      "why": "主体链，user_id=user.id 落自己"
+    },
+    {
+      "file": "books.py",
+      "unit": "get_by_title",
+      "start_line": 45,
+      "category": "authz",
+      "truth": true,
+      "rule": true,
+      "why": "作者注释 # Broken Object Level Authorization（vuln 分支形参定位）"
+    },
+    {
+      "file": "users.py",
+      "unit": "delete_user",
+      "start_line": 206,
+      "category": "authz",
+      "truth": false,
+      "rule": false,
+      "why": "主体链 + user.admin 门"
+    },
+    {
+      "file": "users.py",
+      "unit": "get_by_username",
+      "start_line": 45,
+      "category": "authz",
+      "truth": true,
+      "rule": true,
+      "why": "README 指名 BOLA：无 token 校验，URL username 直查"
+    },
+    {
+      "file": "users.py",
+      "unit": "me",
+      "start_line": 28,
+      "category": "authz",
+      "truth": false,
+      "rule": false,
+      "why": "主体链 resp['sub'] 查自己"
+    },
+    {
+      "file": "users.py",
+      "unit": "update_email",
+      "start_line": 132,
+      "category": "authz",
+      "truth": false,
+      "rule": false,
+      "why": "主体链 resp['sub'] 定位，URL 形参未参与目标定位"
+    },
+    {
+      "file": "users.py",
+      "unit": "update_password",
+      "start_line": 179,
+      "category": "authz",
+      "truth": true,
+      "rule": true,
+      "why": "README 指名 Unauthorized Password Change（vuln 分支写他人密码）"
+    }
+  ]
+}
