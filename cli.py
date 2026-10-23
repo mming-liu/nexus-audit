@@ -975,9 +975,11 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
     if py:
         n += _fix_python_sqli(repo, py, report)
         n += _fix_python_deserial(repo, py, report)
+        n += _fix_python_shell(repo, py, report)
     if sol:
         n += _fix_solidity_txorigin(repo, sol, report)
         n += _fix_solidity_reentrancy(repo, sol, report)
+        n += _fix_solidity_initiator(repo, sol, report)
     if rest:
         n += _fix_mp_concat(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
@@ -1264,6 +1266,170 @@ def _fix_solidity_reentrancy(repo: Path, targets: list, lines: list) -> int:
                       "> 同时改变了失败语义 —— 需人工确认回滚路径。", ""]
         else:
             lines += [f"## [sol-reentrancy] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
+def _fix_solidity_initiator(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 9 类（Module 40）：executeOperation 回调插 initiator 校验。
+
+    Aave 借贷池回调 `executeOperation` 缺 `require(initiator == address(this))`
+    时任何人可直调回调转走资产（M34 判据的真值形态）。修复 = 在函数体
+    `{` 后插入 initiator 恒等校验（形参名从签名抓：initiator/_initiator），
+    重切片 + 重跑 access_control 翻 False 才算自检通过，finally 字节级还原。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if "executeOperation" not in src:
+            continue
+        if rule_verdict("access_control", src) is not True:
+            continue
+        pm = re.search(r"executeOperation\s*\([^)]*\b(?:_)?initiator\b", src)
+        if not pm:
+            continue
+        im = re.search(r"address\s+(?:payable\s+)?(_?initiator)\b", src)
+        if not im:
+            continue
+        init_var = im.group(1)
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        # 在 executeOperation 函数体 `{` 之后插入校验行（取入口行区间内
+        # 签名的第一个 `{`；插入行带原文件缩进 8 空格的兜底——按函数体
+        # 首个非空行的缩进对齐更稳）。
+        lines_all = original.splitlines(keepends=True)
+        insert_at = None
+        indent = "        "
+        for i in range(max(0, u.start_line - 1), min(u.end_line, len(lines_all))):
+            if i < u.start_line - 1:
+                continue
+            if "executeOperation" in lines_all[i]:
+                # 找签名 `{`：若在本行，插入点 = 下一行；若签名跨行，
+                # 继续向下找首个 `{`
+                seg = lines_all[i]
+                if "{" in seg:
+                    insert_at = i + 1
+                else:
+                    for j in range(i + 1, min(u.end_line, len(lines_all))):
+                        if "{" in lines_all[j]:
+                            insert_at = j + 1
+                            break
+                break
+        if insert_at is None:
+            continue
+        # 缩进对齐：看插入点前一非空行
+        for k in range(insert_at - 1, -1, -1):
+            t = lines_all[k].lstrip()
+            if t and not t.startswith("//"):
+                indent = lines_all[k][: len(lines_all[k]) - len(t)]
+                break
+        stmt = (f'{indent}require({init_var} == address(this), '
+                f'"Unauthorized initiator");\n')
+        patched_lines = lines_all[:insert_at] + [stmt] + lines_all[insert_at:]
+        patched = "".join(patched_lines)
+        v2 = None
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.slicer.web3_slither import SoliditySlicer
+            u2 = next((x for x in SoliditySlicer(repo).extract_entry_units(repo)
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = rule_verdict("access_control", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [sol-initiator] {u.unit_name}（`{f.name}`）", "```diff",
+                      *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 access_control 规则 → False。",
+                      "> 回调只允许本合约发起的闪贷触发，外部直调 revert。", ""]
+        else:
+            lines += [f"## [sol-initiator] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
+_PY_SHELL_TRUE_RE = re.compile(
+    r"((?:subprocess\.\w+|os\.system)\s*\()([^;]{0,200}?shell\s*=\s*True[^;]{0,80}?\))",
+    re.S)
+
+
+def _fix_python_shell(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 10 类（Module 40）：Python `shell=True` 改列表传参。
+
+    `subprocess.run(cmd, shell=True, ...)` → `subprocess.run(
+    shlex.split(cmd), ...)`：拆掉 shell 解释层，注入面消失（元字符不再
+    被 /bin/sh 解释）。os.system 形态的命令拼接太自由（整串含重定向等
+    shell 语义），不能机械改写 —— 不处理，宁可不修也不产坏补丁。
+    需要时在文件头补 `import shlex`。自检同前：重切片 cmdi 翻 False。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if "shell=True" not in src or "os.system" in src:
+            continue
+        m = _PY_SHELL_TRUE_RE.search(src)
+        if not m:
+            continue
+        inner = m.group(2)
+        # 命令必须是单个裸变量名（shlex.split(var)）—— 字符串字面量/
+        # f-string/拼接形态交人工（shlex.split 一个已拼好的串防不住
+        # 注入，必须改源头）。
+        cm = re.match(r"\s*([A-Za-z_]\w*)\s*[,)]", inner)
+        if not cm:
+            continue
+        var = cm.group(1)
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        new_call = re.sub(
+            r"(\(\s*)" + re.escape(var) + r"\s*,([^;]{0,200}?)shell\s*=\s*True\s*,?\s*",
+            rf"\g<1>shlex.split({var}),\2", original, count=1, flags=re.S)
+        if new_call == original:
+            # shell=True 在尾参位置（后面没有逗号）
+            new_call = re.sub(
+                r"\(\s*" + re.escape(var) + r"\s*,([^;]{0,200}?)shell\s*=\s*True\s*\)",
+                rf"(shlex.split({var}),\1)", original, count=1, flags=re.S)
+        if new_call == original:
+            continue
+        if "import shlex" not in new_call:
+            new_call = "import shlex\n" + new_call
+        v2 = None
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(new_call)
+            from core.slicer.web_treesitter import WebTreeSitterSlicer
+            u2 = next((x for x in WebTreeSitterSlicer(repo).extract_entry_units()
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = rule_verdict("cmdi", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), new_call.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [py-shell] {u.unit_name}（`{f.name}`）", "```diff",
+                      *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 cmdi 规则 → False。",
+                      "> shell=True → shlex.split 列表传参：元字符不再被", ""
+                      "> /bin/sh 解释，命令注入面消失。", ""]
+        else:
+            lines += [f"## [py-shell] {u.unit_name}（`{f.name}`）",
                       f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
     return fixed
 

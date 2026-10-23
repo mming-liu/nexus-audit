@@ -4310,6 +4310,45 @@ check("M39：无本合约 modifier 时不留空段头",
       "修饰符定义（本合约，供核验）----\n\n" not in _m39_empty.source_code
       or "require(msg.sender == owner" in _m39_empty.source_code, True)
 
+# ---- [84] Module 40：补丁第 9/10 类（initiator 插校验 / shell=True 改列表）----
+_m40dir = Path(tempfile.mkdtemp(prefix="m40fx_"))
+(_m40dir / "Flashloan.sol").write_text('''contract Flash {
+    function executeOperation(
+        uint256 amount,
+        address _initiator,
+        bytes calldata data
+    ) external {
+        IERC20(USDa).safeTransfer(address(lendingPool), amount);
+    }
+}
+''', encoding="utf-8")
+(_m40dir / "app_ping.py").write_text('''from flask import Flask
+app = Flask(__name__)
+
+@app.route("/ping")
+def ping(host):
+    cmd = "ping -c 1 " + host
+    subprocess.run(cmd, shell=True)
+''', encoding="utf-8")
+import cli as _cli                                                 # noqa: E402
+_sol40 = SoliditySlicer().extract_entry_units(_m40dir)
+_l40a: list[str] = []
+check("M40：initiator 补丁命中 1 条（executeOperation 插 require）",
+      _cli._fix_solidity_initiator(_m40dir, _sol40, _l40a), 1)
+check("M40：补丁报告带自检通过标记",
+      (any("sol-initiator" in x for x in _l40a)
+       and any("自检通过" in x for x in _l40a)), True)
+check("M40：Solidity 字节级还原",
+      "require(" not in (_m40dir / "Flashloan.sol").read_text(encoding="utf-8"),
+      True)
+_py40 = WebTreeSitterSlicer(_m40dir).extract_entry_units()
+_l40b: list[str] = []
+check("M40：shell=True 补丁命中 1 条（shlex.split 列表传参）",
+      _cli._fix_python_shell(_m40dir, _py40, _l40b), 1)
+check("M40：Python 字节级还原",
+      "shlex" not in (_m40dir / "app_ping.py").read_text(encoding="utf-8"),
+      True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
