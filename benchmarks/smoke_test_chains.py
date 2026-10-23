@@ -4621,6 +4621,42 @@ check("M48：doctor 补丁器清单升到 12 类且全绿",
        and "共 19 类" in _sp91.stdout),
       True)
 
+# ---- [92] Module 49：Mermaid 污点链路图 ----
+from core.context.taint_graph import build_taint_graph as _bg92   # noqa: E402
+_g92_src = """// Full-Route: /api/order/{id}
+    @GetMapping("/order/{id}")
+    public Result detail(@PathVariable Long id) {
+        return orderService.detail(id);
+    }
+
+// ---- 同文件辅助方法 ----
+    protected Result helper(String sql) {
+        return stmt.executeQuery(sql);
+    }
+"""
+_u92 = None
+_d92g = _tf91.mkdtemp(prefix="m49_")
+try:
+    _f92 = Path(_d92g) / "OrderController.java"
+    _f92.write_text(_g92_src, encoding="utf-8")
+    _u92 = _CU88(file_path=str(_f92), language=_L88.JAVA_WEB,
+                 unit_name="OrderController.detail", start_line=2, end_line=5,
+                 route_path="/api/order/{id}", source_code=_g92_src)
+    _g92 = _bg92(_u92, "sqli")
+    check("M92：Mermaid 图含合法节点/边语法（flowchart LR + --> 边）",
+          ("```mermaid" in _g92 and "flowchart LR" in _g92
+           and " --> " in _g92), True)
+    check("M92：图含入口路由名与跨文件/Hop 节点",
+          ("/api/order" in _g92.replace("{", "").replace("}", "")
+           and "N1" in _g92 and "N0 --> N1" in _g92), True)
+    check("M92：图含 Sink 节点与**源文件真实行号**",
+          ("SINK" in _g92 and "OrderController.java:9" in _g92), True)
+    check("M92：标签转义（无裸引号/方括号破坏 Mermaid）",
+          (']"' not in _g92 and '["' in _g92.replace('&lbrace;', '')
+           and _g92.count('"') % 2 == 0), True)
+finally:
+    shutil.rmtree(_d92g, ignore_errors=True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

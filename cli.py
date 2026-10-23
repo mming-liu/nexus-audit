@@ -487,6 +487,11 @@ def cmd_scan_java(args, repo: Path):
         lines += [f"## [{cat.upper()}] {u.unit_name}",
                   f"- 位置：`{u.file_path}:{u.start_line}`",
                   f"- 路由：{', '.join(u.decorators_or_modifiers)}", ""]
+        if getattr(args, "graph", None):
+            from core.context.taint_graph import build_taint_graph
+            g = build_taint_graph(u, cat)
+            if g:
+                lines += [g, ""]
     if failed:
         lines += ["## 判定失败（需重跑，不是无漏洞）", ""]
         for u, c in failed:
@@ -2143,6 +2148,9 @@ def main():
     p_scan.add_argument("--github-comment", dest="github_comment", action="store_true",
                         help="输出 GitHub Actions 行级 annotation + 写入 $GITHUB_STEP_SUMMARY")
     p_scan.add_argument("--output", default=None, help="报告输出路径")
+    p_scan.add_argument("--graph", action="store_true",
+                        help="M49：报告中内嵌 Mermaid 污点传播路径图"
+                             "（入口 → Hop → Sink 行号）")
     p_scan.add_argument("--emit-poc", default=None, metavar="DIR",
                         help="M45：把规则层确定性 True 命中合成为可运行 PoC "
                              "骨架（Solidity .t.sol / Python pytest / Java MockMvc）"
@@ -2170,6 +2178,8 @@ def main():
     p_pr.add_argument("--sarif", default=None, metavar="OUT.sarif",
                       help="将命中结果导出为 SARIF v2.1.0（GitHub Code Scanning 格式）")
     p_pr.add_argument("--output", default=None, help="报告输出路径")
+    p_pr.add_argument("--graph", action="store_true",
+                      help="M49：报告中内嵌 Mermaid 污点传播路径图")
     args = parser.parse_args()
     if args.command == "scan":
         cmd_scan(args)
