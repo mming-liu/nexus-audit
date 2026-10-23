@@ -76,10 +76,13 @@ def _slicer_fingerprint() -> str:
              os.path.abspath(__file__)]
     for p in files:
         try:
-            st = os.stat(p)
+            with open(p, "rb") as fh:
+                h.update(fh.read())
         except OSError:
             continue
-        h.update(f"{p}:{st.st_mtime_ns}:{st.st_size}".encode())
+    # M35 修正：原来是 mtime_ns 指纹——任何进程触碰文件（哪怕内容没变）
+    # 都会造成假失配，触发 12 分钟级假重建（M32 实测连撞三次）。改内容
+    # 哈希：内容没变就命中，内容变了必失效，两个方向都正确。
     return h.hexdigest()[:16]
 
 

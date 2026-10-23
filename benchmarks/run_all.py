@@ -36,7 +36,7 @@ SCOREBOARD = ROOT / "benchmarks" / "results" / "SCOREBOARD.md"
 # (名称, 命令, 前置目录检查, 类别, 可并发)
 #   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
 JOBS = [
-    ("冒烟测试 [1]-[73]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
+    ("冒烟测试 [1]-[79]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke", False),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target", True),
@@ -154,6 +154,7 @@ def build_scoreboard() -> str:
         ("vulpy (Python)", "vulpy.json", "total_units"),
         ("RuoYi (Java 多模块)", "ruoyi.json", "total_units"),
         ("pygoat (Python Flask labs)", "pygoat.json", "total_units"),
+        ("eladmin-mp (MyBatis-Plus)", "eladminmp.json", "total_units"),
     ]
     total_fp = total_rev = 0
     for label, fname, unit_key in WHITELIST:
