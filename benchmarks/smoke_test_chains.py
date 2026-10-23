@@ -4426,6 +4426,57 @@ check("M44：退回桶下压（access_control/含未知安全包装 422 → <400
                      / "triage_fallbacks.json").read_text(encoding="utf-8"))
       ["total"]["access_control/含未知安全包装"] < 400, True)
 
+# ---- [88] Module 45：PoC Harness 合成器 ----
+import ast as _ast88                                            # noqa: E402
+import tempfile as _tf88                                       # noqa: E402
+from core.models import CodeUnit as _CU88, Language as _L88     # noqa: E402
+from core.sandbox.poc_synthesizer import PocSynthesizer as _PS88   # noqa: E402
+_pocdir88 = _tf88.mkdtemp(prefix="poc_m45_")
+_sp88 = subprocess.run(
+    [sys.executable, str(Path(__file__).resolve().parent.parent / "cli.py"),
+     "scan", str(Path(__file__).resolve().parent.parent / "reference_repos"
+                 / "DeFiVulnLabs-main"), "--web3", "--emit-poc", _pocdir88],
+    capture_output=True, text=True)
+_ps88 = _PS88()
+_sol88 = _ps88.synthesize(_CU88(
+    file_path="contracts/Victim.sol", language=_L88.SOLIDITY_WEB3,
+    unit_name="withdraw", start_line=10, end_line=20,
+    source_code='contract Victim { function withdraw(uint amount) public {'
+                ' balances[msg.sender] -= amount;'
+                ' msg.sender.call{value: amount}(""); } }'), "reentrancy")
+_py88 = _ps88.synthesize(_CU88(
+    file_path="app/api.py", language=_L88.PYTHON_WEB,
+    unit_name="get_user", start_line=5, end_line=12, route_path="/users/<id>",
+    source_code='@app.route("/users/<id>")\ndef get_user(id):\n'
+                '    cur.execute("SELECT * FROM u WHERE id=" + id)'), "sqli")
+_java88 = _ps88.synthesize(_CU88(
+    file_path="src/OrderController.java", language=_L88.JAVA_WEB,
+    unit_name="OrderController.get", start_line=20, end_line=30,
+    route_path="/order/get",
+    source_code='@GetMapping("/get")\npublic Result get(Long orderId) {'
+                ' return orderService.get(orderId); }'), "authz")
+check("M45：三语言 PoC 合成 + 自检全通（Solidity/Python/Java）",
+      (_sol88.self_check_ok, _py88.self_check_ok, _java88.self_check_ok),
+      (True, True, True))
+check("M45：产出非空且含真实目标路由/函数名",
+      (len(_sol88.content) > 200 and "testExploit" in _sol88.content,
+       len(_py88.content) > 200 and "/users/<id>" in _py88.content,
+       len(_java88.content) > 200 and "/order/get" in _java88.content),
+      (True, True, True))
+check("M45：Python 产出可 ast.parse（零语法错误）",
+      bool(_ast88.parse(_py88.content)), True)
+check("M45：攻击者断言存在（Solidity 断言 / Java 4xx 期望）",
+      ("assertTrue" in _sol88.content,
+       "is4xxClientError" in _java88.content),
+      (True, True))
+check("M45：文件名带源文件前缀（同名函数不互相覆盖）",
+      (".sol" in _sol88.path and "_Victim_withdraw" in _sol88.path,
+       "api_get_user" in _py88.path,
+       "OrderController_get" in _java88.path),
+      (True, True, True))
+check("M45：cli.py scan --emit-poc 端到端可跑（DeFiVulnLabs 10 条命中全自检通过）",
+      _sp88.returncode, 0)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

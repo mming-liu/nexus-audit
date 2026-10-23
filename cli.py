@@ -70,6 +70,39 @@ def build_report(repo: str, hypotheses, poc_results, skipped_skeptic: int) -> st
     return "\n".join(lines)
 
 
+def _collect_rule_true(units, categories) -> list:
+    """收集规则层确定性判 True 的 (unit, category)。
+
+    只认 True —— False 是"这一类目上安全"，没有可验证的攻击面；
+    None 是证据不足，合成出来的 PoC 只会是凭空断言。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    hits = []
+    for u in units:
+        for c in categories:
+            try:
+                if rule_verdict(c, u.source_code) is True:
+                    hits.append((u, c))
+            except Exception:  # noqa: BLE001 —— 单条判据异常不许中断整批合成
+                continue
+    return hits
+
+
+def _emit_pocs(units, categories, out_dir: str) -> int:
+    """把规则层 True 命中翻译成可运行的 PoC 骨架并落盘（M45）。"""
+    from core.sandbox.poc_synthesizer import PocSynthesizer
+    hits = _collect_rule_true(units, categories)
+    print(f"[PoC] 规则层确定性命中 {len(hits)} 条，开始合成验证骨架 ...")
+    rep = PocSynthesizer().synthesize_many(hits, Path(out_dir))
+    for a in rep.artifacts:
+        flag = "OK " if a.self_check_ok else "FAIL"
+        print(f"  [{flag}] {a.path:44} {a.language:9} {a.category:14} {a.self_check_msg}")
+    for e in rep.errors:
+        print(f"  [ERR] {e}")
+    print(f"[PoC] 产出 {len(rep.artifacts)} 份（自检通过 {rep.ok_count}）→ {out_dir}")
+    return 0 if rep.ok_count == len(rep.artifacts) else 1
+
+
 def cmd_scan(args):
     repo = Path(args.repo_path).resolve()
     if args.web3:
@@ -82,6 +115,13 @@ def cmd_scan(args):
     print(f"[1/5] 切片：提取路由入口 ...")
     units = WebTreeSitterSlicer(repo).extract_entry_units(repo)
     print(f"      共 {len(units)} 个路由入口")
+
+    # PoC 合成模式：只跑规则层 + 合成，不调模型
+    if getattr(args, "emit_poc", None):
+        from core.agents.vuln_categories import OWASP_KEYS
+        cats = ([c.strip() for c in args.categories.split(",")]
+                if getattr(args, "categories", None) else list(OWASP_KEYS))
+        return _emit_pocs(units, cats, args.emit_poc)
 
     print(f"[2/5] 跨文件上下文扩展循环 ...")
     ctx = run_context_loop(units, repo)
@@ -316,6 +356,9 @@ def cmd_scan_java(args, repo: Path):
         print("      未发现 Java Web 入口（需 @WebServlet / @GetMapping 等注解）")
         return
 
+    if getattr(args, "emit_poc", None):
+        return _emit_pocs(units, categories, args.emit_poc)
+
     print(f"[2/4] 类目选择：{', '.join(categories)}")
     print(f"[3/4] 两步法初筛（规则前置 + 并发 {args.concurrency}）...")
 
@@ -488,6 +531,11 @@ def cmd_scan_web3(args, repo: Path):
     print(f"[1/4] Solidity 函数切片 ...")
     units = SoliditySlicer().extract_entry_units(repo)
     print(f"      共 {len(units)} 个函数")
+
+    if getattr(args, "emit_poc", None):
+        # Solidity 侧确定性 True 的两类：重入 / 越权（tx.origin 钓鱼也归
+        # access_control —— 规则层对 tx.origin 鉴权直接判 True）
+        return _emit_pocs(units, ["reentrancy", "access_control"], args.emit_poc)
 
     print(f"[2/4] Scenario 场景匹配 ...")
     print(f"[3/4] Property 属性核对（精度/重入/任意外部调用/ETH 接收）...")
@@ -1953,6 +2001,10 @@ def main():
     p_scan.add_argument("--github-comment", dest="github_comment", action="store_true",
                         help="输出 GitHub Actions 行级 annotation + 写入 $GITHUB_STEP_SUMMARY")
     p_scan.add_argument("--output", default=None, help="报告输出路径")
+    p_scan.add_argument("--emit-poc", default=None, metavar="DIR",
+                        help="M45：把规则层确定性 True 命中合成为可运行 PoC "
+                             "骨架（Solidity .t.sol / Python pytest / Java MockMvc）"
+                             "并落盘到 DIR")
     p_scan.add_argument("--sarif", default=None, metavar="OUT.sarif",
                         help="将命中结果导出为 SARIF v2.1.0（GitHub Code Scanning 格式）")
     p_scan.add_argument("--python", default=None, help="PoC 执行使用的 Python 解释器")
