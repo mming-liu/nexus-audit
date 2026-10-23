@@ -115,15 +115,6 @@ def _strip_comments(text: str) -> str:
     return text
 
 
-_JAVA_COMMENT_RE = re.compile(
-    r'"(?:\\.|[^"\\])*"'        # 字符串字面量整体跳过，避免把 "//" 当注释
-    r"|'(?:\\.|[^'\\])*'"       # 字符字面量
-    r"|//[^\n]*"                # 行注释
-    r"|/\*.*?\*/",              # 块注释
-    re.S,
-)
-
-
 def _strip_java_comments(text: str, keep_lines: bool = True) -> str:
     """单遍词法剥离 Java 注释。实现已移到 `core.text_utils`，规则层共用同一份。
 

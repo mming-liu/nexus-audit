@@ -2068,11 +2068,21 @@ DOCTOR_PATCHERS = [
 ]
 
 
+def _strip_scoreboard_timestamp(text: str) -> str:
+    """去掉 SCOREBOARD 里的"生成时间"行。
+
+    时间戳每次现算都不同，比对它没有意义（而且会让 doctor 永远 FAIL）。
+    同步真正要看的是**表体**（靶场行 + 合计行）是否与当前 json 一致。
+    """
+    return "\n".join(l for l in text.splitlines()
+                     if not l.startswith("生成时间"))
+
+
 def cmd_doctor(args) -> int:
     """只读自检：依赖 / 规则注册表 / 缓存指纹 / 补丁器就位。exit 0 = 全部就绪。"""
     ok = True
 
-    print("== [1/4] 依赖就位 ==")
+    print("== [1/5] 依赖就位 ==")
     print(f"  [OK] python {sys.version.split()[0]}")
     for name in ["httpx", "tree_sitter(可选·缺省正则降级)", "pyyaml(可选)", "slither(可选)"]:
         try:
@@ -2084,7 +2094,7 @@ def cmd_doctor(args) -> int:
             if "(可选" not in name:
                 ok = False
 
-    print("== [2/4] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
+    print("== [2/5] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
     from core.agents import rule_detectors
     for cat in DOCTOR_RULE_CATEGORIES:
         try:
@@ -2098,7 +2108,7 @@ def cmd_doctor(args) -> int:
             print(f"  [FAIL] {cat}: 路由异常 {type(e).__name__}: {e}")
             ok = False
     print(f"  共 {len(DOCTOR_RULE_CATEGORIES)} 类，全部走 verdict() 路由")
-    print("== [3/4] 缓存指纹自检 ==")
+    print("== [3/5] 缓存指纹自检 ==")
     try:
         from benchmarks.diag_owasp_sqli_fp import _slicer_fingerprint
         fp1, fp2 = _slicer_fingerprint(), _slicer_fingerprint()
@@ -2111,7 +2121,7 @@ def cmd_doctor(args) -> int:
         print(f"  [FAIL] 指纹不可用: {type(e).__name__}: {e}")
         ok = False
 
-    print("== [4/4] 补丁器就位（10 类）==")
+    print(f"== [4/5] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
     for fn_name in DOCTOR_PATCHERS:
         fn = globals().get(fn_name)
         if callable(fn):
@@ -2125,8 +2135,134 @@ def cmd_doctor(args) -> int:
         print("  [FAIL] _verify_fixes_any 不存在")
         ok = False
 
+    ok = _doctor_extended_checks(ok)
+
     print("doctor:", "PASS（全部就绪）" if ok else "FAIL（存在缺失项）")
     return 0 if ok else 1
+
+
+def _doctor_extended_checks(ok: bool) -> bool:
+    """doctor 第五段：PoC 合成器 / 覆盖地板 / SCOREBOARD 同步 / 正则卫生。
+
+    四项都是**只读**检查，任何一项不过就把整体判 FAIL ——
+    doctor 的价值就在于"配置漂了"能当场发现，而不是等跑批时才发现。
+    """
+    root = Path(__file__).resolve().parent
+
+    # ---- 5.1 PoC 合成器：可导入 + 三语言模板自检通过 ----
+    print("== [5/5] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
+    print("  -- PoC 合成器 --")
+    try:
+        from core.sandbox.poc_synthesizer import PocSynthesizer, PocArtifact
+        synth = PocSynthesizer()
+        probes = [
+            ("solidity", "Contract", "reentrancy", "function f() public { msg.sender.transfer(1); }"),
+            ("python", "app", "sqli", "def f():\n    cur.execute('select ' + x)"),
+            ("java", "OrderController", "sqli", "public void f(String q) { jdbc.query(q); }"),
+        ]
+        for lang, target, cat, body in probes:
+            from core.models import CodeUnit, Language
+            lg = {"solidity": Language.SOLIDITY_WEB3, "python": Language.PYTHON_WEB,
+                  "java": Language.JAVA_WEB}[lang]
+            unit = CodeUnit(file_path="X", language=lg, unit_name=target,
+                            start_line=1, end_line=2, decorators_or_modifiers=[],
+                            called_symbols=[], source_code=body, own_body=body)
+            art = synth.synthesize(unit, cat)
+            if art is None:
+                print(f"  [FAIL] {lang}: 合成器返回 None")
+                ok = False
+            elif not art.self_check_ok:
+                print(f"  [FAIL] {lang}: 自检未过 — {art.self_check_msg}")
+                ok = False
+            else:
+                print(f"  [OK] {lang}: {art.path} 自检通过")
+    except Exception as e:  # noqa: BLE001
+        print(f"  [FAIL] PoC 合成器不可用: {type(e).__name__}: {e}")
+        ok = False
+
+    # ---- 5.2 覆盖地板：--check-floor 的 FLOORS 与 results/*.json 一致 ----
+    print("  -- 覆盖地板（--check-floor）--")
+    try:
+        sys.path.insert(0, str(root))
+        from benchmarks.triage_fallbacks import FLOORS
+        missing = []
+        for name, floor in sorted(FLOORS.items()):
+            j = root / "benchmarks" / "results" / f"{name}.json"
+            if not j.exists():
+                print(f"  [WARN] {name:14} 无 {name}.json（跳过）")
+                continue
+            d = json.loads(j.read_text(encoding="utf-8"))
+            decided = d.get("decided")
+            if not isinstance(decided, (int, float)):
+                print(f"  [WARN] {name:14} json 无 decided 字段")
+                continue
+            if decided < floor:
+                print(f"  [FAIL] {name:14} decided={decided} < 地板={floor}")
+                missing.append(name)
+            else:
+                print(f"  [OK]  {name:14} decided={decided} ≥ 地板={floor}")
+        if missing:
+            ok = False
+        else:
+            print(f"  共 {len(FLOORS)} 项地板配置")
+    except Exception as e:  # noqa: BLE001
+        print(f"  [FAIL] 覆盖地板配置不可读: {type(e).__name__}: {e}")
+        ok = False
+
+    # ---- 5.3 SCOREBOARD 同步：磁盘上的表 vs 用当前 json 现算的表 ----
+    # 不按靶场名做子串匹配（标签措辞会变，"eladmin-mp" 与 json 键
+    # "eladminmp" 就对不上）——直接**现算一遍**再逐行比。这才是"同步"的
+    # 真口径：磁盘上的表与当前 results/*.json 不一致就是漂了。
+    print("  -- SCOREBOARD.md 同步 --")
+    sb_path = root / "benchmarks" / "results" / "SCOREBOARD.md"
+    if not sb_path.exists():
+        print("  [FAIL] SCOREBOARD.md 不存在")
+        ok = False
+    else:
+        try:
+            sys.path.insert(0, str(root))
+            from benchmarks.run_all import build_scoreboard
+            want = _strip_scoreboard_timestamp(build_scoreboard())
+            have = _strip_scoreboard_timestamp(sb_path.read_text(encoding="utf-8"))
+            if want == have:
+                print("  [OK]  与当前 results/*.json 现算结果一致")
+            else:
+                wl = [l for l in want.splitlines() if l.startswith("|")]
+                hl = [l for l in have.splitlines() if l.startswith("|")]
+                missing = [l for l in wl if l not in hl]
+                extra = [l for l in hl if l not in wl]
+                for l in missing:
+                    print(f"  [FAIL] 缺行（json 有、板上没有）: {l}")
+                for l in extra:
+                    print(f"  [FAIL] 多行（板上有、json 无）  : {l}")
+                if not missing and not extra:
+                    print("  [FAIL] 表体一致但非表体部分有差异")
+                print("  提示：跑 `python benchmarks/run_all.py --offline` 全绿后会自动刷新")
+                ok = False
+        except Exception as e:  # noqa: BLE001
+            print(f"  [FAIL] SCOREBOARD 同步检查异常: {type(e).__name__}: {e}")
+            ok = False
+
+    # ---- 5.4 正则卫生：死正则 / 遮蔽冲突 / 内联遮蔽 ----
+    print("  -- 正则卫生（死正则 / 遮蔽冲突 / 内联遮蔽）--")
+    try:
+        from core.agents.regex_audit import audit_paths
+        import pathlib as _pl
+        mods = sorted(str(p.relative_to(root)).replace("\\", "/")
+                      for p in (root / "core").rglob("*.py"))
+        audit = audit_paths(mods)
+        print(f"  扫描 {audit.modules} 模块 / {audit.top_level_regexes} 个顶层正则")
+        for issue in audit.issues:
+            print(f"  [FAIL] {issue}")
+        if audit.issues:
+            ok = False
+        else:
+            print("  [OK] 无死正则、无遮蔽冲突、无内联遮蔽")
+    except Exception as e:  # noqa: BLE001
+        print(f"  [FAIL] 正则卫生检查异常: {type(e).__name__}: {e}")
+        ok = False
+
+    return ok
 
 
 def main():

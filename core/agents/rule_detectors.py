@@ -154,9 +154,6 @@ def _wiring_sections(wblock: str) -> list[tuple[str, str]]:
     return out
 
 
-_DECORATOR = re.compile(r"^\s*@\w+", re.M)
-
-
 def _entry_head(source: str) -> str:
     """入口方法的注解 + 签名 + 方法体（不含兄弟方法）。
 
@@ -315,8 +312,6 @@ def parse_subject_params(source: str) -> dict[str, str]:
 
 ACAO_RE = re.compile(
     r"""setHeader\s*\(\s*["']Access-Control-Allow-Origin["']\s*,\s*([^)]*)\)""", re.I)
-ACAC_RE = re.compile(
-    r"""setHeader\s*\(\s*["']Access-Control-Allow-Credentials["']\s*,\s*["']true["']""", re.I)
 # 请求头读法：getHeader("Origin") 及其变体
 ORIGIN_READ_RE = re.compile(
     r"""getHeader\s*\(\s*["']origin["']\s*\)""", re.I)
@@ -537,9 +532,6 @@ DESERIAL_SAFE_RE = re.compile(
     r"SafeConstructor|safeMode|setAllowedClasses|ObjectInputFilter|"
     r"createFilter\s*\(|allowList|whitelist|setWhiteList|"
     r"ValidatingObjectInputStream|\.\s*accept\s*\(\s*[\w.]+\.class", re.I)
-# 黑名单式"防护"：看起来在防，实际可绕
-DESERIAL_BLACKLIST_RE = re.compile(
-    r"denyClasses|denyList|blacklist|setBlacklist|startsWith\s*\(\s*deny", re.I)
 
 # ---- fastjson：**版本决定结论**，代码本身给不出答案 ----
 #
@@ -921,7 +913,7 @@ def _jpa_derived_query_safe(source: str) -> bool:
     if i < 0:
         return False
     seg = source[i:]
-    nxt = re.search(r"^//\s*----", seg[len(marker):], re.M)
+    nxt = _SEP.search(seg[len(marker):])
     if nxt:
         seg = seg[: len(marker) + nxt.start()]
     if not _JPA_REPO_DECL_RE.search(seg):
@@ -1809,7 +1801,7 @@ def _chain_reader_body(source: str) -> str:
     if i < 0:
         return ""
     seg = source[i:]
-    nxt = re.search(r"^//\s*----", seg[len(_CHAIN_SEP):], re.M)
+    nxt = _SEP.search(seg[len(_CHAIN_SEP):])
     if nxt:
         seg = seg[: len(_CHAIN_SEP) + nxt.start()]
     j = seg.find("读取点方法体")
@@ -1837,7 +1829,7 @@ def _has_plain_chain(source: str) -> bool:
     if i < 0:
         return False
     seg = source[i:]
-    nxt = re.search(r"^//\s*----", seg[len(_CHAIN_SEP):], re.M)
+    nxt = _SEP.search(seg[len(_CHAIN_SEP):])
     if nxt:
         seg = seg[: len(_CHAIN_SEP) + nxt.start()]
     for ln in seg.splitlines():
@@ -1990,12 +1982,6 @@ _DB_CHAIN_SEP = "// 数据库持久层"
 #     return JSON.toJSONString(list);   → 序列化后进响应
 _DB_DIRECT_ECHO_RE = re.compile(
     r"return\s+[^;]*\b\w*(?:Mapper|Dao|DAO|Repository|Service)\s*\.\s*\w+\s*\(", re.I)
-# 读取点里出现"往仓储发写指令" → 它自己是写入方，不是读取点。
-# db 连接是**双向**产出的（同一字段上的调用分不出读写），所以必须在这里
-# 把方向判出来：`deleteFeedById` / `add` / `insert` / `update` 都是写。
-_DB_WRITE_CALL_RE = re.compile(
-    r"\.\s*(?:insert|add|save|update|delete|remove|removeById|deleteById|"
-    r"deleteFeedById|batchSave|merge|persist)\w*\s*\(", re.I)
 # 从库取值的调用。MyBatis 的方法名由作者自定（`list` / `getStored` /
 # `selectAll` / `page`），所以这里不按动词穷举，而是**排除写指令后
 # 剩下的仓储调用**就算取值调用 —— 见 `_db_render_points`。
@@ -3087,7 +3073,6 @@ def _path_concat_all_constant(body: str, helpers: str) -> bool:
 # 之前我把它写成"If 分支里出现字面量赋值就交模型"，方向保守但会白白丢掉
 # 一批可判定的安全样本；正确的做法是判**哪一支会被选中**，再读那一支的值。
 
-_CONST_TOKEN_RE = re.compile(r"\d+|true|false|&&|\|\||[()<>=!+\-*/%]|\s+|'.'")
 _IF_RE = re.compile(r"\bif\s*\(")
 _WHILE_RE = re.compile(r"\bwhile\s*\(")
 
@@ -3956,9 +3941,6 @@ _SSRF_HELPER_DENY_RE = re.compile(
     r"Pattern\s*\.\s*compile\s*\(|"
     r"\.\s*matcher\s*\(|"
     r"\.\s*matches\s*\(\s*\"[^\"]*[\\(\[\|]", re.I)
-# 只限定协议的方法（isHttp）不是 SSRF 防护，读到时不能当成白名单证据
-_SSRF_PROTOCOL_ONLY_RE = re.compile(
-    r"startsWith\s*\(\s*\"https?(:?//)?\"|getProtocol\s*\(\s*\)\s*\.\s*equals", re.I)
 
 
 def _ssrf_helper_nature(body: str, sib: str) -> bool | None:
@@ -4278,17 +4260,6 @@ _HELPER_DENY_RE = re.compile(
     r"\.\s*indexOf\s*\(\s*\"|"                        # content.indexOf("..")
     r"\bblack_?list\b|\bdeny_?list\b|\bblackList\b|"   # 变量就叫黑名单
     r"\.\s*matches\s*\(\s*\"[^\"]*[\[\]\.\*\+\?]", re.I)
-
-# 黑名单前置了「解码 / 规范化 / 归一化」——作者意识到编码绕过并做了还原。
-# 这类实现到底够不够（解码一次还是循环解码、Unicode 变体、大小写…）
-# 没有可以逐行核对的事实支点，规则不应替模型下结论。
-_DECODE_BEFORE_CHECK_RE = re.compile(
-    r"URLDecoder\s*\.\s*decode|"
-    r"URLEncoder\s*\.\s*decode|"
-    r"\.\s*normalize\s*\(\s*\)|"
-    r"getCanonicalPath\s*\(\s*\)|"
-    r"while\s*\([^)]*indexOf\s*\(\s*'%'\s*\)", re.I)
-
 
 def _named_method_bodies(sib: str, names: set[str]) -> list[tuple[str, str]]:
     """在证据段里只截出**名字命中**的方法体，返回 [(方法名, 方法体)]。
@@ -4905,7 +4876,7 @@ def _ownership_compared(body: str, subject: str) -> bool:
     「规则退回 None」—— 静默、不报错。
     """
     k = rf"\b{re.escape(subject)}\s*\.\s*get\w*[Ii]d\s*\(\s*\)"
-    for m in re.finditer(r"\bif\s*\(", body):
+    for m in _IF_RE.finditer(body):
         cond = _balanced_cond(body, m.end())
         if not cond or not re.search(k, cond):
             continue
@@ -5248,8 +5219,9 @@ def _py_func_params(source: str) -> set[str]:
     return out
 
 
+
+
 _PY_SQL_SINK_RE = re.compile(r"\.\s*execute(?:script)?\s*\(|\.\s*executemany\s*\(")
-_PY_PARAM_SQL_RE = re.compile(r"\"\"|'%s'\"|")   # 占位符形态在函数内逐调用判定
 
 
 def python_sqli_verdict(source: str) -> bool | None:
@@ -5530,7 +5502,6 @@ _PY_CMDSINK_RE = re.compile(
     r"\bos\s*\.\s*system\s*\(|\bos\s*\.\s*popen\s*\(|"
     r"subprocess\s*\.\s*(?:Popen|call|run|check_output|check_call)\s*\(")
 _PY_SHELL_TRUE_RE = re.compile(r"shell\s*=\s*True")
-_PY_SHELL_FALSE_RE = re.compile(r"shell\s*=\s*False")
 _PY_SHLEX_RE = re.compile(r"shlex\s*\.\s*(?:quote|split|join)\s*\(")
 
 

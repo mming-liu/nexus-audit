@@ -88,9 +88,6 @@ def _match_paren(text: str, open_idx: int) -> int:
                 return i
         i += 1
     return -1
-# 注解行：单独扫描，用于给方法挂 @Override / @GetMapping 等
-ANNOTATION_RE = re.compile(r"^[ \t]*@([A-Za-z_]\w*)(?:\(([^)]*)\))?", re.M)
-
 SERVLET_METHODS = {"doGet", "doPost", "doPut", "doDelete", "doPatch", "service"}
 HTTP_VERB_OF = {"doGet": "GET", "doPost": "POST", "doPut": "PUT",
                 "doDelete": "DELETE", "doPatch": "PATCH"}
@@ -1037,7 +1034,7 @@ class JavaSlicer:
             if any(SPRING_ROUTE_RE.match(a) for a in _anns):
                 route_methods.add(_n)
                 continue
-            if any(re.match(r"@(GET|POST|PUT|DELETE|PATCH)\b", a) for a in _anns):
+            if any(JAXRS_ROUTE_RE.match(a) for a in _anns):
                 route_methods.add(_n)
             elif any(a.startswith("@Path") for a in _anns):
                 route_methods.add(_n)
@@ -1090,7 +1087,7 @@ class JavaSlicer:
 
             # JAX-RS：@Path + @GET/@POST（方法级注解）
             jax_verb = next((a[1:].split("(")[0] for a in anns
-                             if re.match(r"@(GET|POST|PUT|DELETE|PATCH)\b", a)), None)
+                             if JAXRS_ROUTE_RE.match(a)), None)
             jax_path = next((a for a in anns if a.startswith("@Path")), None)
             if jax_verb and (jax_path or class_prefix):
                 decorators.append(jax_path or f"@{jax_verb}")

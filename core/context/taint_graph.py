@@ -48,7 +48,6 @@ SINK_RES: dict[str, re.Pattern[str]] = {
 _FULL_ROUTE_RE = re.compile(r"^//\s*Full-Route:\s*(\S+)", re.M)
 _HOP_RE = re.compile(r"^//\s*来自\s+(.+?)\s+\[Hop\s+(\d+)\]", re.M)
 _IMPL_RE = re.compile(r"^//\s*----\s*跨文件证据：(.+?)\s*@\s*(.+?)\s*----", re.M)
-_SEG_SEP_RE = re.compile(r"^//\s*----\s.*----\s*$", re.M)
 
 
 def _esc(text: str) -> str:

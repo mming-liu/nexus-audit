@@ -4373,9 +4373,9 @@ _sp86 = subprocess.run(
      "doctor"], capture_output=True, text=True)
 check("M42：doctor exit 0（依赖/规则表/指纹/补丁器全就绪）",
       _sp86.returncode, 0)
-check("M42：doctor 输出含四段自检 + PASS 尾标",
+check("M42：doctor 输出含五段自检 + PASS 尾标（M50 升段）",
       all(s in _sp86.stdout for s in
-          ("[1/4]", "[2/4]", "[3/4]", "[4/4]", "PASS")), True)
+          ("[1/5]", "[2/5]", "[3/5]", "[4/5]", "[5/5]", "PASS")), True)
 check("M42：doctor 规则注册表 19 类全 OK",
       _sp86.stdout.count("  [OK]") >= 19
       and "共 19 类" in _sp86.stdout, True)
@@ -4656,6 +4656,104 @@ try:
            and _g92.count('"') % 2 == 0), True)
 finally:
     shutil.rmtree(_d92g, ignore_errors=True)
+
+
+# ---- [93] Module 50：doctor 升级（12 补丁器 / PoC 合成器 / 地板 / SCOREBOARD）+ 死正则清理 ----
+from core.agents.regex_audit import (          # noqa: E402
+    audit_paths as _ap93, audit_module as _am93, RegexAudit as _RA93)
+
+# 93.1 死正则清理：全量 core/ 扫描，死正则 / 遮蔽冲突 / 内联遮蔽 三项归零
+import pathlib as _pl93                      # noqa: E402
+_mods93 = sorted(str(_p.relative_to(ROOT)).replace("\\", "/")
+                 for _p in (ROOT / "core").rglob("*.py"))
+_aud93 = _ap93(_mods93)
+check("M93：core/ 全量正则审计零问题（死正则/遮蔽冲突/内联遮蔽）",
+      (_aud93.ok and _aud93.modules >= 30 and _aud93.top_level_regexes >= 150),
+      True)
+check("M93：审计确实覆盖到顶层正则（不是空跑）",
+      (_aud93.top_level_regexes > 0
+       and len(_aud93.by_kind("dead")) == 0
+       and len(_aud93.by_kind("shadow")) == 0
+       and len(_aud93.by_kind("inline_shadow")) == 0),
+      True)
+
+# 93.2 审计器本身能识别三类问题（造阳性样本自证，不是只会说"OK"）
+_bad93 = """
+import re
+_DEAD = re.compile(r"a")
+_TOP = re.compile(r"b")
+X = 1
+X = 2
+def f(s):
+    _TOP.search(s)
+    return re.match(r"b", s)
+"""
+_iss93, _n93 = _am93(_bad93, "synthetic.py")
+_kinds93 = {i.kind for i in _iss93}
+check("M93：审计器能识别死正则/遮蔽冲突/内联遮蔽三类（阳性对照）",
+      (_kinds93 == {"dead", "shadow", "inline_shadow"} and len(_iss93) == 3),
+      True)
+# 自引用包装不算遮蔽（`X = _CompatPrompt(X)` 是刻意的）
+_wrap93 = """
+import re
+T = "x"
+T = Wrap(T)
+"""
+_iss93b, _ = _am93(_wrap93, "synthetic2.py")
+check("M93：自引用包装不算遮蔽冲突（假阳性排除）",
+      (len([i for i in _iss93b if i.kind == "shadow"]) == 0), True)
+
+# 93.3 死正则确已从源码删除（按名字点名，不靠行号）
+_rd93 = (ROOT / "core" / "agents" / "rule_detectors.py").read_text(encoding="utf-8")
+_gone93 = ["_DECORATOR", "ACAC_RE", "DESERIAL_BLACKLIST_RE", "_DB_WRITE_CALL_RE",
+           "_CONST_TOKEN_RE", "_SSRF_PROTOCOL_ONLY_RE", "_DECODE_BEFORE_CHECK_RE",
+           "_PY_PARAM_SQL_RE", "_PY_SHELL_FALSE_RE"]
+check("M93：rule_detectors.py 的 9 个死正则已删除",
+      (all(_g not in _rd93 for _g in _gone93)), True)
+_tg93 = (ROOT / "core" / "context" / "taint_graph.py").read_text(encoding="utf-8")
+check("M93：taint_graph.py 的 _SEG_SEP_RE 已删除", ("_SEG_SEP_RE" not in _tg93), True)
+_js93 = (ROOT / "core" / "slicer" / "java_servlet.py").read_text(encoding="utf-8")
+check("M93：java_servlet.py 的 ANNOTATION_RE 已删且 JAXRS_ROUTE_RE 已被真正使用",
+      ("ANNOTATION_RE" not in _js93
+       and "JAXRS_ROUTE_RE.match" in _js93
+       and _js93.count("JAXRS_ROUTE_RE.match") == 2), True)
+
+# 93.4 doctor 五段全绿（含 12 补丁器 / PoC 合成器 / 地板 / SCOREBOARD / 正则卫生）
+_sp93 = subprocess.run(
+    [sys.executable, str(ROOT / "cli.py"), "doctor"],
+    capture_output=True, text=True)
+_out93 = _sp93.stdout
+check("M93：doctor 退出码 0 且五段标题齐全",
+      (_sp93.returncode == 0
+       and all(f"[{i}/5]" in _out93 for i in range(1, 6))), True)
+check("M93：doctor 补丁器清单 12 类全绿",
+      (_out93.count("[OK] _fix_") == 12
+       and "补丁器就位（12 类）" in _out93), True)
+check("M93：doctor 校验 PoC 合成器三语言自检",
+      ("-- PoC 合成器 --" in _out93
+       and _out93.count("自检通过") >= 3), True)
+check("M93：doctor 校验覆盖地板（10 项）与 SCOREBOARD 同步",
+      ("-- 覆盖地板（--check-floor）--" in _out93
+       and "共 10 项地板配置" in _out93
+       and "-- SCOREBOARD.md 同步 --" in _out93
+       and "与当前 results/*.json 现算结果一致" in _out93), True)
+check("M93：doctor 报告正则卫生（零死正则/零遮蔽）",
+      ("-- 正则卫生（死正则 / 遮蔽冲突 / 内联遮蔽）--" in _out93
+       and "无死正则、无遮蔽冲突、无内联遮蔽" in _out93), True)
+
+# 93.5 死正则真的删干净了 —— 从 git 看这些名字的历史引用应只落在历史里
+import subprocess as _sb93             # noqa: E402
+# `-w` 全词匹配：否则 _DECORATOR 会命中 ROUTE_DECORATOR_RE 的子串
+# 排除冒烟测试自身：它按名字点名了这批正则（那正是断言材料）
+_grep93 = _sb93.run(["git", "grep", "-n", "-w", "-E",
+                     "_DECORATOR|ACAC_RE|DESERIAL_BLACKLIST_RE|_DB_WRITE_CALL_RE|"
+                     "_CONST_TOKEN_RE|_SSRF_PROTOCOL_ONLY_RE|_DECODE_BEFORE_CHECK_RE|"
+                     "_PY_PARAM_SQL_RE|_PY_SHELL_FALSE_RE|_SEG_SEP_RE|ANNOTATION_RE",
+                     "--", "core", "cli.py", "benchmarks",
+                     ":(exclude)benchmarks/smoke_test_chains.py"],
+                    capture_output=True, text=True, cwd=str(ROOT))
+check("M93：工作树中已无这 11 个死正则名（git grep 空）",
+      (_grep93.returncode != 0 or not _grep93.stdout.strip()), True)
 
 print()
 if FAILS:
