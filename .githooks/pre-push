@@ -142,6 +142,19 @@ if [ -d reference_repos/litemall-master ]; then
   echo "pre-push: litemall 基线通过 ✔"
 fi
 
+# M72/M73：真实 Python Flask 与 compound-protocol 生产协议基线
+if [ -d reference_repos/employee-management-system ]; then
+  echo "pre-push: Employee-Management-System 基线 ..."
+  "$PY" benchmarks/benchmark_flaskcrud.py --strict > /dev/null
+  echo "pre-push: Employee-Management-System 基线通过 ✔"
+fi
+
+if [ -d reference_repos/compound-protocol/contracts ]; then
+  echo "pre-push: compound-protocol 基线 ..."
+  "$PY" benchmarks/benchmark_compound.py --strict > /dev/null
+  echo "pre-push: compound-protocol 基线通过 ✔"
+fi
+
 # 覆盖地板门禁（Module 41）：确定性命中数下限
 echo "pre-push: 覆盖地板门禁 ..."
 "$PY" benchmarks/triage_fallbacks.py --check-floor > /dev/null

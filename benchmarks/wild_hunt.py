@@ -1,4 +1,4 @@
-"""M69：七个真实开源项目的野战数据采集（scan --auto + benchmark --strict）。
+"""M69/M78：九个真实开源项目的野战数据采集（scan --auto + benchmark --strict）。
 
 所有数字由本脚本实跑产出，报告只引用 results/wild_hunt.json：
 
