@@ -135,8 +135,13 @@ def _card(e: dict) -> str:
 
 
 def build_html_report(entries: list[dict], repo: str = ".",
-                      title: str = "nexus-audit 审计报告") -> str:
-    """把检出项序列化为单文件 HTML。entries 结构见模块 docstring。"""
+                      title: str = "nexus-audit 审计报告",
+                      funnel: dict | None = None) -> str:
+    """把检出项序列化为单文件 HTML。entries 结构见模块 docstring。
+
+    funnel（可选，M66）：{"total_units", "p0_confirmed", "funnel_filtered",
+    "funnel_dispatched"} —— 顶部仪表盘渲染二级漏斗效率与类目热力条。
+    """
     n_total = len(entries)
     n_hit = sum(1 for e in entries if e.get("level") != "note")
     by_cat = Counter(str(e.get("category") or "UNKNOWN").upper()
@@ -153,6 +158,38 @@ def build_html_report(entries: list[dict], repo: str = ".",
               f'<div class="lbl">{html.escape(c)}</div></div>'
               for c, n in by_cat.most_common()]
 
+    # M66：漏斗效率仪表盘 + 类目热力条
+    funnel_html = ""
+    if funnel:
+        total = funnel.get("funnel_filtered", 0) + funnel.get(
+            "funnel_dispatched", 0)
+        eff = (funnel.get("funnel_filtered", 0) / total * 100) if total else 0
+        max_cat = max(by_cat.values()) if by_cat else 0
+        bars = "".join(
+            f'<div style="display:flex;align-items:center;gap:8px;'
+            f'margin:3px 0;">'
+            f'<div style="width:64px;color:#9fb0c9;font-size:12px;'
+            f'text-align:right;">{html.escape(c)}</div>'
+            f'<div style="flex:1;background:#22334f;border-radius:4px;">'
+            f'<div style="width:{(n / max_cat * 100) if max_cat else 0:.0f}%;'
+            f'background:#e0524b;height:10px;border-radius:4px;"></div>'
+            f'</div><div style="color:#c9d4e4;font-size:12px;">{n}</div></div>'
+            for c, n in by_cat.most_common())
+        funnel_html = f"""
+  <div class="stats">
+    <div class="stat"><div class="num">{funnel.get("total_units", 0)}</div>
+      <div class="lbl">切片单元</div></div>
+    <div class="stat"><div class="num">{eff:.1f}%</div>
+      <div class="lbl">漏斗过滤率</div></div>
+    <div class="stat"><div class="num">{funnel.get("funnel_dispatched", 0)}</div>
+      <div class="lbl">模型派发</div></div>
+    <div class="stat"><div class="num">{funnel.get("p0_confirmed", 0)}</div>
+      <div class="lbl">P0 实锤</div></div>
+  </div>
+  <div style="margin-top:12px;background:#16233a;border-radius:8px;
+              padding:10px 14px;">{bars or '<i style="color:#556;">无检出</i>'}
+  </div>"""
+
     cards = "\n".join(_card(e) for e in entries)
     esc_repo = html.escape(str(repo))
     return f"""<!DOCTYPE html>
@@ -168,6 +205,7 @@ def build_html_report(entries: list[dict], repo: str = ".",
   <h1>{html.escape(title)}</h1>
   <div class="meta">仓库：{esc_repo} · 由 nexus-audit 规则层 + 确定性补丁自检生成</div>
   <div class="stats">{''.join(stats)}</div>
+  {funnel_html}
 </header>
 <main>
 {cards}

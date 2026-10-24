@@ -5383,6 +5383,44 @@ public void vul(HttpServletRequest request) {
 check("M104：真阳退回样本 0 漏网（实参经赋值链与输入行有交集）",
       ("候选输入行" in _check65c and "候选敏感操作行" in _check65c), True)
 
+# ---- [105] Module 66：--summary-json 狩猎简报 + HTML 漏斗仪表盘 ----
+_d105 = Path(_tmod.mkdtemp(prefix="nexus_t105_"))
+try:
+    (_d105 / "dao.py").write_text(
+        "from flask import request\n"
+        "@app.route('/q', methods=['GET'])\n"
+        "def vul_sqli():\n"
+        "    import sqlite3\n"
+        "    uid = request.args.get('uid')\n"
+        "    c = sqlite3.connect('a.db')\n"
+        "    return c.execute('SELECT * FROM users WHERE id=' + uid).fetchall()\n",
+        encoding="utf-8")
+    (_d105 / "math.py").write_text("def g(a):\n    return a * 2\n",
+                                   encoding="utf-8")
+    _r105 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d105),
+         "--auto", "--offline", "--output", str(_d105 / "ra.md"),
+         "--html", str(_d105 / "ra.html"),
+         "--summary-json", str(_d105 / "summary.json")],
+        capture_output=True, text=True)
+    check("M105：--summary-json 产出且字段齐全", _r105.returncode, 0)
+    _sj105 = json.loads((_d105 / "summary.json").read_text(encoding="utf-8"))
+    check("M105：漏斗字段齐全（units/pairs/p0/filter/dispatch）",
+          all(k in _sj105 for k in (
+              "total_units", "total_pairs_evaluated", "p0_confirmed",
+              "funnel_filtered_out", "funnel_filter_rate", "llm_dispatched",
+              "patches_verified", "pocs_generated")), True)
+    check("M105：过滤率计算准确（本仓 = 100%）",
+          (_sj105["funnel_filter_rate"] == 1.0
+           and _sj105["p0_confirmed"] >= 1), True)
+    _h105 = (_d105 / "ra.html").read_text(encoding="utf-8")
+    check("M105：HTML 顶部渲染漏斗过滤率仪表盘",
+          ("漏斗过滤率" in _h105 and "切片单元" in _h105), True)
+    check("M105：HTML 类目热力条渲染",
+          ("SQLI" in _h105 and "background:#e0524b" in _h105), True)
+finally:
+    shutil.rmtree(_d105, ignore_errors=True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

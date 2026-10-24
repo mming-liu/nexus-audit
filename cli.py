@@ -337,12 +337,37 @@ def cmd_scan_auto(args, repo: Path):
     print(f"\n完成：野战报告已写入 {out}")
 
     # --- M61：野战一键组合（--fix / --emit-poc 与漏斗联动）---
+    patches_verified = 0
     if getattr(args, "fix", None) and p0:
-        _verify_fixes_any(repo, [u for u, _ in p0],
-                          out_path=str(out.with_name("fix_report_auto.md")))
+        _fix_out = out.with_name("fix_report_auto.md")
+        _verify_fixes_any(repo, [u for u, _ in p0], out_path=str(_fix_out))
+        if _fix_out.exists():
+            patches_verified = _fix_out.read_text(
+                encoding="utf-8").count("```diff")
+    pocs_generated = 0
     if getattr(args, "emit_poc", None) and p0:
         from core.sandbox.poc_synthesizer import PocSynthesizer
-        PocSynthesizer().synthesize_many(list(p0), Path(args.emit_poc))
+        _syn = PocSynthesizer().synthesize_many(list(p0), Path(args.emit_poc))
+        pocs_generated = _syn.ok_count
+
+    # --- M66：机器可读狩猎简报 ---
+    if getattr(args, "summary_json", None):
+        summary = {
+            "repo": str(repo),
+            "total_units": len(units),
+            "total_pairs_evaluated": n_pairs,
+            "p0_confirmed": len(p0),
+            "funnel_filtered_out": n_filtered,
+            "funnel_filter_rate": round(filter_rate, 4),
+            "llm_dispatched": len(model_candidates),
+            "patches_verified": patches_verified,
+            "pocs_generated": pocs_generated,
+            "elapsed_ms": round(elapsed_ms, 1),
+        }
+        Path(args.summary_json).write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2),
+            encoding="utf-8")
+        print(f"      狩猎简报已写入 {args.summary_json}")
 
     if getattr(args, "sarif", None):
         entries = [{"file": u.file_path, "line": u.start_line,
@@ -372,7 +397,15 @@ def cmd_scan_auto(args, repo: Path):
                          for u, cat in model_candidates]
         prio_rank = {"P0": 0, "P1": 1, "P2": 2}
         html_entries.sort(key=lambda e: prio_rank.get(str(e.get("priority")), 3))
-        _write_html(args, html_entries, repo)
+        from core.context.report_html import build_html_report
+        out_html = Path(args.html)
+        out_html.write_text(build_html_report(
+            html_entries, str(repo),
+            funnel={"total_units": len(units), "p0_confirmed": len(p0),
+                    "funnel_filtered": n_filtered,
+                    "funnel_dispatched": len(model_candidates)}),
+            encoding="utf-8")
+        print(f"      HTML 报告已写入 {out_html}（{len(html_entries)} 条）")
 
 
 def emit_github_annotations(flagged, failed, repo: Path) -> int:
@@ -2670,6 +2703,8 @@ def main():
                         help="将命中结果导出为 SARIF v2.1.0（GitHub Code Scanning 格式）")
     p_scan.add_argument("--html", default=None, metavar="OUT.html",
                         help="M57：产出零外部依赖的单文件交互式 HTML 报告")
+    p_scan.add_argument("--summary-json", default=None, metavar="OUT.json",
+                        help="M66：输出机器可读的狩猎漏斗统计（Hunt Dossier）")
     p_scan.add_argument("--no-llm-cache", dest="no_llm_cache", action="store_true",
                         help="M59：禁用大模型响应磁盘缓存（默认开）")
     p_scan.add_argument("--auto", action="store_true",
