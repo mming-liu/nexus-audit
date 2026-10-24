@@ -36,7 +36,7 @@ SCOREBOARD = ROOT / "benchmarks" / "results" / "SCOREBOARD.md"
 # (名称, 命令, 前置目录检查, 类别, 可并发)
 #   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
 JOBS = [
-    ("冒烟测试 [1]-[109]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
+    ("冒烟测试 [1]-[115]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke", False),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target", True),
@@ -127,6 +127,17 @@ JOBS = [
     # path sink 与形参相关性（含 request.getInputStream 排除）。
     ("litemall (野战实弹)", ["benchmarks/benchmark_litemall.py", "--strict"],
      "reference_repos/litemall-master", "target", True),
+    # 第 25 靶场（Module 72）：真实 Flask-SQLAlchemy CRUD。
+    # 真值 2 条（delete 对象级 authz + app.secret_key 文件级密钥），
+    # insert/update 的"缺失认证"单列人工复核，不掺真值。
+    ("Employee-Management-System (Python 野战)",
+     ["benchmarks/benchmark_flaskcrud.py", "--strict"],
+     "reference_repos/employee-management-system", "target", True),
+    # 第 26 靶场（Module 73）：compound-protocol 生产 contracts/。
+    # 顶级 DeFi 协议压测 Solidity 规则层：450 入口 / 0 条 True 误报。
+    ("compound-protocol (Solidity 生产协议)",
+     ["benchmarks/benchmark_compound.py", "--strict"],
+     "reference_repos/compound-protocol/contracts", "target", True),
 ]
 
 
@@ -193,6 +204,7 @@ def build_scoreboard() -> str:
         ("VAmPI (Connexion/OpenAPI)", "vampi.json", "total_units"),
         ("mall (生产级多模块对照)", "mall.json", "total_units"),
         ("WebGoat (教学关卡成对真值)", "webgoat.json", "total_units"),
+        ("compound-protocol (Solidity 生产协议)", "compound.json", "total_units"),
     ]
     total_fp = total_rev = 0
     for label, fname, unit_key in WHITELIST:

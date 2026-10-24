@@ -37,6 +37,10 @@ REPOS = [
     ("mall", "reference_repos/mall-main", "mall", ["--strict"]),
     ("My-Blog", "reference_repos/My-Blog-master", "myblog", ["--strict"]),
     ("litemall", "reference_repos/litemall-master", "litemall", ["--strict"]),
+    ("Employee-Management-System",
+     "reference_repos/employee-management-system", "flaskcrud", ["--strict"]),
+    ("Compound", "reference_repos/compound-protocol/contracts",
+     "compound", ["--strict"]),
 ]
 
 P0_LINE = re.compile(r"^- \*\*\[([a-z_]+)\]\*\* `")

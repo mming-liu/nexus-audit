@@ -1,0 +1,10 @@
+{
+  "bench": "flaskcrud",
+  "units": 4,
+  "decided": 15,
+  "truth_n": 2,
+  "fp": 0,
+  "fn": 0,
+  "secret_ok": true,
+  "rows": []
+}

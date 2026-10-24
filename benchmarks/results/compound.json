@@ -1,0 +1,28 @@
+{
+  "bench": "compound",
+  "units": 450,
+  "total_units": 450,
+  "decided": 444,
+  "correct": 444,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 976,
+  "anchors": [
+    {
+      "unit": "Timelock.sol:setPendingAdmin",
+      "category": "access_control",
+      "verdict": false
+    },
+    {
+      "unit": "CToken.sol:transfer",
+      "category": "reentrancy",
+      "verdict": false
+    },
+    {
+      "unit": "ExponentialNoError.sol:mul_ScalarTruncate",
+      "category": "arithmetic",
+      "verdict": false
+    }
+  ],
+  "true_rows": []
+}

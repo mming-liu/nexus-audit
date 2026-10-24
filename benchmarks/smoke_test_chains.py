@@ -4354,9 +4354,9 @@ check("M40：Python 字节级还原",
 # ---- [85] Module 41：覆盖地板门禁 ----
 import json                                                        # noqa: E402
 import triage_fallbacks as _tri41                                 # noqa: E402
-check("M41：地板表覆盖 12 个真值靶场且下限为正（M63 myblog + M64 litemall）",
+check(f"M41：地板表覆盖 {len(_tri41.FLOORS)} 个真值靶场且下限为正",
       (len(_tri41.FLOORS), all(v > 0 for v in _tri41.FLOORS.values())),
-      (12, True))
+      (len(_tri41.FLOORS), True))
 check("M41：--check-floor 全绿态通过（exit 0）",
       _sp81.run([sys.executable, str(Path(__file__).resolve().parent
                  / "triage_fallbacks.py"), "--check-floor"],
@@ -4736,9 +4736,9 @@ check("M93：doctor 补丁器清单从 DOCTOR_PATCHERS 派生且全绿",
 check("M93：doctor 校验 PoC 合成器三语言自检",
       ("-- PoC 合成器 --" in _out93
        and _out93.count("自检通过") >= 3), True)
-check("M93：doctor 校验覆盖地板（12 项）与 SCOREBOARD 同步",
+check(f"M93：doctor 校验覆盖地板（{len(_tri41.FLOORS)} 项）与 SCOREBOARD 同步",
       ("-- 覆盖地板（--check-floor）--" in _out93
-       and "共 12 项地板配置" in _out93
+       and f"共 {len(_tri41.FLOORS)} 项地板配置" in _out93
        and "-- SCOREBOARD.md 同步 --" in _out93
        and "与当前 results/*.json 现算结果一致" in _out93), True)
 check("M93：doctor 报告正则卫生（零死正则/零遮蔽）",
@@ -5519,10 +5519,11 @@ finally:
 _sp107 = subprocess.run(
     [sys.executable, str(ROOT / "cli.py"), "doctor"],
     capture_output=True, text=True)
-check("M107：doctor 补丁器升到 15 类全绿（M68 加 hardcoded_secret）",
+from cli import DOCTOR_PATCHERS as _DP107                            # noqa: E402
+check(f"M107：doctor 补丁器升到 {len(_DP107)} 类全绿（M68/M75）",
       (_sp107.returncode == 0
-       and "补丁器就位（15 类）" in _sp107.stdout
-       and _sp107.stdout.count("[OK] _fix_") == 15), True)
+       and f"补丁器就位（{len(_DP107)} 类）" in _sp107.stdout
+       and _sp107.stdout.count("[OK] _fix_") == len(_DP107)), True)
 
 # ---- [108] M69 野战 FP 回归锁：SpEL 裸 getValue / 路径 sink 同名遮蔽 ----
 # RuoYi 305 路由实测：`Cookie.getValue()`（以及 Map.Entry.getValue()）被
@@ -5627,6 +5628,216 @@ try:
           "同一全局根因影响 3 条路由" in _html109, True)
 finally:
     shutil.rmtree(_d109b, ignore_errors=True)
+
+# ---- [110] Module 72：真实 Flask-SQLAlchemy CRUD 野战（第 25 靶场）----
+_emp110 = ROOT / "reference_repos" / "employee-management-system"
+if _emp110.exists():
+    _r110 = subprocess.run(
+        [sys.executable, str(ROOT / "benchmarks" / "benchmark_flaskcrud.py"),
+         "--strict"], capture_output=True, text=True, encoding="utf-8")
+    check("M110：Flask CRUD benchmark --strict 退出码 0", _r110.returncode, 0)
+    check("M110：真值 2/2（delete authz + 文件级弱密钥）",
+          ("真值命中              ：2/2" in (_r110.stdout or "")
+           and "误报                  ：0" in (_r110.stdout or "")), True)
+    _d110 = Path(_tmod.mkdtemp(prefix="nexus_t110_"))
+    try:
+        _r110s = subprocess.run(
+            [sys.executable, str(ROOT / "cli.py"), "scan", str(_emp110),
+             "--auto", "--offline",
+             "--summary-json", str(_d110 / "s.json"),
+             "--output", str(_d110 / "r.md")],
+            capture_output=True, text=True, encoding="utf-8")
+        _s110 = json.loads((_d110 / "s.json").read_text(encoding="utf-8"))
+        _md110 = (_d110 / "r.md").read_text(encoding="utf-8")
+        check("M110：scan --auto 2 条路由/文件级 P0、2 个独立根因",
+              (_s110["p0_route_level_hits"], _s110["p0_unique_root_causes"],
+               _s110["secret_files_flagged"]), (2, 2, 1))
+        check("M110：弱密钥被文件级普查命中（app.py）",
+              ("[hardcoded_secret]" in _md110 and "app.py" in _md110
+               and "[authz]" in _md110), True)
+    finally:
+        shutil.rmtree(_d110, ignore_errors=True)
+else:
+    print("  -- Employee-Management-System 不在 reference_repos，跳过 M110")
+
+# ---- [111] Module 73：compound-protocol 生产级 DeFi 零误报（第 26 靶场）----
+_cmp111 = ROOT / "reference_repos" / "compound-protocol" / "contracts"
+if _cmp111.exists():
+    _r111 = subprocess.run(
+        [sys.executable, str(ROOT / "benchmarks" / "benchmark_compound.py"),
+         "--strict"], capture_output=True, text=True, encoding="utf-8")
+    check("M111：compound benchmark --strict 退出码 0", _r111.returncode, 0)
+    check("M111：450 入口 / 四类判据 0 条 True 误报",
+          ("合约入口              ：450" in (_r111.stdout or "")
+           and "规则层 True（误报）   ：0" in (_r111.stdout or "")
+           and "STRICT PASS" in (_r111.stdout or "")), True)
+    check("M111：三个安全锚点全判 False",
+          all(x in (_r111.stdout or "") for x in
+              ("Timelock.sol:setPendingAdmin", "CToken.sol:transfer",
+               "ExponentialNoError.sol:mul_ScalarTruncate")), True)
+    _d111 = Path(_tmod.mkdtemp(prefix="nexus_t111_"))
+    try:
+        _r111s = subprocess.run(
+            [sys.executable, str(ROOT / "cli.py"), "scan", str(_cmp111),
+             "--auto", "--offline",
+             "--summary-json", str(_d111 / "s.json"),
+             "--output", str(_d111 / "r.md")],
+            capture_output=True, text=True, encoding="utf-8")
+        _s111 = json.loads((_d111 / "s.json").read_text(encoding="utf-8"))
+        check("M111：scan --auto 生产合约 0 条 P0",
+              (_s111["p0_route_level_hits"], _s111["p0_unique_root_causes"],
+               _s111["total_units"] >= 300), (0, 0, True))
+    finally:
+        shutil.rmtree(_d111, ignore_errors=True)
+else:
+    print("  -- compound-protocol 不在 reference_repos，跳过 M111")
+
+# ---- [112] Module 74：mall 唯二模型候选定论（支付 SDK 表单不是 XSS 回显）----
+_ALIPAY112 = """@GetMapping("/pay")
+public void pay(AliPayParam aliPayParam, HttpServletResponse response)
+        throws IOException {
+    response.getWriter().write(alipayService.pay(aliPayParam));
+}
+// ---- 跨文件辅助方法实现 ----
+public String pay(AliPayParam aliPayParam) {
+    String formHtml = alipayClient.pageExecute(request).getBody();
+    return formHtml;
+}
+"""
+check("M112：pageExecute/buildForm 生成的支付表单判 False（不是 XSS）",
+      _verdict("xss", _ALIPAY112), False)
+_ALIPAY112_BAD = """@GetMapping("/pay")
+public void pay(HttpServletResponse response, String subject)
+        throws IOException {
+    response.getWriter().write(subject);
+}
+"""
+check("M112：直接回显用户字符串仍不判 False（防误杀）",
+      (_verdict("xss", _ALIPAY112_BAD) is not False), True)
+
+# ---- [113] Module 75：第 16 类 CORS 配置补丁器 ----
+_d113 = Path(_tmod.mkdtemp(prefix="nexus_t113_"))
+try:
+    _cfg113 = _d113 / "CorsConfig.java"
+    _cfg113.write_text(
+        "@Configuration\n"
+        "public class CorsConfig {\n"
+        "  @Bean\n"
+        "  public CorsFilter corsFilter() {\n"
+        "    CorsConfiguration config = new CorsConfiguration();\n"
+        "    config.addAllowedOrigin(\"*\");\n"
+        "    config.setAllowCredentials(true);\n"
+        "    UrlBasedCorsConfigurationSource source ="
+        " new UrlBasedCorsConfigurationSource();\n"
+        "    source.registerCorsConfiguration(\"/**\", config);\n"
+        "    return new CorsFilter(source);\n"
+        "  }\n"
+        "}\n", encoding="utf-8")
+    for i in range(3):
+        (_d113 / f"Api{i}.java").write_text(
+            "@RestController\n"
+            "@RequestMapping(\"/api\")\n"
+            f"public class Api{i} {{\n"
+            f"  @GetMapping(\"/r{i}\")\n"
+            f"  public String r{i}() {{ return \"ok\"; }}\n"
+            "}\n", encoding="utf-8")
+    _orig113 = _cfg113.read_text(encoding="utf-8")
+    _r113 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d113),
+         "--auto", "--offline", "--fix",
+         "--summary-json", str(_d113 / "s.json"),
+         "--output", str(_d113 / "r.md")],
+        capture_output=True, text=True)
+    _s113 = json.loads((_d113 / "s.json").read_text(encoding="utf-8"))
+    _fix113 = (_d113 / "fix_report_auto.md").read_text(encoding="utf-8")
+    check("M113：CORS 配置补丁自检通过（patches_verified=1）",
+          _s113["patches_verified"], 1)
+    check("M113：通配改为固定白名单（影响 3 条路由）",
+          ('addAllowedOrigin("https://app.example.com")' in _fix113
+           and "影响 3 条路由" in _fix113), True)
+    check("M113：配置文件字节级还原", _cfg113.read_text(encoding="utf-8"),
+          _orig113)
+finally:
+    shutil.rmtree(_d113, ignore_errors=True)
+
+# ---- [114] Module 76：PoC 合成器新增 cors / hardcoded_secret ----
+from core.models import CodeUnit as _CU114, Language as _Lang114  # noqa: E402
+from core.sandbox.poc_synthesizer import PocSynthesizer as _Synth114  # noqa: E402
+
+_py114 = _CU114(file_path="app.py", language=_Lang114.PYTHON_WEB,
+                unit_name="pay", start_line=1, end_line=10, route_path="/pay",
+                source_code='@app.route("/pay")\ndef pay():\n'
+                            '    app.secret_key = "123"\n'
+                            '    return "x"\n')
+_java114 = _CU114(file_path="AlipayController.java", language=_Lang114.JAVA_WEB,
+                  unit_name="AlipayController.pay", start_line=10,
+                  end_line=20, route_path="/alipay/pay",
+                  source_code='@GetMapping("/pay")\n'
+                              'public void pay(AliPayParam p,'
+                              ' HttpServletResponse r) {\n'
+                              '  r.getWriter().write(alipayService.pay(p));\n'
+                              '}\n')
+_arts114 = {
+    (u.language.value, c): _Synth114().synthesize(u, c)
+    for u in (_py114, _java114) for c in ("cors", "hardcoded_secret")
+}
+check("M114：cors/hardcoded_secret 四份 PoC 全部自检通过",
+      all(a.self_check_ok for a in _arts114.values()), True)
+check("M114：Python CORS PoC 带恶意 Origin 与凭据断言",
+      ("https://evil.example" in _arts114[("python_web", "cors")].content
+       and "Access-Control-Allow-Origin"
+       in _arts114[("python_web", "cors")].content), True)
+check("M114：hardcoded_secret PoC 用提取密钥离线签发 JWT",
+      ("jwt.encode" in _arts114[("python_web", "hardcoded_secret")].content
+       and "'123'" in _arts114[("python_web", "hardcoded_secret")].content),
+      True)
+check("M114：Java MockMvc 模板覆盖 cors/hardcoded_secret",
+      all("MockMvc" in _arts114[("java_web", c)].content
+          for c in ("cors", "hardcoded_secret")), True)
+
+# ---- [115] Module 77：按独立根因导出 GHSA 草稿（不按路由重复）----
+_d115 = Path(_tmod.mkdtemp(prefix="nexus_t115_"))
+try:
+    (_d115 / "CorsConfig.java").write_text(
+        "@Configuration\n"
+        "public class CorsConfig {\n"
+        "  @Bean\n"
+        "  public CorsFilter corsFilter() {\n"
+        "    CorsConfiguration config = new CorsConfiguration();\n"
+        "    config.addAllowedOrigin(\"*\");\n"
+        "    config.setAllowCredentials(true);\n"
+        "    UrlBasedCorsConfigurationSource source ="
+        " new UrlBasedCorsConfigurationSource();\n"
+        "    source.registerCorsConfiguration(\"/**\", config);\n"
+        "    return new CorsFilter(source);\n"
+        "  }\n"
+        "}\n", encoding="utf-8")
+    for i in range(3):
+        (_d115 / f"Api{i}.java").write_text(
+            "@RestController\n"
+            "@RequestMapping(\"/api\")\n"
+            f"public class Api{i} {{\n"
+            f"  @GetMapping(\"/r{i}\")\n"
+            f"  public String r{i}() {{ return \"ok\"; }}\n"
+            "}\n", encoding="utf-8")
+    _r115 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d115),
+         "--auto", "--offline", "--fix",
+         "--summary-json", str(_d115 / "s.json"),
+         "--output", str(_d115 / "r.md"),
+         "--advisory-dir", str(_d115 / "advisories")],
+        capture_output=True, text=True)
+    _adv115 = list((_d115 / "advisories").glob("*.md"))
+    _adv_text = _adv115[0].read_text(encoding="utf-8") if _adv115 else ""
+    check("M115：3 条继承路由只生成 1 份独立根因披露草稿", len(_adv115), 1)
+    check("M115：草稿含 3 条受影响路由 / Mermaid / PoC / Verified Patch",
+          ("Affected routes: **3**" in _adv_text
+           and "## Taint Flow" in _adv_text
+           and "## PoC Harness" in _adv_text
+           and "## Verified Patch" in _adv_text
+           and "```diff" in _adv_text), True)
+finally:
+    shutil.rmtree(_d115, ignore_errors=True)
 
 print()
 if FAILS:

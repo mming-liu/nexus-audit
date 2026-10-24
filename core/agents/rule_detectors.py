@@ -3424,7 +3424,7 @@ _SECRET_TOKEN = (
     r"|private[_-]?key|signing[_-]?key|secret)")
 SECRET_ASSIGN_RE = re.compile(
     r"(?i)(?P<name>[\w.$\[\]'\"]*?" + _SECRET_TOKEN + r")"
-    r"['\"]?\]?\s*[:=]\s*['\"](?P<val>[^'\"]{4,})['\"]")
+    r"['\"]?\]?\s*[:=]\s*['\"](?P<val>[^'\"]{1,})['\"]")
 SECRET_ENV_READ_RE = re.compile(
     r"\bos\s*\.\s*environ\b|\bos\s*\.\s*getenv\b|System\s*\.\s*getenv\b"
     r"|System\s*\.\s*getProperty\b|@Value\s*\(\s*\"\$\{"
@@ -3434,7 +3434,7 @@ SECRET_PLACEHOLDER_RE = re.compile(
     r"|\$\{|todo|fixme|insert_|default|已脱敏|\btest\b")
 SECRET_JWT_CTX_RE = re.compile(
     r"jwt\s*\.\s*(?:encode|decode)|Jwts\s*\.|create_?token"
-    r"|config\s*\[[^\]\n]*SECRET_KEY", re.I)
+    r"|config\s*\[[^\]\n]*SECRET_KEY|app\s*\.\s*secret_key", re.I)
 
 
 def hardcoded_secret_verdict(source: str) -> bool | None:
@@ -3672,10 +3672,34 @@ def _echo_value_traced_locally(body: str, var: str = "bar") -> bool | None:
         return None
 
 
+_VENDOR_FORM_RE = re.compile(
+    r"pageExecute\s*\([^)]*\)\s*\.\s*getBody\s*\(|"
+    r"buildForm\s*\(|create[A-Za-z]*Form\s*\(", re.I)
+
+
+def _vendor_form_response(source: str) -> bool:
+    """支付 SDK 的 pageExecute/buildForm 生成表单 → 不是本方法的 XSS 回显。
+
+    mall 实测（M74）：`response.getWriter().write(alipayService.pay(param))`
+    的返回值来自 Alipay SDK `AbstractAlipayClient.pageExecute` →
+    `WebUtils.buildForm`；`buildHiddenField` 对 value 只做 `"` → `&quot;`
+    转义，用户可控的 `subject` 放在 `biz_content` 的 hidden input **属性值**
+    里，`<`/`>` 在属性值状态不构成标签，无法逃逸。这是可逐行核对的第三方
+    库事实，不交模型猜。
+    """
+    body = entry_body(source)
+    if not re.search(r"getWriter\s*\(\s*\)\s*\.\s*write\s*\(\s*"
+                     r"\w*[Ss]ervice\s*\.\s*\w+\s*\(", body):
+        return False
+    return bool(_VENDOR_FORM_RE.search(_all_evidence(source)))
+
+
 def xss_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not body:
         return None
+    if _vendor_form_response(source):
+        return False
 
     has_param = has_external_input(source)
     # 注意用 `_chain_reader_body`（只认 cookie/session/request/model 那条证据块）

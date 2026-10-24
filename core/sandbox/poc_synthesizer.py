@@ -294,17 +294,44 @@ def test_bola_other_account_denied(client):
         "越权访问未被拒绝（状态码 %s）" % resp.status_code)
 '''
 
+_PY_CORS = '''
+
+def test_cors_evil_origin_not_echoed(client):
+    """恶意 Origin + credentials 不应被 ACAO 回显。"""
+    resp = client.get({call}, headers={{"Origin": "https://evil.example"}})
+    acao = resp.headers.get("Access-Control-Allow-Origin", "")
+    assert acao != "https://evil.example", "CORS 回显任意 Origin：%s" % acao
+'''
+
+_PY_SECRET = '''
+
+def test_forged_admin_token_with_hardcoded_secret(client):
+    """用代码里的硬编码密钥离线签发管理员 JWT，验证其可被用于伪造身份。"""
+    import jwt
+    forged = jwt.encode({{"sub": "admin", "role": "admin"}},
+                        {secret!r}, algorithm="HS256")
+    resp = client.get({call}, headers={{"Authorization": "Bearer " + forged}})
+    assert resp.status_code != 200, "硬编码密钥可伪造管理员 Token"
+'''
+
+
+def _extract_secret(unit: CodeUnit) -> str:
+    from core.agents.rule_detectors import SECRET_ASSIGN_RE
+    m = SECRET_ASSIGN_RE.search(unit.source_code or "")
+    return m.group("val") if m else "REDACTED_SECRET"
+
 
 def _synth_python(unit: CodeUnit, category: str) -> str:
     arg = _first_arg_name(unit)
     route = _route_or_name(unit)
     call = f'"{route}", params={{"{arg}": "1"}}'
-    tpl = _PY_SQLI if category == "sqli" else _PY_AUTHZ
+    tpl = {"sqli": _PY_SQLI, "cors": _PY_CORS,
+           "hardcoded_secret": _PY_SECRET}.get(category, _PY_AUTHZ)
     return _PY_HEADER.format(target=unit.unit_name, category=category,
                               file=Path(unit.file_path).name,
                               line=unit.start_line,
                               fname="test_poc_" + _safe_name(unit.unit_name) + ".py") \
-        + tpl.format(call=call)
+        + tpl.format(call=call, secret=_extract_secret(unit))
 
 
 # ---------------------------------------------------------------- Java
@@ -322,6 +349,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.*;
+import static org.hamcrest.Matchers.not;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -350,6 +378,32 @@ _JAVA_AUTHZ = """
 }}
 """
 
+_JAVA_CORS = """
+    @Test
+    void corsEvilOriginNotReflected() throws Exception {{
+        mockMvc.perform(options("{route}")
+                .header("Origin", "https://evil.example")
+                .header("Access-Control-Request-Method", "GET"))
+            .andExpect(header().string("Access-Control-Allow-Origin",
+                                       not("https://evil.example")));
+    }}
+}}
+"""
+
+_JAVA_SECRET = """
+    @Test
+    void forgedAdminTokenWithHardcodedSecret() throws Exception {{
+        String forged = io.jsonwebtoken.Jwts.builder()
+            .setSubject("admin").claim("role", "admin")
+            .signWith(io.jsonwebtoken.SignatureAlgorithm.HS256, "{secret}")
+            .compact();
+        mockMvc.perform(get("{route}")
+                .header("Authorization", "Bearer " + forged))
+            .andExpect(status().is4xxClientError());
+    }}
+}}
+"""
+
 
 def _synth_java(unit: CodeUnit, category: str) -> str:
     cls = _safe_name(unit.unit_name).capitalize()
@@ -357,8 +411,10 @@ def _synth_java(unit: CodeUnit, category: str) -> str:
     route = _route_or_name(unit)
     if not route.startswith("/"):
         route = "/" + route
-    tpl = _JAVA_SQLI if category == "sqli" else _JAVA_AUTHZ
-    body = tpl.format(route=route, arg=arg)
+    tpl = {"sqli": _JAVA_SQLI, "cors": _JAVA_CORS,
+           "hardcoded_secret": _JAVA_SECRET}.get(category, _JAVA_AUTHZ)
+    secret = _extract_secret(unit).replace("\\", "\\\\").replace('"', '\\"')
+    body = tpl.format(route=route, arg=arg, secret=secret)
     return _JAVA_HEADER.format(target=unit.unit_name, category=category,
                                file=Path(unit.file_path).name,
                                line=unit.start_line, cls=cls) + body

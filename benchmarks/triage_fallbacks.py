@@ -132,6 +132,8 @@ FLOORS = {
     "webgoat": 6,             # WebGoat 6/6（M46，教学关卡成对真值）
     "myblog": 191,            # My-Blog 野战实弹 191 项判定（M63）
     "litemall": 908,          # litemall 野战实弹 908 项判定（M64）
+    "flaskcrud": 15,          # M72 真实 Flask CRUD 15 项判定
+    "compound": 444,          # M73 compound-protocol 450 入口 / 444 单元覆盖
 }
 
 

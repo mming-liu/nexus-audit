@@ -472,17 +472,26 @@ def cmd_scan_auto(args, repo: Path):
 
     # --- M61：野战一键组合（--fix / --emit-poc 与漏斗联动）---
     patches_verified = 0
+    fix_text = ""
     if getattr(args, "fix", None) and p0:
         _fix_out = out.with_name("fix_report_auto.md")
         _verify_fixes_any(repo, [u for u, _ in p0], out_path=str(_fix_out))
         if _fix_out.exists():
-            patches_verified = _fix_out.read_text(
-                encoding="utf-8").count("```diff")
+            fix_text = _fix_out.read_text(encoding="utf-8")
+            patches_verified = fix_text.count("```diff")
     pocs_generated = 0
     if getattr(args, "emit_poc", None) and p0:
         from core.sandbox.poc_synthesizer import PocSynthesizer
         _syn = PocSynthesizer().synthesize_many(list(p0), Path(args.emit_poc))
         pocs_generated = _syn.ok_count
+
+    if getattr(args, "advisory_dir", None):
+        from core.context.advisory_exporter import export_advisories
+        adv_paths = export_advisories(root_causes, repo,
+                                      Path(args.advisory_dir),
+                                      fix_text=fix_text)
+        print(f"      披露草稿 {len(adv_paths)} 份（按独立根因，"
+              f"不按路由）-> {args.advisory_dir}")
 
     # --- M66：机器可读狩猎简报 ---
     if getattr(args, "summary_json", None):
@@ -515,6 +524,11 @@ def cmd_scan_auto(args, repo: Path):
             "funnel_filtered_out": n_filtered,
             "funnel_filter_rate": round(filter_rate, 4),
             "llm_dispatched": len(model_candidates),
+            "model_candidates": [{
+                "unit": u.unit_name, "category": cat,
+                "file": u.file_path, "line": u.start_line,
+                "diagnostic": build_rule_diagnostic(cat, u.source_code)[:1200],
+            } for u, cat in model_candidates[:20]],
             "patches_verified": patches_verified,
             "pocs_generated": pocs_generated,
             "elapsed_ms": round(elapsed_ms, 1),
@@ -1463,6 +1477,7 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_solidity_arith_guard(repo, sol, report)
         n += _fix_solidity_unchecked_wrap(repo, sol, report)
     if rest:
+        n += _fix_cors_config(repo, rest, report)
         n += _fix_hardcoded_secret(repo, rest, report)
         n += _fix_mp_concat(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
@@ -2294,13 +2309,13 @@ _SECRET_NAME_RE = (
     r"|private[_-]?key|signing[_-]?key|secret)")
 _SECRET_PY_ASSIGN_RE = re.compile(
     r"^(?P<prefix>[ \t]*[^=\n]*?" + _SECRET_NAME_RE + r")"
-    r"(?P<tail>(?![\w])[^=\n]*?=\s*)['\"](?P<val>[^'\"]{4,})['\"]"
+    r"(?P<tail>(?![\w])[^=\n]*?=\s*)['\"](?P<val>[^'\"]{1,})['\"]"
     r"(?P<suffix>\s*)$", re.I)
 # Java：String jwtSecret = "..."; / String API_SECRET = "...";
 _SECRET_JAVA_ASSIGN_RE = re.compile(
     r"^(?P<prefix>[ \t]*(?:(?:private|public|protected|static|final)"
     r"\s+)*String\s+(?P<name>\w*?" + _SECRET_NAME_RE + r"))"
-    r"(?P<tail>(?![\w])\s*=\s*)['\"](?P<val>[^'\"]{4,})['\"]"
+    r"(?P<tail>(?![\w])\s*=\s*)['\"](?P<val>[^'\"]{1,})['\"]"
     r"(?P<suffix>\s*;\s*)$", re.I)
 
 
@@ -2317,6 +2332,90 @@ def _env_name(var: str) -> str:
     ident = names[-1] if names else "APP"
     env = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", ident).upper()
     return env or "APP_SECRET"
+
+
+# ---- Module 75：第 16 类（全局 CORS 通配 → 固定白名单） ----
+
+_CORS_WILDCARD_PATCHES = [
+    (re.compile(r'\.\s*allowedOriginPatterns\s*\(\s*"\*"\s*\)'),
+     '.allowedOriginPatterns("https://app.example.com")'),
+    (re.compile(r'\.\s*allowedOrigins\s*\(\s*"\*"\s*\)'),
+     '.allowedOrigins("https://app.example.com")'),
+    (re.compile(r'\.\s*addAllowedOriginPattern\s*\(\s*"\*"\s*\)'),
+     '.addAllowedOriginPattern("https://app.example.com")'),
+    (re.compile(r'\.\s*addAllowedOrigin\s*\(\s*"\*"\s*\)'),
+     '.addAllowedOrigin("https://app.example.com")'),
+    (re.compile(r'\.\s*setAllowedOrigins\s*\(\s*"\*"\s*\)'),
+     '.setAllowedOrigins("https://app.example.com")'),
+]
+
+
+def _fix_cors_config(repo: Path, targets: list, lines: list) -> int:
+    """第 16 类补丁：全局 CORS 通配 + 凭据 → 固定白名单。
+
+    一条 `CorsConfig` / `WebMvcConfigurer` 配置会污染整仓所有路由；这里按
+    装配证据里的 `来源 X.java` 归并，每个配置文件只打一处补丁，然后重切片
+    验证**代表性路由**的 cors_verdict 翻 False，finally 字节级还原。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    from core.agents.rule_detectors import wiring_block
+    by_file: dict[Path, list] = {}
+    for u in targets:
+        if rule_verdict("cors", u.source_code) is not True:
+            continue
+        blk = wiring_block(u.source_code)
+        m = _WIRING_SOURCE_RE.search(blk) if blk else None
+        if not m:
+            continue
+        rel = m.group(1).replace("\\", "/")
+        cand = repo / rel
+        if not cand.is_file():
+            cand = next(repo.rglob(Path(rel).name), None)
+        if cand and cand.is_file():
+            by_file.setdefault(cand, []).append(u)
+    fixed = 0
+    for cfg, units in by_file.items():
+        with open(cfg, encoding="utf-8", errors="replace", newline="") as fh:
+            original = fh.read()
+        patched = original
+        for pat, repl in _CORS_WILDCARD_PATCHES:
+            patched = pat.sub(repl, patched)
+        if patched == original:
+            lines += [f"## [cors] 全局配置 `{cfg.name}`",
+                      "- 未找到可确定性替换的 `*` 通配，跳过", ""]
+            continue
+        try:
+            with open(cfg, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+            from core.slicer.java_servlet import JavaSlicer
+            fresh = {x.unit_name: x for x in
+                     JavaSlicer(repo).extract_entry_units()}
+            rep = units[0]
+            u2 = fresh.get(rep.unit_name)
+            v2 = (rule_verdict("cors", u2.source_code) if u2 else None)
+        finally:
+            with open(cfg, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+        rel = cfg.relative_to(repo).as_posix()
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(
+                original.splitlines(), patched.splitlines(),
+                fromfile=f"a/{rel}", tofile=f"b/{rel}", lineterm="")
+            lines += [f"## [cors] 全局配置 `{rel}`（影响 {len(units)} 条路由）",
+                      "```diff", *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 cors 规则 → False。",
+                      "> 通配改为固定白名单；若确需多域名，请从环境变量读取",
+                      "> 白名单并在启动时校验。", ""]
+        else:
+            lines += [f"## [cors] 全局配置 `{rel}`",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）",
+                      ""]
+    return fixed
 
 
 def _ensure_os_import(lines: list[str]) -> list[str]:
@@ -2831,7 +2930,7 @@ DOCTOR_PATCHERS = [
     "_fix_python_yaml", "_fix_solidity_reentrancy", "_fix_solidity_initiator",
     "_fix_solidity_onlyowner", "_fix_solidity_txorigin", "_fix_mp_concat",
     "_fix_solidity_arith_guard", "_fix_solidity_unchecked_wrap",
-    "_fix_hardcoded_secret",
+    "_fix_hardcoded_secret", "_fix_cors_config",
 ]
 
 
@@ -3064,6 +3163,8 @@ def main():
                         help="M57：产出零外部依赖的单文件交互式 HTML 报告")
     p_scan.add_argument("--summary-json", default=None, metavar="OUT.json",
                         help="M66：输出机器可读的狩猎漏斗统计（Hunt Dossier）")
+    p_scan.add_argument("--advisory-dir", default=None, metavar="DIR",
+                        help="M77：按独立根因导出 GitHub Security Advisory 草稿")
     p_scan.add_argument("--no-llm-cache", dest="no_llm_cache", action="store_true",
                         help="M59：禁用大模型响应磁盘缓存（默认开）")
     p_scan.add_argument("--auto", action="store_true",
