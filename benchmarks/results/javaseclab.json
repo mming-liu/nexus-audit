@@ -2,9 +2,9 @@
   "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\JavaSecLab-main",
   "total_units": 227,
   "with_truth": 63,
-  "rule_covered": 42,
-  "rule_coverage": 0.6667,
-  "rule_correct": 41,
+  "rule_covered": 41,
+  "rule_coverage": 0.6508,
+  "rule_correct": 40,
   "rule_accuracy": 1.0,
   "per_category": {
     "xxe": {
@@ -58,8 +58,8 @@
     "pathtraver": {
       "n": 11,
       "safe_n": 1,
-      "decided": 6,
-      "correct": 6
+      "decided": 5,
+      "correct": 5
     },
     "deserial": {
       "n": 4,
@@ -182,6 +182,12 @@
       "category": "pathtraver",
       "real_vuln": false,
       "route": "/safe"
+    },
+    {
+      "unit": "UploadController.vul",
+      "category": "pathtraver",
+      "real_vuln": true,
+      "route": "/vul"
     },
     {
       "unit": "UploadController.safe",

@@ -1,33 +1,33 @@
 {
   "total": {
-    "sqli/缺 Sink": 1804,
-    "cmdi/缺 Sink": 1933,
-    "deserial/缺 Sink": 1882,
-    "ssrf/缺 Sink": 1934,
-    "xxe/缺 Sink": 1935,
-    "reentrancy/缺 Sink": 1276,
-    "access_control/缺 Sink": 769,
+    "sqli/缺 Sink": 1786,
+    "cmdi/缺 Sink": 1915,
+    "deserial/缺 Sink": 1852,
+    "ssrf/缺 Sink": 1917,
+    "xxe/缺 Sink": 1917,
+    "reentrancy/缺 Sink": 1232,
+    "access_control/缺 Sink": 692,
     "xss/缺 Sink": 271,
-    "access_control/含未知安全包装": 330,
+    "access_control/含未知安全包装": 333,
     "authz/缺 Source": 8,
-    "authz/缺 Sink": 1666,
+    "authz/缺 Sink": 1648,
+    "authz/含未知安全包装": 9,
     "pathtraver/缺 Sink": 27,
-    "deserial/含未知安全包装": 33,
-    "pathtraver/含未知安全包装": 28,
+    "deserial/含未知安全包装": 40,
+    "pathtraver/含未知安全包装": 30,
     "pathtraver/缺 Source": 9,
-    "deserial/缺 Source": 14,
-    "access_control/缺 Source": 114,
+    "deserial/缺 Source": 19,
+    "access_control/缺 Source": 76,
     "xxe/缺 Source": 2,
     "xss/含未知安全包装": 18,
     "authz/跨文件链路未闭合": 3,
-    "authz/含未知安全包装": 4,
     "access_control/跨文件链路未闭合": 1,
     "deserial/跨文件链路未闭合": 2,
-    "reentrancy/含未知安全包装": 162,
+    "reentrancy/含未知安全包装": 194,
     "sqli/含未知安全包装": 5,
     "xss/缺 Source": 48,
     "ssrf/含未知安全包装": 1,
-    "reentrancy/缺 Source": 55,
+    "reentrancy/缺 Source": 50,
     "cmdi/缺 Source": 2
   },
   "per_bench": {
@@ -35,7 +35,7 @@
       "sqli/缺 Sink": 284,
       "cmdi/缺 Sink": 305,
       "deserial/缺 Sink": 298,
-      "ssrf/缺 Sink": 304,
+      "ssrf/缺 Sink": 305,
       "xxe/缺 Sink": 303,
       "reentrancy/缺 Sink": 305,
       "access_control/缺 Sink": 253,
@@ -43,16 +43,16 @@
       "access_control/含未知安全包装": 33,
       "authz/缺 Source": 8,
       "authz/缺 Sink": 105,
+      "authz/含未知安全包装": 6,
       "pathtraver/缺 Sink": 10,
       "deserial/含未知安全包装": 5,
-      "pathtraver/含未知安全包装": 2,
+      "pathtraver/含未知安全包装": 3,
       "pathtraver/缺 Source": 1,
       "deserial/缺 Source": 2,
       "access_control/缺 Source": 18,
       "xxe/缺 Source": 2,
       "xss/含未知安全包装": 1,
       "authz/跨文件链路未闭合": 3,
-      "authz/含未知安全包装": 1,
       "access_control/跨文件链路未闭合": 1
     },
     "eladmin-mp": {
@@ -65,7 +65,7 @@
       "reentrancy/缺 Sink": 63,
       "access_control/缺 Sink": 63,
       "authz/含未知安全包装": 3,
-      "pathtraver/含未知安全包装": 18,
+      "pathtraver/含未知安全包装": 19,
       "deserial/含未知安全包装": 26,
       "pathtraver/缺 Sink": 7,
       "xss/缺 Sink": 23,
@@ -110,53 +110,55 @@
       "access_control/含未知安全包装": 1
     },
     "smartbugs": {
-      "sqli/缺 Sink": 841,
-      "authz/缺 Sink": 841,
-      "cmdi/缺 Sink": 841,
-      "deserial/缺 Sink": 836,
-      "ssrf/缺 Sink": 841,
-      "xxe/缺 Sink": 841,
-      "reentrancy/缺 Sink": 418,
-      "access_control/缺 Sink": 126,
-      "reentrancy/含未知安全包装": 119,
-      "access_control/含未知安全包装": 194,
-      "access_control/缺 Source": 40,
-      "deserial/缺 Source": 5,
-      "reentrancy/缺 Source": 28,
+      "sqli/缺 Sink": 834,
+      "authz/缺 Sink": 834,
+      "cmdi/缺 Sink": 834,
+      "deserial/缺 Sink": 824,
+      "ssrf/缺 Sink": 834,
+      "xxe/缺 Sink": 834,
+      "reentrancy/缺 Sink": 381,
+      "access_control/缺 Sink": 85,
+      "reentrancy/含未知安全包装": 153,
+      "access_control/含未知安全包装": 195,
+      "deserial/含未知安全包装": 2,
+      "deserial/缺 Source": 8,
+      "access_control/缺 Source": 24,
+      "reentrancy/缺 Source": 24,
       "xss/缺 Sink": 2
     },
     "DeFiVulnLabs": {
-      "sqli/缺 Sink": 323,
-      "authz/缺 Sink": 323,
-      "cmdi/缺 Sink": 319,
-      "deserial/缺 Sink": 318,
-      "ssrf/缺 Sink": 323,
-      "xxe/缺 Sink": 323,
+      "sqli/缺 Sink": 314,
+      "authz/缺 Sink": 314,
+      "cmdi/缺 Sink": 310,
+      "deserial/缺 Sink": 306,
+      "ssrf/缺 Sink": 314,
+      "xxe/缺 Sink": 314,
       "reentrancy/缺 Source": 22,
-      "access_control/缺 Source": 48,
-      "reentrancy/缺 Sink": 202,
-      "access_control/含未知安全包装": 53,
-      "access_control/缺 Sink": 110,
+      "access_control/缺 Source": 28,
+      "reentrancy/缺 Sink": 195,
+      "access_control/含未知安全包装": 51,
+      "access_control/缺 Sink": 77,
       "deserial/缺 Source": 2,
-      "reentrancy/含未知安全包装": 14,
+      "deserial/含未知安全包装": 4,
+      "reentrancy/含未知安全包装": 13,
       "cmdi/缺 Source": 2,
-      "pathtraver/缺 Sink": 1,
-      "deserial/含未知安全包装": 1
+      "pathtraver/缺 Sink": 1
     },
     "nssc": {
-      "sqli/缺 Sink": 203,
-      "authz/缺 Sink": 203,
-      "cmdi/缺 Sink": 203,
-      "deserial/缺 Sink": 200,
-      "ssrf/缺 Sink": 203,
-      "xxe/缺 Sink": 203,
-      "reentrancy/含未知安全包装": 27,
-      "access_control/含未知安全包装": 47,
+      "sqli/缺 Sink": 201,
+      "authz/缺 Sink": 201,
+      "cmdi/缺 Sink": 201,
+      "deserial/缺 Sink": 194,
+      "ssrf/缺 Sink": 201,
+      "xxe/缺 Sink": 201,
+      "reentrancy/含未知安全包装": 26,
+      "access_control/含未知安全包装": 51,
       "reentrancy/缺 Sink": 87,
-      "reentrancy/缺 Source": 5,
-      "access_control/缺 Source": 8,
-      "access_control/缺 Sink": 17,
-      "deserial/缺 Source": 3
+      "reentrancy/缺 Source": 4,
+      "access_control/缺 Source": 6,
+      "access_control/缺 Sink": 14,
+      "deserial/含未知安全包装": 2,
+      "deserial/缺 Source": 5
     }
   },
   "samples": {
@@ -237,6 +239,13 @@
       "CommonController.java:CommonController.uploadFile",
       "CommonController.java:CommonController.uploadFiles"
     ],
+    "RuoYi/authz/含未知安全包装": [
+      "SysJobController.java:SysJobController.queryCronExpression",
+      "SysDictTypeController.java:SysDictTypeController.selectDictTree",
+      "SysLoginController.java:SysLoginController.login",
+      "SysMenuController.java:SysMenuController.selectMenuTree",
+      "SysNoticeController.java:SysNoticeController.view"
+    ],
     "RuoYi/pathtraver/缺 Sink": [
       "GenController.java:GenController.importTableSave",
       "GenController.java:GenController.editSave",
@@ -253,7 +262,8 @@
     ],
     "RuoYi/pathtraver/含未知安全包装": [
       "GenController.java:GenController.genCode",
-      "CommonController.java:CommonController.fileDownload"
+      "CommonController.java:CommonController.fileDownload",
+      "SysProfileController.java:SysProfileController.updateAvatar"
     ],
     "RuoYi/pathtraver/缺 Source": [
       "CommonController.java:CommonController.resourceDownload"
@@ -280,9 +290,6 @@
       "SysIndexController.java:SysIndexController.menuStyle",
       "TestController.java:TestController.update",
       "TestController.java:TestController.delete"
-    ],
-    "RuoYi/authz/含未知安全包装": [
-      "SysLoginController.java:SysLoginController.login"
     ],
     "RuoYi/access_control/跨文件链路未闭合": [
       "TestController.java:TestController.update"
@@ -659,26 +666,30 @@
       "parity_wallet_bug_1.sol:revoke",
       "parity_wallet_bug_1.sol:changeOwner"
     ],
-    "smartbugs/access_control/缺 Source": [
-      "parity_wallet_bug_1.sol:initWallet",
-      "parity_wallet_bug_1.sol:Wallet",
-      "parity_wallet_bug_2.sol:initDaylimit",
-      "parity_wallet_bug_2.sol:initWallet",
-      "BECToken.sol:transfer"
+    "smartbugs/deserial/含未知安全包装": [
+      "parity_wallet_bug_1.sol:execute",
+      "parity_wallet_bug_1.sol:confirm"
     ],
     "smartbugs/deserial/缺 Source": [
       "parity_wallet_bug_1.sol:create",
       "parity_wallet_bug_2.sol:create",
       "spank_chain_payment.sol:recoverSigner",
-      "spank_chain_payment.sol:_isContained",
-      "0x663e4229142a27f00bafb5d087e1e730648314c3.sol:_memcpy"
+      "spank_chain_payment.sol:isSignedBy",
+      "spank_chain_payment.sol:initVCstate"
+    ],
+    "smartbugs/access_control/缺 Source": [
+      "parity_wallet_bug_1.sol:Wallet",
+      "parity_wallet_bug_2.sol:initDaylimit",
+      "BECToken.sol:transfer",
+      "0x23a91059fdc9579a9fbd0edc5f2ea0bfdb70deb4.sol:PrivateBank",
+      "0x8c7777c45481dba411450c228cb692ac3d550344.sol:ETH_VAULT"
     ],
     "smartbugs/reentrancy/缺 Source": [
       "BECToken.sol:transfer",
       "send_loop.sol:refundAll",
       "reentrancy_bonus.sol:withdrawReward",
-      "spank_chain_payment.sol:consensusCloseChannel",
-      "governmental_survey.sol:resetInvestment"
+      "reentrancy_bonus.sol:getFirstWithdrawalBonus",
+      "spank_chain_payment.sol:consensusCloseChannel"
     ],
     "smartbugs/xss/缺 Sink": [
       "0x663e4229142a27f00bafb5d087e1e730648314c3.sol:_isValidMatingPair",
@@ -736,9 +747,9 @@
     "DeFiVulnLabs/access_control/缺 Source": [
       "ApproveScam.sol:testApproveScam",
       "Delegatecall.sol:testDelegatecall",
-      "ecrecover.sol:testecRecover",
       "ecrecover.sol:transfer",
-      "empty-loop.sol:testVulnSignatureValidation"
+      "empty-loop.sol:testVulnSignatureValidation",
+      "ERC777-reentrancy.sol:claim"
     ],
     "DeFiVulnLabs/reentrancy/缺 Sink": [
       "ApproveScam.sol:transfer",
@@ -748,22 +759,28 @@
       "ApproveScam.sol:burn"
     ],
     "DeFiVulnLabs/access_control/含未知安全包装": [
-      "ApproveScam.sol:transfer",
       "ApproveScam.sol:transferFrom",
       "ApproveScam.sol:mint",
       "ApproveScam.sol:burn",
+      "Bypasscontract.sol:protected",
       "Bypasscontract.sol:protected"
     ],
     "DeFiVulnLabs/access_control/缺 Sink": [
       "Array-deletion.sol:setUp",
-      "Array-deletion.sol:testArrayDeletion",
-      "Array-deletion.sol:testFixedArrayDeletion",
       "Array-deletion.sol:deleteElement",
-      "Array-deletion.sol:deleteElement"
+      "Backdoor-assembly.sol:testBackdoorCall",
+      "Bypasscontract.sol:testBypassContractCheck",
+      "DataLocation.sol:testDataLocation"
     ],
     "DeFiVulnLabs/deserial/缺 Source": [
       "Backdoor-assembly.sol:referee",
       "SignatureReplayNBA.sol:verify"
+    ],
+    "DeFiVulnLabs/deserial/含未知安全包装": [
+      "Backdoor-assembly.sol:pickWinner",
+      "SignatureReplayNBA.sol:mint_approved",
+      "TransientStorageMisuse.t.sol:mint",
+      "TransientStorageMisuse.t.sol:SwapCallback"
     ],
     "DeFiVulnLabs/reentrancy/含未知安全包装": [
       "DOS.sol:claimThrone",
@@ -778,9 +795,6 @@
     ],
     "DeFiVulnLabs/pathtraver/缺 Sink": [
       "Slippage-deadline.sol:testswapTokensWithMaxDeadline"
-    ],
-    "DeFiVulnLabs/deserial/含未知安全包装": [
-      "TransientStorageMisuse.t.sol:SwapCallback"
     ],
     "nssc/sqli/缺 Sink": [
       "auction.sol:bid",
@@ -827,16 +841,16 @@
     "nssc/reentrancy/含未知安全包装": [
       "auction.sol:bid",
       "list_dos.sol:withdraw",
-      "Reentrancy.sol:if",
       "ReentrancyExploit.sol:deposit",
-      "incorrect_constructor.sol:withdraw"
+      "incorrect_constructor.sol:withdraw",
+      "Rubixi.sol:collectAllFees"
     ],
     "nssc/access_control/含未知安全包装": [
       "auction.sol:bid",
       "auction.sol:bid",
       "coin.sol:transfer",
-      "coin.sol:approveAndCall",
-      "coin.sol:buy"
+      "coin.sol:transferFrom",
+      "coin.sol:approveAndCall"
     ],
     "nssc/reentrancy/缺 Sink": [
       "auction.sol:bid",
@@ -849,26 +863,31 @@
       "list_dos.sol:refundDos",
       "list_dos.sol:refundSafe",
       "ReentrancyExploit.sol:launch_attack",
-      "ReentrancyExploit.sol:if",
       "SpankChain_Payment.sol:consensusCloseChannel"
     ],
     "nssc/access_control/缺 Source": [
       "list_dos.sol:refundDos",
       "list_dos.sol:refundSafe",
-      "WalletLibrary.sol:initWallet",
       "WalletLibrary.sol:Wallet",
-      "DAO.sol:transferWithoutReward"
+      "SpankChain_Payment.sol:consensusCloseChannel",
+      "SpankChain_Payment.sol:byzantineCloseChannel"
     ],
     "nssc/access_control/缺 Sink": [
       "coin.sol:TokenERC20",
-      "coin.sol:MyAdvancedToken",
       "Alice.sol:set",
       "Alice.sol:set_fixed",
-      "integer_overflow_1.sol:add"
+      "integer_overflow_1.sol:add",
+      "integer_overflow_1.sol:safe_add"
+    ],
+    "nssc/deserial/含未知安全包装": [
+      "WalletLibrary.sol:execute",
+      "WalletLibrary.sol:confirm"
     ],
     "nssc/deserial/缺 Source": [
       "WalletLibrary.sol:create",
       "SpankChain_Payment.sol:recoverSigner",
+      "SpankChain_Payment.sol:isSignedBy",
+      "SpankChain_Payment.sol:initVCstate",
       "SpankChain_Payment.sol:_isContained"
     ]
   }

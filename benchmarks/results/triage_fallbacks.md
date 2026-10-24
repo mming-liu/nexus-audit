@@ -2,29 +2,29 @@
 
 | 靶场/类目/桶 | 样本数 |
 |---|---|
-| xxe/缺 Sink | 1935 |
-| ssrf/缺 Sink | 1934 |
-| cmdi/缺 Sink | 1933 |
-| deserial/缺 Sink | 1882 |
-| sqli/缺 Sink | 1804 |
-| authz/缺 Sink | 1666 |
-| reentrancy/缺 Sink | 1276 |
-| access_control/缺 Sink | 769 |
-| access_control/含未知安全包装 | 330 |
+| ssrf/缺 Sink | 1917 |
+| xxe/缺 Sink | 1917 |
+| cmdi/缺 Sink | 1915 |
+| deserial/缺 Sink | 1852 |
+| sqli/缺 Sink | 1786 |
+| authz/缺 Sink | 1648 |
+| reentrancy/缺 Sink | 1232 |
+| access_control/缺 Sink | 692 |
+| access_control/含未知安全包装 | 333 |
 | xss/缺 Sink | 271 |
-| reentrancy/含未知安全包装 | 162 |
-| access_control/缺 Source | 114 |
-| reentrancy/缺 Source | 55 |
+| reentrancy/含未知安全包装 | 194 |
+| access_control/缺 Source | 76 |
+| reentrancy/缺 Source | 50 |
 | xss/缺 Source | 48 |
-| deserial/含未知安全包装 | 33 |
-| pathtraver/含未知安全包装 | 28 |
+| deserial/含未知安全包装 | 40 |
+| pathtraver/含未知安全包装 | 30 |
 | pathtraver/缺 Sink | 27 |
+| deserial/缺 Source | 19 |
 | xss/含未知安全包装 | 18 |
-| deserial/缺 Source | 14 |
+| authz/含未知安全包装 | 9 |
 | pathtraver/缺 Source | 9 |
 | authz/缺 Source | 8 |
 | sqli/含未知安全包装 | 5 |
-| authz/含未知安全包装 | 4 |
 | authz/跨文件链路未闭合 | 3 |
 | xxe/缺 Source | 2 |
 | deserial/跨文件链路未闭合 | 2 |
@@ -45,16 +45,16 @@
 - `RuoYi/access_control/含未知安全包装`：SysJobController.java:SysJobController.detail；SysJobController.java:SysJobController.edit；SysJobLogController.java:SysJobLogController.jobLog；SysJobLogController.java:SysJobLogController.detail；SysOperlogController.java:SysOperlogController.detail
 - `RuoYi/authz/缺 Source`：SysJobController.java:SysJobController.checkCronExpressionIsValid；SysDictTypeController.java:SysDictTypeController.treeData；SysIndexController.java:SysIndexController.lockscreen；SysIndexController.java:SysIndexController.switchSkin；SysIndexController.java:SysIndexController.main
 - `RuoYi/authz/缺 Sink`：SysJobController.java:SysJobController.cron；GenController.java:GenController.createTable；CommonController.java:CommonController.fileDownload；CommonController.java:CommonController.uploadFile；CommonController.java:CommonController.uploadFiles
+- `RuoYi/authz/含未知安全包装`：SysJobController.java:SysJobController.queryCronExpression；SysDictTypeController.java:SysDictTypeController.selectDictTree；SysLoginController.java:SysLoginController.login；SysMenuController.java:SysMenuController.selectMenuTree；SysNoticeController.java:SysNoticeController.view
 - `RuoYi/pathtraver/缺 Sink`：GenController.java:GenController.importTableSave；GenController.java:GenController.editSave；GenController.java:GenController.preview；GenController.java:GenController.download；GenController.java:GenController.batchGenCode
 - `RuoYi/deserial/含未知安全包装`：GenController.java:GenController.download；CommonController.java:CommonController.fileDownload；CommonController.java:CommonController.uploadFile；CommonController.java:CommonController.uploadFiles；SysProfileController.java:SysProfileController.updateAvatar
-- `RuoYi/pathtraver/含未知安全包装`：GenController.java:GenController.genCode；CommonController.java:CommonController.fileDownload
+- `RuoYi/pathtraver/含未知安全包装`：GenController.java:GenController.genCode；CommonController.java:CommonController.fileDownload；SysProfileController.java:SysProfileController.updateAvatar
 - `RuoYi/pathtraver/缺 Source`：CommonController.java:CommonController.resourceDownload
 - `RuoYi/deserial/缺 Source`：CommonController.java:CommonController.resourceDownload；DemoFormController.java:DemoFormController.upload
 - `RuoYi/access_control/缺 Source`：CacheController.java:CacheController.cache；CacheController.java:CacheController.getCacheNames；CacheController.java:CacheController.getCacheKeys；CacheController.java:CacheController.getCacheValue；ServerController.java:ServerController.server
 - `RuoYi/xxe/缺 Source`：ServerController.java:ServerController.server；SysLoginController.java:SysLoginController.ajaxLogin
 - `RuoYi/xss/含未知安全包装`：SysCaptchaController.java:SysCaptchaController.getKaptchaImage
 - `RuoYi/authz/跨文件链路未闭合`：SysIndexController.java:SysIndexController.menuStyle；TestController.java:TestController.update；TestController.java:TestController.delete
-- `RuoYi/authz/含未知安全包装`：SysLoginController.java:SysLoginController.login
 - `RuoYi/access_control/跨文件链路未闭合`：TestController.java:TestController.update
 - `eladmin-mp/sqli/缺 Sink`：AliPayController.java:AliPayController.toPayAsPc；AliPayController.java:AliPayController.toPayAsWeb；AliPayController.java:AliPayController.notify；LocalStorageController.java:LocalStorageController.exportFile；LocalStorageController.java:LocalStorageController.uploadPicture
 - `eladmin-mp/xss/含未知安全包装`：AliPayController.java:AliPayController.toPayAsPc；AliPayController.java:AliPayController.toPayAsWeb；AliPayController.java:AliPayController.notify；DeployController.java:DeployController.uploadDeploy；GeneratorController.java:GeneratorController.generatorCode

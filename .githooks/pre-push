@@ -8,6 +8,10 @@
 # 但必须知道自己在豁免什么。
 
 set -e
+# 钩子必须与终端代码页解耦：Windows 下未设 UTF-8 时 Python 子进程的
+# argparse 帮助文本按 GBK 输出，smoke 的 subprocess 捕获会 UnicodeDecodeError。
+export PYTHONUTF8=1
+export PYTHONIOENCODING=utf-8
 cd "$(git rev-parse --show-toplevel)"
 
 PY=""
