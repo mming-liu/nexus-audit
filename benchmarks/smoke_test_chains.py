@@ -5114,6 +5114,54 @@ _sp98 = subprocess.run(
     capture_output=True, text=True)
 check("M98：cli scan 已接入 --html 参数", ("--html" in _sp98.stdout), True)
 
+# ---- [99] Module 58：野战模式 scan --auto（全类目普查 + Sink 门控漏斗） ----
+_d99 = Path(_tmod.mkdtemp(prefix="nexus_t99_"))
+try:
+    (_d99 / "dao.py").write_text(
+        "from flask import request\n"
+        "@app.route('/q', methods=['GET'])\n"
+        "def vul_sqli():\n"
+        "    import sqlite3\n"
+        "    uid = request.args.get('uid')\n"
+        "    c = sqlite3.connect('a.db')\n"
+        "    return c.execute('SELECT * FROM users WHERE id=' + uid).fetchall()\n",
+        encoding="utf-8")
+    (_d99 / "page.py").write_text(
+        "from flask import request, render_template_string\n"
+        "@app.route('/hi')\n"
+        "def vul_xss():\n"
+        "    name = request.args.get('name')\n"
+        "    return render_template_string(f'<h1>{name}</h1>')\n",
+        encoding="utf-8")
+    (_d99 / "math.py").write_text(
+        "def pure_calc(a, b):\n"
+        "    total = 0\n"
+        "    for i in range(a):\n"
+        "        total += i * b\n"
+        "    return total * 2\n",
+        encoding="utf-8")
+    _r99 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d99),
+         "--auto", "--offline", "--output", str(_d99 / "report_auto.md")],
+        capture_output=True, text=True)
+    _o99 = _r99.stdout
+    _rep99 = (_d99 / "report_auto.md").read_text(encoding="utf-8") \
+        if (_d99 / "report_auto.md").exists() else ""
+    check("M99：--auto 零指定类目跨类目检出（sqli + xss 双 P0）",
+          (_r99.returncode == 0
+           and "## P0 [Confirmed] 规则实锤" in _rep99
+           and "**[sqli]**" in _rep99
+           and "**[xss]**" in _rep99), True)
+    check("M99：安全函数 0 模型派发（Sink 漏斗过滤率 100%）",
+          ("模型候选 0" in _o99
+           and "Sink 漏斗过滤" in _o99
+           and "过滤率 100%" in _o99), True)
+    check("M99：毫秒级普查（均值 < 50 ms/单元）",
+          bool(re.search(r"均值 \d+(\.\d+)? ms/单元", _o99))
+          and not re.search(r"均值 [5-9]\d\.\d+ ms|均值 \d{3,}", _o99), True)
+finally:
+    shutil.rmtree(_d99, ignore_errors=True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

@@ -18,6 +18,7 @@ import json
 import os
 import re
 import subprocess
+import time
 import sys
 from pathlib import Path
 
@@ -111,6 +112,10 @@ def cmd_scan(args):
     # Java 赛道：按类目做两步法（Web 赛道的 IDOR/越权场景不适用于 Servlet 用例）
     if args.java:
         return cmd_scan_java(args, repo)
+
+    # M58 野战模式：全类目规则普查 + Sink 门控漏斗（无需人工指定类目）
+    if getattr(args, "auto", False):
+        return cmd_scan_auto(args, repo)
 
     print(f"[1/5] 切片：提取路由入口 ...")
     units = WebTreeSitterSlicer(repo).extract_entry_units(repo)
@@ -224,6 +229,125 @@ def cmd_scan(args):
                     "code_from": r.hypothesis.unit.start_line}
                    for r in results]
         _write_html(args, entries, repo)
+
+
+_SOLIDITY_AUTO_CATS = ["reentrancy", "access_control",
+                       "unchecked_low_level_calls", "arithmetic"]
+
+
+def cmd_scan_auto(args, repo: Path):
+    """M58 野战模式：全类目毫秒级规则普查 + Sink 门控漏斗。
+
+    两级漏斗：
+      第一级（全类目规则普查）——按 unit 语言自动遍历全部适用类目：
+        · rule_verdict == True  → P0（确定性实锤），不调模型；
+        · rule_verdict == False → 静默排除；
+      第二级（Sink 门控模型派发）——对 None 的 (unit, 类目) 对用
+        build_rule_diagnostic 检查是否"真有外部输入 + 敏感 Sink"：
+        无事实的（纯计算函数等）直接过滤，不派发模型；
+        有事实的才是模型复核候选（P1/P2，模型层在 M60 分桶）。
+    """
+    from core.agents.rule_detectors import (verdict as rule_verdict,
+                                            build_rule_diagnostic,
+                                            _looks_solidity,
+                                            _looks_python)
+    from core.agents.vuln_categories import CATEGORIES
+
+    print(f"[auto/1] 全语言切片 ...")
+    units = list(WebTreeSitterSlicer(repo).extract_entry_units(repo))
+    from core.slicer.web3_slither import SoliditySlicer
+    units += list(SoliditySlicer(repo).extract_entry_units(repo))
+    print(f"      共 {len(units)} 个入口")
+
+    web_cats = sorted(c for c in CATEGORIES if c not in _SOLIDITY_AUTO_CATS)
+    p0: list[tuple] = []            # [(unit, cat)] 规则实锤
+    model_candidates: list[tuple] = []   # None + 有 Sink/输入事实
+    n_filtered = 0                  # None 且无 Sink 事实 → 不派发
+    n_false = 0                     # 规则确定性排除
+    t0 = time.monotonic()
+
+    print(f"[auto/2] 全类目规则普查（毫秒级/单元）...")
+    for u in units:
+        if _looks_solidity(u.source_code):
+            cats = _SOLIDITY_AUTO_CATS
+        else:
+            cats = web_cats
+        for cat in cats:
+            v = rule_verdict(cat, u.source_code)
+            if v is True:
+                p0.append((u, cat))
+            elif v is False:
+                n_false += 1
+            else:
+                # Sink 门控：诊断非空 ⇔ 该单元真的存在外部输入行 + 敏感 Sink 行
+                if build_rule_diagnostic(cat, u.source_code):
+                    model_candidates.append((u, cat))
+                else:
+                    n_filtered += 1
+    elapsed_ms = (time.monotonic() - t0) * 1000
+    per_unit_ms = elapsed_ms / max(len(units), 1)
+    n_pairs = len(p0) + n_false + len(model_candidates) + n_filtered
+    filter_rate = n_filtered / max(n_filtered + len(model_candidates), 1)
+    print(f"      {n_pairs} 次（unit × 类目）判定，耗时 {elapsed_ms:.0f} ms"
+          f"（均值 {per_unit_ms:.2f} ms/单元）")
+    print(f"      P0 实锤 {len(p0)} ｜ 规则排除 {n_false} ｜ "
+          f"模型候选 {len(model_candidates)} ｜ Sink 漏斗过滤 {n_filtered}"
+          f"（过滤率 {filter_rate:.0%}）")
+
+    # --- 产出（P0 落报告；模型候选在 --offline 下标 P2 待复核）---
+    lines = [f"# 野战扫描报告（--auto 全类目普查）—— {repo}", "",
+             f"- 切片单元：{len(units)}",
+             f"- 判定对：{n_pairs}（unit × 类目），规则普查 {elapsed_ms:.0f} ms",
+             f"- P0 实锤：{len(p0)}；规则排除：{n_false}",
+             f"- Sink 漏斗：过滤 {n_filtered}，模型候选 {len(model_candidates)}"
+             f"（过滤率 {filter_rate:.0%}）", ""]
+    if p0:
+        lines.append("## P0 [Confirmed] 规则实锤")
+        lines.append("")
+        for u, cat in p0:
+            lines.append(f"- **[{cat}]** `{u.unit_name}` @ "
+                         f"`{u.file_path}:{u.start_line}`")
+        lines.append("")
+    if model_candidates:
+        lines.append("## P2 [Review-Needed] Sink 门控候选（模型复核队列）")
+        lines.append("")
+        for u, cat in model_candidates[:50]:
+            lines.append(f"- [{cat}] `{u.unit_name}` @ "
+                         f"`{u.file_path}:{u.start_line}`")
+        if len(model_candidates) > 50:
+            lines.append(f"- ...（共 {len(model_candidates)} 条）")
+        lines.append("")
+    out = Path(args.output or "report_auto.md")
+    out.write_text("\n".join(lines), encoding="utf-8")
+    print(f"\n完成：野战报告已写入 {out}")
+
+    if getattr(args, "sarif", None):
+        entries = [{"file": u.file_path, "line": u.start_line,
+                    "category": cat, "unit": u.unit_name,
+                    "level": "warning", "priority": "P0",
+                    "message": f"[{cat}] 规则层确定性实锤（P0）"}
+                   for u, cat in p0]
+        entries += [{"file": u.file_path, "line": u.start_line,
+                     "category": cat, "unit": u.unit_name,
+                     "level": "note", "priority": "P2",
+                     "message": f"[{cat}] Sink 门控候选（待模型复核）"}
+                    for u, cat in model_candidates]
+        write_sarif(args.sarif, entries, repo)
+        print(f"      SARIF 已写入 {args.sarif}（{len(entries)} 条 results）")
+    if getattr(args, "html", None):
+        html_entries = [{"file": u.file_path, "line": u.start_line,
+                         "category": cat, "unit": u.unit_name,
+                         "priority": "P0", "level": "warning",
+                         "message": f"{cat} 规则层确定性实锤（P0）",
+                         "code": u.source_code, "code_from": u.start_line}
+                        for u, cat in p0]
+        html_entries += [{"file": u.file_path, "line": u.start_line,
+                          "category": cat, "unit": u.unit_name,
+                          "priority": "P2", "level": "note",
+                          "message": f"{cat} Sink 门控候选（待模型复核）",
+                          "code": u.source_code, "code_from": u.start_line}
+                         for u, cat in model_candidates]
+        _write_html(args, html_entries, repo)
 
 
 def emit_github_annotations(flagged, failed, repo: Path) -> int:
