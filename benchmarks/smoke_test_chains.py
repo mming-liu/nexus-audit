@@ -4615,9 +4615,9 @@ finally:
 _sp91 = subprocess.run(
     [sys.executable, str(Path(__file__).resolve().parent.parent / "cli.py"),
      "doctor"], capture_output=True, text=True)
-check("M48：doctor 补丁器清单升到 12 类且全绿",
+check("M48：doctor 补丁器清单升到 14 类且全绿（M55 加 arithmetic/unchecked）",
       (_sp91.returncode == 0
-       and _sp91.stdout.count("_fix_") >= 12
+       and _sp91.stdout.count("_fix_") >= 14
        and "共 21 类" in _sp91.stdout),
       True)
 
@@ -4726,9 +4726,9 @@ _out93 = _sp93.stdout
 check("M93：doctor 退出码 0 且五段标题齐全",
       (_sp93.returncode == 0
        and all(f"[{i}/5]" in _out93 for i in range(1, 6))), True)
-check("M93：doctor 补丁器清单 12 类全绿",
-      (_out93.count("[OK] _fix_") == 12
-       and "补丁器就位（12 类）" in _out93), True)
+check("M93：doctor 补丁器清单 14 类全绿（M55 后）",
+      (_out93.count("[OK] _fix_") == 14
+       and "补丁器就位（14 类）" in _out93), True)
 check("M93：doctor 校验 PoC 合成器三语言自检",
       ("-- PoC 合成器 --" in _out93
        and _out93.count("自检通过") >= 3), True)
@@ -4992,6 +4992,46 @@ _sp95 = subprocess.run(
 check("M95：smartbugs 纳入 arithmetic 后 decided=205（M54 收敛后）",
       ("规则确定性判定        ：205/678" in _sp95.stdout
        and "判定正确              ：205/205" in _sp95.stdout), True)
+
+# ---- [96] Module 55：--fix 第 13/14 类补丁器 E2E（arithmetic / unchecked） ----
+from cli import (                      # noqa: E402
+    _fix_solidity_arith_guard as _fix96a,
+    _fix_solidity_unchecked_wrap as _fix96b,
+)
+_d96 = Path(_tmod.mkdtemp(prefix="nexus_t96_"))
+try:
+    (_d96 / "V.sol").write_text(
+        "pragma solidity ^0.4.24;\n"
+        "contract V {\n"
+        "    uint count;\n"
+        "    function dec(uint amt) public {\n"
+        "        count -= amt;\n"
+        "    }\n"
+        "    function fail() public {\n"
+        "        msg.sender.call.value(1)();\n"
+        "    }\n"
+        "}\n", encoding="utf-8")
+    _u96 = SoliditySlicer(_d96).extract_entry_units(_d96)
+    _orig96 = (_d96 / "V.sol").read_text(encoding="utf-8")
+    _rep96: list = []
+    _n96a = _fix96a(_d96, _u96, _rep96)
+    _n96b = _fix96b(_d96, _u96, _rep96)
+    check("M96：第 13 类 arithmetic 守卫注入自检通过（True → False）",
+          _n96a, 1)
+    check("M96：第 14 类 unchecked require 包裹自检通过（True → False）",
+          _n96b, 1)
+    check("M96：报告含 diff 块", any("```diff" in x for x in _rep96), True)
+    check("M96：文件字节级无损还原",
+          (_d96 / "V.sol").read_text(encoding="utf-8"), _orig96)
+finally:
+    shutil.rmtree(_d96, ignore_errors=True)
+_sp96 = subprocess.run(
+    [sys.executable, str(ROOT / "cli.py"), "doctor"],
+    capture_output=True, text=True)
+check("M96：doctor 补丁器升到 14 类全绿",
+      (_sp96.returncode == 0
+       and "补丁器就位（14 类）" in _sp96.stdout
+       and _sp96.stdout.count("[OK] _fix_") == 14), True)
 
 print()
 if FAILS:

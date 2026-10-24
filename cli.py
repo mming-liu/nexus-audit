@@ -1037,6 +1037,8 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_solidity_reentrancy(repo, sol, report)
         n += _fix_solidity_initiator(repo, sol, report)
         n += _fix_solidity_onlyowner(repo, sol, report)
+        n += _fix_solidity_arith_guard(repo, sol, report)
+        n += _fix_solidity_unchecked_wrap(repo, sol, report)
     if rest:
         n += _fix_mp_concat(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
@@ -1713,6 +1715,151 @@ def _fix_solidity_txorigin(repo: Path, targets: list, lines: list) -> int:
     return fixed
 
 
+# ---- Module 55：第 13 类（arithmetic 守卫注入）/ 第 14 类（unchecked 调用包裹） ----
+
+# 复合赋值语句：`balances[msg.sender] -= amt;` / `totalSupply += amount;`
+_SOL_COMPOUND_ASSIGN_RE = re.compile(
+    r"^(?P<indent>[ \t]*)(?P<lhs>[A-Za-z_]\w*(?:\s*\[[^\]]*\])*)"
+    r"\s*(?P<op>\+=|-=)\s*(?P<rhs>[^;]+);\s*$")
+# 独立语句行的裸底层调用：`target.send(amt);` / `target.call(...);`
+# 也覆盖老语法 `msg.sender.call.value(1)();`（0.4.x 常见形态）。
+# —— 左侧无赋值（有赋值说明返回值已被消费，不是本类目的面）
+_SOL_BARE_CALL_RE = re.compile(
+    r"^(?P<indent>[ \t]*)(?P<expr>[A-Za-z_][\w.]*\s*\.\s*"
+    r"(?:send|call)\b[^;]*)\s*;\s*$")
+
+
+def _fix_solidity_arith_guard(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 13 类（Module 55）：算术溢出/下溢守卫注入。
+
+    对规则层判 True 的复合赋值语句，在语句前插入前置守卫：
+      `x -= y;` → `require(x >= y, "underflow");` + 原语句
+      `x += y;` → `require(x + y >= x, "overflow");` + 原语句
+    自检闭环：重切片 + 重跑 arithmetic 规则 → False。
+    只处理单行复合赋值；多行/嵌套形态交人工。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    from core.slicer.web3_slither import SoliditySlicer
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("arithmetic", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        file_lines = original.splitlines(keepends=True)
+        patched_lines = list(file_lines)
+        inserts: list[tuple[int, str]] = []      # (行号, 守卫行)
+        for i in range(max(0, u.start_line - 1),
+                       min(u.end_line, len(patched_lines))):
+            m = _SOL_COMPOUND_ASSIGN_RE.match(patched_lines[i].rstrip("\r\n"))
+            if not m:
+                continue
+            indent, lhs, op, rhs = (m.group("indent"), m.group("lhs"),
+                                    m.group("op"), m.group("rhs"))
+            if op == "-=":
+                guard = f'{indent}require({lhs} >= {rhs}, "underflow");'
+            else:
+                guard = f'{indent}require({lhs} + {rhs} >= {lhs}, "overflow");'
+            inserts.append((i, guard))
+        if not inserts:
+            continue
+        for i, guard in sorted(inserts, reverse=True):
+            patched_lines.insert(i, guard + "\n")
+        patched = "".join(patched_lines)
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            u2 = next((x for x in SoliditySlicer(repo).extract_entry_units(repo)
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = rule_verdict("arithmetic", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(),
+                                        patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [sol-arith-guard] {u.unit_name}（`{f.name}`）",
+                      "```diff", *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 arithmetic 规则 → False。",
+                      "> 前置上下界守卫在溢出发生前中止，是 0.4.x~0.7.x",
+                      "> 的标准写法（0.8+ 编译器已内置）。", ""]
+        else:
+            lines += [f"## [sol-arith-guard] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
+def _fix_solidity_unchecked_wrap(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 14 类（Module 55）：底层调用返回值检查包裹。
+
+    对规则层判 True 的裸底层调用语句（`target.send(amt);` / 
+    `target.call(...);`），包裹 `require(..., "call failed");`。
+    自检闭环：重切片 + 重跑 unchecked_low_level_calls 规则 → False。
+    有赋值的调用（返回值已被消费）不是本类目的面，不动。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    from core.slicer.web3_slither import SoliditySlicer
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("unchecked_low_level_calls", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        file_lines = original.splitlines(keepends=True)
+        patched_lines = list(file_lines)
+        changed = False
+        for i in range(max(0, u.start_line - 1),
+                       min(u.end_line, len(patched_lines))):
+            raw = patched_lines[i].rstrip("\r\n")
+            m = _SOL_BARE_CALL_RE.match(raw)
+            if not m or "=" in raw.split("(")[0]:
+                continue
+            indent, expr = m.group("indent"), m.group("expr")
+            patched_lines[i] = (f'{indent}require({expr}, "call failed");\n')
+            changed = True
+        if not changed:
+            continue
+        patched = "".join(patched_lines)
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            u2 = next((x for x in SoliditySlicer(repo).extract_entry_units(repo)
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = (rule_verdict("unchecked_low_level_calls", u2.source_code)
+                  if u2 else None)
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(),
+                                        patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [sol-unchecked-wrap] {u.unit_name}（`{f.name}`）",
+                      "```diff", *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 unchecked_low_level_calls",
+                      "> 规则 → False。失败即中止（SWC-104）：底层调用失败",
+                      "> 不再被静默忽略。", ""]
+        else:
+            lines += [f"## [sol-unchecked-wrap] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
 _MP_CONCAT_RE = re.compile(
     r'(\.apply|\.last)\s*\(\s*"([^"]*)"\s*\+\s*([A-Za-z_]\w*)'
     r'(?:\s*\+\s*"([^"]*)")?\s*\)')
@@ -2087,6 +2234,7 @@ DOCTOR_PATCHERS = [
     "_fix_python_deserial", "_fix_python_sqli", "_fix_python_shell",
     "_fix_python_yaml", "_fix_solidity_reentrancy", "_fix_solidity_initiator",
     "_fix_solidity_onlyowner", "_fix_solidity_txorigin", "_fix_mp_concat",
+    "_fix_solidity_arith_guard", "_fix_solidity_unchecked_wrap",
 ]
 
 
