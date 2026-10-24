@@ -1,0 +1,14 @@
+{
+  "bench": "vulpy_gen",
+  "units": 35,
+  "total_units": 35,
+  "decided": 137,
+  "rule_evaluations": 137,
+  "correct": 15,
+  "fp": 0,
+  "reverse_fn": 0,
+  "truth_n": 15,
+  "missed": [],
+  "unexpected": [],
+  "broken_false": []
+}

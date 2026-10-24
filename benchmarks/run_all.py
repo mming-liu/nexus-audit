@@ -158,6 +158,15 @@ JOBS = [
     ("DjanGoat (Django urls.py 路由表)",
      ["benchmarks/benchmark_djangoat.py", "--strict"],
      "reference_repos/DjanGoat", "target", True),
+    # 第 30 靶场（Module 95）：OpenZeppelin 标准安全基元库。这条门禁的问法
+    # 与别处相反：不是"漏洞找得准不准"，而是"**会不会把安全写法当成漏洞**"。
+    # M95 实测 8 条 True 全为框架级安全写法，逐条补判据后收到 0 条：
+    #   身份别名（Ownable2Step） / 递给看不见实现体的 helper（Address.verifyCallResult）
+    #   / return 直接上交（RelayedCall） / 看过即消费（ERC-7579 try-execute）
+    #   / 转发壳（ERC721.safeTransferFrom）。576 生产入口 / 0 True。
+    ("OpenZeppelin (标准安全基元库)",
+     ["benchmarks/benchmark_openzeppelin.py", "--strict"],
+     "reference_repos/openzeppelin-contracts/contracts", "target", True),
     # 第 28 靶场（Module 80）：FastAPI async + Depends + SQLAlchemy 2.0。
     # 9 异步入口 / users 全 authz False / 0 True。
     ("FastAPI (Python 异步真实模板)",

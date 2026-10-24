@@ -7304,6 +7304,8 @@ def solidity_access_verdict(source: str) -> bool | None:
     # 当保护会把 initWallet 判反，方向错误比退回恶劣得多。
     protected = bool(_SOLIDITY_MSGSENDER_CHECK_RE.search(func_src)
                      or _SOLIDITY_MSGSENDER_MEMBER_RE.search(func_src))
+    if not protected and _sol_identity_alias_check(func_src):
+        protected = True
     if not protected and re.search(
             r"require\s*\(\s*\w*[Ii]sApprovedOrOwner\b"
             r"|require\s*\(\s*_?msgSender\s*\(\s*\)", func_src):
@@ -7427,6 +7429,20 @@ def solidity_access_verdict(source: str) -> bool | None:
             #      92=False）走的是**本地** `_transfer(from, ...)` 形态，
             #      不受本早退影响（实测仍 74=True / 92=False）。
             if _sol_delegated_from_transfer(func_src):
+                return None
+            # M95：**本合约内的转发壳** —— 非限定调用（`transferFrom(from, ...)`）
+            # 把动作交给同合约的另一个函数，而那个函数体里**看得见调用者身份的
+            # 流转**（msg.sender / _msgSender()）⇒ 权限判定在下一层。
+            #
+            # OpenZeppelin ERC721 就是这条链：
+            #   safeTransferFrom(from,to,id) → transferFrom(...)
+            #   → _update(to, id, _msgSender()) → _checkAuthorized → revert
+            # 本单元自己没有把 from 直转出去，转出发生在有校验的那一层 ——
+            # 判 True 是"把缺证据当成有漏洞"。按铁律退回 None。
+            #
+            # 判反锚点：DeFiVulnLabs 的 VulnerableERC721 里 `_transfer` **不用**
+            # msg.sender，本条不成立 ⇒ 真阳仍判 True（实测 74=True / 92=False）。
+            if _sol_unqualified_callee_uses_sender(func_src, _inh_func_block):
                 return None
             return True
 
@@ -8133,6 +8149,159 @@ def _sol_value_consumed_by_helper(func_src: str, evidence: str,
             continue
         if _sol_helper_aborts_on_false(body, params[idx], evidence):
             return True
+        # M95：**看过即消费** —— helper 里把该 bool 用于分支/事件/返回，
+        # 即使处理策略不是 revert（ERC-7579 的 try-execute 刻意不 revert），
+        # 也不构成"返回值被静默丢弃"。
+        if _sol_var_inspected_by_helper(body, params[idx]):
+            return True
+    return False
+
+
+def _sol_body_callees(text: str) -> set[str]:
+    """函数体里调用的函数名集合（不含内建关键字）。
+
+    与 `_sol_modifier_callees` 同口径，只是起点换成**函数体**：用于"权限
+    判定在下一层"这类转发壳（ERC721.safeTransferFrom → transferFrom）。
+    """
+    out: set[str] = set()
+    for c in re.findall(r"\b([A-Za-z_]\w*)\s*\(", text):
+        if c in {"require", "assert", "revert", "if", "for", "while",
+                 "return", "_", "emit"}:
+            continue
+        out.add(c)
+    return out
+
+
+def _sol_unqualified_callee_uses_sender(func_src: str, evidence: str) -> bool:
+    """本合约内的非限定调用里，是否有被调函数体**用了调用者身份**（M95）。
+
+    判据（挂机制不挂名字）：
+      ① 调用是**非限定**的（`f(` 而不是 `x.f(`）—— 限定调用是别的合约，
+         归 `_sol_delegated_from_transfer` 管；
+      ② 被调函数的实现体**在证据段里**（看不见就不算证据）；
+      ③ 那个实现体里出现 msg.sender / _msgSender() / msgSender()。
+
+    满足三条只说明"身份在下一层参与了"，**不能**证明下一层的判定充分 ——
+    所以调用方给 None（缺证据），不给 False。
+    """
+    for m in re.finditer(r"(?<![\w.])([A-Za-z_]\w*)\s*\(", func_src):
+        fname = m.group(1)
+        if fname in {"require", "assert", "if", "for", "while", "return"}:
+            continue
+        body = _sol_find_func_body(evidence, fname)
+        if not body:
+            continue
+        if re.search(r"\bmsg\s*\.\s*sender\b|_msgSender\s*\(\s*\)|"
+                     r"\bmsgSender\s*\(\s*\)", body):
+            return True
+    return False
+
+
+_SOL_IDENTITY_ALIAS_SRC_RE = re.compile(
+    r"\b(?:address|Account)\s+(?:payable\s+)?([A-Za-z_]\w*)\s*=\s*"
+    r"(?:payable\s*\(\s*)?(?:msg\s*\.\s*sender|_msgSender\s*\(\s*\)|"
+    r"msgSender\s*\(\s*\))")
+# 条件表达式入口（if / require / assert / while）。
+# 抽成顶层正则而不是函数内内联字面量 —— 内联会与顶层同名 pattern 冲突，
+# 被正则卫生审计记成"内联遮蔽"（M95 实测）。
+_SOL_COND_EXPR_RE = re.compile(r"\b(?:if|require|assert|while)\s*\(")
+
+
+def _sol_identity_alias_check(func_src: str) -> bool:
+    """身份**别名**形态的身份校验（M95）。
+
+    OpenZeppelin Ownable2Step 的标准写法：
+        address sender = _msgSender();
+        if (pendingOwner() != sender) { revert OwnableUnauthorizedAccount(sender); }
+        _transferOwnership(sender);
+
+    身份先落到局部变量上、再参与比较。`_SOLIDITY_MSGSENDER_CHECK_RE` 只认
+    `msg.sender` 字面，看不见这条路径 —— 于是把 OZ 的核心安全合约判成
+    "缺访问控制"，方向完全反了。
+
+    判据挂机制：局部变量被赋值为**身份来源**，随后该变量出现在 require/
+    assert/if 的比较式里，且条件不成立时中止。
+    """
+    for m in _SOL_IDENTITY_ALIAS_SRC_RE.finditer(func_src):
+        var = m.group(1)
+        pat = re.compile(rf"\b{re.escape(var)}\b")
+        for im in _SOL_COND_EXPR_RE.finditer(func_src):
+            close = _sol_match_paren(func_src, im.end() - 1)
+            if close < 0:
+                continue
+            cond = func_src[im.end():close]
+            if not pat.search(cond) or not re.search(r"==|!=", cond):
+                continue
+            tail = func_src[close + 1:]
+            stripped = tail.lstrip()
+            if stripped[:1] == "{":
+                blk = _sol_block_body(stripped, 0)
+                if blk and _sol_block_aborts(blk):
+                    return True
+            elif re.match(r"\s*(?:revert|throw|return)\b", tail):
+                return True
+        for rm in re.finditer(r"\b(?:require|assert)\s*\(", func_src):
+            close = _sol_match_paren(func_src, rm.end() - 1)
+            if close < 0:
+                continue
+            cond = func_src[rm.end():close]
+            if pat.search(cond) and re.search(r"==|!=", cond):
+                return True
+    return False
+
+
+def _sol_var_inspected_by_helper(body: str, pname: str) -> bool:
+    """helper 体里是否**看过**这个 bool（哪怕处理方式不是 revert）。
+
+    SWC-104 的危害是"失败被**静默忽略**"。把一个 bool 送进 if/require/assert
+    条件、emit 实参或 return，说明调用方处理了它；只是处理策略不一定是退回。
+
+    实测样本：OpenZeppelin `draft-ERC7579Utils._validateExecutionMode`：
+        if (execType == EXECTYPE_DEFAULT) { Address.verifyCallResult(success, ...); }
+        else if (execType == EXECTYPE_TRY) { if (!success) emit ERC7579TryExecuteFail(...); }
+    TRY 模式的语义就是"失败不 revert、发事件交给上层"（ERC-7579 规范），
+    判成"返回值被丢弃"属误报。
+    """
+    b = _sol_strip_noise(body)
+    pat = re.compile(rf"\b{re.escape(pname)}\b")
+    for m in _SOL_COND_EXPR_RE.finditer(b):
+        close = _sol_match_paren(b, m.end() - 1)
+        if close < 0:
+            continue
+        if pat.search(b[m.end():close]):
+            return True
+    if re.search(rf"\bemit\s+\w+\s*\([^;]*\b{re.escape(pname)}\b", b):
+        return True
+    if re.search(rf"\breturn\b[^;]*\b{re.escape(pname)}\b", b):
+        return True
+    return False
+
+
+def _sol_handed_to_opaque(func_src: str, evidence: str, var: str) -> bool:
+    """返回值变量是否被**交给实现体看不见的函数**（M95：证据不足 ⇒ 不下结论）。
+
+    与 `_sol_value_consumed_by_helper` 的分工要分清：
+      · `_sol_value_consumed_by_helper` 要求"**看见** helper 体，且它失败会
+        中止（revert/require/assert）"—— 能证明 checked；
+      · 本函数只要求"真的把变量递出去了，但看不到对方怎么处理"—— 只能证明
+        **没有丢弃**（丢弃才是 SWC-104 的危害），不能证明 checked。
+
+    OpenZeppelin 的 `Address.verifyCallResult(success, returndata)` 是前者，
+    但 `Address.sol` 的实现体常常不在切片证据里（跨文件辅助段有预算上限），
+    于是两种证明都拿不到。此时唯一诚实的结论是 None。
+    """
+    for m in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", func_src):
+        fname = m.group(1)
+        if fname in ("if", "for", "while", "require", "assert", "return"):
+            continue
+        args = _sol_parse_args(func_src, m.end() - 1)
+        if not args:
+            continue
+        if not any(re.fullmatch(r"\s*" + re.escape(var) + r"\s*", a)
+                   for a in args):
+            continue
+        if not _sol_find_func_body(evidence, fname):
+            return True
     return False
 
 
@@ -8184,6 +8353,7 @@ def solidity_unchecked_call_verdict(source: str) -> bool | None:
         return None
     named = _sol_named_returns(func_src)
     any_unchecked = False
+    any_opaque = False
     for m in sites:
         stmt_start = max(func_src.rfind(";", 0, m.start()),
                          func_src.rfind("{", 0, m.start()),
@@ -8193,6 +8363,15 @@ def solidity_unchecked_call_verdict(source: str) -> bool | None:
         # 行注释用**等长空白**替换（保偏移量）：语句头可能是注释
         # （TownCrier request 实测），直接 strip 会把 if 头顶进噪声。
         stmt = re.sub(r"//[^\n]*", lambda mm: " " * len(mm.group(0)), stmt)
+        # M95：`return addr.call{...}(...)` —— 返回值被**直接上交**给调用方。
+        #
+        # OpenZeppelin `RelayedCall.relayCall` 就是这一形态：
+        #   `return getRelayer(salt).call{value: value}(abi.encodePacked(...));`
+        # 结果进的是函数的**命名返回值**，本单元没有任何"丢弃"行为 ——
+        # SWC-104 的危害是"失败被静默忽略"，上交显然不是忽略。
+        # 此前它落到"没有赋值目标 ⇒ 裸调用"的分支里被判 True。
+        if re.match(r"\s*return\b", stmt):
+            continue                                    # 上交 → checked
         # 内联消费的语义：调用点位于控制关键字（if/require/...）的**条件
         # 括号平衡区间内**才算被检查。`if (cond) owner.send(...)` 的调用
         # 是 if 的语句体，不在条件里 —— 未检查（finalize 实测判反教训）。
@@ -8255,12 +8434,26 @@ def solidity_unchecked_call_verdict(source: str) -> bool | None:
                 continue                                # 上交调用方 → checked
             if var in named and "bool" in named.get(var, ""):
                 continue                                # 命名返回值 → 上交
+            # M95：把 success **交给实现体看不见的函数** ⇒ 证据不足。
+            #
+            # OpenZeppelin 的 `Address.verifyCallResult(success, returndata)`
+            # 是标准消费点（失败即 revert），但 Address.sol 的**实现体**常常
+            # 不在切片证据里（跨文件辅助段有预算）。此前这种情况既拿不到
+            # "跨函数消费"的证据，又落进"丢弃"的结论 —— 把 3 个 OZ 核心
+            # 合约（Governor.relay / TimelockController._execute /
+            # GovernorTimelockAccess._executeOperations）判成漏洞。
+            # 正确语义：**看不见证据就不下结论**（None），不硬判 True。
+            if _sol_handed_to_opaque(func_src, func_ev, var):
+                any_opaque = True
+                break
             any_unchecked = True
             break
         else:
             if not cands:
                 any_unchecked = True                    # 裸调用 → unchecked
-    return True if any_unchecked else False
+    if any_unchecked:
+        return True
+    return None if any_opaque else False
 
 
 

@@ -1421,6 +1421,298 @@ def cmd_hunt(args) -> int:
     return 0 if t["failed_repos"] == 0 else 1
 
 
+_BENCH_TEMPLATE = '''"""@@NAME@@（@@TARGET@@）—— 由 `cli.py benchmark-gen` 自动固化的回归门禁。
+
+## 这个文件是怎么来的
+
+M93 之前每个野战仓的回归门禁都是**手抄**一份：抄默认路径、抄单元数地板、
+抄几条代表性锚点。抄三份就开始漂（M73/M79/M80 各漂过一次），而且新仓
+上手要重抄一遍。
+
+`cli.py benchmark-gen <repo>` 把那一遍自动化了：对目标仓库跑一次全量
+切片 + 全类目规则普查，把**当时的事实**固化成本脚本：
+
+  · 切片单元 @@UNIT_COUNT@@ 个、确定性判定 @@PAIRS@@ 对；
+  · 确定性 True @@N_TRUE@@ 条（逐条登记为 TRUE_ANCHORS，漏一条就红）；
+  · 确定性命中 False 的锚点 @@N_FALSE@@ 条（代表"已确认安全"的写法，
+    翻成 True 就说明新判据把安全代码判成了漏洞）。
+
+生成时间：@@GEN_TS@@
+生成命令：`python cli.py benchmark-gen @@TARGET@@ --out <本文件>`
+
+## 门禁（--strict）
+
+  1. 切片 ≥ MIN_UNITS（切片器退化能当场发现）
+  2. 确定性判定 ≥ MIN_DECIDED（判据静默退回能当场发现）
+  3. TRUE_ANCHORS 全部仍判 True（零漏报 / 零判反）
+  4. 除 TRUE_ANCHORS 外零 True（零误报）
+  5. FALSE_ANCHORS 全部仍判 False（安全锚点不得翻面）
+
+> 这个门禁锁的是"**相对生成时刻不漂**"，不是"这套真值绝对正确"。
+> 生成时那批 True 是否真是漏洞，仍需人工逐条核查（M63 起的野战纪律）。
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+
+def _find_root(start: Path) -> Path:
+    """定位仓库根（含 core/agents/rule_detectors.py 的那一层）。
+
+    不能写死 `parent.parent`：生成到 `benchmarks/` 之外时（冒烟与临时仓
+    都是这样）`sys.path` 会指错，脚本连 import 都进不去。先向上走
+    （正常情形：生成在 benchmarks/ 下），走不到就用生成时记录的根路径。
+    """
+    for p in [start, *start.parents]:
+        if (p / "core" / "agents" / "rule_detectors.py").is_file():
+            return p
+    hint = Path(ROOT_HINT)
+    if (hint / "core" / "agents" / "rule_detectors.py").is_file():
+        return hint
+    return start.parent
+
+
+# 生成时所在仓库根（只有向上走找不到时才用到）
+ROOT_HINT = r"@@ROOT_HINT@@"
+ROOT = _find_root(Path(__file__).resolve().parent)
+sys.path.insert(0, str(ROOT))
+
+from benchmarks.slice_cache import cached_units              # noqa: E402
+from core.agents.rule_detectors import (                     # noqa: E402
+    _looks_solidity, verdict as rule_verdict)
+from core.agents.vuln_categories import CATEGORIES           # noqa: E402
+
+DEFAULT_TARGET = ROOT / "@@TARGET@@"
+BENCH_KEY = "@@BENCH_KEY@@"
+MIN_UNITS = @@MIN_UNITS@@
+MIN_DECIDED = @@MIN_DECIDED@@
+
+SOL_CATS = ["reentrancy", "access_control",
+            "unchecked_low_level_calls", "arithmetic"]
+WEB_CATS = sorted(c for c in CATEGORIES if c not in SOL_CATS)
+
+# (仓库内相对路径, 单元名, 类目)
+TRUE_ANCHORS = {
+@@TRUE_ANCHORS@@}
+
+FALSE_ANCHORS = [
+@@FALSE_ANCHORS@@]
+
+
+def _rel(repo: Path, file_path: str) -> str:
+    try:
+        return Path(file_path).resolve().relative_to(repo.resolve()).as_posix()
+    except (ValueError, OSError):
+        return Path(file_path).as_posix()
+
+
+def build_units(repo: Path) -> list:
+    """三语言切片（与 `cli.py scan --auto` 同口径）。"""
+    from core.slicer.java_servlet import JavaSlicer
+    from core.slicer.web3_slither import SoliditySlicer
+    from core.slicer.web_treesitter import WebTreeSitterSlicer
+    units = list(WebTreeSitterSlicer(repo).extract_entry_units(repo))
+    units += list(SoliditySlicer(repo).extract_entry_units(repo))
+    units += list(JavaSlicer(repo).extract_entry_units())
+    return units
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="@@NAME@@ 自动生成回归门禁")
+    ap.add_argument("target", nargs="?", default=str(DEFAULT_TARGET))
+    ap.add_argument("--strict", action="store_true",
+                    help="单元/判定地板 + 真值全命中 + 零误报 + 安全锚点不翻面")
+    ap.add_argument("--no-cache", action="store_true", help="禁用切片温缓存")
+    ap.add_argument("--offline", action="store_true", help="规则层（默认）")
+    ap.add_argument("--output",
+                    default=str(ROOT / "benchmarks" / "results" /
+                                "@@BENCH_KEY@@.json"))
+    args = ap.parse_args()
+
+    repo = Path(args.target)
+    if not repo.exists():
+        print(f"! 找不到 {repo}")
+        return 2
+
+    units = cached_units(repo, BENCH_KEY, lambda: build_units(repo),
+                         no_cache=args.no_cache)
+    print(f"靶场：{repo}")
+    print(f"      切片单元 {len(units)} 个（地板 {MIN_UNITS}）")
+
+    verdicts: dict[tuple[str, str, str], bool] = {}
+    n_decided = 0
+    for u in units:
+        rel = _rel(repo, u.file_path)
+        cats = SOL_CATS if _looks_solidity(u.source_code) else WEB_CATS
+        for c in cats:
+            v = rule_verdict(c, u.source_code)
+            if v is None:
+                continue
+            n_decided += 1
+            verdicts[(rel, u.unit_name, c)] = v
+
+    true_hits = {k for k, v in verdicts.items() if v is True}
+    missed = sorted(TRUE_ANCHORS - (true_hits & TRUE_ANCHORS))
+    unexpected = sorted(true_hits - TRUE_ANCHORS)
+    broken_false = sorted(k for k in FALSE_ANCHORS
+                          if verdicts.get(k) is not False)
+
+    print("=" * 72)
+    print("@@NAME@@ 结果（benchmark-gen 固化门禁）")
+    print("=" * 72)
+    print(f"  切片单元              ：{len(units)}")
+    print(f"  确定性判定            ：{n_decided}（地板 {MIN_DECIDED}）")
+    print(f"  真值锚点命中          ：{len(TRUE_ANCHORS) - len(missed)}"
+          f"/{len(TRUE_ANCHORS)}")
+    print(f"  误报（真值外 True）   ：{len(unexpected)}")
+    print(f"  安全锚点翻面          ：{len(broken_false)}/{len(FALSE_ANCHORS)}")
+    for k in missed[:10]:
+        print(f"    [漏报] {k[0]}:{k[1]} [{k[2]}]")
+    for k in unexpected[:10]:
+        print(f"    [误报] {k[0]}:{k[1]} [{k[2]}]")
+    for k in broken_false[:10]:
+        print(f"    [翻面] {k[0]}:{k[1]} [{k[2]}]")
+
+    bad = []
+    if len(units) < MIN_UNITS:
+        bad.append(f"切片 {len(units)} < {MIN_UNITS}")
+    if n_decided < MIN_DECIDED:
+        bad.append(f"判定 {n_decided} < {MIN_DECIDED}")
+    if missed:
+        bad.append(f"漏报 {len(missed)} 条")
+    if unexpected:
+        bad.append(f"误报 {len(unexpected)} 条")
+    if broken_false:
+        bad.append(f"安全锚点翻面 {len(broken_false)} 条")
+    ok = not bad
+    print(f"\\n{'STRICT PASS ✔（真值全命中 / 零误报 / 锚点未翻面）' if ok else 'STRICT FAIL ✘ ' + '；'.join(bad)}")
+
+    out = Path(args.output)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps({
+        "bench": BENCH_KEY, "units": len(units), "total_units": len(units),
+        "decided": n_decided, "rule_evaluations": n_decided,
+        "correct": len(TRUE_ANCHORS) - len(missed),
+        "fp": len(unexpected), "reverse_fn": len(missed) + len(broken_false),
+        "truth_n": len(TRUE_ANCHORS),
+        "missed": [list(k) for k in missed],
+        "unexpected": [list(k) for k in unexpected],
+        "broken_false": [list(k) for k in broken_false],
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"结果写入 {out}")
+    return 0 if (ok or not args.strict) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+'''
+
+
+def _bench_gen_units(repo: Path) -> list:
+    """与 `cli.py scan --auto` 同口径的三语言切片。"""
+    from core.slicer.web_treesitter import WebTreeSitterSlicer
+    units = list(WebTreeSitterSlicer(repo).extract_entry_units(repo))
+    from core.slicer.web3_slither import SoliditySlicer
+    units += list(SoliditySlicer(repo).extract_entry_units(repo))
+    from core.slicer.java_servlet import JavaSlicer
+    units += list(JavaSlicer(repo).extract_entry_units())
+    return units
+
+
+def cmd_benchmark_gen(args) -> int:
+    """M93：把一个野战仓库一键转成回归门禁脚本。
+
+    自动化的是**抄写**，不是判断：生成器只把"此刻的事实"（切片单元数、
+    确定性判定数、当时判 True 的锚点、几条有代表性的 False 锚点）固化下来，
+    真值是否成立仍要人工核查。所以脚本的 docstring 里明写
+    "锁的是相对生成时刻不漂，不是这套真值绝对正确"。
+    """
+    from core.agents.rule_detectors import (verdict as rule_verdict,
+                                            _looks_solidity)
+    from core.agents.vuln_categories import CATEGORIES
+    from benchmarks.slice_cache import cached_units
+
+    repo = Path(args.repo_path)
+    if not repo.exists():
+        print(f"! 仓库不存在：{repo}")
+        return 2
+    name = _hunt_repo_name(repo)
+    bench_key = args.bench_key or re.sub(r"[^a-z0-9_]+", "_", name.lower()).strip("_")
+    out = Path(args.out or f"benchmarks/benchmark_{bench_key}.py")
+
+    units = cached_units(repo, f"{bench_key}_gen",
+                         lambda: _bench_gen_units(repo),
+                         no_cache=getattr(args, "no_cache", False))
+    sol_cats = list(_SOLIDITY_AUTO_CATS)
+    web_cats = sorted(c for c in CATEGORIES if c not in sol_cats)
+
+    def rel(fp: str) -> str:
+        try:
+            return Path(fp).resolve().relative_to(repo.resolve()).as_posix()
+        except (ValueError, OSError):
+            return Path(fp).as_posix()
+
+    verdicts: dict[tuple[str, str, str], bool] = {}
+    n_decided = 0
+    for u in units:
+        r = rel(u.file_path)
+        cats = sol_cats if _looks_solidity(u.source_code) else web_cats
+        for c in cats:
+            v = rule_verdict(c, u.source_code)
+            if v is None:
+                continue
+            n_decided += 1
+            verdicts[(r, u.unit_name, c)] = v
+
+    true_keys = sorted(k for k, v in verdicts.items() if v is True)
+    # False 锚点取样：每个类目最多 3 条，总量上限 24 条 —— 全量写进去会让
+    # 生成脚本变成第二个靶场，失去"锚点"的意义。
+    by_cat: dict[str, list] = {}
+    for k, v in sorted(verdicts.items()):
+        if v is False:
+            by_cat.setdefault(k[2], []).append(k)
+    false_keys: list = []
+    for c in sorted(by_cat):
+        false_keys += by_cat[c][:3]
+    false_keys = false_keys[:24]
+
+    gen_ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    root_dir = Path(__file__).resolve().parent
+    try:
+        target_rel = repo.resolve().relative_to(root_dir.resolve()).as_posix()
+    except ValueError:
+        target_rel = str(repo).replace("\\", "/")
+    script = (_BENCH_TEMPLATE
+              .replace("@@NAME@@", name)
+              .replace("@@TARGET@@", target_rel)
+              .replace("@@BENCH_KEY@@", bench_key)
+              .replace("@@ROOT_HINT@@", str(root_dir).replace("\\", "/"))
+              .replace("@@GEN_TS@@", gen_ts)
+              .replace("@@UNIT_COUNT@@", str(len(units)))
+              .replace("@@PAIRS@@", str(n_decided))
+              .replace("@@N_TRUE@@", str(len(true_keys)))
+              .replace("@@N_FALSE@@", str(len(false_keys)))
+              .replace("@@MIN_UNITS@@", str(max(1, int(len(units) * 0.8))))
+              .replace("@@MIN_DECIDED@@", str(max(1, int(n_decided * 0.8))))
+              .replace("@@TRUE_ANCHORS@@",
+                       "".join(f"    ({k[0]!r}, {k[1]!r}, {k[2]!r}),\n"
+                               for k in true_keys))
+              .replace("@@FALSE_ANCHORS@@",
+                       "".join(f"    ({k[0]!r}, {k[1]!r}, {k[2]!r}),\n"
+                               for k in false_keys)))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(script, encoding="utf-8")
+    print(f"[benchmark-gen] {name} → {out}")
+    print(f"  切片 {len(units)} 单元 / 判定 {n_decided} 对 / "
+          f"True 锚点 {len(true_keys)} / False 锚点 {len(false_keys)}")
+    print(f"  单元地板 {max(1, int(len(units) * 0.8))} / "
+          f"判定地板 {max(1, int(n_decided * 0.8))}")
+    return 0
+
+
 def _reslice_for_fix(repo: Path, unit_name: str):
     """补丁写入后重新切片并取回同一入口（剥 `#N` 后缀比对）。
 
@@ -3786,6 +4078,14 @@ def main():
                         help="对每仓 P0 跑确定性补丁自检（--fix）")
     p_hunt.add_argument("--jobs", type=int, default=1,
                         help="并发仓数（≥2 启用并发，默认顺序）")
+    p_gen = sub.add_parser(
+        "benchmark-gen", help="M93：把野战仓库一键转成回归门禁脚本")
+    p_gen.add_argument("repo_path")
+    p_gen.add_argument("--out", default=None, metavar="OUT.py",
+                       help="生成的脚本路径（默认 benchmarks/benchmark_<name>.py）")
+    p_gen.add_argument("--bench-key", default=None,
+                       help="urn：结果 json 与切片缓存键（默认由目录名派生）")
+    p_gen.add_argument("--no-cache", action="store_true", help="禁用切片温缓存")
     args = parser.parse_args()
     if args.command == "scan":
         cmd_scan(args)
@@ -3793,6 +4093,8 @@ def main():
         sys.exit(cmd_doctor(args))
     elif args.command == "hunt":
         sys.exit(cmd_hunt(args))
+    elif args.command == "benchmark-gen":
+        sys.exit(cmd_benchmark_gen(args))
     else:
         cmd_pr_scan(args)
 

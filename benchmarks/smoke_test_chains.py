@@ -4877,8 +4877,9 @@ _out94b = _sp94sub.run([sys.executable,
 check("M94：M52 探针可跑且 access_control 退回桶显著下压（< 630）",
       ("access_control 退回" in _out94b.stdout), True)
 _m94 = re.search(r"access_control 退回\s+(\d+)", _out94b.stdout)
-check("M94：M52 后 access_control 退回桶 531 条（M52 前 643，M54 后 531）",
-      (bool(_m94) and int(_m94.group(1)) == 531), True)
+check("M94：M52 后 access_control 退回桶 530 条"
+      "（M52 前 643 / M54 后 531 / M95 转 530）",
+      (bool(_m94) and int(_m94.group(1)) == 530), True)
 
 
 # ---- [95] Module 53：Solidity arithmetic 类目（SWC-101 算术溢出） ----
@@ -6716,6 +6717,236 @@ check("M128：doctor 内置 SARIF 合规自检（自产合规 + 坏文档被拦�
       (_r128d.returncode,
        "自产 SARIF 合规" in (_r128d.stdout or ""),
        "坏 SARIF 逐条拦住" in (_r128d.stdout or "")), (0, True, True))
+
+# ---- [129] Module 93：`cli.py benchmark-gen` 野战仓一键转回归门禁 ----
+# 自动化的是**抄写**而不是判断：生成器把"此刻的事实"（单元数 / 判定数 /
+# 当时判 True 的锚点 / 几条代表性 False 锚点）固化成独立脚本，真值是否
+# 成立仍要人工核查。所以脚本必须自带温缓存与 --strict 地板，且能直接跑通。
+print("\n[129] cli.py benchmark-gen 门禁生成器（M93）")
+
+_g129 = Path(_tmod.mkdtemp(prefix="nexus_t129_"))
+try:
+    _repo129 = _g129 / "mini-repo"
+    (_repo129 / "web").mkdir(parents=True)
+    # Python 真阳（pickle 反序列化）+ 一条确定安全（参数化 execute）
+    (_repo129 / "web" / "urls.py").write_text(
+        "from django.conf.urls import url\nfrom . import views\n"
+        "urlpatterns = [url(r'^a/$', views.a, name='a'),\n"
+        "               url(r'^b/$', views.b, name='b')]\n",
+        encoding="utf-8")
+    (_repo129 / "web" / "views.py").write_text(
+        "import pickle, base64\n"
+        "def a(request):\n"
+        "    return pickle.loads(base64.b64decode(request.POST['d']))\n"
+        "\n"
+        "def b(request):\n"
+        "    cur.execute('select * from t where id = ?', (request.GET['id'],))\n"
+        "    return 'ok'\n", encoding="utf-8")
+    # Java 真阳（命令注入）
+    (_repo129 / "Svc.java").write_text(
+        "@RestController\npublic class Svc {\n"
+        "  @GetMapping(\"/r\")\n"
+        "  public String r(@RequestParam String c) throws Exception {\n"
+        "    Runtime.getRuntime().exec(c);\n"
+        "    return \"ok\";\n  }\n}\n", encoding="utf-8")
+    _out129 = _g129 / "gen_bench.py"
+    _r129 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "benchmark-gen",
+         str(_repo129), "--out", str(_out129),
+         "--bench-key", "smoke_gen_m93", "--no-cache"],
+        capture_output=True, text=True, encoding="utf-8")
+    check("M129：benchmark-gen 退出码 0", _r129.returncode, 0)
+    _t129 = _out129.read_text(encoding="utf-8") if _out129.exists() else ""
+    check("M129：生成的脚本自带 slice_cache / --strict / 锚点表",
+          ("from benchmarks.slice_cache import cached_units" in _t129
+           and '"--strict"' in _t129
+           and "TRUE_ANCHORS = {" in _t129
+           and "FALSE_ANCHORS = [" in _t129), True)
+    check("M129：生成的脚本可编译（语法自洽）",
+          (compile(_t129, "gen_bench.py", "exec") is not None
+           if _t129 else False), True)
+    # 直接执行生成的脚本：--strict 必须 exit 0
+    _r129b = subprocess.run(
+        [sys.executable, str(_out129), "--strict", "--no-cache",
+         "--output", str(_g129 / "gen.json")],
+        capture_output=True, text=True, encoding="utf-8")
+    _ok129b = (_g129 / "gen.json").exists()
+    _j129 = (json.loads((_g129 / "gen.json").read_text(encoding="utf-8"))
+             if _ok129b else {})
+    check("M129：生成脚本 --strict 直接跑通（exit 0）",
+          (_r129b.returncode, _ok129b), (0, True))
+    check("M129：生成脚本固化的锚点自洽（漏报 0 / 误报 0）",
+          (_j129.get("fp"), _j129.get("missed"), _j129.get("broken_false")),
+          (0, [], []))
+    check("M129：生成脚本登记了真值与地板（真值 ≥1、单元 ≥3）",
+          (_j129.get("truth_n", 0) >= 1, _j129.get("units", 0) >= 3),
+          (True, True))
+    # 负例：把锚点改坏后必须红（门禁不是摆设）
+    _t129bad = _t129.replace("TRUE_ANCHORS = {", "TRUE_ANCHORS = {\n"
+                             "    ('no/such.py', 'nope', 'sqli'),", 1)
+    (_g129 / "gen_bad.py").write_text(_t129bad, encoding="utf-8")
+    _r129c = subprocess.run(
+        [sys.executable, str(_g129 / "gen_bad.py"), "--strict", "--no-cache",
+         "--output", str(_g129 / "bad.json")],
+        capture_output=True, text=True, encoding="utf-8")
+    check("M129：锚点被改坏时门禁转红（exit 1）", _r129c.returncode, 1)
+finally:
+    shutil.rmtree(_g129, ignore_errors=True)
+
+# ---- [130] Module 94：M87–M93 阶段门禁自检 ----
+# 前半程收了七件事：unchecked 分区 / 自定义错误 / Django 路由通道 / 第 24 类 ssti /
+# Python redir + 第 18 类补丁器 / cli.py hunt / SARIF 校验器 / benchmark-gen。
+# 这一条把它们**逐项挂回既有基础设施**——新增模块必须进缓存指纹、进 doctor、
+# 进 CLI 帮助、进 run_all 作业表；漏挂就等于"写了但没人会用"。
+print("\n[130] M87–M93 阶段门禁自检（M94）")
+
+import subprocess as _sp130                                       # noqa: E402
+
+from benchmarks.slice_cache import (                              # noqa: E402
+    _FINGERPRINT_DIRS as _FP130, slicer_fingerprint as _sfp130,
+)
+_fp1_130, _fp2_130 = _sfp130(), _sfp130()
+check("M130：切片指纹两次调用一致（64 hex）",
+      (len(_fp1_130), _fp1_130 == _fp2_130, _fp1_130.isalnum()),
+      (64, True, True))
+check("M130：新增模块落在指纹目录内（M88 slicer / M92 context）",
+      ("core/slicer" in _FP130 and "core/context" in _FP130
+       and (ROOT / "core" / "context" / "sarif_validator.py").is_file()
+       and (ROOT / "core" / "slicer" / "web_treesitter.py").is_file()), True)
+
+from core.agents.vuln_categories import CATEGORIES as _C130        # noqa: E402
+import cli as _cli130                                             # noqa: E402
+from benchmarks.run_all import JOBS as _JOBS130                   # noqa: E402
+check("M130：规则 24 类 / 补丁器 18 类（doctor 单一事实源）",
+      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (24, 18))
+check("M130：run_all 作业表 30 项且含 comet / DjanGoat / 覆盖地板",
+      (len(_JOBS130),
+       any("comet" in str(j[0]) for j in _JOBS130),
+       any("DjanGoat" in str(j[0]) for j in _JOBS130),
+       any("覆盖地板" in str(j[0]) for j in _JOBS130)),
+      (30, True, True, True))
+
+import core.agents.rule_detectors as _rd130                       # noqa: E402
+_NEW130 = ("ssti_verdict", "_sol_unchecked_zones", "_py_redir_verdict",
+           "_py_ssti_verdict", "_ssti_template_sources", "_ssti_java_params",
+           "_SSTI_VELOCITY_RE", "_ARITH_GUARD_MIRROR_RE")
+check("M130：M87–M93 新增判据入口全部就位且可调用/可检索",
+      all(hasattr(_rd130, n) for n in _NEW130)
+      and callable(_rd130.ssti_verdict), True)
+check("M130：ssti 走 verdict 路由（空源码 → None，不抛异常）",
+      _rd130.verdict("ssti", ""), None)
+
+_h130 = _sp130.run([sys.executable, str(ROOT / "cli.py"), "--help"],
+                   capture_output=True, text=True, encoding="utf-8")
+check("M130：cli.py --help 列出 hunt 与 benchmark-gen",
+      ("hunt" in (_h130.stdout or "")
+       and "benchmark-gen" in (_h130.stdout or "")), True)
+for _cmd130 in ("hunt", "benchmark-gen"):
+    _r130 = _sp130.run([sys.executable, str(ROOT / "cli.py"), _cmd130,
+                        "--help"], capture_output=True, text=True,
+                       encoding="utf-8")
+    check(f"M130：`cli.py {_cmd130} --help` 可用（exit 0）",
+          _r130.returncode, 0)
+
+_r130d = _sp130.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
+                    capture_output=True, text=True, encoding="utf-8")
+_out130 = _r130d.stdout or ""
+check("M130：doctor exit 0 且 24 类 / 18 类 / 六段齐全",
+      (_r130d.returncode, "共 24 类" in _out130, "（18 类）" in _out130,
+       "[6/6]" in _out130), (0, True, True, True))
+check("M130：doctor 覆盖 M87–M93 的四项新自检",
+      ("SARIF 2.1.0 合规校验" in _out130
+       and "PoC 合成器" in _out130
+       and "正则卫生" in _out130
+       and "覆盖地板" in _out130), True)
+
+# ---- [131] Module 95：OpenZeppelin 标准安全库零误报极限压测 ----
+# 这条门禁的问法与其他靶场相反：它问"会不会把**安全的写法**当成漏洞"。
+# 初测 2558 入口里 8 条 True，全部是框架级安全写法；逐条定位后补了五类判据。
+print("\n[131] OpenZeppelin 零误报压测（M95）")
+
+from core.agents.rule_detectors import (            # noqa: E402
+    _sol_identity_alias_check as _alias131,
+    _sol_unqualified_callee_uses_sender as _shell131,
+    _sol_var_inspected_by_helper as _insp131,
+    solidity_access_verdict as _ac131,
+    solidity_unchecked_call_verdict as _uc131,
+)
+
+# ① 身份别名：`address sender = _msgSender();` + `if (pendingOwner() != sender) revert`
+check("M131：身份别名形态被认作保护（Ownable2Step 形态）",
+      _alias131("function f() public {\n"
+                "  address sender = _msgSender();\n"
+                "  if (pendingOwner() != sender) {\n"
+                "    revert OwnableUnauthorizedAccount(sender);\n"
+                "  }\n"
+                "  _transferOwnership(sender);\n"
+                "}\n"), True)
+check("M131：别名比较但**不中止**不算保护（只是记日志）",
+      _alias131("function f() public {\n"
+                "  address sender = msg.sender;\n"
+                "  if (pendingOwner() != sender) { log('x'); }\n"
+                "}\n"), False)
+check("M131：access_control 认别名守卫 ⇒ 判 False",
+      _ac131("// contract: C\ncontract C {\n"
+             "  address owner;\n"
+             "  function f() public {\n"
+             "    address sender = _msgSender();\n"
+             "    if (pendingOwner() != sender) {\n"
+             "      revert OwnableUnauthorizedAccount(sender);\n"
+             "    }\n"
+             "    selfdestruct(payable(msg.sender));\n"
+             "  }\n}\n"), False)
+
+# ② 递给**看不见实现体**的 helper ⇒ 证据不足 ⇒ None（不硬判 True）
+_UNCHK131 = ("// contract: C\ncontract C {\n"
+             "  function g(address target, bytes memory data) public payable {\n"
+             "    (bool success, bytes memory returndata) = target.call{value: 1}(data);\n"
+             "    Address.verifyCallResult(success, returndata);\n"
+             "  }\n}\n")
+check("M131：success 交给看不见实现体的 helper ⇒ None（不是 True）",
+      _uc131(_UNCHK131), None)
+check("M131：`return addr.call{...}(...)` 直接上交 ⇒ 不算丢弃",
+      _uc131("// contract: C\ncontract C {\n"
+             "  function h(address t, bytes memory d) internal returns (bool ok, bytes memory r) {\n"
+             "    return t.call{value: 0}(d);\n"
+             "  }\n}\n"), False)
+check("M131：helper 里**看过** bool（TRY 模式发事件）⇒ 不算丢弃",
+      _insp131("if (execType == TRY) { if (!success) emit TryFail(i, r); }",
+               "success"), True)
+check("M131：helper 里完全不提该 bool ⇒ 仍是丢弃",
+      _insp131("return returndata;", "success"), False)
+
+# ③ 转发壳：非限定调用且被调体里身份在流转 ⇒ None
+_SHELL131 = ("function transferFrom(address from, address to, uint256 id) public {\n"
+             "  _update(to, id, _msgSender());\n"
+             "  emit Transfer(from, to, id);\n"
+             "}\n")
+check("M131：非限定被调体里用了 _msgSender() ⇒ 转发壳成立",
+      _shell131("function safeTransferFrom(address from, address to,"
+                " uint256 id) public {\n"
+                "  transferFrom(from, to, id);\n"
+                "}\n", _SHELL131), True)
+
+# ④ E2E：576 生产基元入口 / 0 True / 五锚点达标
+_oz131 = ROOT / "reference_repos" / "openzeppelin-contracts" / "contracts"
+if _oz131.exists():
+    _r131 = subprocess.run(
+        [sys.executable, str(ROOT / "benchmarks" / "benchmark_openzeppelin.py"),
+         "--strict"], capture_output=True, text=True, encoding="utf-8")
+    _j131 = json.loads((ROOT / "benchmarks" / "results" / "openzeppelin.json")
+                       .read_text(encoding="utf-8"))
+    check("M131：OpenZeppelin --strict 通过", _r131.returncode, 0)
+    check("M131：576 生产入口 / 0 条 True（标准库零误报）",
+          (_j131["total_units"] >= 500, _j131["fp"]),
+          (True, 0))
+    check("M131：五个安全锚点全部达标（2 条 False + 3 条 not-True）",
+          (all(a["ok"] for a in _j131["anchors"]),
+           len(_j131["anchors"])), (True, 5))
+    check("M131：全库 2558 入口也不许有 True（不止生产基元目录）",
+          (_j131["all_units"] >= 2000, _j131["fp"]), (True, 0))
+else:
+    print("  -- OpenZeppelin 不在 reference_repos，跳过 E2E（M95 安装步骤）")
 
 print()
 if FAILS:
