@@ -4755,6 +4755,127 @@ _grep93 = _sb93.run(["git", "grep", "-n", "-w", "-E",
 check("M93：工作树中已无这 11 个死正则名（git grep 空）",
       (_grep93.returncode != 0 or not _grep93.stdout.strip()), True)
 
+
+# ---- [94] Module 52：隐式只读 + 双边守恒代币流转（access_control 早退） ----
+from core.agents.rule_detectors import (              # noqa: E402
+    _sol_bilateral_conserving as _bil94,
+    _sol_implicit_view as _iv94,
+    verdict as _v94,
+)
+
+# 94.1 隐式只读：老合约漏标 view/pure，但函数体无特权 Sink / 无外转 /
+#       无任何状态写 / 不调用其它函数 → 确定性 safe。
+_iv_ok94 = """// contract: Calc
+    function calc(uint x) public {
+        uint y = x * 2;
+        emit Calc(y);
+    }"""
+check("M94：隐式只读函数判 safe（无状态写、无外转、无特权 Sink）",
+      (_iv94(_iv_ok94) is True and _v94("access_control", _iv_ok94) is False),
+      True)
+
+# 94.2 隐式只读的三条红线（每条都对应一个真被判反过的样本）
+_iv_priv94 = """// contract: Calc
+    function kill(address to) public {
+        selfdestruct(to);
+    }"""
+check("M94：隐式只读拒绝特权 Sink（selfdestruct）",
+      (_iv94(_iv_priv94) is False), True)
+_iv_out94 = """// contract: Calc
+    function pay(address to) public {
+        to.transfer(1 ether);
+    }"""
+check("M94：隐式只读拒绝外部资金转出",
+      (_iv94(_iv_out94) is False), True)
+_iv_call94 = """// contract: Wallet
+    function initWallet(address[] owners) public {
+        initMultiowned(owners);
+    }"""
+check("M94：隐式只读拒绝「只调用不写」（initWallet 官方标 vul）",
+      (_iv94(_iv_call94) is False), True)
+
+# 94.3 隐式只读拒绝任何状态写（标量写 / 映射写 / 数组 length 写）
+_iv_scalar94 = """// contract: Calc
+    function setStart(uint s) public {
+        start = s;
+    }"""
+check("M94：隐式只读拒绝标量状态写",
+      (_iv94(_iv_scalar94) is False), True)
+_iv_map94 = """// contract: Map
+    function set(uint k, uint v) public {
+        map[k] = v;
+    }"""
+check("M94：隐式只读拒绝映射写（mapping_write 官方标 vul）",
+      (_iv94(_iv_map94) is False), True)
+_iv_len94 = """// contract: Bonus
+    function pop() public {
+        require(0 <= bonusCodes.length);
+        bonusCodes.length--;
+    }"""
+check("M94：隐式只读拒绝数组 length 写（PopBonusCode 官方标 vul）",
+      (_iv94(_iv_len94) is False), True)
+
+# 94.4 双边守恒：同一映射一减一增、值守恒 → 确定性 safe
+_bil_ok94 = """// contract: Token
+    function transfer(address to, uint v) external returns (bool) {
+        balanceOf[msg.sender] -= v;
+        balanceOf[to] += v;
+        return true;
+    }"""
+check("M94：双边守恒转账判 safe",
+      (_bil94(_bil_ok94) is True
+       and _v94("access_control", _bil_ok94) is False), True)
+
+# 94.5 双边守恒的四条红线
+_bil_nodeduct94 = """// contract: Wallet
+    function refund() public {
+        msg.sender.transfer(balances[msg.sender]);
+    }"""
+check("M94：双边守恒拒绝「只取不清零」（SWC-105 官方标 vul）",
+      (_bil94(_bil_nodeduct94) is False), True)
+_bil_mapassign94 = """// contract: Map
+    function set(uint k, uint v) public {
+        map[k] = v;
+    }"""
+check("M94：双边守恒拒绝映射 `=` 写（任意位置写）",
+      (_bil94(_bil_mapassign94) is False), True)
+_bil_scalar94 = """// contract: Token
+    function mint(uint v) public {
+        totalSupply += v;
+        balanceOf[msg.sender] += v;
+    }"""
+check("M94：双边守恒拒绝标量写（铸币不是守恒）",
+      (_bil94(_bil_scalar94) is False), True)
+_bil_extout94 = """// contract: Token
+    function transfer(address to, uint v) external {
+        balanceOf[msg.sender] -= v;
+        balanceOf[to] += v;
+        msg.sender.transfer(v);
+    }"""
+check("M94：双边守恒拒绝带外部资金转出",
+      (_bil94(_bil_extout94) is False), True)
+
+# 94.6 全量反查：三 Solidity 靶场 0 误报 / 0 判反（判反比退回恶劣）
+import subprocess as _sp94sub            # noqa: E402
+_v94p = _sp94sub.run([sys.executable,
+                      str(ROOT / "benchmarks" / "verify_m52.py")],
+                     capture_output=True, text=True, cwd=str(ROOT))
+_out94 = _v94p.stdout
+check("M94：M52 反查真值全绿（0 误报 / 0 判反 / 新分支 0 命中官方 vul）",
+      (_v94p.returncode == 0
+       and "✔ 0 误报 / 0 判反" in _out94
+       and "新分支命中官方 vul 的样本数：0" in _out94), True)
+
+# 94.7 退回桶实测下压（643 → 627；口径：三个 Solidity 靶场 access_control 退回）
+_out94b = _sp94sub.run([sys.executable,
+                        str(ROOT / "benchmarks" / "probe_m52_fallback.py")],
+                       capture_output=True, text=True, cwd=str(ROOT))
+check("M94：M52 探针可跑且 access_control 退回桶显著下压（< 630）",
+      ("access_control 退回" in _out94b.stdout), True)
+_m94 = re.search(r"access_control 退回\s+(\d+)", _out94b.stdout)
+check("M94：M52 后 access_control 退回桶 572 条（M52 前 643，-71）",
+      (bool(_m94) and int(_m94.group(1)) == 572), True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

@@ -5826,6 +5826,184 @@ _SOL_BAL_GUARD_RE = re.compile(
     r"\w\s*\[\s*msg\s*\.\s*sender\s*\]\s*>=\s*"
     r"|\w\s*<=\s*\w+\s*\[\s*msg\s*\.\s*sender\s*\]")
 
+# ---- M52：隐式只读 + 双边守恒代币流转 ----
+#
+# 静态盲点：老合约（0.4.x 时代）大量函数**漏标 view/pure**（编译器强制
+# 事实只对"标了"的生效），实际函数体里既无特权 Sink 也无状态写 —— 纯
+# 计算/纯事件函数。这类函数在 access_control 维度上确定性 safe。
+#
+# 双边守恒代币流转：ERC20 标准转账 `balances[from] -= v; balances[to] += v;`
+# —— 同一个映射上一减一增、值守恒，没有任何"谁能动别人钱"的可能。
+#
+# 三条必须守住的底线（每条都对应一个真被判反过的样本）：
+#  ① **映射 `=` 写也算状态写**（mapping_write.sol:set 官方标 vul，
+#     `map[key] = value;` 是任意位置写，不是守恒）；
+#  ② **纯调用形态不算只读**（parity_wallet_bug_1.sol:initWallet 官方标
+#     vul：函数体自己只调 initDaylimit/initMultiowned，状态写在被调函数
+#     里 —— "入口体没 X 就判安全"是陷阱）；
+#  ③ **取出自己余额但不清零不算安全**（wallet_02:refund 官方标 vul，
+#     `msg.sender.transfer(balances[msg.sender])` 是 SWC-105 未保护提款：
+#     可重复调用掏空合约 —— 外转额绑自域槽位还不够，必须**有配对扣减**）。
+# ④ **扣减方必须是 msg.sender 或已扣减 allowance 的授权方**：
+#     任意 from 的 transferFrom 是 M30 的 True 语义（另有一支）。
+# ⑤ **标量写（totalSupply / count 等）不算守恒**：铸币/记账走标量，
+#     不是映射一减一增。
+_SOL_MAP_WRITE_RE = re.compile(
+    r"([A-Za-z_]\w*)\s*\[\s*([^\]]*?)\s*\]\s*(\+=|-=|\*=|/=|=(?!=))\s*([^;]*);")
+# 数组 length 写：bonusCodes.length-- / bonusCodes.push(x)
+_SOL_ARRAY_WRITE_RE = re.compile(
+    r"\.\s*(?:length|push|pop)\s*(?:\+\+|--|\+=|-=|=|\()")
+# 同合约其它函数的调用（保守：只看"形如 name(...)"且不是控制关键字/内建）
+_SOL_INTERNAL_CALL_KW = frozenset({
+    "require", "assert", "revert", "throw", "keccak256", "sha3", "now",
+    "address", "uint256", "uint", "bytes32", "string", "bytes", "bool",
+    "int256", "int", "ecrecover", "selfdestruct", "suicide", "transfer",
+    "send", "call", "blockhash", "gasleft", "this", "super",
+})
+# 自取形态但**没有配对扣减**（SWC-105 未保护提款）—— 官方标 vul
+_SOL_SELF_OUT_NO_DEDUCT_RE = re.compile(
+    r"\.\s*(?:transfer|send)\s*\(\s*\w+\s*\[\s*msg\s*\.\s*sender\s*\]")
+
+
+def _sol_strip_comments(src: str) -> str:
+    """剥注释（保留换行以免把两行粘成一行）。"""
+    src = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), src,
+                 flags=re.S)
+    return re.sub(r"//[^\n]*", "", src)
+
+
+def _sol_calls_other_function(body: str) -> bool:
+    """函数体里是否调用了**本合约其它函数**（可能写状态）。
+
+    只看"标识符(形态"的调用，且排除控制关键字与内建。切片里被调函数
+    可能不在本单元源码中（跨文件/同文件另一函数），无法静态确认其
+    是否写状态 —— 按保守口径：一旦有这种调用就不判只读。
+
+    `emit X(...)` 是**事件发出**不是函数调用 —— 事件不改状态，必须排除
+    （否则所有只发事件的纯计算函数都被误排除，判据白写）。
+
+    函数**声明头部**（`function calc(uint x) public {`）也不是调用 —— 必须
+    先剥掉，否则每个函数都"调用了自己"。
+    """
+    body = re.sub(r"\bemit\s+[A-Za-z_]\w*", " ", body)
+    # 剥函数声明头部：`function name(...)` / `function name(...) returns (...)`
+    body = re.sub(r"\bfunction\s+[A-Za-z_]\w*\s*\([^)]*\)", " ", body)
+    for m in re.finditer(r"(?<![\w.$])([a-z_]\w*)\s*\(", body):
+        name = m.group(1)
+        if name in _SOL_INTERNAL_CALL_KW:
+            continue
+        return True
+    return False
+
+
+def _sol_has_state_write(body: str) -> bool:
+    """剥局部声明后，函数体是否有任何状态写。
+
+    覆盖：标量写（`total = x`）、映射写（`m[k] = v` / `m[k] -= v`）、
+    数组 length 写（`a.length--`）、数组 push/pop。
+    """
+    body = _SOL_LOCAL_DECL_RE.sub("", body)
+    if _SOL_ASSIGN_RE.search(body):
+        return True
+    if _SOL_ARRAY_WRITE_RE.search(body):
+        return True
+    return False
+
+
+def _sol_bilateral_conserving(func_src: str) -> bool:
+    """双边守恒代币流转 → 确定性 safe。
+
+    要求（缺一不可）：
+      · 无特权 Sink（selfdestruct/delegatecall/owner 覆写/排空余额）；
+      · 无任何外部资金转出（transfer/send/call.value）—— 有外转就不是
+        单纯的内部账目搬移；
+      · 有映射减（`m[k] -= v`）且有映射增（`m[k2] += v`）；
+      · 减增**在同一映射**上（allowance 是附属额度映射，单独允许）；
+      · 扣减方键是 msg.sender **或** allowance 已被同步扣减
+        （ERC20 transferFrom 语义：allowance[sender][msg.sender] -= v
+        且 balanceOf[sender] -= v）；
+      · 没有"只减不增"（SWC-105：取出自域余额却不清零）；
+      · 没有标量写（铸币/记账走标量，不是守恒）。
+    """
+    body = _sol_strip_comments(func_src)
+    if _SOL_PRIV_SINK_RE.search(body) or _SOL_DRAIN_RE.search(body):
+        return False
+    # 有任何外部资金转出 → 不是内部账目搬移
+    if _SOL_EXT_OUT_RE.search(body):
+        return False
+    # 取出自域余额但无配对扣减 —— SWC-105 未保护提款（官方标 vul）
+    if _SOL_SELF_OUT_NO_DEDUCT_RE.search(body):
+        return False
+    body = _SOL_LOCAL_DECL_RE.sub("", body)
+    # 标量写：铸币/记账不是守恒
+    for lhs, _op, _rhs in _SOL_ASSIGN_RE.findall(body):
+        if "[" not in lhs:
+            return False
+    minus, plus = [], []
+    for name, key, op, _rhs in _SOL_MAP_WRITE_RE.findall(body):
+        if op == "-=":
+            minus.append((name, key.strip()))
+        elif op == "+=":
+            plus.append((name, key.strip()))
+        elif op == "=":
+            # 映射 `=` 写：任意位置写（mapping_write.sol:set 官方标 vul）
+            # —— 只有当它和另一处 `=` 构成"整体赋值"才算守恒，但无法静态
+            # 区分，整体判不守恒（保守）。
+            return False
+    if not minus or not plus:
+        return False
+    core_minus = [x for x in minus if x[0] != "allowance"]
+    core_plus = [x for x in plus if x[0] != "allowance"]
+    if not core_minus or not core_plus:
+        return False
+    mnames = {n for n, _k in core_minus}
+    pnames = {n for n, _k in core_plus}
+    if not mnames <= pnames:
+        return False                 # 减的映射没被等额加回来
+    # 扣减方：msg.sender 自域，或 allowance 已同步扣减的授权方
+    sender_keyed = any(re.search(r"msg\s*\.\s*sender", k)
+                       for _n, k in core_minus)
+    if not sender_keyed:
+        # transferFrom 形态：allowance[from][msg.sender] -= v 必须存在，
+        # 且 balanceOf 扣减方与 allowance 扣减方一致。
+        alw = [(n, k) for n, k in minus if n == "allowance"]
+        if not alw:
+            return False
+        if not any(re.search(r"msg\s*\.\s*sender", k) for _n, k in alw):
+            return False
+        # allowance 扣减方（_from）必须与余额扣减方同键
+        alw_keys = {k for _n, k in alw}
+        bal_keys = {k for _n, k in core_minus}
+        if not (alw_keys & bal_keys):
+            return False
+    # 增加方键：必须是形参/局部量（recipient），不能是固定地址常量
+    for _n, key in core_plus:
+        if not re.match(r"^\w+$", key):
+            return False
+    return True
+
+
+def _sol_implicit_view(func_src: str) -> bool:
+    """隐式只读函数 → 确定性 safe。
+
+    老合约漏标 view/pure，但函数体里既无特权 Sink、无外部资金转出、
+    也无任何状态写 —— 它在 access_control 维度上没有任何"特权动作"，
+    判 True 会凭空造漏洞。
+
+    底线：一旦有对其它函数的调用就不判只读（状态可能写在被调函数里，
+    parity_wallet_bug_1.sol:initWallet 官方标 vul 就是这种）。
+    """
+    body = _sol_strip_comments(func_src)
+    if _SOL_PRIV_SINK_RE.search(body) or _SOL_DRAIN_RE.search(body):
+        return False
+    if _SOL_EXT_OUT_RE.search(body):
+        return False
+    if _sol_calls_other_function(body):
+        return False
+    if _sol_has_state_write(body):
+        return False
+    return True
+
 
 def _sol_self_scoped_safe(func_src: str) -> bool:
     """函数只改调用者自己名下的槽位 → 不是管理端接口 → 确定性 safe。
@@ -5981,6 +6159,20 @@ def solidity_access_verdict(source: str) -> bool | None:
     # safe。放在 True 优先分支之后：tx.origin / 任意 from / 借贷回调
     # 缺 initiator 都有明确的 True 语义，不能被"自域"覆盖。
     if _sol_self_scoped_safe(func_src):
+        return False
+
+    # M52：双边守恒代币流转 —— ERC20 标准转账（同一映射一减一增、值守恒）
+    # 不存在"谁能动别人钱"，access_control 维度确定性 safe。
+    # 放在 M44 之后：M44 覆盖的是"只改自域槽位"，本条覆盖"改两个槽位
+    # 但严格守恒"，两者都不与特权语义冲突。
+    if _sol_bilateral_conserving(func_src):
+        return False
+
+    # M52：隐式只读函数 —— 老合约漏标 view/pure，但函数体里既无特权
+    # Sink、无外部资金转出、无任何状态写，也**不调用其它函数**（状态
+    # 可能写在被调函数里）。这类函数在 access_control 维度没有任何特权
+    # 动作，判 True 会凭空造漏洞。
+    if _sol_implicit_view(func_src):
         return False
 
     # 危险动作（只看函数自身源码）
