@@ -5075,6 +5075,45 @@ try:
 finally:
     shutil.rmtree(_d97, ignore_errors=True)
 
+# ---- [98] Module 57：零外部依赖单文件 HTML 交互式审计报告 ----
+from core.context.report_html import build_html_report as _bhtml   # noqa: E402
+_entries98 = [
+    {"file": "src/dao.py", "line": 3, "category": "sqli", "unit": "vul_pct",
+     "level": "warning", "priority": "P0",
+     "message": "外部可控字符串直接拼进 SQL（P0 规则实锤）",
+     "code": 'def vul_pct(uid):\n'
+             '    return c.execute("SELECT * FROM u WHERE id=" + uid)\n'
+             '<script>alert(1)</script>\n',
+     "code_from": 1,
+     "fix_diff": "--- a/src/dao.py\n+++ b/src/dao.py\n"
+                 "@@ -1,2 +1,2 @@\n"
+                 "-    return c.execute(\"SELECT * FROM u WHERE id=\" + uid)\n"
+                 "+    return c.execute(\"SELECT * FROM u WHERE id=?\", (uid,))\n",
+     "flow": [{"file": "src/api.py", "line": 10, "message": "HTTP 入参"},
+              {"file": "src/dao.py", "line": 3, "message": "Sink"}]},
+    {"file": "T.sol", "line": 4, "category": "reentrancy", "unit": "withdraw",
+     "level": "note", "priority": "P2", "message": "静态高危候选（待 forge 验证）"},
+]
+_html98 = _bhtml(_entries98, repo="demo-repo")
+check("M98：HTML 结构完整（DOCTYPE / 内联 CSS / details 卡片 / 统计栏）",
+      ("<style>" in _html98 and "<!DOCTYPE html>" in _html98
+       and '<details class="card">' in _html98
+       and 'class="stats"' in _html98), True)
+check("M98：Sink 行高亮标记存在（line=3 → sink-line）",
+      ('class="sink-line"' in _html98), True)
+check("M98：Diff 补丁块渲染", ('<pre class="diff">' in _html98
+                          and 'class="add"' in _html98), True)
+check("M98：污点路径摘要渲染", ('<ul class="flow">' in _html98
+                           and "src/api.py" in _html98), True)
+check("M98：恶意源码被严格转义（<script> → &lt;script&gt;）",
+      ("<script>alert" not in _html98
+       and "&lt;script&gt;alert(1)&lt;/script&gt;" in _html98), True)
+check("M98：P0/P2 徽章渲染", ('>P0<' in _html98 and '>P2<' in _html98), True)
+_sp98 = subprocess.run(
+    [sys.executable, str(ROOT / "cli.py"), "scan", "--help"],
+    capture_output=True, text=True)
+check("M98：cli scan 已接入 --html 参数", ("--html" in _sp98.stdout), True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

@@ -210,6 +210,21 @@ def cmd_scan(args):
         write_sarif(args.sarif, entries, repo)
         print(f"      SARIF 已写入 {args.sarif}（{len(entries)} 条 results）")
 
+    # --- M57：单文件交互式 HTML 报告 ---
+    if getattr(args, "html", None):
+        entries = [{"file": r.hypothesis.unit.file_path,
+                    "line": r.hypothesis.unit.start_line,
+                    "category": r.hypothesis.vuln_type,
+                    "unit": r.hypothesis.unit.unit_name,
+                    "level": "warning" if r.verified else "note",
+                    "priority": "P0" if r.verified else "P2",
+                    "message": (r.hypothesis.property_missing
+                                or f"{r.hypothesis.vuln_type} 高危候选"),
+                    "code": r.hypothesis.unit.source_code,
+                    "code_from": r.hypothesis.unit.start_line}
+                   for r in results]
+        _write_html(args, entries, repo)
+
 
 def emit_github_annotations(flagged, failed, repo: Path) -> int:
     """向 stdout 输出 GitHub Actions 行级 annotation，返回输出条数。
@@ -243,6 +258,18 @@ def emit_github_annotations(flagged, failed, repo: Path) -> int:
               f"{cat.upper()} 判定失败（限流/超时），需重跑，不是无漏洞")
         n += 1
     return n
+
+
+def _write_html(args, entries: list[dict], repo: Path) -> None:
+    """M57：把检出项写成单文件交互式 HTML 报告。
+
+    entries 与 SARIF 导出共用同一份 dict（单一事实源）；code / fix_diff
+    为可选字段 —— 有则渲染带行号 Sink 高亮的代码块与补丁 Diff 框。
+    """
+    from core.context.report_html import build_html_report
+    out = Path(args.html)
+    out.write_text(build_html_report(entries, str(repo)), encoding="utf-8")
+    print(f"      HTML 报告已写入 {out}（{len(entries)} 条）")
 
 
 def _sarif_rel(file_path: str, repo: Path) -> str:
@@ -513,7 +540,15 @@ def cmd_scan_java(args, repo: Path):
         n = write_sarif(args.sarif, entries, repo)
         print(f"      SARIF 已写入 {args.sarif}（{n} 条 results）")
 
-    # CI 集成：只在 GitHub Actions 里生效，本地跑是 no-op
+    # --- M57：单文件交互式 HTML 报告（Java 赛道）---
+    if getattr(args, "html", None):
+        html_entries = [{"file": u.file_path, "line": u.start_line,
+                         "category": c, "unit": u.unit_name,
+                         "priority": "P0", "level": "warning",
+                         "message": f"{c} 规则/模型命中（P0 规则实锤）",
+                         "code": u.source_code, "code_from": u.start_line}
+                        for u, c in flagged]
+        _write_html(args, html_entries, repo)
     if getattr(args, "github_comment", False):
         n = emit_github_annotations(flagged, failed, repo)
         summed = emit_step_summary(out)
@@ -745,7 +780,9 @@ def cmd_pr_scan(args):
         output=args.output or "report_pr.md", python=None, _units=subset,
         no_skeptic=getattr(args, "no_skeptic", False),
         github_comment=getattr(args, "github_comment", False),
-        sarif=getattr(args, "sarif", None))
+        sarif=getattr(args, "sarif", None),
+        html=getattr(args, "html", None),
+        auto=getattr(args, "auto", False))
     print("\n进入审计（仅上述受影响路由）...")
     cmd_scan_java(ns, repo)
 
@@ -2463,6 +2500,11 @@ def main():
                              "并落盘到 DIR")
     p_scan.add_argument("--sarif", default=None, metavar="OUT.sarif",
                         help="将命中结果导出为 SARIF v2.1.0（GitHub Code Scanning 格式）")
+    p_scan.add_argument("--html", default=None, metavar="OUT.html",
+                        help="M57：产出零外部依赖的单文件交互式 HTML 报告")
+    p_scan.add_argument("--auto", action="store_true",
+                        help="M58 野战模式：全类目规则普查 + Sink 门控漏斗，"
+                             "无需人工指定类目")
     p_scan.add_argument("--python", default=None, help="PoC 执行使用的 Python 解释器")
     p_pr = sub.add_parser("pr-scan", help="PR 增量扫描（仅 git diff 影响的调用链）")
     p_pr.add_argument("--base", default="origin/main", help="diff 基线，如 origin/main 或 HEAD~1")
@@ -2483,6 +2525,8 @@ def main():
                            "生成补丁并重跑规则自检（写 fix_report.md，不改仓库文件）")
     p_pr.add_argument("--sarif", default=None, metavar="OUT.sarif",
                       help="将命中结果导出为 SARIF v2.1.0（GitHub Code Scanning 格式）")
+    p_pr.add_argument("--html", default=None, metavar="OUT.html",
+                      help="M57：产出零外部依赖的单文件交互式 HTML 报告")
     p_pr.add_argument("--output", default=None, help="报告输出路径")
     p_pr.add_argument("--graph", action="store_true",
                       help="M49：报告中内嵌 Mermaid 污点传播路径图")
