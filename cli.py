@@ -257,6 +257,8 @@ def cmd_scan_auto(args, repo: Path):
     units = list(WebTreeSitterSlicer(repo).extract_entry_units(repo))
     from core.slicer.web3_slither import SoliditySlicer
     units += list(SoliditySlicer(repo).extract_entry_units(repo))
+    from core.slicer.java_servlet import JavaSlicer
+    units += list(JavaSlicer(repo).extract_entry_units())
     print(f"      共 {len(units)} 个入口")
 
     web_cats = sorted(c for c in CATEGORIES if c not in _SOLIDITY_AUTO_CATS)
@@ -307,6 +309,11 @@ def cmd_scan_auto(args, repo: Path):
         for u, cat in p0:
             lines.append(f"- **[{cat}]** `{u.unit_name}` @ "
                          f"`{u.file_path}:{u.start_line}`")
+            if getattr(args, "graph", None):
+                from core.context.taint_graph import build_taint_graph
+                g = build_taint_graph(u, cat)
+                if g:
+                    lines += [g, ""]
         lines.append("")
     # M60：报告固定按 P0 → P1 → P2 三档渲染（段序即优先级）。
     # P1 [High-Confidence]：规则退 None、含敏感 Sink、经模型 Cite-Before-Verdict
@@ -328,6 +335,14 @@ def cmd_scan_auto(args, repo: Path):
     out = Path(args.output or "report_auto.md")
     out.write_text("\n".join(lines), encoding="utf-8")
     print(f"\n完成：野战报告已写入 {out}")
+
+    # --- M61：野战一键组合（--fix / --emit-poc 与漏斗联动）---
+    if getattr(args, "fix", None) and p0:
+        _verify_fixes_any(repo, [u for u, _ in p0],
+                          out_path=str(out.with_name("fix_report_auto.md")))
+    if getattr(args, "emit_poc", None) and p0:
+        from core.sandbox.poc_synthesizer import PocSynthesizer
+        PocSynthesizer().synthesize_many(list(p0), Path(args.emit_poc))
 
     if getattr(args, "sarif", None):
         entries = [{"file": u.file_path, "line": u.start_line,
@@ -2660,6 +2675,9 @@ def main():
     p_scan.add_argument("--auto", action="store_true",
                         help="M58 野战模式：全类目规则普查 + Sink 门控漏斗，"
                              "无需人工指定类目")
+    p_scan.add_argument("--fix", action="store_true",
+                        help="M61：野战组合 —— 对 P0 实锤跑确定性补丁自检"
+                             "（报告写入 fix_report_auto.md）")
     p_scan.add_argument("--python", default=None, help="PoC 执行使用的 Python 解释器")
     p_pr = sub.add_parser("pr-scan", help="PR 增量扫描（仅 git diff 影响的调用链）")
     p_pr.add_argument("--base", default="origin/main", help="diff 基线，如 origin/main 或 HEAD~1")

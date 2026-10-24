@@ -5255,6 +5255,49 @@ try:
 finally:
     shutil.rmtree(_d100, ignore_errors=True)
 
+# ---- [101] Module 61：首次全自动野战模式跨语言实战演习 ----
+_d101 = Path(_tmod.mkdtemp(prefix="nexus_t101_"))
+try:
+    # 真实靶场三语言混合子集：Solidity 重入 + Python 路由 + Java Servlet SQLi
+    shutil.copy(ROOT / "reference_repos" / "smartbugs-curated-main" / "dataset"
+                / "reentrancy" / "reentrancy_simple.sol", _d101)
+    shutil.copy(ROOT / "reference_repos" / "vulpy-master" / "bad" / "vulpy.py",
+                _d101)
+    (_d101 / "servlet").mkdir()
+    shutil.copy(ROOT / "reference_repos" / "Hello-Java-Sec-master" / "src" / "main"
+                / "java" / "com" / "best" / "hello" / "controller" / "SQLI"
+                / "JDBC.java", _d101 / "servlet")
+    _r101 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d101),
+         "--auto", "--offline", "--fix",
+         "--emit-poc", str(_d101 / "poc"), "--graph",
+         "--sarif", str(_d101 / "r.sarif"), "--html", str(_d101 / "r.html"),
+         "--output", str(_d101 / "report_auto.md")],
+        capture_output=True, text=True)
+    _o101 = _r101.stdout
+    _md101 = (_d101 / "report_auto.md").read_text(encoding="utf-8") \
+        if (_d101 / "report_auto.md").exists() else ""
+    _m_filter = re.search(r"过滤率 (\d+)%", _o101)
+    _filter_rate = int(_m_filter.group(1)) if _m_filter else 0
+    check("M101：野战一键命令零异常退出", _r101.returncode, 0)
+    check("M101：跨语言 P0 实锤（Java SQLi + Solidity 重入）",
+          ("P0 实锤 " in _o101 and "## P0 [Confirmed] 规则实锤" in _md101
+           and "**[sqli]**" in _md101 and "**[reentrancy]**" in _md101), True)
+    check("M101：Sink 漏斗过滤率 ≥ 85%",
+          (_filter_rate >= 85 and "模型候选" in _o101), True)
+    check("M101：四类产物合规落盘（HTML / SARIF / Mermaid / PoC）",
+          ((_d101 / "r.html").exists()
+           and (_d101 / "r.sarif").exists()
+           and "```mermaid" in _md101
+           and ( _d101 / "poc").exists()
+           and any((_d101 / "poc").iterdir())), True)
+    check("M101：P0/P1/P2 三档分区 + 补丁自检产物",
+          ("## P0 [Confirmed]" in _md101 and "## P1 [High-Confidence]" in _md101
+           and "## P2 [Review-Needed]" in _md101
+           and (_d101 / "fix_report_auto.md").exists()), True)
+finally:
+    shutil.rmtree(_d101, ignore_errors=True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
