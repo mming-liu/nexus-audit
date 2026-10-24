@@ -23,7 +23,7 @@
 | 新增靶场 | My-Blog（第 23）、litemall（第 24） |
 | 新增规则 | `hardcoded_secret`（第 22 类，CWE-798） |
 | 新增补丁器 | 第 15 类（硬编码密钥 → 环境变量） |
-| 冒烟 | `[1]`–`[108]`，**654 项全 PASS** |
+| 冒烟 | `[1]`–`[109]`，**655 项全 PASS** |
 | 全量门禁 | `run_all --offline --jobs 4` **23 PASS / 0 FAIL / 0 SKIP** |
 | `doctor` | **22 类规则 + 15 类补丁器 + 正则卫生，PASS** |
 | 7 个真实仓库 strict | **7/7 exit 0**（零误报 / 零漏报 / 零判反） |
@@ -136,10 +136,10 @@ python benchmarks/run_all.py --offline --jobs 4
 
 ### 4.2 冒烟
 
-- `[1]`–`[108]`，**654 项断言全 PASS**；
+- `[1]`–`[109]`，**655 项断言全 PASS**；
 - 新增：`[102]` My-Blog、`[103]` litemall、`[104]` 漏斗相关性、`[105]`
   summary-json/HTML、`[106]` hardcoded_secret、`[107]` 第 15 类补丁器、
-  `[108]` SpEL/路径 FP 回归锁。
+  `[108]` SpEL/路径 FP 回归锁、`[109]` 补丁报告重置。
 
 ### 4.3 医生与生成物
 
@@ -169,7 +169,7 @@ python cli.py doctor   → PASS
 ## 5. M70 验收
 
 - [x] `run_all.py --offline --jobs 4` **23 PASS / 0 FAIL / 0 SKIP**
-- [x] 冒烟 `[1]`–`[108]` **654 项 PASS**
+- [x] 冒烟 `[1]`–`[109]` **655 项 PASS**
 - [x] `cli.py doctor` exit 0（22 类规则 + 15 类补丁器 + 正则卫生）
 - [x] 7 个真实仓库 `benchmark_* --strict` 全 exit 0
 - [x] `SCOREBOARD.md` / `run_all.md` / `triage_fallbacks.md` 与结果同步

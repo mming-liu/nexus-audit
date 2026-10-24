@@ -5563,6 +5563,18 @@ public byte[] read(@RequestParam String path) throws Exception {
 check("M108：形参直接进 Paths.get 仍判 True（真遍历不误杀）",
       _verdict("pathtraver", _path_tp108), True)
 
+# ---- [109] M70 补丁报告重置：重复 --fix 不把上一轮 diff 算进 patches_verified ----
+from cli import _verify_fixes_any as _vfa109                       # noqa: E402
+_d109 = Path(_tmod.mkdtemp(prefix="nexus_t109_"))
+try:
+    _out109 = _d109 / "fix_report.md"
+    _out109.write_text("STALE FROM PREVIOUS SCAN\n", encoding="utf-8")
+    _vfa109(_d109, [], _out109)
+    check("M109：补丁报告每次扫描重置（旧 diff 不残留）",
+          _out109.read_text(encoding="utf-8"), "")
+finally:
+    shutil.rmtree(_d109, ignore_errors=True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

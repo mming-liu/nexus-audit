@@ -1322,6 +1322,11 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
     避免路由判 Python、规则判 Java 的分裂。
     """
     from core.agents.rule_detectors import _looks_python, _looks_solidity
+    # 每次扫描重建补丁报告：旧实现 append 到上次的 fix_report，重复 --fix 时
+    # patches_verified 会把上一轮 diff 也算进来（VAmPI 实测 1 条报成 2 条）。
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("", encoding="utf-8")
     py = [u for u in units if _looks_python(u.source_code)]
     sol = [u for u in units if _looks_solidity(u.source_code)]
     rest = [u for u in units if not _looks_python(u.source_code)
