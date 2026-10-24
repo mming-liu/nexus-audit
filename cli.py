@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import difflib
+import hashlib
 import importlib
 import json
 import os
@@ -246,6 +247,62 @@ _SECRET_FILE_SKIP = {
 }
 
 
+_WIRING_SOURCE_RE = re.compile(r"来源\s+([^\s]+)")
+
+
+def _root_cause_key(unit, cat: str) -> tuple[str, str, str]:
+    """M71：把路由级 P0 归并到独立根因。
+
+    返回 (signature, kind, evidence_file)：
+      · kind=global-config —— CORS 结论完全来自 `框架装配证据` 的同一份全局
+        配置（入口体里没有 Access-Control-Allow-Origin），按配置体哈希归并；
+      · kind=file-level    —— 硬编码密钥文件级伪单元，一个文件一个根因；
+      · kind=endpoint      —— 其余按 (类目, 文件, 起始行, 单元名) 独立。
+    """
+    from core.agents.rule_detectors import entry_body, wiring_block
+    src = unit.source_code or ""
+    if cat == "cors" and "Access-Control-Allow-Origin" not in entry_body(src):
+        blk = wiring_block(src)
+        if blk:
+            norm = re.sub(r"\s+", " ", blk).strip()
+            m = _WIRING_SOURCE_RE.search(blk)
+            evidence = m.group(1) if m else ""
+            return (f"cors:{hashlib.sha256(norm.encode()).hexdigest()[:12]}",
+                    "global-config", evidence)
+    if cat == "hardcoded_secret" and getattr(unit, "file_level", False):
+        p = str(Path(unit.file_path).resolve())
+        return f"hardcoded_secret:file:{p}", "file-level", unit.file_path
+    p = str(Path(unit.file_path).resolve())
+    return (f"{cat}:{p}:{unit.start_line}:{unit.unit_name}", "endpoint",
+            unit.file_path)
+
+
+def _build_root_causes(p0: list[tuple]) -> list[dict]:
+    """把 [(unit, cat)] 折叠成独立根因列表（保持首次出现顺序）。"""
+    groups: dict[str, dict] = {}
+    for u, cat in p0:
+        key, kind, evidence = _root_cause_key(u, cat)
+        g = groups.get(key)
+        if g is None:
+            g = {"signature": key, "category": cat, "kind": kind,
+                 "evidence_file": evidence, "units": []}
+            groups[key] = g
+        g["units"].append(u)
+    out: list[dict] = []
+    for g in groups.values():
+        us = g["units"]
+        rep = us[0]
+        out.append({
+            "signature": g["signature"], "category": g["category"],
+            "kind": g["kind"], "evidence_file": g["evidence_file"],
+            "representative": rep, "affected_routes": len(us),
+            "routes": [x.unit_name for x in us[:5]],
+            "file": rep.file_path, "line": rep.start_line,
+            "unit_name": rep.unit_name,
+        })
+    return out
+
+
 def _scan_secret_files(repo: Path) -> list:
     """M67 补充：配置文件/工具类里的硬编码密钥不挂在路由入口上。
 
@@ -340,6 +397,7 @@ def cmd_scan_auto(args, repo: Path):
     secret_units = [x for x in _scan_secret_files(repo)
                     if Path(x.file_path).resolve() not in secret_covered]
     p0 += [(u, "hardcoded_secret") for u in secret_units]
+    root_causes = _build_root_causes(p0)
     elapsed_ms = (time.monotonic() - t0) * 1000
     per_unit_ms = elapsed_ms / max(len(units), 1)
     n_pairs = (len(p0) - len(secret_units) + n_false
@@ -347,7 +405,8 @@ def cmd_scan_auto(args, repo: Path):
     filter_rate = n_filtered / max(n_filtered + len(model_candidates), 1)
     print(f"      {n_pairs} 次（unit × 类目）判定，耗时 {elapsed_ms:.0f} ms"
           f"（均值 {per_unit_ms:.2f} ms/单元）")
-    print(f"      P0 实锤 {len(p0)} ｜ 规则排除 {n_false} ｜ "
+    print(f"      P0 实锤 {len(p0)} ｜ 独立根因 {len(root_causes)} ｜ "
+          f"规则排除 {n_false} ｜ "
           f"模型候选 {len(model_candidates)} ｜ Sink 漏斗过滤 {n_filtered}"
           f"（过滤率 {filter_rate:.0%}）")
     if secret_units:
@@ -358,7 +417,8 @@ def cmd_scan_auto(args, repo: Path):
     lines = [f"# 野战扫描报告（--auto 全类目普查）—— {repo}", "",
              f"- 切片单元：{len(units)}",
              f"- 判定对：{n_pairs}（unit × 类目），规则普查 {elapsed_ms:.0f} ms",
-             f"- P0 实锤：{len(p0)}；规则排除：{n_false}",
+             f"- P0 实锤：{len(p0)}（独立根因 {len(root_causes)}）；"
+             f"规则排除：{n_false}",
              f"- Sink 漏斗：过滤 {n_filtered}，模型候选 {len(model_candidates)}"
              f"（过滤率 {filter_rate:.0%}）"]
     if secret_units:
@@ -366,11 +426,23 @@ def cmd_scan_auto(args, repo: Path):
                      "（配置/工具类，不占路由入口）")
     lines.append("")
     if p0:
-        lines.append("## P0 [Confirmed] 规则实锤")
+        lines.append(f"## P0 [Confirmed] 规则实锤"
+                     f"（{len(root_causes)} 个独立根因 / {len(p0)} 条路由级命中）")
         lines.append("")
-        for u, cat in p0:
-            lines.append(f"- **[{cat}]** `{u.unit_name}` @ "
-                         f"`{u.file_path}:{u.start_line}`")
+        for rc in root_causes:
+            u, cat = rc["representative"], rc["category"]
+            if rc["affected_routes"] > 1:
+                ev = (Path(rc["evidence_file"]).name
+                      if rc["evidence_file"] else "全局装配证据")
+                lines.append(f"- **[{cat}]** 全局根因 `{ev}`"
+                             f"（影响 {rc['affected_routes']} 条路由）")
+                lines.append(f"  - 代表入口：`{u.unit_name}` @ "
+                             f"`{u.file_path}:{u.start_line}`")
+                lines.append("  - 前 5 条路由：" + "；".join(
+                    f"`{x}`" for x in rc["routes"]))
+            else:
+                lines.append(f"- **[{cat}]** `{u.unit_name}` @ "
+                             f"`{u.file_path}:{u.start_line}`")
             if getattr(args, "graph", None):
                 from core.context.taint_graph import build_taint_graph
                 g = build_taint_graph(u, cat)
@@ -414,11 +486,31 @@ def cmd_scan_auto(args, repo: Path):
 
     # --- M66：机器可读狩猎简报 ---
     if getattr(args, "summary_json", None):
+        route_by_cat: dict[str, int] = {}
+        unique_by_cat: dict[str, int] = {}
+        for _, cat in p0:
+            route_by_cat[cat] = route_by_cat.get(cat, 0) + 1
+        for rc in root_causes:
+            unique_by_cat[rc["category"]] = unique_by_cat.get(
+                rc["category"], 0) + 1
         summary = {
             "repo": str(repo),
             "total_units": len(units),
             "total_pairs_evaluated": n_pairs,
+            # 兼容既有门禁：p0_confirmed 仍是路由级命中数。
             "p0_confirmed": len(p0),
+            "p0_route_level_hits": len(p0),
+            "p0_unique_root_causes": len(root_causes),
+            "p0_route_by_cat": route_by_cat,
+            "p0_unique_by_cat": unique_by_cat,
+            "root_causes": [{
+                "category": rc["category"], "kind": rc["kind"],
+                "signature": rc["signature"],
+                "affected_routes": rc["affected_routes"],
+                "representative": rc["unit_name"],
+                "file": rc["file"], "line": rc["line"],
+                "routes": rc["routes"],
+            } for rc in root_causes],
             "secret_files_flagged": len(secret_units),
             "funnel_filtered_out": n_filtered,
             "funnel_filter_rate": round(filter_rate, 4),
@@ -433,11 +525,19 @@ def cmd_scan_auto(args, repo: Path):
         print(f"      狩猎简报已写入 {args.summary_json}")
 
     if getattr(args, "sarif", None):
-        entries = [{"file": u.file_path, "line": u.start_line,
-                    "category": cat, "unit": u.unit_name,
+        entries = [{"file": rc["file"], "line": rc["line"],
+                    "category": rc["category"],
+                    "unit": (rc["unit_name"] if rc["affected_routes"] == 1
+                             else f"{rc['category']} 全局根因"),
                     "level": "warning", "priority": "P0",
-                    "message": f"[{cat}] 规则层确定性实锤（P0）"}
-                   for u, cat in p0]
+                    "affected_routes_count": rc["affected_routes"],
+                    "root_cause": rc["signature"],
+                    "root_kind": rc["kind"],
+                    "message": (f"[{rc['category']}] 规则层确定性实锤（P0）"
+                                + (f"；同一全局配置影响 "
+                                   f"{rc['affected_routes']} 条路由"
+                                   if rc["affected_routes"] > 1 else ""))}
+                   for rc in root_causes]
         entries += [{"file": u.file_path, "line": u.start_line,
                      "category": cat, "unit": u.unit_name,
                      "level": "note", "priority": "P2",
@@ -446,12 +546,19 @@ def cmd_scan_auto(args, repo: Path):
         write_sarif(args.sarif, entries, repo)
         print(f"      SARIF 已写入 {args.sarif}（{len(entries)} 条 results）")
     if getattr(args, "html", None):
-        html_entries = [{"file": u.file_path, "line": u.start_line,
-                         "category": cat, "unit": u.unit_name,
+        html_entries = [{"file": rc["file"], "line": rc["line"],
+                         "category": rc["category"],
+                         "unit": (rc["unit_name"] if rc["affected_routes"] == 1
+                                  else f"{rc['category']} 全局根因"),
                          "priority": "P0", "level": "warning",
-                         "message": f"{cat} 规则层确定性实锤（P0）",
-                         "code": u.source_code, "code_from": u.start_line}
-                        for u, cat in p0]
+                         "message": (f"{rc['category']} 规则层确定性实锤（P0）"
+                                     + (f"；影响 {rc['affected_routes']} 条路由"
+                                        if rc["affected_routes"] > 1 else "")),
+                         "code": rc["representative"].source_code,
+                         "code_from": rc["representative"].start_line,
+                         "affected_routes": rc["affected_routes"],
+                         "routes": rc["routes"]}
+                        for rc in root_causes]
         html_entries += [{"file": u.file_path, "line": u.start_line,
                           "category": cat, "unit": u.unit_name,
                           "priority": "P2", "level": "note",
@@ -465,6 +572,8 @@ def cmd_scan_auto(args, repo: Path):
         out_html.write_text(build_html_report(
             html_entries, str(repo),
             funnel={"total_units": len(units), "p0_confirmed": len(p0),
+                    "p0_route_level_hits": len(p0),
+                    "p0_unique_root_causes": len(root_causes),
                     "funnel_filtered": n_filtered,
                     "funnel_dispatched": len(model_candidates)}),
             encoding="utf-8")
@@ -566,7 +675,14 @@ def build_sarif(entries: list[dict], repo: str | Path = ".") -> dict:
                "message": {"text": e.get("message") or f"{cat} @ {e.get('unit', '')}"},
                # M60：置信度分档进 properties（GitHub Code Scanning 会透出）
                "properties": {"priority": e.get("priority")
-                              or ("P0" if e.get("level") != "note" else "P2")},
+                              or ("P0" if e.get("level") != "note" else "P2"),
+                              **({"affected_routes_count":
+                                  int(e["affected_routes_count"])}
+                                 if e.get("affected_routes_count") else {}),
+                              **({"root_cause": e["root_cause"]}
+                                 if e.get("root_cause") else {}),
+                              **({"root_kind": e["root_kind"]}
+                                 if e.get("root_kind") else {})},
                "locations": [{"physicalLocation": phys}],
                # codeFlows 常驻：哪怕是单点链路，GitHub 的 "Code flow" 面板
                # 也要有东西可渲染；多跳链路把 flow 传进来即可。

@@ -5575,6 +5575,59 @@ try:
 finally:
     shutil.rmtree(_d109, ignore_errors=True)
 
+# M71：全局配置根因折叠 —— 3 条路由继承 1 份 CorsConfig，报告只出 1 张根因卡
+_d109b = Path(_tmod.mkdtemp(prefix="nexus_t109b_"))
+try:
+    (_d109b / "CorsConfig.java").write_text(
+        "@Configuration\n"
+        "public class CorsConfig {\n"
+        "  @Bean\n"
+        "  public CorsFilter corsFilter() {\n"
+        "    CorsConfiguration config = new CorsConfiguration();\n"
+        "    config.addAllowedOrigin(\"*\");\n"
+        "    config.setAllowCredentials(true);\n"
+        "    UrlBasedCorsConfigurationSource source ="
+        " new UrlBasedCorsConfigurationSource();\n"
+        "    source.registerCorsConfiguration(\"/**\", config);\n"
+        "    return new CorsFilter(source);\n"
+        "  }\n"
+        "}\n", encoding="utf-8")
+    for i in range(3):
+        (_d109b / f"Api{i}.java").write_text(
+            "@RestController\n"
+            "@RequestMapping(\"/api\")\n"
+            f"public class Api{i} {{\n"
+            f"  @GetMapping(\"/r{i}\")\n"
+            f"  public String r{i}() {{ return \"ok\"; }}\n"
+            "}\n", encoding="utf-8")
+    _r109 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d109b),
+         "--auto", "--offline",
+         "--summary-json", str(_d109b / "s.json"),
+         "--output", str(_d109b / "r.md"),
+         "--html", str(_d109b / "r.html"),
+         "--sarif", str(_d109b / "r.sarif")],
+        capture_output=True, text=True)
+    _sj109 = json.loads((_d109b / "s.json").read_text(encoding="utf-8"))
+    _md109 = (_d109b / "r.md").read_text(encoding="utf-8")
+    _sar109 = json.loads((_d109b / "r.sarif").read_text(encoding="utf-8"))
+    _html109 = (_d109b / "r.html").read_text(encoding="utf-8")
+    check("M71：3 条路由级 CORS 命中折叠为 1 个独立根因",
+          (_sj109["p0_route_level_hits"], _sj109["p0_unique_root_causes"],
+           _sj109["p0_route_by_cat"].get("cors"),
+           _sj109["p0_unique_by_cat"].get("cors")), (3, 1, 3, 1))
+    check("M71：Markdown 只渲染 1 张根因卡并标注影响 3 条路由",
+          (_md109.count("- **[cors]** 全局根因"), "影响 3 条路由" in _md109),
+          (1, True))
+    check("M71：SARIF 只出 1 条根因 result（带 affected_routes_count）",
+          (len(_sar109["runs"][0]["results"]),
+           _sar109["runs"][0]["results"][0]["properties"].get(
+               "affected_routes_count")), (1, 3))
+    check("M71：HTML 根因卡展示受影响路由数",
+          "同一全局根因影响 3 条路由" in _html109, True)
+finally:
+    shutil.rmtree(_d109b, ignore_errors=True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

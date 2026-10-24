@@ -124,6 +124,13 @@ def _card(e: dict) -> str:
             "</li>"
             for f_ in e["flow"])
         parts.append(f'<ul class="flow">{items}</ul>')
+    if int(e.get("affected_routes") or 1) > 1:
+        routes = "；".join(html.escape(str(x))
+                          for x in (e.get("routes") or [])[:5])
+        parts.append(
+            f'<div class="flow"><b>同一全局根因影响 '
+            f'{int(e["affected_routes"])} 条路由</b>'
+            + (f"（前 5 条：{routes}）" if routes else "") + "</div>")
     if code:
         parts.append(_code_block(code, line, code_from))
     if e.get("fix_diff"):
@@ -175,6 +182,14 @@ def build_html_report(entries: list[dict], repo: str = ".",
             f'background:#e0524b;height:10px;border-radius:4px;"></div>'
             f'</div><div style="color:#c9d4e4;font-size:12px;">{n}</div></div>'
             for c, n in by_cat.most_common())
+        route_stat = (f'<div class="stat"><div class="num">'
+                      f'{funnel.get("p0_route_level_hits", 0)}</div>'
+                      f'<div class="lbl">路由级 P0 命中</div></div>'
+                      if "p0_route_level_hits" in funnel else "")
+        unique_stat = (f'<div class="stat"><div class="num">'
+                       f'{funnel.get("p0_unique_root_causes", 0)}</div>'
+                       f'<div class="lbl">独立根因 P0</div></div>'
+                       if "p0_unique_root_causes" in funnel else "")
         funnel_html = f"""
   <div class="stats">
     <div class="stat"><div class="num">{funnel.get("total_units", 0)}</div>
@@ -183,8 +198,7 @@ def build_html_report(entries: list[dict], repo: str = ".",
       <div class="lbl">漏斗过滤率</div></div>
     <div class="stat"><div class="num">{funnel.get("funnel_dispatched", 0)}</div>
       <div class="lbl">模型派发</div></div>
-    <div class="stat"><div class="num">{funnel.get("p0_confirmed", 0)}</div>
-      <div class="lbl">P0 实锤</div></div>
+    {route_stat}{unique_stat}
   </div>
   <div style="margin-top:12px;background:#16233a;border-radius:8px;
               padding:10px 14px;">{bars or '<i style="color:#556;">无检出</i>'}

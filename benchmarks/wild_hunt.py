@@ -70,7 +70,14 @@ def collect_scan(name: str, rel: str) -> dict:
             if m:
                 by_cat[m.group(1)] = by_cat.get(m.group(1), 0) + 1
     return {"name": name, "path": rel, "scan_rc": rc, "wall_s": round(wall, 2),
-            "summary": summary, "p0_by_cat": by_cat,
+            "summary": summary,
+            "p0_route_level_hits": summary.get("p0_route_level_hits",
+                                               summary.get("p0_confirmed", 0)),
+            "p0_unique_root_causes": summary.get("p0_unique_root_causes",
+                                                 len(by_cat)),
+            "p0_route_by_cat": summary.get("p0_route_by_cat", by_cat),
+            "p0_unique_by_cat": summary.get("p0_unique_by_cat", by_cat),
+            "p0_by_cat": by_cat,
             "scan_tail": "\n".join(log.strip().splitlines()[-6:])}
 
 
