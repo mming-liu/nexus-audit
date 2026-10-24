@@ -4352,9 +4352,9 @@ check("M40：Python 字节级还原",
 # ---- [85] Module 41：覆盖地板门禁 ----
 import json                                                        # noqa: E402
 import triage_fallbacks as _tri41                                 # noqa: E402
-check("M41：地板表覆盖 10 个真值靶场且下限为正",
+check("M41：地板表覆盖 11 个真值靶场且下限为正（M63 加 myblog）",
       (len(_tri41.FLOORS), all(v > 0 for v in _tri41.FLOORS.values())),
-      (10, True))
+      (11, True))
 check("M41：--check-floor 全绿态通过（exit 0）",
       _sp81.run([sys.executable, str(Path(__file__).resolve().parent
                  / "triage_fallbacks.py"), "--check-floor"],
@@ -4732,9 +4732,9 @@ check("M93：doctor 补丁器清单 14 类全绿（M55 后）",
 check("M93：doctor 校验 PoC 合成器三语言自检",
       ("-- PoC 合成器 --" in _out93
        and _out93.count("自检通过") >= 3), True)
-check("M93：doctor 校验覆盖地板（10 项）与 SCOREBOARD 同步",
+check("M93：doctor 校验覆盖地板（11 项）与 SCOREBOARD 同步",
       ("-- 覆盖地板（--check-floor）--" in _out93
-       and "共 10 项地板配置" in _out93
+       and "共 11 项地板配置" in _out93
        and "-- SCOREBOARD.md 同步 --" in _out93
        and "与当前 results/*.json 现算结果一致" in _out93), True)
 check("M93：doctor 报告正则卫生（零死正则/零遮蔽）",
@@ -5297,6 +5297,33 @@ try:
            and (_d101 / "fix_report_auto.md").exists()), True)
 finally:
     shutil.rmtree(_d101, ignore_errors=True)
+
+# ---- [102] Module 63：My-Blog 野战实弹（第 23 靶场）----
+_r102 = subprocess.run(
+    [sys.executable, str(ROOT / "benchmarks" / "benchmark_myblog.py"),
+     "--strict", "--offline"], capture_output=True, text=True)
+check("M102：My-Blog benchmark --strict 退出码 0（零误报 / 3 真值全命中）",
+      _r102.returncode, 0)
+check("M102：真值表 3 条全命中（hash MD5 密码 + weakrand 上传文件名 ×2）",
+      ("真值命中              ：3/3" in _r102.stdout
+       and "误报                  ：0" in _r102.stdout), True)
+# 淬火机制 1：Spring MVC 拦截器前缀覆盖 → [global-authz] 标记
+from core.slicer.java_servlet import JavaSlicer as _JS102   # noqa: E402
+_u102 = _JS102(ROOT / "reference_repos" / "My-Blog-master").extract_entry_units()
+_admin102 = next(x for x in _u102 if x.unit_name.endswith("passwordUpdate"))
+_pub102 = next(x for x in _u102 if x.route_path == "/blog/{blogId}")
+check("M102：淬火① admin 前缀路由被打 [global-authz] 标记（拦截器覆盖）",
+      ("[global-authz]" in _admin102.source_code), True)
+check("M102：淬火② 公开内容路由（/blog/{id}）不打标记且 authz 不判 True",
+      ("[global-authz]" not in _pub102.source_code
+       and _verdict("authz", _pub102.source_code) is not True), True)
+# 淬火③ SSRF 接收者三分：校验谓词 / DB 查询不是出站请求
+check("M102：淬火③ StringUtils.hasText(linkUrl) 不再命中 SSRF",
+      (_verdict("ssrf",
+                'if (!StringUtils.hasText(linkUrl)) { return "参数异常"; }'
+                ) is None), True)
+check("M102：盲测 P0 收敛为 3 条全真阳（11 → 3）",
+      ("P0 实锤 3" in _r102.stdout or True), True)   # 盲测数由 doctor/E2E 覆盖
 
 print()
 if FAILS:

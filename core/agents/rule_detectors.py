@@ -3823,8 +3823,11 @@ SSRF_SINK_RE = re.compile(
     r"Jsoup\s*\.\s*connect\s*\(|"
     r"restTemplate\s*\.\s*(?:getForObject|getForEntity|exchange|postForObject)\s*\(|"
     r"IOUtils\s*\.\s*(?:toByteArray|copy)\s*\(\s*(?:new\s+)?URL|"
-    # 把 url 变量交给 Http* / *Service / *Utils 方法去发请求
-    r"\b\w*(?:Http|http|Service|Utils|Request)\w*\s*\.\s*\w+\s*\(\s*\w*url\w*", re.I)
+    # 真 HTTP 客户端接收者把 url 变量交给任意方法 —— 强 sink
+    # （M63 三分机制：客户端名词是"发请求"的接收者语义；Python
+    # `requests.get(url)` 与 Java `httpUtil.get(url)` 都落这里）
+    r"\b(?:requests|httpx|urlLib|httpClient|httpUtil|okhttp|webClient"
+    r"|restTemplate|httpService)\w*\s*\.\s*\w+\s*\(\s*\w*url\w*")
 
 # ---------------- 弱 sink：同一个方法名在不同上下文里含义相反 ----------------
 #
@@ -3843,7 +3846,15 @@ SSRF_SINK_RE = re.compile(
 # 这与记忆里"先看接收者，再看实参"是同一条：`ImageIO.read(...)` 离了 URL
 # 什么都不是。
 SSRF_WEAK_SINK_RE = re.compile(
-    r"ImageIO\s*\.\s*read\s*\(|\.\s*getInputStream\s*\(\s*\)")
+    r"ImageIO\s*\.\s*read\s*\(|\.\s*getInputStream\s*\(\s*\)"
+    # 非 HTTP 客户端的 *Service/*Utils/*Request 接收者 + url 形参 —— **弱
+    # sink**：`StringUtils.hasText(linkUrl)`（空值校验）、
+    # `blogService.getBlogDetailBySubUrl(subUrl)`（DB 查询）都命中这个宽
+    # 形态（My-Blog 实测两例）。弱 sink 必须带 URL 旁证才成立（铁律 5）。
+    # 校验谓词在方法名层面排除（has/is/check/valid 前缀是谓词语义）。
+    r"|\b\w*(?:Http|http|Service|Utils|Request)\w*\s*\.\s*"
+    r"(?!has[A-Z]|is[A-Z]|check[A-Z]|validat|empty|blank|equals)"
+    r"\w+\s*\(\s*\w*url\w*")
 SSRF_URL_EVIDENCE_RE = re.compile(
     r"new\s+URL\s*\(|\.\s*openConnection\s*\(\s*\)|"
     r"\b(?:Http)?URLConnection\b|\bURL\s+[A-Za-z_]\w*\s*=")
@@ -5113,13 +5124,30 @@ def authz_verdict(source: str) -> bool | None:
         # 过滤器层就被 401；不豁免会把整个安全的生产级项目判成漏洞。）
         if "[global-authz]" in source:
             return None
+
+        # M63 My-Blog 淬火：**公开内容路由豁免**。类目 sink 定义是"访问
+        # 归属于某个主体的资源"—— 博客文章/标签/分类/搜索页按内容主键
+        # 查公开内容（/blog/{id}、/tag/{name}、/search），匿名访问本来就是
+        # 设计意图，不构成越权面；RuoYi 的 /system/** 后台路由不受此豁免。
+        # 判别信号 = 路由语境（内容型前缀 / 根级单段通配 {subUrl}），
+        # 与 M15 的主体命名语义同一口径。豁免 → None（不硬判安全）。
+        _rp = (re.search(r"//\s*(?:Full-Route|Alias-Route):\s*(\S+)", source)
+               or [None, ""])[1] if False else ""
+        _rpm = re.search(r"//\s*(?:Full-Route|Alias-Route):\s*(\S+)", source)
+        _rp = _rpm.group(1) if _rpm else ""
+        if re.match(r"(?i)^/(?:blog|article|post|news|tag|category|archives"
+                    r"|search|about|link)(?:/|$)", _rp) \
+                or re.fullmatch(r"/\{[^}]+\}", _rp):
+            return None
+
         for m in _AUTHZ_RESOURCE_RE.finditer(body):
             args = _balanced_cond(body, m.end())
             if args is None:
                 continue
-            if any(re.fullmatch(r"[A-Za-z_]\w*", a.strip()) and a.strip() in params
-                   for a in _split_args(args)):
-                return True
+            for a in _split_args(args):
+                a = a.strip()
+                if re.fullmatch(r"[A-Za-z_]\w*", a) and a in params:
+                    return True
 
     # 2f) 会话自毁分支：logout / signout 入口的**全部动作**只是销毁当前请求
     #     自己的会话与凭据 ——

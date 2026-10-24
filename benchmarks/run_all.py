@@ -115,6 +115,12 @@ JOBS = [
     # 经探针判定为口径冲突或 sink 跨文件不可判，一律不登记。
     ("WebGoat (教学关卡成对真值)", ["benchmarks/benchmark_webgoat.py", "--strict"],
      "reference_repos/WebGoat-master", "target", True),
+    # 第 23 靶场（Module 63）：My-Blog。首轮野战实弹——真实开源博客系统，
+    # 真值来自盲测逐条人工核查（MD5 密码哈希 + 2 条弱随机上传文件名）。
+    # 逼出三项通用淬火：Spring MVC 拦截器前缀覆盖 → [global-authz]、
+    # 公开内容路由豁免（authz）、SSRF 接收者语义三分（强/谓词/弱+旁证）。
+    ("My-Blog (野战实弹)", ["benchmarks/benchmark_myblog.py", "--strict"],
+     "reference_repos/My-Blog-master", "target", True),
 ]
 
 

@@ -844,8 +844,16 @@ class JavaSlicer:
                           "（JwtAuthenticationTokenFilter / addFilterBefore）")
 
     def _mark_global_authz(self, root: Path, units: List[CodeUnit]) -> None:
-        """仓库里存在 JWT 过滤器注册（addFilterBefore + *Filter 类）时，
-        给全部入口单元的切片头打机器标记。检测失败静默跳过。"""
+        """仓库级统一鉴权检测（机器标记，检测失败静默跳过）。
+
+        两种真实形态（M63 My-Blog 淬火补第二种）：
+          ① Spring Security 过滤器：addFilterBefore + *Filter 类
+             → 认证由过滤器统一强制，全部入口打标记；
+          ② Spring MVC 拦截器前缀覆盖：WebMvcConfigurer 的
+             `addInterceptor(x).addPathPatterns("/admin/**")`
+             → 仅给**路由路径落在前缀下**的入口打标记
+             （`/admin/**` 只保护 /admin 前缀，公开页不打）。
+        """
         try:
             for java in root.rglob("*.java"):
                 try:
@@ -859,6 +867,26 @@ class JavaSlicer:
                         if src and self._GLOBAL_AUTHZ_MARK not in src:
                             u.source_code = self._GLOBAL_AUTHZ_MARK + "\n" + src
                     return
+            # ② Spring MVC 拦截器前缀：addPathPatterns("/xxx/**")
+            prefixes: list[str] = []
+            for java in root.rglob("*.java"):
+                try:
+                    text = java.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                if "addInterceptors" not in text:
+                    continue
+                prefixes += re.findall(
+                    r'addPathPatterns\(\s*"(/\w+)/\*\*\s*"\s*\)', text)
+            if not prefixes:
+                return
+            for u in units:
+                rp = u.route_path or ""
+                if not any(rp == p or rp.startswith(p + "/") for p in prefixes):
+                    continue
+                src = u.source_code or ""
+                if src and self._GLOBAL_AUTHZ_MARK not in src:
+                    u.source_code = self._GLOBAL_AUTHZ_MARK + "\n" + src
         except Exception:
             pass
 

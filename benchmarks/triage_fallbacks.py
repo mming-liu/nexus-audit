@@ -130,6 +130,7 @@ FLOORS = {
     "ruoyi": 159,
     "eladminmp": 53,
     "webgoat": 6,             # WebGoat 6/6（M46，教学关卡成对真值）
+    "myblog": 191,            # My-Blog 野战实弹 191 项判定（M63）
 }
 
 
