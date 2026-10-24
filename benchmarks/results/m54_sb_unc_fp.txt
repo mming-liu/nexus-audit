@@ -1,0 +1,577 @@
+### 0x07f7ecb66d788ab01dc93b9b71a88401de7d0f2e.sol :: play  lines=141-169  vul_lines=[201, 213]  rule=None
+// pragma: solidity ^0.4.24;
+// contract: PoCGame
+    function play()
+    isOpenToPublic()
+    onlyRealPeople()
+    onlyPlayers()
+    public
+    {
+        uint256 blockNumber = timestamps[msg.sender];
+        if(blockNumber < block.number)
+        {
+            timestamps[msg.sender] = 0;
+            wagers[msg.sender] = 0;
+    
+            uint256 winningNumber = uint256(keccak256(abi.encodePacked(blockhash(blockNumber),  msg.sender)))%difficulty +1;
+    
+            if(winningNumber == difficulty / 2)
+            {
+                payout(msg.sender);
+            }
+            else 
+            {
+                //player loses
+                loseWager(betLimit / 2);
+            }    
+        }
+        else
+        {
+            revert();
+        }
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier isOpenToPublic()
+    {
+        require(openToPublic);
+        _;
+    
+modifier onlyRealPeople()
+    {
+          require (msg.sender == tx.origin);
+        _;
+    
+modifier  onlyPlayers()
+    { 
+        require (wagers[msg.sender] > 0); 
+        _; 
+    
+// ---- 同文件辅助函数证据 [loseWager, payout] ----
+function loseWager(uint256 amount) 
+    internal 
+    {
+                                            
+        whale.call.value(amount)(bytes4(keccak256("donate()")));
+        totalDonated += amount;
+        emit Lose(amount, msg.sender);
+    }
+function payout(address winner) 
+    internal 
+    {
+        uint256 ethToTransfer = address(this).balance / 2;
+        
+        winner.transfer(ethToTransfer);
+        emit Win(ethToTransfer, winner);
+    }
+
+### 0x07f7ecb66d788ab01dc93b9b71a88401de7d0f2e.sol :: donate  lines=174-180  vul_lines=[201, 213]  rule=None
+// pragma: solidity ^0.4.24;
+// contract: PoCGame
+    function donate()
+    isOpenToPublic()
+    public 
+    payable
+    {
+        donateToWhale(msg.value);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier isOpenToPublic()
+    {
+        require(openToPublic);
+        _;
+    
+// ---- 同文件辅助函数证据 [donateToWhale] ----
+function donateToWhale(uint256 amount) 
+    internal 
+    {
+                                            
+        whale.call.value(amount)(bytes4(keccak256("donate()")));
+        totalDonated += amount;
+        emit Donate(amount, whale, msg.sender);
+    }
+
+### 0x19cf8481ea15427a98ba3cdd6d9e14690011ab10.sol :: FundsTransfer  lines=431-434  vul_lines=[439, 465]  rule=False
+// pragma: solidity ^0.4.11;
+// contract: daoPOLSKAtokens
+    function FundsTransfer() external {
+	if(funding==true) throw;
+		 	if (!owner.send(this.balance)) throw;
+    }
+
+### 0x39cfd754c85023648bf003bea2dd498c5612abfa.sol :: WitdrawTokenToHolder  lines=76-85  vul_lines=[44, 97]  rule=None
+// pragma: solidity ^0.4.18;
+// contract: TokenBank
+    function WitdrawTokenToHolder(address _to,address _token,uint _amount)
+    public
+    onlyOwner
+    {
+        if(Holders[_to]>0)
+        {
+            Holders[_to]=0;
+            WithdrawToken(_token,_amount,_to);     
+        }
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner
+    {
+        if(owner == msg.sender)_;
+    
+// ---- 父合约函数证据 [Token.WithdrawToken] ----
+function WithdrawToken(address token, uint256 amount,address to)
+    public 
+    onlyOwner
+    {
+                                            
+        token.call(bytes4(sha3("transfer(address,uint256)")),to,amount); 
+    }
+
+### 0x3a0e9acd953ffc0dd18d63603488846a6b8b2b01.sol :: WitdrawTokenToHolder  lines=76-85  vul_lines=[44, 97]  rule=None
+// pragma: solidity ^0.4.18;
+// contract: TokenBank
+    function WitdrawTokenToHolder(address _to,address _token,uint _amount)
+    public
+    onlyOwner
+    {
+        if(Holders[_to]>0)
+        {
+            Holders[_to]=0;
+            WithdrawToken(_token,_amount,_to);     
+        }
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner
+    {
+        if(owner == msg.sender)_;
+    
+// ---- 父合约函数证据 [Token.WithdrawToken] ----
+function WithdrawToken(address token, uint256 amount,address to)
+    public 
+    onlyOwner
+    {
+                                            
+        token.call(bytes4(sha3("transfer(address,uint256)")),to,amount); 
+    }
+
+### 0x627fa62ccbb1c1b04ffaecd72a53e37fc0e17839.sol :: WitdrawTokenToHolder  lines=76-85  vul_lines=[44]  rule=None
+// pragma: solidity ^0.4.19;
+// contract: TokenBank
+    function WitdrawTokenToHolder(address _to,address _token,uint _amount)
+    public
+    onlyOwner
+    {
+        if(Holders[_to]>0)
+        {
+            Holders[_to]=0;
+            WithdrawToken(_token,_amount,_to);     
+        }
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner
+    {
+        if(owner == msg.sender)_;
+    
+// ---- 父合约函数证据 [Token.WithdrawToken] ----
+function WithdrawToken(address token, uint256 amount,address to)
+    public 
+    onlyOwner
+    {
+                                             
+        token.call(bytes4(sha3("transfer(address,uint256)")),to,amount); 
+    }
+
+### 0x627fa62ccbb1c1b04ffaecd72a53e37fc0e17839.sol :: WithdrawToHolder  lines=87-99  vul_lines=[44]  rule=False
+// pragma: solidity ^0.4.19;
+// contract: TokenBank
+    function WithdrawToHolder(address _addr, uint _wei) 
+    public
+    onlyOwner
+    payable
+    {
+        if(Holders[_addr]>0)
+        {
+            if(_addr.call.value(_wei)())
+            {
+                Holders[_addr]-=_wei;
+            }
+        }
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner
+    {
+        if(owner == msg.sender)_;
+    
+
+### 0x7d09edb07d23acb532a82be3da5c17d9d85806b4.sol :: play  lines=138-166  vul_lines=[198, 210]  rule=None
+// pragma: solidity ^0.4.24;
+// contract: PoCGame
+    function play()
+    isOpenToPublic()
+    onlyRealPeople()
+    onlyPlayers()
+    public
+    {
+        uint256 blockNumber = timestamps[msg.sender];
+        if(blockNumber < block.number)
+        {
+            timestamps[msg.sender] = 0;
+            wagers[msg.sender] = 0;
+    
+            uint256 winningNumber = uint256(keccak256(abi.encodePacked(blockhash(blockNumber),  msg.sender)))%difficulty +1;
+    
+            if(winningNumber == difficulty / 2)
+            {
+                payout(msg.sender);
+            }
+            else 
+            {
+                //player loses
+                loseWager(betLimit / 2);
+            }    
+        }
+        else
+        {
+            revert();
+        }
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier isOpenToPublic()
+    {
+        require(openToPublic);
+        _;
+    
+modifier onlyRealPeople()
+    {
+          require (msg.sender == tx.origin);
+        _;
+    
+modifier  onlyPlayers()
+    { 
+        require (wagers[msg.sender] > 0); 
+        _; 
+    
+// ---- 同文件辅助函数证据 [loseWager, payout] ----
+function loseWager(uint256 amount) 
+    internal 
+    {
+                                            
+        whale.call.value(amount)(bytes4(keccak256("donate()")));
+        totalDonated += amount;
+        emit Lose(amount, msg.sender);
+    }
+function payout(address winner) 
+    internal 
+    {
+        uint256 ethToTransfer = address(this).balance / 2;
+        
+        winner.transfer(ethToTransfer);
+        emit Win(ethToTransfer, winner);
+    }
+
+### 0x7d09edb07d23acb532a82be3da5c17d9d85806b4.sol :: donate  lines=171-177  vul_lines=[198, 210]  rule=None
+// pragma: solidity ^0.4.24;
+// contract: PoCGame
+    function donate()
+    isOpenToPublic()
+    public 
+    payable
+    {
+        donateToWhale(msg.value);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier isOpenToPublic()
+    {
+        require(openToPublic);
+        _;
+    
+// ---- 同文件辅助函数证据 [donateToWhale] ----
+function donateToWhale(uint256 amount) 
+    internal 
+    {
+                                            
+        whale.call.value(amount)(bytes4(keccak256("donate()")));
+        totalDonated += amount;
+        emit Donate(amount, whale, msg.sender);
+    }
+
+### 0x89c1b3807d4c67df034fffb62f3509561218d30b.sol :: TownCrier  lines=51-61  vul_lines=[162, 175, 180, 192]  rule=None
+// pragma: solidity ^0.4.9;
+// contract: TownCrier
+    function TownCrier() public {
+        // Start request IDs at 1 for two reasons:
+        //   1. We can use 0 to denote an invalid request (ids are unsigned)
+        //   2. Storage is more expensive when changing something from zero to non-zero,
+        //      so this means the first request isn't randomly more expensive.
+        requestCnt = 1;
+        requests[0].requester = msg.sender;
+        killswitch = false;
+        unrespondedCnt = 0;
+        externalCallFlag = false;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [request] ----
+function request(uint8 requestType, address callbackAddr, bytes4 callbackFID, uint timestamp, bytes32[] requestData) public payable returns (int) {
+        if (externalCallFlag) {
+            throw;
+        }
+
+        if (killswitch) {
+            externalCallFlag = true;
+            if (!msg.sender.call.value(msg.value)()) {
+                throw;
+            }
+            externalCallFlag = false;
+            return newVersion;
+        }
+
+        if (msg.value < MIN_FEE) {
+            externalCallFlag = true;
+                                                                             
+                                                                      
+            if (!msg.sender.call.value(msg.value)()) {
+                throw;
+            }
+            externalCallFlag = false;
+            return FAIL_FLAG;
+        } else {
+                                  
+            uint64 requestId = requestCnt;
+            requestCnt++;
+            unrespondedCnt++;
+
+            bytes32 paramsHash = sha3(requestType, requestData);
+            requests[requestId].requester = msg.sender;
+            requests[requestId].fee = msg.value;
+            requests[requestId].callbackAddr = callbackAddr;
+            requests[requestId].callbackFID = callbackFID;
+            requests[requestId].paramsHash = paramsHash;
+
+                                                                    
+            RequestInfo(requestId, requestType, msg.sender, msg.value, callbackAddr, paramsHash, timestamp, requestData);
+            return requestId;
+        }
+    }
+
+### 0x89c1b3807d4c67df034fffb62f3509561218d30b.sol :: withdraw  lines=92-98  vul_lines=[162, 175, 180, 192]  rule=False
+// pragma: solidity ^0.4.9;
+// contract: TownCrier
+    function withdraw() public {
+        if (msg.sender == requests[0].requester && unrespondedCnt == 0) {
+            if (!requests[0].requester.call.value(this.balance)()) {
+                throw;
+            }
+        }
+    }
+
+### 0x89c1b3807d4c67df034fffb62f3509561218d30b.sol :: request  lines=100-140  vul_lines=[162, 175, 180, 192]  rule=False
+// pragma: solidity ^0.4.9;
+// contract: TownCrier
+    function request(uint8 requestType, address callbackAddr, bytes4 callbackFID, uint timestamp, bytes32[] requestData) public payable returns (int) {
+        if (externalCallFlag) {
+            throw;
+        }
+
+        if (killswitch) {
+            externalCallFlag = true;
+            if (!msg.sender.call.value(msg.value)()) {
+                throw;
+            }
+            externalCallFlag = false;
+            return newVersion;
+        }
+
+        if (msg.value < MIN_FEE) {
+            externalCallFlag = true;
+            // If the amount of ether sent by the requester is too little or 
+            // too much, refund the requester and discard the request.
+            if (!msg.sender.call.value(msg.value)()) {
+                throw;
+            }
+            externalCallFlag = false;
+            return FAIL_FLAG;
+        } else {
+            // Record the request.
+            uint64 requestId = requestCnt;
+            requestCnt++;
+            unrespondedCnt++;
+
+            bytes32 paramsHash = sha3(requestType, requestData);
+            requests[requestId].requester = msg.sender;
+            requests[requestId].fee = msg.value;
+            requests[requestId].callbackAddr = callbackAddr;
+            requests[requestId].callbackFID = callbackFID;
+            requests[requestId].paramsHash = paramsHash;
+
+            // Log the request for the Town Crier server to process.
+            RequestInfo(requestId, requestType, msg.sender, msg.value, callbackAddr, paramsHash, timestamp, requestData);
+            return requestId;
+        }
+    }
+
+### 0x89c1b3807d4c67df034fffb62f3509561218d30b.sol :: cancel  lines=196-221  vul_lines=[162, 175, 180, 192]  rule=False
+// pragma: solidity ^0.4.9;
+// contract: TownCrier
+    function cancel(uint64 requestId) public returns (int) {
+        if (externalCallFlag) {
+            throw;
+        }
+
+        if (killswitch) {
+            return 0;
+        }
+
+        uint fee = requests[requestId].fee;
+        if (requests[requestId].requester == msg.sender && fee >= CANCELLATION_FEE) {
+            // If the request was sent by this user and has money left on it,
+            // then cancel it.
+            requests[requestId].fee = CANCELLED_FEE_FLAG;
+            externalCallFlag = true;
+            if (!msg.sender.call.value(fee - CANCELLATION_FEE)()) {
+                throw;
+            }
+            externalCallFlag = false;
+            Cancel(requestId, msg.sender, requests[requestId].requester, requests[requestId].fee, 1);
+            return SUCCESS_FLAG;
+        } else {
+            Cancel(requestId, msg.sender, requests[requestId].requester, fee, -1);
+            return FAIL_FLAG;
+        }
+    }
+
+### 0x8fd1e427396ddb511533cf9abdbebd0a7e08da35.sol :: WitdrawTokenToHolder  lines=76-85  vul_lines=[44, 97]  rule=None
+// pragma: solidity ^0.4.18;
+// contract: TokenBank
+    function WitdrawTokenToHolder(address _to,address _token,uint _amount)
+    public
+    onlyOwner
+    {
+        if(Holders[_to]>0)
+        {
+            Holders[_to]=0;
+            WithdrawToken(_token,_amount,_to);     
+        }
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner
+    {
+        if(owner == msg.sender)_;
+    
+// ---- 父合约函数证据 [Token.WithdrawToken] ----
+function WithdrawToken(address token, uint256 amount,address to)
+    public 
+    onlyOwner
+    {
+                                            
+        token.call(bytes4(sha3("transfer(address,uint256)")),to,amount); 
+    }
+
+### 0xe09b1ab8111c2729a76f16de96bc86a7af837928.sol :: withdrawDonation  lines=217-225  vul_lines=[150]  rule=None
+// pragma: solidity ^0.4.24;
+// contract: FiftyFlip
+    function withdrawDonation(uint amount)
+    external 
+    {
+        require(donateAmount[msg.sender] >= amount, "You are going to withdraw more than you donated!");
+        
+        if (sendFunds(msg.sender, amount)){
+            donateAmount[msg.sender] -= amount;
+        }
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [sendFunds] ----
+function sendFunds(address paidUser, uint amount) private returns (bool){
+        bool success = paidUser.send(amount);
+        if (success) {
+            emit Payment(paidUser, amount);
+        } else {
+            emit FailedPayment(paidUser, amount);
+        }
+        return success;
+    }
+
+### 0xe09b1ab8111c2729a76f16de96bc86a7af837928.sol :: withdrawDevFee  lines=239-249  vul_lines=[150]  rule=None
+// pragma: solidity ^0.4.24;
+// contract: FiftyFlip
+    function withdrawDevFee(address withdrawAddress, uint withdrawAmount)
+    onlyOwner()
+    checkContractHealth() 
+    external {
+        require (devFeeSize >= withdrawAmount, "You are trying to withdraw more amount than developer fee.");
+        require (withdrawAmount <= address(this).balance, "Contract balance is lower than withdrawAmount");
+        require (devFeeSize <= address(this).balance, "Not enough funds to withdraw.");
+        if (sendFunds(withdrawAddress, withdrawAmount)){
+            devFeeSize -= withdrawAmount;
+        }
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner() {
+        require (msg.sender == owner, "You are not the owner of this contract!");
+        _;
+    
+modifier checkContractHealth() {
+        require (address(this).balance >= lockedInBets + jackpotSize + devFeeSize, "This contract doesn't have enough balance, it is stopped till someone donate to this game!");
+        _;
+    
+// ---- 同文件辅助函数证据 [sendFunds] ----
+function sendFunds(address paidUser, uint amount) private returns (bool){
+        bool success = paidUser.send(amount);
+        if (success) {
+            emit Payment(paidUser, amount);
+        } else {
+            emit FailedPayment(paidUser, amount);
+        }
+        return success;
+    }
+
+### 0xe09b1ab8111c2729a76f16de96bc86a7af837928.sol :: withdrawBotFee  lines=252-262  vul_lines=[150]  rule=None
+// pragma: solidity ^0.4.24;
+// contract: FiftyFlip
+    function withdrawBotFee(uint withdrawAmount)
+    onlyBot()
+    checkContractHealth() 
+    external {
+        require (devFeeSize >= withdrawAmount, "You are trying to withdraw more amount than developer fee.");
+        require (withdrawAmount <= address(this).balance, "Contract balance is lower than withdrawAmount");
+        require (devFeeSize <= address(this).balance, "Not enough funds to withdraw.");
+        if (sendFunds(autoPlayBot, withdrawAmount)){
+            devFeeSize -= withdrawAmount;
+        }
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyBot() {
+        require (msg.sender == autoPlayBot, "You are not the bot of this contract!");
+        _;
+    
+modifier checkContractHealth() {
+        require (address(this).balance >= lockedInBets + jackpotSize + devFeeSize, "This contract doesn't have enough balance, it is stopped till someone donate to this game!");
+        _;
+    
+// ---- 同文件辅助函数证据 [sendFunds] ----
+function sendFunds(address paidUser, uint amount) private returns (bool){
+        bool success = paidUser.send(amount);
+        if (success) {
+            emit Payment(paidUser, amount);
+        } else {
+            emit FailedPayment(paidUser, amount);
+        }
+        return success;
+    }
+
+### 0xe09b1ab8111c2729a76f16de96bc86a7af837928.sol :: sendFunds  lines=323-331  vul_lines=[150]  rule=False
+// pragma: solidity ^0.4.24;
+// contract: FiftyFlip
+    function sendFunds(address paidUser, uint amount) private returns (bool){
+        bool success = paidUser.send(amount);
+        if (success) {
+            emit Payment(paidUser, amount);
+        } else {
+            emit FailedPayment(paidUser, amount);
+        }
+        return success;
+    }
+
+### unchecked_return_value.sol :: callchecked  lines=11-13  vul_lines=[17]  rule=False
+// pragma: solidity 0.4.25;
+// contract: ReturnValue
+  function callchecked(address callee) public {
+    require(callee.call());
+  }

@@ -3,7 +3,7 @@
   "truth_entries": 8,
   "resolved": 8,
   "missing": [],
-  "total_functions": 208,
+  "total_functions": 204,
   "decided": 7,
   "correct": 7,
   "fp": 0,

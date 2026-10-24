@@ -1,0 +1,212 @@
+{
+ "stats": {
+  "access_control 退回": 531,
+  "桶/缺 Sink": 176,
+  "候选①隐式只读": 1,
+  "桶/含未知安全包装": 297,
+  "桶/缺 Source": 58,
+  "候选②双边守恒": 21
+ },
+ "hits": [
+  {
+   "bench": "smartbugs",
+   "file": "arbitrary_location_write_simple.sol",
+   "unit": "PushBonusCode",
+   "view": true,
+   "bilateral": false,
+   "start_line": 21,
+   "end_line": 23,
+   "official_vul": false
+  },
+  {
+   "bench": "smartbugs",
+   "file": "spank_chain_payment.sol",
+   "unit": "transferFrom",
+   "view": false,
+   "bilateral": true,
+   "start_line": 194,
+   "end_line": 203
+  },
+  {
+   "bench": "smartbugs",
+   "file": "0x19cf8481ea15427a98ba3cdd6d9e14690011ab10.sol",
+   "unit": "transferFrom",
+   "view": false,
+   "bilateral": true,
+   "start_line": 298,
+   "end_line": 308
+  },
+  {
+   "bench": "DeFiVulnLabs",
+   "file": "ApproveScam.sol",
+   "unit": "transferFrom",
+   "view": false,
+   "bilateral": true,
+   "start_line": 101,
+   "end_line": 111
+  },
+  {
+   "bench": "DeFiVulnLabs",
+   "file": "Overflow2.sol",
+   "unit": "transfer",
+   "view": false,
+   "bilateral": true,
+   "start_line": 103,
+   "end_line": 108
+  },
+  {
+   "bench": "DeFiVulnLabs",
+   "file": "Overflow2.sol",
+   "unit": "transferFrom",
+   "view": false,
+   "bilateral": true,
+   "start_line": 121,
+   "end_line": 128
+  },
+  {
+   "bench": "DeFiVulnLabs",
+   "file": "phantom-permit.sol",
+   "unit": "transfer",
+   "view": false,
+   "bilateral": true,
+   "start_line": 196,
+   "end_line": 198
+  },
+  {
+   "bench": "DeFiVulnLabs",
+   "file": "phantom-permit.sol",
+   "unit": "transferFrom",
+   "view": false,
+   "bilateral": true,
+   "start_line": 200,
+   "end_line": 220
+  },
+  {
+   "bench": "DeFiVulnLabs",
+   "file": "SignatureReplay.sol",
+   "unit": "transfer",
+   "view": false,
+   "bilateral": true,
+   "start_line": 157,
+   "end_line": 162
+  },
+  {
+   "bench": "DeFiVulnLabs",
+   "file": "SignatureReplay.sol",
+   "unit": "transferProxy",
+   "view": false,
+   "bilateral": true,
+   "start_line": 164,
+   "end_line": 191
+  },
+  {
+   "bench": "DeFiVulnLabs",
+   "file": "SignatureReplay.sol",
+   "unit": "transfer",
+   "view": false,
+   "bilateral": true,
+   "start_line": 217,
+   "end_line": 222
+  },
+  {
+   "bench": "DeFiVulnLabs",
+   "file": "SignatureReplay.sol",
+   "unit": "transferProxy",
+   "view": false,
+   "bilateral": true,
+   "start_line": 224,
+   "end_line": 249
+  },
+  {
+   "bench": "DeFiVulnLabs",
+   "file": "UnsafeCall.sol",
+   "unit": "transfer",
+   "view": false,
+   "bilateral": true,
+   "start_line": 100,
+   "end_line": 105
+  },
+  {
+   "bench": "DeFiVulnLabs",
+   "file": "UnsafeCall.sol",
+   "unit": "transferFrom",
+   "view": false,
+   "bilateral": true,
+   "start_line": 118,
+   "end_line": 125
+  },
+  {
+   "bench": "nssc",
+   "file": "coin.sol",
+   "unit": "transfer",
+   "view": false,
+   "bilateral": true,
+   "start_line": 84,
+   "end_line": 87
+  },
+  {
+   "bench": "nssc",
+   "file": "coin.sol",
+   "unit": "transferFrom",
+   "view": false,
+   "bilateral": true,
+   "start_line": 98,
+   "end_line": 103
+  },
+  {
+   "bench": "nssc",
+   "file": "coin.sol",
+   "unit": "buy",
+   "view": false,
+   "bilateral": true,
+   "start_line": 171,
+   "end_line": 176
+  },
+  {
+   "bench": "nssc",
+   "file": "DAO.sol",
+   "unit": "transferFrom",
+   "view": false,
+   "bilateral": true,
+   "start_line": 108,
+   "end_line": 126
+  },
+  {
+   "bench": "nssc",
+   "file": "DAO.sol",
+   "unit": "transfer",
+   "view": false,
+   "bilateral": true,
+   "start_line": 1073,
+   "end_line": 1084
+  },
+  {
+   "bench": "nssc",
+   "file": "DAO.sol",
+   "unit": "transferFrom",
+   "view": false,
+   "bilateral": true,
+   "start_line": 1094,
+   "end_line": 1105
+  },
+  {
+   "bench": "nssc",
+   "file": "SpankChain.sol",
+   "unit": "transferFrom",
+   "view": false,
+   "bilateral": true,
+   "start_line": 75,
+   "end_line": 84
+  },
+  {
+   "bench": "nssc",
+   "file": "SpankChain_Payment.sol",
+   "unit": "transferFrom",
+   "view": false,
+   "bilateral": true,
+   "start_line": 188,
+   "end_line": 197
+  }
+ ],
+ "vul_hits": []
+}

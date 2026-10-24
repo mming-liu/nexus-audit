@@ -122,7 +122,7 @@ def iter_units(bench: str):
 FLOORS = {
     "defivulnlabs": 9,      # DeFiVulnLabs 9/9 满贯（M36）
     "nssc": 7,              # nssc 7/8（1 条真值按口径退模型）
-    "smartbugs": 180,       # M44 自域早退后 +3
+    "smartbugs": 204,       # M53 arithmetic 类目后 +24
     "vampi": 7,             # VAmPI 7/7（M37）
     "mall": 16,             # mall 16/16（M38）
     "vulpy": 6,

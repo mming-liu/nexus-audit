@@ -1,0 +1,2442 @@
+==============================================================================
+[0] IbcToken.sol:_transfer L392-415  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0c356b7fd36a5357e5a017ef11887ba100c9ab76_eth\IbcToken.sol
+==============================================================================
+// pragma: solidity 0.8.0;
+// contract: ERC20
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(sender, recipient, amount);
+
+        uint256 senderBalance = _balances[sender];
+        require(
+            senderBalance >= amount,
+            "ERC20: transfer amount exceeds balance"
+        );
+        unchecked {
+            _balances[sender] = senderBalance - amount;
+        }
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+
+        _afterTokenTransfer(sender, recipient, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[1] IbcToken.sol:_burn L449-464  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0c356b7fd36a5357e5a017ef11887ba100c9ab76_eth\IbcToken.sol
+==============================================================================
+// pragma: solidity 0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+        }
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[2] BAToken.sol:safeAdd L12-16  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0d8775f648430679a709e98d2b0cb6250d2887ef_eth\BAToken.sol
+==============================================================================
+// pragma: solidity ^0.4.10;
+// contract: SafeMath
+    function safeAdd(uint256 x, uint256 y) internal returns(uint256) {
+      uint256 z = x + y;
+      assert((z >= x) && (z >= y));
+      return z;
+    }
+
+==============================================================================
+[3] BAToken.sol:safeMult L24-28  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0d8775f648430679a709e98d2b0cb6250d2887ef_eth\BAToken.sol
+==============================================================================
+// pragma: solidity ^0.4.10;
+// contract: SafeMath
+    function safeMult(uint256 x, uint256 y) internal returns(uint256) {
+      uint256 z = x * y;
+      assert((x == 0)||(z/x == y));
+      return z;
+    }
+
+==============================================================================
+[4] BAToken.sol:transfer L47-56  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0d8775f648430679a709e98d2b0cb6250d2887ef_eth\BAToken.sol
+==============================================================================
+// pragma: solidity ^0.4.10;
+// contract: StandardToken
+    function transfer(address _to, uint256 _value) returns (bool success) {
+      if (balances[msg.sender] >= _value && _value > 0) {
+        balances[msg.sender] -= _value;
+        balances[_to] += _value;
+        Transfer(msg.sender, _to, _value);
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+==============================================================================
+[5] BAToken.sol:transferFrom L58-68  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0d8775f648430679a709e98d2b0cb6250d2887ef_eth\BAToken.sol
+==============================================================================
+// pragma: solidity ^0.4.10;
+// contract: StandardToken
+    function transferFrom(address _from, address _to, uint256 _value) returns (bool success) {
+      if (balances[_from] >= _value && allowed[_from][msg.sender] >= _value && _value > 0) {
+        balances[_to] += _value;
+        balances[_from] -= _value;
+        allowed[_from][msg.sender] -= _value;
+        Transfer(_from, _to, _value);
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+==============================================================================
+[6] Bora20v2.sol:mulDiv L227-307  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function mulDiv(
+        uint256 x,
+        uint256 y,
+        uint256 denominator
+    ) internal pure returns (uint256 result) {
+        unchecked {
+            // 512-bit multiply [prod1 prod0] = x * y. Compute the product mod 2^256 and mod 2^256 - 1, then use
+            // use the Chinese Remainder Theorem to reconstruct the 512 bit result. The result is stored in two 256
+            // variables such that product = prod1 * 2^256 + prod0.
+            uint256 prod0; // Least significant 256 bits of the product
+            uint256 prod1; // Most significant 256 bits of the product
+            assembly {
+                let mm := mulmod(x, y, not(0))
+                prod0 := mul(x, y)
+                prod1 := sub(sub(mm, prod0), lt(mm, prod0))
+            }
+
+            // Handle non-overflow cases, 256 by 256 division.
+            if (prod1 == 0) {
+                return prod0 / denominator;
+            }
+
+            // Make sure the result is less than 2^256. Also prevents denominator == 0.
+            require(denominator > prod1);
+
+            ///////////////////////////////////////////////
+            // 512 by 256 division.
+            ///////////////////////////////////////////////
+
+            // Make division exact by subtracting the remainder from [prod1 prod0].
+            uint256 remainder;
+            assembly {
+                // Compute remainder using mulmod.
+                remainder := mulmod(x, y, denominator)
+
+                // Subtract 256 bit number from 512 bit number.
+                prod1 := sub(prod1, gt(remainder, prod0))
+                prod0 := sub(prod0, remainder)
+            }
+
+            // Factor powers of two out of denominator and compute largest power of two divisor of denominator. Always >= 1.
+            // See https://cs.stackexchange.com/q/138556/92363.
+
+            // Does not overflow because the denominator cannot be zero at this stage in the function.
+            uint256 twos = denominator & (~denominator + 1);
+            assembly {
+                // Divide denominator by twos.
+                denominator := div(denominator, twos)
+
+                // Divide [prod1 prod0] by twos.
+                prod0 := div(prod0, twos)
+
+                // Flip twos such that it is 2^256 / twos. If twos is zero, then it becomes one.
+                twos := add(div(sub(0, twos), twos), 1)
+            }
+
+            // Shift in bits from prod1 into prod0.
+            prod0 |= prod1 * twos;
+
+            // Invert denominator mod 2^256. Now that denominator is an odd number, it has an inverse modulo 2^256 such
+            // that denominator * inv = 1 mod 2^256. Compute the inverse by starting with a seed that is correct for
+            // four bits. That is, denominator * inv = 1 mod 2^4.
+            uint256 inverse = (3 * denominator) ^ 2;
+
+            // Use the Newton-Raphson iteration to improve the precision. Thanks to Hensel's lifting lemma, this also works
+            // in modular arithmetic, doubling the correct bits in each step.
+            inverse *= 2 - denominator * inverse; // inverse mod 2^8
+            inverse *= 2 - denominator * inverse; // inverse mod 2^16
+            inverse *= 2 - denominator * inverse; // inverse mod 2^32
+            inverse *= 2 - denominator * inverse; // inverse mod 2^64
+            inverse *= 2 - denominator * inverse; // inverse mod 2^128
+            inverse *= 2 - denominator * inverse; // inverse mod 2^256
+
+            // Because the division is now exact we can divide by multiplying with the modular inverse of denominator.
+            // This will give us the correct result modulo 2^256. Since the preconditions guarantee that the outcome is
+            // less than 2^256, this is the final result. We don't need to compute the high bits of the result and prod1
+            // is no longer required.
+            result = prod0 * inverse;
+            return result;
+        }
+    }
+
+==============================================================================
+[7] Bora20v2.sol:_transfer L1353-1375  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+            // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
+            // decrementing then incrementing.
+            _balances[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[8] Bora20v2.sol:_mint L1386-1399  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _mint(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: mint to the zero address");
+
+        _beforeTokenTransfer(address(0), account, amount);
+
+        _totalSupply += amount;
+        unchecked {
+            // Overflow not possible: balance + amount is at most totalSupply + amount, which is checked above.
+            _balances[account] += amount;
+        }
+        emit Transfer(address(0), account, amount);
+
+        _afterTokenTransfer(address(0), account, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[9] Bora20v2.sol:_burn L1412-1428  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+            // Overflow not possible: amount <= accountBalance <= totalSupply.
+            _totalSupply -= amount;
+        }
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[10] MXToken.sol:_transfer L36-52  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x11eef04c884e24d9b7b4760e7476d06ddf797f36_eth\MXToken.sol
+==============================================================================
+// pragma: solidity ^0.4.19;
+// contract: MXToken
+    function _transfer(address _from, address _to, uint _value) internal {
+        // Prevent transfer to 0x0 address. Use burn() instead
+        require(_to != 0x0);
+        // Check if the sender has enough
+        require(balanceOf[_from] >= _value);
+        // Check for overflows
+        require(balanceOf[_to] + _value > balanceOf[_to]);
+        // Save this for an assertion in the future
+        uint previousBalances = balanceOf[_from] + balanceOf[_to];
+        // Subtract from the sender
+        balanceOf[_from] -= _value;
+        // Add the same to the recipient
+        balanceOf[_to] += _value;
+        Transfer(_from, _to, _value);
+        // Asserts are used to use static analysis to find bugs in your code. They should never fail
+        assert(balanceOf[_from] + balanceOf[_to] == previousBalances);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [burn] ----
+function burn(uint256 _value) public returns (bool success) {
+        require(balanceOf[msg.sender] >= _value);                                    
+        balanceOf[msg.sender] -= _value;                                       
+        totalSupply -= _value;                                            
+        Burn(msg.sender, _value);
+        return true;
+    }
+
+==============================================================================
+[11] MXToken.sol:burn L122-128  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x11eef04c884e24d9b7b4760e7476d06ddf797f36_eth\MXToken.sol
+==============================================================================
+// pragma: solidity ^0.4.19;
+// contract: MXToken
+    function burn(uint256 _value) public returns (bool success) {
+        require(balanceOf[msg.sender] >= _value);   // Check if the sender has enough
+        balanceOf[msg.sender] -= _value;            // Subtract from the sender
+        totalSupply -= _value;                      // Updates totalSupply
+        Burn(msg.sender, _value);
+        return true;
+    }
+
+==============================================================================
+[12] MXToken.sol:burnFrom L138-146  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x11eef04c884e24d9b7b4760e7476d06ddf797f36_eth\MXToken.sol
+==============================================================================
+// pragma: solidity ^0.4.19;
+// contract: MXToken
+    function burnFrom(address _from, uint256 _value) public returns (bool success) {
+        require(balanceOf[_from] >= _value);                // Check if the targeted balance is enough
+        require(_value <= allowance[_from][msg.sender]);    // Check allowance
+        balanceOf[_from] -= _value;                         // Subtract from the targeted balance
+        allowance[_from][msg.sender] -= _value;             // Subtract from the sender's allowance
+        totalSupply -= _value;                              // Update totalSupply
+        Burn(_from, _value);
+        return true;
+    }
+
+==============================================================================
+[13] BitDAO.sol:tryMul L47-55  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x1a4b46696b2bb4794eb3d4c26f1c55f9170fa4c5_eth\BitDAO.sol
+==============================================================================
+// pragma: solidity >=0.6.5 <0.8.0;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+==============================================================================
+[14] ETH.sol:transferFrom L71-89  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3432b6a60d23ca0dfca7761b7ab56459d9c964d0_eth\ETH.sol
+==============================================================================
+// pragma: solidity 0.6.11;
+// contract: WETH
+    function transferFrom(address src, address dst, uint wad)
+        public
+        override
+        returns (bool)
+    {
+        require(balanceOf[src] >= wad);
+
+        if (src != msg.sender && allowance[src][msg.sender] != uint(-1)) {
+            require(allowance[src][msg.sender] >= wad);
+            allowance[src][msg.sender] -= wad;
+        }
+
+        balanceOf[src] -= wad;
+        balanceOf[dst] += wad;
+
+        emit Transfer(src, dst, wad);
+
+        return true;
+    }
+
+==============================================================================
+[15] niswapV2Pair.sol:_update L89-102  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3432b6a60d23ca0dfca7761b7ab56459d9c964d0_eth\niswapV2Pair.sol
+==============================================================================
+// pragma: solidity 0.6.11;
+// contract: UniswapV2Pair
+    function _update(uint balance0, uint balance1, uint112 _reserve0, uint112 _reserve1) private {
+        require(balance0 <= uint112(-1) && balance1 <= uint112(-1), 'UniswapV2: OVERFLOW');
+        uint32 blockTimestamp = uint32(block.timestamp % 2**32);
+        uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
+        if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
+            // * never overflows, and + overflow is desired
+            price0CumulativeLast += uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
+            price1CumulativeLast += uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
+        }
+        reserve0 = uint112(balance0);
+        reserve1 = uint112(balance1);
+        blockTimestampLast = blockTimestamp;
+        emit Sync(reserve0, reserve1);
+    }
+
+==============================================================================
+[16] tringHelpers.sol:safeParseInt L125-148  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3432b6a60d23ca0dfca7761b7ab56459d9c964d0_eth\tringHelpers.sol
+==============================================================================
+// pragma: solidity 0.6.11;
+// contract: ?
+    function safeParseInt(string memory _a, uint _b) internal pure returns (uint _parsedInt) {
+        bytes memory bresult = bytes(_a);
+        uint mint = 0;
+        bool decimals = false;
+        for (uint i = 0; i < bresult.length; i++) {
+            if ((uint(uint8(bresult[i])) >= 48) && (uint(uint8(bresult[i])) <= 57)) {
+                if (decimals) {
+                   if (_b == 0) break;
+                    else _b--;
+                }
+                mint *= 10;
+                mint += uint(uint8(bresult[i])) - 48;
+            } else if (uint(uint8(bresult[i])) == 46) {
+                require(!decimals, 'More than one decimal encountered in string!');
+                decimals = true;
+            } else {
+                revert("Non-numeral character encountered in string!");
+            }
+        }
+        if (_b > 0) {
+            mint *= 10 ** _b;
+        }
+        return mint;
+    }
+
+==============================================================================
+[17] tringHelpers.sol:parseInt L154-177  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3432b6a60d23ca0dfca7761b7ab56459d9c964d0_eth\tringHelpers.sol
+==============================================================================
+// pragma: solidity 0.6.11;
+// contract: ?
+    function parseInt(string memory _a, uint _b) internal pure returns (uint _parsedInt) {
+        bytes memory bresult = bytes(_a);
+        uint mint = 0;
+        bool decimals = false;
+        for (uint i = 0; i < bresult.length; i++) {
+            if ((uint(uint8(bresult[i])) >= 48) && (uint(uint8(bresult[i])) <= 57)) {
+                if (decimals) {
+                   if (_b == 0) {
+                       break;
+                   } else {
+                       _b--;
+                   }
+                }
+                mint *= 10;
+                mint += uint(uint8(bresult[i])) - 48;
+            } else if (uint(uint8(bresult[i])) == 46) {
+                decimals = true;
+            }
+        }
+        if (_b > 0) {
+            mint *= 10 ** _b;
+        }
+        return mint;
+    }
+
+==============================================================================
+[18] BTT.sol:tryMul L154-162  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x352cb5e19b12fc216548a2677bd0fce83bae434b_bsc\BTT.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+==============================================================================
+[19] BscToken.sol:divCeil L24-32  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x4691937a7508860f876c9c0a2a617e7d9e945d4b_bsc\BscToken.sol
+==============================================================================
+// pragma: solidity 0.6.9;
+// contract: ?
+    function divCeil(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 quotient = div(a, b);
+        uint256 remainder = a - quotient * b;
+        if (remainder > 0) {
+            return quotient + 1;
+        } else {
+            return quotient;
+        }
+    }
+
+==============================================================================
+[20] WootradeNetwork.sol:transfer L42-49  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x4691937a7508860f876c9c0a2a617e7d9e945d4b_eth\WootradeNetwork.sol
+==============================================================================
+// pragma: solidity ^0.4.4;
+// contract: StandardToken
+    function transfer(address _to, uint256 _value) public returns (bool success) {
+        if (balances[msg.sender] >= _value && _value > 0) {
+            balances[msg.sender] -= _value;
+            balances[_to] += _value;
+            Transfer(msg.sender, _to, _value);
+            return true;
+        } else { return false; }
+    }
+
+==============================================================================
+[21] WootradeNetwork.sol:transferFrom L51-59  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x4691937a7508860f876c9c0a2a617e7d9e945d4b_eth\WootradeNetwork.sol
+==============================================================================
+// pragma: solidity ^0.4.4;
+// contract: StandardToken
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool success) {
+        if (balances[_from] >= _value && allowed[_from][msg.sender] >= _value && _value > 0) {
+            balances[_to] += _value;
+            balances[_from] -= _value;
+            allowed[_from][msg.sender] -= _value;
+            Transfer(_from, _to, _value);
+            return true;
+        } else { return false; }
+    }
+
+==============================================================================
+[22] TRX.sol:tryMul L154-162  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x50327c6c5a14dcade707abad2e27eb517df87ab5_eth\TRX.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+==============================================================================
+[23] ERC20.sol:_transfer L209-221  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x582d872a1b094fc48f5de31d3b73f2d9be47def1_eth\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.7.4;
+// contract: ERC20
+    function _transfer(address sender, address recipient, uint256 amount) internal virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(sender, recipient, amount);
+
+        uint256 senderBalance = _balances[sender];
+        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        _balances[sender] = senderBalance - amount;
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_beforeTokenTransfer] ----
+function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
+
+==============================================================================
+[24] ERC20.sol:_mint L232-240  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x582d872a1b094fc48f5de31d3b73f2d9be47def1_eth\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.7.4;
+// contract: ERC20
+    function _mint(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: mint to the zero address");
+
+        _beforeTokenTransfer(address(0), account, amount);
+
+        _totalSupply += amount;
+        _balances[account] += amount;
+        emit Transfer(address(0), account, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_beforeTokenTransfer] ----
+function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
+
+==============================================================================
+[25] ERC20.sol:_burn L253-264  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x582d872a1b094fc48f5de31d3b73f2d9be47def1_eth\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.7.4;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        _balances[account] = accountBalance - amount;
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_beforeTokenTransfer] ----
+function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
+
+==============================================================================
+[26] GnosisToken.sol:transfer L37-49  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x6810e776880c02933d47db1b9fc05908e5386b96_eth\GnosisToken.sol
+==============================================================================
+// pragma: solidity 0.4.10;
+// contract: StandardToken
+    function transfer(address _to, uint256 _value)
+        public
+        returns (bool)
+    {
+        if (balances[msg.sender] < _value) {
+            // Balance too low
+            throw;
+        }
+        balances[msg.sender] -= _value;
+        balances[_to] += _value;
+        Transfer(msg.sender, _to, _value);
+        return true;
+    }
+
+==============================================================================
+[27] GnosisToken.sol:transferFrom L56-69  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x6810e776880c02933d47db1b9fc05908e5386b96_eth\GnosisToken.sol
+==============================================================================
+// pragma: solidity 0.4.10;
+// contract: StandardToken
+    function transferFrom(address _from, address _to, uint256 _value)
+        public
+        returns (bool)
+    {
+        if (balances[_from] < _value || allowed[_from][msg.sender] < _value) {
+            // Balance or allowance too low
+            throw;
+        }
+        balances[_to] += _value;
+        balances[_from] -= _value;
+        allowed[_from][msg.sender] -= _value;
+        Transfer(_from, _to, _value);
+        return true;
+    }
+
+==============================================================================
+[28] GnosisToken.sol:GnosisToken L130-150  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x6810e776880c02933d47db1b9fc05908e5386b96_eth\GnosisToken.sol
+==============================================================================
+// pragma: solidity 0.4.10;
+// contract: GnosisToken
+    function GnosisToken(address dutchAuction, address[] owners, uint[] tokens)
+        public
+    {
+        if (dutchAuction == 0)
+            // Address should not be null.
+            throw;
+        totalSupply = 10000000 * 10**18;
+        balances[dutchAuction] = 9000000 * 10**18;
+        Transfer(0, dutchAuction, balances[dutchAuction]);
+        uint assignedTokens = balances[dutchAuction];
+        for (uint i=0; i<owners.length; i++) {
+            if (owners[i] == 0)
+                // Address should not be null.
+                throw;
+            balances[owners[i]] += tokens[i];
+            Transfer(0, owners[i], tokens[i]);
+            assignedTokens += tokens[i];
+        }
+        if (assignedTokens != totalSupply)
+            throw;
+    }
+
+==============================================================================
+[29] PepeToken.sol:_transfer L445-465  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x6982508145454ce325ddbe47a25d4ec3d2311933_eth\PepeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(sender, recipient, amount);
+
+        uint256 senderBalance = _balances[sender];
+        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[sender] = senderBalance - amount;
+        }
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+
+        _afterTokenTransfer(sender, recipient, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[30] PepeToken.sol:_burn L499-514  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x6982508145454ce325ddbe47a25d4ec3d2311933_eth\PepeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+        }
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[31] MaskToken.sol:tryMul L154-162  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x69af81e73a73b40adf4f3d4223cd9b1ece623074_eth\MaskToken.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+==============================================================================
+[32] HBToken.sol:transfer L42-50  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x6f259637dcd74c767781e37bc6133cd6a68aa161_eth\HBToken.sol
+==============================================================================
+// pragma: solidity 0.4.19;
+// contract: RegularToken
+    function transfer(address _to, uint _value) returns (bool) {
+        //Default assumes totalSupply can't be over max (2^256 - 1).
+        if (balances[msg.sender] >= _value && balances[_to] + _value >= balances[_to]) {
+            balances[msg.sender] -= _value;
+            balances[_to] += _value;
+            Transfer(msg.sender, _to, _value);
+            return true;
+        } else { return false; }
+    }
+
+==============================================================================
+[33] HBToken.sol:transferFrom L52-60  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x6f259637dcd74c767781e37bc6133cd6a68aa161_eth\HBToken.sol
+==============================================================================
+// pragma: solidity 0.4.19;
+// contract: RegularToken
+    function transferFrom(address _from, address _to, uint _value) returns (bool) {
+        if (balances[_from] >= _value && allowed[_from][msg.sender] >= _value && balances[_to] + _value >= balances[_to]) {
+            balances[_to] += _value;
+            balances[_from] -= _value;
+            allowed[_from][msg.sender] -= _value;
+            Transfer(_from, _to, _value);
+            return true;
+        } else { return false; }
+    }
+
+==============================================================================
+[34] HBToken.sol:transferFrom L90-109  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x6f259637dcd74c767781e37bc6133cd6a68aa161_eth\HBToken.sol
+==============================================================================
+// pragma: solidity 0.4.19;
+// contract: UnboundedRegularToken
+    function transferFrom(address _from, address _to, uint _value)
+        public
+        returns (bool)
+    {
+        uint allowance = allowed[_from][msg.sender];
+        if (balances[_from] >= _value
+            && allowance >= _value
+            && balances[_to] + _value >= balances[_to]
+        ) {
+            balances[_to] += _value;
+            balances[_from] -= _value;
+            if (allowance < MAX_UINT) {
+                allowed[_from][msg.sender] -= _value;
+            }
+            Transfer(_from, _to, _value);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+==============================================================================
+[35] ERC20.sol:_transfer L209-221  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x76a797a59ba2c17726896976b7b3747bfd1d220f_bsc\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.7.4;
+// contract: ERC20
+    function _transfer(address sender, address recipient, uint256 amount) internal virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(sender, recipient, amount);
+
+        uint256 senderBalance = _balances[sender];
+        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        _balances[sender] = senderBalance - amount;
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_beforeTokenTransfer] ----
+function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
+
+==============================================================================
+[36] ERC20.sol:_mint L232-240  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x76a797a59ba2c17726896976b7b3747bfd1d220f_bsc\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.7.4;
+// contract: ERC20
+    function _mint(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: mint to the zero address");
+
+        _beforeTokenTransfer(address(0), account, amount);
+
+        _totalSupply += amount;
+        _balances[account] += amount;
+        emit Transfer(address(0), account, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_beforeTokenTransfer] ----
+function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
+
+==============================================================================
+[37] ERC20.sol:_burn L253-264  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x76a797a59ba2c17726896976b7b3747bfd1d220f_bsc\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.7.4;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        _balances[account] = accountBalance - amount;
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_beforeTokenTransfer] ----
+function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
+
+==============================================================================
+[38] ETH.sol:transferFrom L71-89  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x853d955acef822db058eb8505911ed77f175b99e_eth\ETH.sol
+==============================================================================
+// pragma: solidity 0.6.11;
+// contract: WETH
+    function transferFrom(address src, address dst, uint wad)
+        public
+        override
+        returns (bool)
+    {
+        require(balanceOf[src] >= wad);
+
+        if (src != msg.sender && allowance[src][msg.sender] != uint(-1)) {
+            require(allowance[src][msg.sender] >= wad);
+            allowance[src][msg.sender] -= wad;
+        }
+
+        balanceOf[src] -= wad;
+        balanceOf[dst] += wad;
+
+        emit Transfer(src, dst, wad);
+
+        return true;
+    }
+
+==============================================================================
+[39] niswapV2Pair.sol:_update L89-102  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x853d955acef822db058eb8505911ed77f175b99e_eth\niswapV2Pair.sol
+==============================================================================
+// pragma: solidity 0.6.11;
+// contract: UniswapV2Pair
+    function _update(uint balance0, uint balance1, uint112 _reserve0, uint112 _reserve1) private {
+        require(balance0 <= uint112(-1) && balance1 <= uint112(-1), 'UniswapV2: OVERFLOW');
+        uint32 blockTimestamp = uint32(block.timestamp % 2**32);
+        uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
+        if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
+            // * never overflows, and + overflow is desired
+            price0CumulativeLast += uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
+            price1CumulativeLast += uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
+        }
+        reserve0 = uint112(balance0);
+        reserve1 = uint112(balance1);
+        blockTimestampLast = blockTimestamp;
+        emit Sync(reserve0, reserve1);
+    }
+
+==============================================================================
+[40] tringHelpers.sol:safeParseInt L125-148  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x853d955acef822db058eb8505911ed77f175b99e_eth\tringHelpers.sol
+==============================================================================
+// pragma: solidity 0.6.11;
+// contract: ?
+    function safeParseInt(string memory _a, uint _b) internal pure returns (uint _parsedInt) {
+        bytes memory bresult = bytes(_a);
+        uint mint = 0;
+        bool decimals = false;
+        for (uint i = 0; i < bresult.length; i++) {
+            if ((uint(uint8(bresult[i])) >= 48) && (uint(uint8(bresult[i])) <= 57)) {
+                if (decimals) {
+                   if (_b == 0) break;
+                    else _b--;
+                }
+                mint *= 10;
+                mint += uint(uint8(bresult[i])) - 48;
+            } else if (uint(uint8(bresult[i])) == 46) {
+                require(!decimals, 'More than one decimal encountered in string!');
+                decimals = true;
+            } else {
+                revert("Non-numeral character encountered in string!");
+            }
+        }
+        if (_b > 0) {
+            mint *= 10 ** _b;
+        }
+        return mint;
+    }
+
+==============================================================================
+[41] tringHelpers.sol:parseInt L154-177  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x853d955acef822db058eb8505911ed77f175b99e_eth\tringHelpers.sol
+==============================================================================
+// pragma: solidity 0.6.11;
+// contract: ?
+    function parseInt(string memory _a, uint _b) internal pure returns (uint _parsedInt) {
+        bytes memory bresult = bytes(_a);
+        uint mint = 0;
+        bool decimals = false;
+        for (uint i = 0; i < bresult.length; i++) {
+            if ((uint(uint8(bresult[i])) >= 48) && (uint(uint8(bresult[i])) <= 57)) {
+                if (decimals) {
+                   if (_b == 0) {
+                       break;
+                   } else {
+                       _b--;
+                   }
+                }
+                mint *= 10;
+                mint += uint(uint8(bresult[i])) - 48;
+            } else if (uint(uint8(bresult[i])) == 46) {
+                decimals = true;
+            }
+        }
+        if (_b > 0) {
+            mint *= 10 ** _b;
+        }
+        return mint;
+    }
+
+==============================================================================
+[42] IbcToken.sol:_transfer L392-415  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x8d983cb9388eac77af0474fa441c4815500cb7bb_eth\IbcToken.sol
+==============================================================================
+// pragma: solidity 0.8.0;
+// contract: ERC20
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(sender, recipient, amount);
+
+        uint256 senderBalance = _balances[sender];
+        require(
+            senderBalance >= amount,
+            "ERC20: transfer amount exceeds balance"
+        );
+        unchecked {
+            _balances[sender] = senderBalance - amount;
+        }
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+
+        _afterTokenTransfer(sender, recipient, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[43] IbcToken.sol:_burn L449-464  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x8d983cb9388eac77af0474fa441c4815500cb7bb_eth\IbcToken.sol
+==============================================================================
+// pragma: solidity 0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+        }
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[44] IbcToken.sol:_transfer L392-415  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x93a62ccfcf1efcb5f60317981f71ed6fb39f4ba2_eth\IbcToken.sol
+==============================================================================
+// pragma: solidity 0.8.0;
+// contract: ERC20
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(sender, recipient, amount);
+
+        uint256 senderBalance = _balances[sender];
+        require(
+            senderBalance >= amount,
+            "ERC20: transfer amount exceeds balance"
+        );
+        unchecked {
+            _balances[sender] = senderBalance - amount;
+        }
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+
+        _afterTokenTransfer(sender, recipient, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[45] IbcToken.sol:_burn L449-464  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x93a62ccfcf1efcb5f60317981f71ed6fb39f4ba2_eth\IbcToken.sol
+==============================================================================
+// pragma: solidity 0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+        }
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[46] DSToken.sol:rpow L149-159  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2_eth\DSToken.sol
+==============================================================================
+// pragma: solidity ^0.4.15;
+// contract: DSMath
+    function rpow(uint x, uint n) internal pure returns (uint z) {
+        z = n % 2 != 0 ? x : RAY;
+
+        for (n /= 2; n != 0; n /= 2) {
+            x = rmul(x, x);
+
+            if (n % 2 != 0) {
+                z = rmul(z, x);
+            }
+        }
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [rmul] ----
+function rmul(uint x, uint y) internal pure returns (uint z) {
+        z = add(mul(x, y), RAY / 2) / RAY;
+    }
+
+==============================================================================
+[47] CoinToken.sol:tryMul L35-45  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xac57de9c1a09fec648e93eb98875b212db0d460b_eth\CoinToken.sol
+==============================================================================
+// pragma: solidity ^0.8.4;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        unchecked {
+            // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+            // benefit is lost if 'b' is also tested.
+            // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+            if (a == 0) return (true, 0);
+            uint256 c = a * b;
+            if (c / a != b) return (false, 0);
+            return (true, c);
+        }
+    }
+
+==============================================================================
+[48] WBNB.sol:transferFrom L48-65  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c_bsc\WBNB.sol
+==============================================================================
+// pragma: solidity ^0.4.18;
+// contract: WBNB
+    function transferFrom(address src, address dst, uint wad)
+    public
+    returns (bool)
+    {
+        require(balanceOf[src] >= wad);
+
+        if (src != msg.sender && allowance[src][msg.sender] != uint(-1)) {
+            require(allowance[src][msg.sender] >= wad);
+            allowance[src][msg.sender] -= wad;
+        }
+
+        balanceOf[src] -= wad;
+        balanceOf[dst] += wad;
+
+        Transfer(src, dst, wad);
+
+        return true;
+    }
+
+==============================================================================
+[49] ONUSToken.sol:tryMul L139-147  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xc0a1adce1c62daedf1b5f07b31266090bc5cc6d2_poly\ONUSToken.sol
+==============================================================================
+// pragma: solidity 0.6.12;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+==============================================================================
+[50] BTT.sol:tryMul L154-162  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xc669928185dbce49d2230cc9b0979be6dc797957_eth\BTT.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+==============================================================================
+[51] CoinToken.sol:lock L443-448  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xc748673057861a797275cd8a068abb95a902e8de_bsc\CoinToken.sol
+==============================================================================
+// pragma: solidity ^0.6.12;
+// contract: Ownable
+    function lock(uint256 time) public virtual onlyOwner {
+        _previousOwner = _owner;
+        _owner = address(0);
+        _lockTime = now + time;
+        emit OwnershipTransferred(_owner, address(0));
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner() {
+        require(_owner == _msgSender(), "Ownable: caller is not the owner");
+        _;
+    
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address payable) {
+        return msg.sender;
+    }
+
+==============================================================================
+[52] TRX.sol:tryMul L154-162  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xce7de646e7208a4ef112cb6ed5038fa6cc6b12e3_bsc\TRX.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+==============================================================================
+[53] TetherToken.sol:issue L402-409  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xdac17f958d2ee523a2206206994597c13d831ec7_eth\TetherToken.sol
+==============================================================================
+// pragma: solidity ^0.4.17;
+// contract: TetherToken
+    function issue(uint amount) public onlyOwner {
+        require(_totalSupply + amount > _totalSupply);
+        require(balances[owner] + amount > balances[owner]);
+
+        balances[owner] += amount;
+        _totalSupply += amount;
+        Issue(amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner() {
+        require(msg.sender == owner);
+        _;
+    
+
+==============================================================================
+[54] ZRXToken.sol:transfer L60-68  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe41d2489571d322189246dafa5ebde1f4699f498_eth\ZRXToken.sol
+==============================================================================
+// pragma: solidity 0.4.11;
+// contract: StandardToken
+    function transfer(address _to, uint _value) returns (bool) {
+        //Default assumes totalSupply can't be over max (2^256 - 1).
+        if (balances[msg.sender] >= _value && balances[_to] + _value >= balances[_to]) {
+            balances[msg.sender] -= _value;
+            balances[_to] += _value;
+            Transfer(msg.sender, _to, _value);
+            return true;
+        } else { return false; }
+    }
+
+==============================================================================
+[55] ZRXToken.sol:transferFrom L70-78  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe41d2489571d322189246dafa5ebde1f4699f498_eth\ZRXToken.sol
+==============================================================================
+// pragma: solidity 0.4.11;
+// contract: StandardToken
+    function transferFrom(address _from, address _to, uint _value) returns (bool) {
+        if (balances[_from] >= _value && allowed[_from][msg.sender] >= _value && balances[_to] + _value >= balances[_to]) {
+            balances[_to] += _value;
+            balances[_from] -= _value;
+            allowed[_from][msg.sender] -= _value;
+            Transfer(_from, _to, _value);
+            return true;
+        } else { return false; }
+    }
+
+==============================================================================
+[56] ZRXToken.sol:transferFrom L108-127  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe41d2489571d322189246dafa5ebde1f4699f498_eth\ZRXToken.sol
+==============================================================================
+// pragma: solidity 0.4.11;
+// contract: UnlimitedAllowanceToken
+    function transferFrom(address _from, address _to, uint _value)
+        public
+        returns (bool)
+    {
+        uint allowance = allowed[_from][msg.sender];
+        if (balances[_from] >= _value
+            && allowance >= _value
+            && balances[_to] + _value >= balances[_to]
+        ) {
+            balances[_to] += _value;
+            balances[_from] -= _value;
+            if (allowance < MAX_UINT) {
+                allowed[_from][msg.sender] -= _value;
+            }
+            Transfer(_from, _to, _value);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+==============================================================================
+[57] ERC20.sol:_transfer L226-246  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe3c408bd53c31c085a1746af401a4042954ff740_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+        }
+        _balances[to] += amount;
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[58] ERC20.sol:_burn L280-295  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe3c408bd53c31c085a1746af401a4042954ff740_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+        }
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[59] SafeMath.sol:tryMul L45-53  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xd33526068d116ce69f19a9ee46f0bd304f21a51f_eth\zeppelin\contracts\math\SafeMath.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+==============================================================================
+[60] SafeMath.sol:tryMul L45-53  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xd17479997f34dd9156deef8f95a52d81d265be9c_bsc\openzeppelin\contracts\math\SafeMath.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+==============================================================================
+[61] ERC20.sol:_transfer L220-240  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xc18360217d8f7ab5e7c516566761ea12ce7f9d72_eth\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(sender, recipient, amount);
+
+        uint256 senderBalance = _balances[sender];
+        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[sender] = senderBalance - amount;
+        }
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+
+        _afterTokenTransfer(sender, recipient, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[62] ERC20.sol:_burn L274-289  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xc18360217d8f7ab5e7c516566761ea12ce7f9d72_eth\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+        }
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[63] ERC20Storage.sol:increaseAllowance L81-93  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xbdeae1ca48894a1759a8374d63925f21f2ee2639_bsc\token\ERC20\libraries\ERC20Storage.sol
+==============================================================================
+// pragma: solidity ^0.8.8;
+// contract: ?
+    function increaseAllowance(Layout storage s, address owner, address spender, uint256 value) internal {
+        require(spender != address(0), "ERC20: approval to address(0)");
+        uint256 allowance_ = s.allowances[owner][spender];
+        if (value != 0) {
+            unchecked {
+                uint256 newAllowance = allowance_ + value;
+                require(newAllowance > allowance_, "ERC20: allowance overflow");
+                s.allowances[owner][spender] = newAllowance;
+                allowance_ = newAllowance;
+            }
+        }
+        emit Approval(owner, spender, allowance_);
+    }
+
+==============================================================================
+[64] ERC20Storage.sol:decreaseAllowance L103-117  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xbdeae1ca48894a1759a8374d63925f21f2ee2639_bsc\token\ERC20\libraries\ERC20Storage.sol
+==============================================================================
+// pragma: solidity ^0.8.8;
+// contract: ?
+    function decreaseAllowance(Layout storage s, address owner, address spender, uint256 value) internal {
+        require(spender != address(0), "ERC20: approval to address(0)");
+        uint256 allowance_ = s.allowances[owner][spender];
+
+        if (allowance_ != type(uint256).max && value != 0) {
+            unchecked {
+                // save gas when allowance is maximal by not reducing it (see https://github.com/ethereum/EIPs/issues/717)
+                uint256 newAllowance = allowance_ - value;
+                require(newAllowance < allowance_, "ERC20: insufficient allowance");
+                s.allowances[owner][spender] = newAllowance;
+                allowance_ = newAllowance;
+            }
+        }
+        emit Approval(owner, spender, allowance_);
+    }
+
+==============================================================================
+[65] ERC20Storage.sol:transfer L127-143  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xbdeae1ca48894a1759a8374d63925f21f2ee2639_bsc\token\ERC20\libraries\ERC20Storage.sol
+==============================================================================
+// pragma: solidity ^0.8.8;
+// contract: ?
+    function transfer(Layout storage s, address from, address to, uint256 value) internal {
+        require(to != address(0), "ERC20: transfer to address(0)");
+
+        if (value != 0) {
+            uint256 balance = s.balances[from];
+            unchecked {
+                uint256 newBalance = balance - value;
+                require(newBalance < balance, "ERC20: insufficient balance");
+                if (from != to) {
+                    s.balances[from] = newBalance;
+                    s.balances[to] += value;
+                }
+            }
+        }
+
+        emit Transfer(from, to, value);
+    }
+
+==============================================================================
+[66] ERC20Storage.sol:mint L318-330  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xbdeae1ca48894a1759a8374d63925f21f2ee2639_bsc\token\ERC20\libraries\ERC20Storage.sol
+==============================================================================
+// pragma: solidity ^0.8.8;
+// contract: ?
+    function mint(Layout storage s, address to, uint256 value) internal {
+        require(to != address(0), "ERC20: mint to address(0)");
+        if (value != 0) {
+            uint256 supply = s.supply;
+            unchecked {
+                uint256 newSupply = supply + value;
+                require(newSupply > supply, "ERC20: supply overflow");
+                s.supply = newSupply;
+                s.balances[to] += value; // balance cannot overflow if supply does not
+            }
+        }
+        emit Transfer(address(0), to, value);
+    }
+
+==============================================================================
+[67] ERC20Storage.sol:burn L379-391  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xbdeae1ca48894a1759a8374d63925f21f2ee2639_bsc\token\ERC20\libraries\ERC20Storage.sol
+==============================================================================
+// pragma: solidity ^0.8.8;
+// contract: ?
+    function burn(Layout storage s, address from, uint256 value) internal {
+        if (value != 0) {
+            uint256 balance = s.balances[from];
+            unchecked {
+                uint256 newBalance = balance - value;
+                require(newBalance < balance, "ERC20: insufficient balance");
+                s.balances[from] = newBalance;
+                s.supply -= value; // will not underflow if balance does not
+            }
+        }
+
+        emit Transfer(from, address(0), value);
+    }
+
+==============================================================================
+[68] ERC20.sol:_transfer L219-239  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x9d65ff81a3c488d585bbfb0bfe3c7707c7917f54_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(sender, recipient, amount);
+
+        uint256 senderBalance = _balances[sender];
+        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[sender] = senderBalance - amount;
+        }
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+
+        _afterTokenTransfer(sender, recipient, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[69] ERC20.sol:_burn L273-288  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x9d65ff81a3c488d585bbfb0bfe3c7707c7917f54_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+        }
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[70] SafeMath.sol:tryMul L45-53  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x9813037ee2218799597d83d4a5b6f3b6778218d9_eth\openzeppelin\contracts\math\SafeMath.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+==============================================================================
+[71] Math.sol:mulDiv L55-135  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x5283d291dbcf85356a21ba090e6db59121208b44_eth\openzeppelin\contracts\utils\math\Math.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function mulDiv(
+        uint256 x,
+        uint256 y,
+        uint256 denominator
+    ) internal pure returns (uint256 result) {
+        unchecked {
+            // 512-bit multiply [prod1 prod0] = x * y. Compute the product mod 2^256 and mod 2^256 - 1, then use
+            // use the Chinese Remainder Theorem to reconstruct the 512 bit result. The result is stored in two 256
+            // variables such that product = prod1 * 2^256 + prod0.
+            uint256 prod0; // Least significant 256 bits of the product
+            uint256 prod1; // Most significant 256 bits of the product
+            assembly {
+                let mm := mulmod(x, y, not(0))
+                prod0 := mul(x, y)
+                prod1 := sub(sub(mm, prod0), lt(mm, prod0))
+            }
+
+            // Handle non-overflow cases, 256 by 256 division.
+            if (prod1 == 0) {
+                return prod0 / denominator;
+            }
+
+            // Make sure the result is less than 2^256. Also prevents denominator == 0.
+            require(denominator > prod1);
+
+            ///////////////////////////////////////////////
+            // 512 by 256 division.
+            ///////////////////////////////////////////////
+
+            // Make division exact by subtracting the remainder from [prod1 prod0].
+            uint256 remainder;
+            assembly {
+                // Compute remainder using mulmod.
+                remainder := mulmod(x, y, denominator)
+
+                // Subtract 256 bit number from 512 bit number.
+                prod1 := sub(prod1, gt(remainder, prod0))
+                prod0 := sub(prod0, remainder)
+            }
+
+            // Factor powers of two out of denominator and compute largest power of two divisor of denominator. Always >= 1.
+            // See https://cs.stackexchange.com/q/138556/92363.
+
+            // Does not overflow because the denominator cannot be zero at this stage in the function.
+            uint256 twos = denominator & (~denominator + 1);
+            assembly {
+                // Divide denominator by twos.
+                denominator := div(denominator, twos)
+
+                // Divide [prod1 prod0] by twos.
+                prod0 := div(prod0, twos)
+
+                // Flip twos such that it is 2^256 / twos. If twos is zero, then it becomes one.
+                twos := add(div(sub(0, twos), twos), 1)
+            }
+
+            // Shift in bits from prod1 into prod0.
+            prod0 |= prod1 * twos;
+
+            // Invert denominator mod 2^256. Now that denominator is an odd number, it has an inverse modulo 2^256 such
+            // that denominator * inv = 1 mod 2^256. Compute the inverse by starting with a seed that is correct for
+            // four bits. That is, denominator * inv = 1 mod 2^4.
+            uint256 inverse = (3 * denominator) ^ 2;
+
+            // Use the Newton-Raphson iteration to improve the precision. Thanks to Hensel's lifting lemma, this also works
+            // in modular arithmetic, doubling the correct bits in each step.
+            inverse *= 2 - denominator * inverse; // inverse mod 2^8
+            inverse *= 2 - denominator * inverse; // inverse mod 2^16
+            inverse *= 2 - denominator * inverse; // inverse mod 2^32
+            inverse *= 2 - denominator * inverse; // inverse mod 2^64
+            inverse *= 2 - denominator * inverse; // inverse mod 2^128
+            inverse *= 2 - denominator * inverse; // inverse mod 2^256
+
+            // Because the division is now exact we can divide by multiplying with the modular inverse of denominator.
+            // This will give us the correct result modulo 2^256. Since the preconditions guarantee that the outcome is
+            // less than 2^256, this is the final result. We don't need to compute the high bits of the result and prod1
+            // is no longer required.
+            result = prod0 * inverse;
+            return result;
+        }
+    }
+
+==============================================================================
+[72] ERC20.sol:_transfer L226-248  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x5283d291dbcf85356a21ba090e6db59121208b44_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+            // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
+            // decrementing then incrementing.
+            _balances[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[73] ERC20.sol:_mint L259-272  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x5283d291dbcf85356a21ba090e6db59121208b44_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _mint(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: mint to the zero address");
+
+        _beforeTokenTransfer(address(0), account, amount);
+
+        _totalSupply += amount;
+        unchecked {
+            // Overflow not possible: balance + amount is at most totalSupply + amount, which is checked above.
+            _balances[account] += amount;
+        }
+        emit Transfer(address(0), account, amount);
+
+        _afterTokenTransfer(address(0), account, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[74] ERC20.sol:_burn L285-301  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x5283d291dbcf85356a21ba090e6db59121208b44_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+            // Overflow not possible: amount <= accountBalance <= totalSupply.
+            _totalSupply -= amount;
+        }
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[75] ERC20.sol:_transfer L221-241  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x4d224452801aced8b2f0aebe155379bb5d594381_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(sender, recipient, amount);
+
+        uint256 senderBalance = _balances[sender];
+        require(senderBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[sender] = senderBalance - amount;
+        }
+        _balances[recipient] += amount;
+
+        emit Transfer(sender, recipient, amount);
+
+        _afterTokenTransfer(sender, recipient, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[76] ERC20.sol:_burn L275-290  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x4d224452801aced8b2f0aebe155379bb5d594381_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+        }
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[77] SafeMath.sol:tryMul L45-53  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x4184aa04215e5d716dd4c213fed519acadc68f92_eth\libs\SafeMath.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+==============================================================================
+[78] ERC20BaseToken.sol:_transfer L156-163  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3845badade8e6dff049820680d1f14bd3903a5d0_eth\Sand\erc20\ERC20BaseToken.sol
+==============================================================================
+// pragma: solidity 0.5.9;
+// contract: ERC20BaseToken
+    function _transfer(address from, address to, uint256 amount) internal {
+        require(to != address(0), "Cannot send to 0x0");
+        uint256 currentBalance = _balances[from];
+        require(currentBalance >= amount, "not enough fund");
+        _balances[from] = currentBalance - amount;
+        _balances[to] += amount;
+        emit Transfer(from, to, amount);
+    }
+
+==============================================================================
+[79] ERC20BaseToken.sol:_mint L165-174  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3845badade8e6dff049820680d1f14bd3903a5d0_eth\Sand\erc20\ERC20BaseToken.sol
+==============================================================================
+// pragma: solidity 0.5.9;
+// contract: ERC20BaseToken
+    function _mint(address to, uint256 amount) internal {
+        require(to != address(0), "Cannot mint to 0x0");
+        require(amount > 0, "cannot mint 0 tokens");
+        uint256 currentTotalSupply = _totalSupply;
+        uint256 newTotalSupply = currentTotalSupply + amount;
+        require(newTotalSupply > currentTotalSupply, "overflow");
+        _totalSupply = newTotalSupply;
+        _balances[to] += amount;
+        emit Transfer(address(0), to, amount);
+    }
+
+==============================================================================
+[80] ERC20BaseToken.sol:_burn L176-195  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3845badade8e6dff049820680d1f14bd3903a5d0_eth\Sand\erc20\ERC20BaseToken.sol
+==============================================================================
+// pragma: solidity 0.5.9;
+// contract: ERC20BaseToken
+    function _burn(address from, uint256 amount) internal {
+        require(amount > 0, "cannot burn 0 tokens");
+        if (msg.sender != from && !_superOperators[msg.sender]) {
+            uint256 currentAllowance = _allowances[from][msg.sender];
+            require(
+                currentAllowance >= amount,
+                "Not enough funds allowed"
+            );
+            if (currentAllowance != (2**256) - 1) {
+                // save gas when allowance is maximal by not reducing it (see https://github.com/ethereum/EIPs/issues/717)
+                _allowances[from][msg.sender] = currentAllowance - amount;
+            }
+        }
+
+        uint256 currentBalance = _balances[from];
+        require(currentBalance >= amount, "Not enough funds");
+        _balances[from] = currentBalance - amount;
+        _totalSupply -= amount;
+        emit Transfer(from, address(0), amount);
+    }
+
+==============================================================================
+[81] ERC20ExecuteExtension.sol:_charge L135-151  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3845badade8e6dff049820680d1f14bd3903a5d0_eth\Sand\erc20\ERC20ExecuteExtension.sol
+==============================================================================
+// pragma: solidity 0.5.9;
+// contract: ERC20ExecuteExtension
+    function _charge(
+        address from,
+        uint256 gasLimit,
+        uint256 tokenGasPrice,
+        uint256 initialGas,
+        uint256 baseGasCharge,
+        address tokenReceiver
+    ) internal {
+        uint256 gasCharge = initialGas - gasleft();
+        if(gasCharge > gasLimit) {
+            gasCharge = gasLimit;
+        }
+        gasCharge += baseGasCharge;
+        uint256 tokensToCharge = gasCharge * tokenGasPrice;
+        require(tokensToCharge / gasCharge == tokenGasPrice, "overflow");
+        _transfer(from, tokenReceiver, tokensToCharge);
+    }
+
+==============================================================================
+[82] BytesUtil.sol:memcpy L4-21  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3845badade8e6dff049820680d1f14bd3903a5d0_eth\racts_common\src\Libraries\BytesUtil.sol
+==============================================================================
+// pragma: solidity ^0.5.2;
+// contract: ?
+    function memcpy(uint256 dest, uint256 src, uint256 len) internal pure {
+        // Copy word-length chunks while possible
+        for (; len >= 32; len -= 32) {
+            assembly {
+                mstore(dest, mload(src))
+            }
+            dest += 32;
+            src += 32;
+        }
+
+        // Copy remaining bytes
+        uint256 mask = 256**(32 - len) - 1;
+        assembly {
+            let srcpart := and(mload(src), not(mask))
+            let destpart := and(mload(dest), mask)
+            mstore(dest, or(destpart, srcpart))
+        }
+    }
+
+==============================================================================
+[83] ERC20.sol:_transfer L226-248  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_bsc\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+            // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
+            // decrementing then incrementing.
+            _balances[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[84] ERC20.sol:_mint L259-272  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_bsc\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _mint(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: mint to the zero address");
+
+        _beforeTokenTransfer(address(0), account, amount);
+
+        _totalSupply += amount;
+        unchecked {
+            // Overflow not possible: balance + amount is at most totalSupply + amount, which is checked above.
+            _balances[account] += amount;
+        }
+        emit Transfer(address(0), account, amount);
+
+        _afterTokenTransfer(address(0), account, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[85] ERC20.sol:_burn L285-301  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_bsc\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+            // Overflow not possible: amount <= accountBalance <= totalSupply.
+            _totalSupply -= amount;
+        }
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[86] ERC20.sol:_transfer L226-248  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_arbi\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+            // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
+            // decrementing then incrementing.
+            _balances[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[87] ERC20.sol:_mint L259-272  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_arbi\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _mint(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: mint to the zero address");
+
+        _beforeTokenTransfer(address(0), account, amount);
+
+        _totalSupply += amount;
+        unchecked {
+            // Overflow not possible: balance + amount is at most totalSupply + amount, which is checked above.
+            _balances[account] += amount;
+        }
+        emit Transfer(address(0), account, amount);
+
+        _afterTokenTransfer(address(0), account, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[88] ERC20.sol:_burn L285-301  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_arbi\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+            // Overflow not possible: amount <= accountBalance <= totalSupply.
+            _totalSupply -= amount;
+        }
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[89] SafeMath.sol:tryMul L45-53  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x1851ccd370c444ff494d7505e6103959bce9f9d9_bsc\libs\SafeMath.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }
+
+==============================================================================
+[90] ERC20.sol:_transfer L226-246  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x152649ea73beab28c5b49b26eb48f7ead6d4c898_eth\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+        }
+        _balances[to] += amount;
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[91] ERC20.sol:_burn L280-295  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x152649ea73beab28c5b49b26eb48f7ead6d4c898_eth\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        unchecked {
+            _balances[account] = accountBalance - amount;
+        }
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+
+        _afterTokenTransfer(account, address(0), amount);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_afterTokenTransfer, _beforeTokenTransfer] ----
+function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
+
+==============================================================================
+[92] SafeMath.sol:tryMul L45-53  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0c10bf8fcb7bf5412187a595ab97a3609160b5c6_eth\openzeppelin\contracts\math\SafeMath.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) return (true, 0);
+        uint256 c = a * b;
+        if (c / a != b) return (false, 0);
+        return (true, c);
+    }

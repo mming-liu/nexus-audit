@@ -1,0 +1,818 @@
+### Bora20v2.sol :: transferOwnership  [owner_write+BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    owner_write
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: Ownable
+        function transferOwnership(address newOwner) public virtual onlyOwner {
+            require(newOwner != address(0), "Ownable: new owner is the zero address");
+            _transferOwnership(newOwner);
+        }
+    
+
+### Bora20v2.sol :: zTransferByAdmin  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: Bora20v2
+        function zTransferByAdmin(address _from, address _to, uint256 _amount) public onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
+            _transfer(_from, _to, _amount);
+            emit TransferByAdmin(_from, _to, _amount, _msgSender(), block.timestamp);
+            return true;
+        }
+    
+
+### Bora20v2.sol :: transferOwnership  [owner_write+BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    owner_write
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: Bora20v2
+        function transferOwnership(address _account) public override onlyOwner {
+            addAdmin(_account);
+            Ownable.transferOwnership(_account);
+        }
+    
+
+### Bora20v2.sol :: zDestroy  [danger+BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    danger
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: Bora20v2
+        function zDestroy() public onlyOwner {
+            require(_destroyFlag, "BORA: Check the destroy flag");
+            selfdestruct(payable(msg.sender));
+        }
+    
+
+### MANAToken.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.4.11;
+    // contract: PausableToken
+      function transferFrom(address _from, address _to, uint _value) whenNotPaused returns (bool) {
+        return super.transferFrom(_from, _to, _value);
+      }
+    
+
+### WBTC.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity 0.4.24;
+    // contract: PausableToken
+      function transferFrom(
+        address _from,
+        address _to,
+        uint256 _value
+      )
+        public
+        whenNotPaused
+        returns (bool)
+      {
+        return super.transferFrom(_from, _to, _value);
+      }
+    
+
+### BoraToken.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.4.18;
+    // contract: PausableToken
+        function transferFrom(address _from, address _to, uint256 _value) public whenNotPaused returns (bool) {
+            return super.transferFrom(_from, _to, _value);
+        }
+    
+
+### chiliZ.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.4.24;
+    // contract: ERC20Pausable
+      function transferFrom(
+        address from,
+        address to,
+        uint256 value
+      )
+        public
+        whenNotPaused
+        returns (bool)
+      {
+        return super.transferFrom(from, to, value);
+      }
+    
+
+### FantomToken.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.4.23;
+    // contract: FantomToken
+        function transferFrom(address _from, address _to, uint _amount) public returns (bool success) {
+            require(tokensTradeable);
+            require(_amount <= unlockedTokensInternal(_from));
+            return super.transferFrom(_from, _to, _amount);
+        }
+    
+
+### LinkToken.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.4.16;
+    // contract: LinkToken
+      function transferFrom(address _from, address _to, uint256 _value)
+        public
+        validRecipient(_to)
+        returns (bool)
+      {
+        return super.transferFrom(_from, _to, _value);
+      }
+    
+
+### BridgeToken.sol :: unwrap  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id+BRANCH_txorigin]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    BRANCH_txorigin
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: BridgeToken
+        function unwrap(uint256 amount, uint256 chainId) public {
+            require(
+                tx.origin == msg.sender,
+                "Calls from smart contracts not supported."
+            );
+            require(chainIds[chainId] == true, "Chain ID not supported.");
+            _burn(msg.sender, amount);
+            emit Unwrap(amount, chainId);
+        }
+    
+
+### BridgeToken.sol :: unwrap  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id+BRANCH_txorigin]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    BRANCH_txorigin
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: BridgeToken
+        function unwrap(uint256 amount, uint256 chainId) public {
+            require(tx.origin == msg.sender, "Contract calls not supported.");
+            require(chainIds[chainId] == true, "Chain ID not supported.");
+            _burn(msg.sender, amount);
+            emit Unwrap(amount, chainId);
+        }
+    
+
+### IoTeXNetwork.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.4.21;
+    // contract: IoTeXNetwork
+        function transferFrom(address _from, address _to, uint _value) whenNotPaused
+            validDestination(_to)
+            returns (bool) {
+            return super.transferFrom(_from, _to, _value);
+        }
+    
+
+### MaticToken.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity 0.5.2;
+    // contract: ERC20Pausable
+        function transferFrom(address from, address to, uint256 value) public whenNotPaused returns (bool) {
+            return super.transferFrom(from, to, value);
+        }
+    
+
+### BridgeToken.sol :: unwrap  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id+BRANCH_txorigin]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    BRANCH_txorigin
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: BridgeToken
+        function unwrap(uint256 amount, uint256 chainId) public {
+            require(tx.origin == msg.sender, "Contract calls not supported.");
+            require(chainIds[chainId] == true, "Chain ID not supported.");
+            _burn(msg.sender, amount);
+            emit Unwrap(amount, chainId);
+        }
+    
+
+### BridgeToken.sol :: unwrap  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id+BRANCH_txorigin]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    BRANCH_txorigin
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: BridgeToken
+        function unwrap(uint256 amount, uint256 chainId) public {
+            require(tx.origin == msg.sender, "Contract calls not supported.");
+            require(chainIds[chainId] == true, "Chain ID not supported.");
+            _burn(msg.sender, amount);
+            emit Unwrap(amount, chainId);
+        }
+    
+
+### wBeldex.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity 0.4.24;
+    // contract: PausableToken
+      function transferFrom(
+        address _from,
+        address _to,
+        uint256 _value
+      )
+        public
+        whenNotPaused
+        returns (bool)
+      {
+        return super.transferFrom(_from, _to, _value);
+      }
+    
+
+### OceanToken.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity 0.5.3;
+    // contract: ERC20Pausable
+        function transferFrom(address from, address to, uint256 value) public whenNotPaused returns (bool) {
+            return super.transferFrom(from, to, value);
+        }
+    
+
+### OceanToken.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity 0.5.3;
+    // contract: OceanToken
+        function transferFrom(
+            address _from,
+            address _to,
+            uint256 _value
+        )
+        public
+        returns (bool)
+        {
+            bool success = super.transferFrom(_from, _to, _value);
+            if (success) {
+                updateTokenHolders(_from, _to);
+            }
+            return success;
+        }
+    
+
+### BridgeToken.sol :: unwrap  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id+BRANCH_txorigin]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    BRANCH_txorigin
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: BridgeToken
+        function unwrap(uint256 amount, uint256 chainId) public {
+            require(tx.origin == msg.sender, "Contract calls not supported.");
+            require(chainIds[chainId] == true, "Chain ID not supported.");
+            _burn(msg.sender, amount);
+            emit Unwrap(amount, chainId);
+        }
+    
+
+### DSToken.sol :: setOwner  [owner_write+OWNERHIT+BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    owner_write
+    OWNERHIT=r(address owner_) |         public |         auth |     { |         owner = owner_; |         LogSetOwner(owner); |    
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.4.15;
+    // contract: DSAuth
+        function setOwner(address owner_)
+            public
+            auth
+        {
+            owner = owner_;
+            LogSetOwner(owner);
+        }
+    
+
+### CroToken.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.4.13;
+    // contract: ReleasableToken
+        function transferFrom(address _from, address _to, uint _value) public canTransfer(_from) returns (bool success) {
+            // Call StandardToken.transferForm()
+            return super.transferFrom(_from, _to, _value);
+        }
+    
+
+### ANTv2.sol :: transferWithAuthorization  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.5.17;
+    // contract: ANTv2
+        function transferWithAuthorization(
+            address from,
+            address to,
+            uint256 value,
+            uint256 validAfter,
+            uint256 validBefore,
+            bytes32 nonce,
+            uint8 v,
+            bytes32 r,
+            bytes32 s
+        )
+            external
+        {
+            require(block.timestamp > validAfter, "ANTV2:AUTH_NOT_YET_VALID");
+            require(block.timestamp < validBefore, "ANTV2:AUTH_EXPIRED");
+            require(!authorizationState[from][nonce],  "ANTV2:AUTH_ALREADY_USED");
+    
+            bytes32 encodeData = keccak256(abi.encode(TRANSFER_WITH_AUTHORIZATION_TYPEHASH, from, to, value, validAfter, validBefore, nonce));
+            _validateSignedData(from, encodeData, v, r, s);
+    
+            authorizationState[from][nonce] = true;
+            emit AuthorizationUsed(from, nonce);
+    
+            _transfer(from, to, value);
+        }
+    
+
+### CrowdsaleToken.sol :: transferOwnership  [owner_write+OWNERHIT+BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    owner_write
+    OWNERHIT=wOwner) onlyOwner { |     if (newOwner != address(0)) { |       owner = newOwner; |     } |   } | 
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // contract: Ownable
+      function transferOwnership(address newOwner) onlyOwner {
+        if (newOwner != address(0)) {
+          owner = newOwner;
+        }
+      }
+    
+
+### CrowdsaleToken.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // contract: ReleasableToken
+      function transferFrom(address _from, address _to, uint _value) canTransfer(_from) returns (bool success) {
+        // Call StandardToken.transferForm()
+        return super.transferFrom(_from, _to, _value);
+      }
+    
+
+### BridgeToken.sol :: unwrap  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id+BRANCH_txorigin]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    BRANCH_txorigin
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: BridgeToken
+        function unwrap(uint256 amount, uint256 chainId) public {
+            require(tx.origin == msg.sender, "Contract calls not supported.");
+            require(chainIds[chainId] == true, "Chain ID not supported.");
+            _burn(msg.sender, amount);
+            emit Unwrap(amount, chainId);
+        }
+    
+
+### ProxyERC20.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity 0.4.25;
+    // contract: ProxyERC20
+        function transferFrom(
+            address from,
+            address to,
+            uint256 value
+        )
+            public
+            returns (bool)
+        {
+            // Mutable state call requires the proxy to tell the target who the msg.sender is.
+            target.setMessageSender(msg.sender);
+    
+            // Forward the ERC20 call to the target contract
+            IERC20(target).transferFrom(from, to, value);
+    
+            // Event emitting will occur via Synthetix.Proxy._emit()
+            return true;
+        }
+
+### BridgeToken.sol :: unwrap  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id+BRANCH_txorigin]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    BRANCH_txorigin
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: BridgeToken
+        function unwrap(uint256 amount, uint256 chainId) public {
+            require(tx.origin == msg.sender, "Contract calls not supported.");
+            require(chainIds[chainId] == true, "Chain ID not supported.");
+            _burn(msg.sender, amount);
+            emit Unwrap(amount, chainId);
+        }
+    
+
+### TetherToken.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.4.17;
+    // contract: TetherToken
+        function transferFrom(address _from, address _to, uint _value) public whenNotPaused {
+            require(!isBlackListed[_from]);
+            if (deprecated) {
+                return UpgradedStandardToken(upgradedAddress).transferFromByLegacy(msg.sender, _from, _to, _value);
+            } else {
+                return super.transferFrom(_from, _to, _value);
+            }
+        }
+    
+
+### EURSToken.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.4.20;
+    // contract: EURSToken
+      function transferFrom (address _from, address _to, uint256 _value)
+      public delegatable payable returns (bool) {
+        if (frozen) return false;
+        else if (
+          (addressFlags [_from] | addressFlags [_to]) & BLACK_LIST_FLAG ==
+          BLACK_LIST_FLAG)
+          return false;
+        else {
+          uint256 fee =
+            (addressFlags [_from] | addressFlags [_to]) & ZERO_FEE_FLAG == ZERO_FEE_FLAG ?
+              0 :
+              calculateFee (_value);
+    
+          if (_value <= allowances [_from][msg.sender] &&
+              fee <= safeSub (allowances [_from][msg.sender], _value) &&
+              _value <= accounts [_from] &&
+              fee <= safeSub (accounts [_from], _value)) {
+            require (AbstractToken.transferFrom (_from, _to, _value));
+            require (AbstractToken.transferFrom (_from, feeCollector, fee));
+            return true;
+          } else return false;
+       
+
+### AVABBC.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity 0.5.17;
+    // contract: PausableToken
+      function transferFrom(
+        address _from,
+        address _to,
+        uint256 _value
+      )
+        public
+        whenNotPaused
+        returns (bool)
+      {
+        return super.transferFrom(_from, _to, _value);
+      }
+    
+
+### BABBC.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity 0.5.17;
+    // contract: PausableToken
+      function transferFrom(
+        address _from,
+        address _to,
+        uint256 _value
+      )
+        public
+        whenNotPaused
+        returns (bool)
+      {
+        return super.transferFrom(_from, _to, _value);
+      }
+    
+
+### WABBC.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity 0.5.17;
+    // contract: PausableToken
+      function transferFrom(
+        address _from,
+        address _to,
+        uint256 _value
+      )
+        public
+        whenNotPaused
+        returns (bool)
+      {
+        return super.transferFrom(_from, _to, _value);
+      }
+    
+
+### FABBC.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity 0.5.17;
+    // contract: PausableToken
+      function transferFrom(
+        address _from,
+        address _to,
+        uint256 _value
+      )
+        public
+        whenNotPaused
+        returns (bool)
+      {
+        return super.transferFrom(_from, _to, _value);
+      }
+    
+
+### MABBC.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity 0.5.17;
+    // contract: PausableToken
+      function transferFrom(
+        address _from,
+        address _to,
+        uint256 _value
+      )
+        public
+        whenNotPaused
+        returns (bool)
+      {
+        return super.transferFrom(_from, _to, _value);
+      }
+    
+
+### ACH.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.5.2;
+    // contract: ERC20Pausable
+        function transferFrom(address from, address to, uint256 value) public whenNotPaused returns (bool) {
+            return super.transferFrom(from, to, value);
+        }
+    
+
+### ENJToken.sol :: transferFrom  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.4.15;
+    // contract: ENJToken
+        function transferFrom(address _from, address _to, uint256 _value) public returns (bool success) {
+            if (isTransferAllowed() == true || msg.sender == crowdFundAddress || msg.sender == incentivisationFundAddress) {        
+                assert(super.transferFrom(_from, _to, _value));
+                return true;
+            }
+            revert();
+        }
+    
+
+### ContractOwnershipBase.sol :: transferOwnership  [owner_write+BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    owner_write
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.8.8;
+    // contract: ContractOwnershipBase
+        function transferOwnership(address newOwner) public virtual override {
+            ContractOwnershipStorage.layout().transferOwnership(_msgSender(), newOwner);
+        }
+    
+
+### Ownable.sol :: transferOwnership  [owner_write+BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    owner_write
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: Ownable
+        function transferOwnership(address newOwner) public virtual onlyOwner {
+            require(newOwner != address(0), "Ownable: new owner is the zero address");
+            _transferOwnership(newOwner);
+        }
+    
+
+### ERC20ExecuteExtension.sol :: transferAndChargeForGas  [BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity 0.5.9;
+    // contract: ERC20ExecuteExtension
+        function transferAndChargeForGas(
+            address from,
+            address to,
+            uint256 amount,
+            uint256 gasLimit,
+            uint256 tokenGasPrice,
+            uint256 baseGasCharge,
+            address tokenReceiver
+        ) external returns (bool) {
+            uint256 initialGas = gasleft();
+            require(_executionOperators[msg.sender], "only execution operators allowed to perfrom transfer and charge");
+            _transfer(from, to, amount);
+            if (tokenGasPrice > 0) {
+                _charge(from, gasLimit, tokenGasPrice, initialGas, baseGasCharge, tokenReceiver);
+            }
+            return true;
+        }
+    
+
+### Ownable.sol :: transferOwnership  [owner_write+BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    owner_write
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: Ownable
+        function transferOwnership(address newOwner) public virtual onlyOwner {
+            require(newOwner != address(0), "Ownable: new owner is the zero address");
+            _transferOwnership(newOwner);
+        }
+    
+
+### Ownable.sol :: transferOwnership  [owner_write+BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    owner_write
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: Ownable
+        function transferOwnership(address newOwner) public virtual onlyOwner {
+            require(newOwner != address(0), "Ownable: new owner is the zero address");
+            _transferOwnership(newOwner);
+        }
+    
+
+### Ownable.sol :: transferOwnership  [owner_write+BRANCH_anyfrom_scoped+BRANCH_self_scoped+BRANCH_bilateral+BRANCH_implicit_view+BRANCH_indirect_id]
+    owner_write
+    BRANCH_anyfrom_scoped=False
+    BRANCH_self_scoped=False
+    BRANCH_bilateral=False
+    BRANCH_implicit_view=False
+    BRANCH_indirect_id=False
+    --- func_src ---
+    // pragma: solidity ^0.8.0;
+    // contract: Ownable
+        function transferOwnership(address newOwner) public virtual onlyOwner {
+            require(newOwner != address(0), "Ownable: new owner is the zero address");
+            _transferOwnership(newOwner);
+        }
+    

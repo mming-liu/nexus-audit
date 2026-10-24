@@ -1,0 +1,50 @@
+      [cache] 温缓存命中 11066 单元（0.03s）
+========================================================================================
+M54 双真值回归台
+========================================================================================
+类目                           sb判定    sb误报    sb判反    sb退回 |    gp判定    gp误报    gpFPR
+----------------------------------------------------------------------------------------
+reentrancy                     44       0       0      99 |    7844       0    0.00%
+access_control                 62       0       0      39 |    9233      76    0.82%
+unchecked_low_level_calls      72       0       0     317 |     337      72   21.36%
+arithmetic                     24       0       0      21 |    4072      93    2.28%
+----------------------------------------------------------------------------------------
+合计误报 241 条（sb + gp） / 判反 0 条
+
+! GPTScan 误报 241 条，按类目：
+  access_control             76
+    按函数名 Top 12：
+      transferFrom                           32
+      transferOwnership                      8
+      unwrap                                 7
+      transfer                               6
+      approve                                6
+      increaseAllowance                      6
+      decreaseAllowance                      6
+      zTransferByAdmin                       1
+      zDestroy                               1
+      setOwner                               1
+      transferWithAuthorization              1
+      transferAndChargeForGas                1
+  unchecked_low_level_calls  72
+    按函数名 Top 12：
+      functionCallWithValue                  62
+      execute                                8
+      executeWithSpecificGas                 1
+      _approveAndExecuteWithSpecificGas      1
+  arithmetic                 93
+    按函数名 Top 12：
+      _transfer                              17
+      _burn                                  16
+      tryMul                                 14
+      transferFrom                           10
+      _mint                                  7
+      transfer                               6
+      mulDiv                                 2
+      burn                                   2
+      _update                                2
+      safeParseInt                           2
+      parseInt                               2
+      safeAdd                                1
+
+✘ 存在方向错误

@@ -1,0 +1,2123 @@
+==============================================================================
+[0] Bora20v2.sol:transferOwnership L900-903  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: Ownable
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        _transferOwnership(newOwner);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner() {
+        _checkOwner();
+        _;
+    
+// ---- 同文件辅助函数证据 [_checkOwner, _transferOwnership] ----
+function _checkOwner() internal view virtual {
+        require(owner() == _msgSender(), "Ownable: caller is not the owner");
+    }
+function _transferOwnership(address newOwner) internal virtual {
+        address oldOwner = _owner;
+        _owner = newOwner;
+        emit OwnershipTransferred(oldOwner, newOwner);
+    }
+
+==============================================================================
+[1] Bora20v2.sol:transfer L1240-1244  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function transfer(address to, uint256 amount) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _transfer(owner, to, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+                                                                                                                   
+                                              
+            _balances[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[2] Bora20v2.sol:approve L1263-1267  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function approve(address spender, uint256 amount) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[3] Bora20v2.sol:increaseAllowance L1308-1312  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, allowance(owner, spender) + addedValue);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve, allowance] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+function allowance(address owner, address spender) public view virtual override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[4] Bora20v2.sol:decreaseAllowance L1328-1337  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        uint256 currentAllowance = allowance(owner, spender);
+        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        unchecked {
+            _approve(owner, spender, currentAllowance - subtractedValue);
+        }
+
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve, allowance] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+function allowance(address owner, address spender) public view virtual override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[5] Bora20v2.sol:zTransferByAdmin L2932-2936  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: Bora20v2
+    function zTransferByAdmin(address _from, address _to, uint256 _amount) public onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
+        _transfer(_from, _to, _amount);
+        emit TransferByAdmin(_from, _to, _amount, _msgSender(), block.timestamp);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyRole(bytes32 role) {
+        _checkRole(role);
+        _;
+    
+// ---- 父合约函数证据 [ERC20._transfer, Context._msgSender, AccessControl._checkRole] ----
+function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+                                                                                                                   
+                                              
+            _balances[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+function _checkRole(bytes32 role, address account) internal view virtual {
+        if (!hasRole(role, account)) {
+            revert(
+                string(
+                    abi.encodePacked(
+                        "AccessControl: account ",
+                        Strings.toHexString(account),
+                        " is missing role ",
+                        Strings.toHexString(uint256(role), 32)
+                    )
+                )
+            );
+        }
+    }
+
+==============================================================================
+[6] Bora20v2.sol:transferOwnership L2973-2976  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: Bora20v2
+    function transferOwnership(address _account) public override onlyOwner {
+        addAdmin(_account);
+        Ownable.transferOwnership(_account);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner() {
+        _checkOwner();
+        _;
+    
+// ---- 同文件辅助函数证据 [addAdmin] ----
+function addAdmin(address _account) public onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
+        require(_account != address(0), "BORA: add admin of the zero address");
+        grantRole(DEFAULT_ADMIN_ROLE, _account);         
+        grantRole(PAUSER_ROLE, _account);         
+        grantRole(MINTER_ROLE, _account);                        
+        grantRole(SYSTEM_ROLE, _account);          
+        emit RoleChanged("addAdmin", _msgSender(), _account, block.timestamp);
+        return true;
+    }
+// ---- 父合约函数证据 [Ownable._checkOwner] ----
+function _checkOwner() internal view virtual {
+        require(owner() == _msgSender(), "Ownable: caller is not the owner");
+    }
+
+==============================================================================
+[7] Bora20v2.sol:zDestroy L2988-2991  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: Bora20v2
+    function zDestroy() public onlyOwner {
+        require(_destroyFlag, "BORA: Check the destroy flag");
+        selfdestruct(payable(msg.sender));
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner() {
+        _checkOwner();
+        _;
+    
+// ---- 父合约函数证据 [Ownable._checkOwner] ----
+function _checkOwner() internal view virtual {
+        require(owner() == _msgSender(), "Ownable: caller is not the owner");
+    }
+
+==============================================================================
+[8] MANAToken.sol:transferFrom L243-245  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0f5d2fb29fb7d3cfee444a200298f468908cc942_eth\MANAToken.sol
+==============================================================================
+// pragma: solidity ^0.4.11;
+// contract: PausableToken
+  function transferFrom(address _from, address _to, uint _value) whenNotPaused returns (bool) {
+    return super.transferFrom(_from, _to, _value);
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+    require(!paused);
+    _;
+  
+
+==============================================================================
+[9] MXToken.sol:transferFrom L75-80  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x11eef04c884e24d9b7b4760e7476d06ddf797f36_eth\MXToken.sol
+==============================================================================
+// pragma: solidity ^0.4.19;
+// contract: MXToken
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool success) {
+        require(_value <= allowance[_from][msg.sender]);     // Check allowance
+        allowance[_from][msg.sender] -= _value;
+        _transfer(_from, _to, _value);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(address _from, address _to, uint _value) internal {
+                                                              
+        require(_to != 0x0);
+                                         
+        require(balanceOf[_from] >= _value);
+                              
+        require(balanceOf[_to] + _value > balanceOf[_to]);
+                                                   
+        uint previousBalances = balanceOf[_from] + balanceOf[_to];
+                                   
+        balanceOf[_from] -= _value;
+                                        
+        balanceOf[_to] += _value;
+        Transfer(_from, _to, _value);
+                                                                                                    
+        assert(balanceOf[_from] + balanceOf[_to] == previousBalances);
+    }
+
+==============================================================================
+[10] WBTC.sol:transferFrom L493-503  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x2260fac5e5542a773aa44fbcfedf7c193bc2c599_eth\WBTC.sol
+==============================================================================
+// pragma: solidity 0.4.24;
+// contract: PausableToken
+  function transferFrom(
+    address _from,
+    address _to,
+    uint256 _value
+  )
+    public
+    whenNotPaused
+    returns (bool)
+  {
+    return super.transferFrom(_from, _to, _value);
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+    require(!paused);
+    _;
+  
+
+==============================================================================
+[11] BoraToken.sol:transferFrom L165-167  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x26fb86579e371c7aedc461b2ddef0a8628c93d3b_eth\BoraToken.sol
+==============================================================================
+// pragma: solidity ^0.4.18;
+// contract: PausableToken
+    function transferFrom(address _from, address _to, uint256 _value) public whenNotPaused returns (bool) {
+        return super.transferFrom(_from, _to, _value);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+        require(!paused);
+        _;
+    
+
+==============================================================================
+[12] niswapV2ERC20.sol:transferFrom L74-80  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3432b6a60d23ca0dfca7761b7ab56459d9c964d0_eth\niswapV2ERC20.sol
+==============================================================================
+// pragma: solidity 0.6.11;
+// contract: UniswapV2ERC20
+    function transferFrom(address from, address to, uint value) external override returns (bool) {
+        if (allowance[from][msg.sender] != uint(-1)) {
+            allowance[from][msg.sender] = allowance[from][msg.sender].sub(value);
+        }
+        _transfer(from, to, value);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(address from, address to, uint value) private {
+        balanceOf[from] = balanceOf[from].sub(value);
+        balanceOf[to] = balanceOf[to].add(value);
+        emit Transfer(from, to, value);
+    }
+
+==============================================================================
+[13] niswapV2Pair.sol:transferFrom L257-263  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3432b6a60d23ca0dfca7761b7ab56459d9c964d0_eth\niswapV2Pair.sol
+==============================================================================
+// pragma: solidity 0.6.11;
+// contract: UniswapV2Pair
+    function transferFrom(address from, address to, uint value) external override returns (bool) {
+        if (allowance[from][msg.sender] != uint(-1)) {
+            allowance[from][msg.sender] = allowance[from][msg.sender].sub(value);
+        }
+        _transfer(from, to, value);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(address from, address to, uint value) private {
+        balanceOf[from] = balanceOf[from].sub(value);
+        balanceOf[to] = balanceOf[to].add(value);
+        emit Transfer(from, to, value);
+    }
+
+==============================================================================
+[14] chiliZ.sol:transferFrom L475-485  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3506424f91fd33084466f402d5d97f05f8e3b4af_eth\chiliZ.sol
+==============================================================================
+// pragma: solidity ^0.4.24;
+// contract: ERC20Pausable
+  function transferFrom(
+    address from,
+    address to,
+    uint256 value
+  )
+    public
+    whenNotPaused
+    returns (bool)
+  {
+    return super.transferFrom(from, to, value);
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+    require(!_paused);
+    _;
+  
+
+==============================================================================
+[15] FantomToken.sol:transferFrom L601-605  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x4e15361fd6b4bb609fa63c81a2be19d873717870_eth\FantomToken.sol
+==============================================================================
+// pragma: solidity ^0.4.23;
+// contract: FantomToken
+    function transferFrom(address _from, address _to, uint _amount) public returns (bool success) {
+        require(tokensTradeable);
+        require(_amount <= unlockedTokensInternal(_from));
+        return super.transferFrom(_from, _to, _amount);
+    }
+// ---- 父合约函数证据 [LockSlots.unlockedTokensInternal] ----
+function unlockedTokensInternal(address _account) internal returns (uint) {
+                                                   
+        if (!mayHaveLockedTokens[_account]) return balances[_account];
+        uint locked = pNumberOfLockedTokens(_account);
+        if (locked == 0) mayHaveLockedTokens[_account] = false;
+        return balances[_account].sub(locked);
+    }
+
+==============================================================================
+[16] LinkToken.sol:transferFrom L279-285  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x514910771af9ca656af840dff83e8264ecf986ca_eth\LinkToken.sol
+==============================================================================
+// pragma: solidity ^0.4.16;
+// contract: LinkToken
+  function transferFrom(address _from, address _to, uint256 _value)
+    public
+    validRecipient(_to)
+    returns (bool)
+  {
+    return super.transferFrom(_from, _to, _value);
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier validRecipient(address _recipient) {
+    require(_recipient != address(0) && _recipient != address(this));
+    _;
+  
+
+==============================================================================
+[17] BridgeToken.sol:unwrap L648-656  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x5947bb275c521040051d82396192181b413227a3_avax\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: BridgeToken
+    function unwrap(uint256 amount, uint256 chainId) public {
+        require(
+            tx.origin == msg.sender,
+            "Calls from smart contracts not supported."
+        );
+        require(chainIds[chainId] == true, "Chain ID not supported.");
+        _burn(msg.sender, amount);
+        emit Unwrap(amount, chainId);
+    }
+// ---- 父合约函数证据 [ERC20._burn] ----
+function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        _balances[account] = accountBalance - amount;
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+    }
+
+==============================================================================
+[18] BridgeToken.sol:unwrap L617-622  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x63a72806098bd3d9520cc43356dd78afe5d386d9_avax\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: BridgeToken
+    function unwrap(uint256 amount, uint256 chainId) public {
+        require(tx.origin == msg.sender, "Contract calls not supported.");
+        require(chainIds[chainId] == true, "Chain ID not supported.");
+        _burn(msg.sender, amount);
+        emit Unwrap(amount, chainId);
+    }
+// ---- 父合约函数证据 [ERC20._burn] ----
+function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        _balances[account] = accountBalance - amount;
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+    }
+
+==============================================================================
+[19] IoTeXNetwork.sol:transferFrom L448-452  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x6fb3e0a217407efff7ca062d46c26e5d60a14d69_eth\IoTeXNetwork.sol
+==============================================================================
+// pragma: solidity ^0.4.21;
+// contract: IoTeXNetwork
+    function transferFrom(address _from, address _to, uint _value) whenNotPaused
+        validDestination(_to)
+        returns (bool) {
+        return super.transferFrom(_from, _to, _value);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+    require(!paused);
+    _;
+  
+modifier validDestination(address to) {
+        require(to != address(0x0));
+        require(to != address(this) );
+        _;
+    
+
+==============================================================================
+[20] MaticToken.sol:transferFrom L428-430  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0_eth\MaticToken.sol
+==============================================================================
+// pragma: solidity 0.5.2;
+// contract: ERC20Pausable
+    function transferFrom(address from, address to, uint256 value) public whenNotPaused returns (bool) {
+        return super.transferFrom(from, to, value);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+        require(!_paused);
+        _;
+    
+
+==============================================================================
+[21] niswapV2ERC20.sol:transferFrom L74-80  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x853d955acef822db058eb8505911ed77f175b99e_eth\niswapV2ERC20.sol
+==============================================================================
+// pragma: solidity 0.6.11;
+// contract: UniswapV2ERC20
+    function transferFrom(address from, address to, uint value) external override returns (bool) {
+        if (allowance[from][msg.sender] != uint(-1)) {
+            allowance[from][msg.sender] = allowance[from][msg.sender].sub(value);
+        }
+        _transfer(from, to, value);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(address from, address to, uint value) private {
+        balanceOf[from] = balanceOf[from].sub(value);
+        balanceOf[to] = balanceOf[to].add(value);
+        emit Transfer(from, to, value);
+    }
+
+==============================================================================
+[22] niswapV2Pair.sol:transferFrom L257-263  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x853d955acef822db058eb8505911ed77f175b99e_eth\niswapV2Pair.sol
+==============================================================================
+// pragma: solidity 0.6.11;
+// contract: UniswapV2Pair
+    function transferFrom(address from, address to, uint value) external override returns (bool) {
+        if (allowance[from][msg.sender] != uint(-1)) {
+            allowance[from][msg.sender] = allowance[from][msg.sender].sub(value);
+        }
+        _transfer(from, to, value);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(address from, address to, uint value) private {
+        balanceOf[from] = balanceOf[from].sub(value);
+        balanceOf[to] = balanceOf[to].add(value);
+        emit Transfer(from, to, value);
+    }
+
+==============================================================================
+[23] BridgeToken.sol:unwrap L617-622  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x8a0cac13c7da965a312f08ea4229c37869e85cb9_avax\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: BridgeToken
+    function unwrap(uint256 amount, uint256 chainId) public {
+        require(tx.origin == msg.sender, "Contract calls not supported.");
+        require(chainIds[chainId] == true, "Chain ID not supported.");
+        _burn(msg.sender, amount);
+        emit Unwrap(amount, chainId);
+    }
+// ---- 父合约函数证据 [ERC20._burn] ----
+function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        _balances[account] = accountBalance - amount;
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+    }
+
+==============================================================================
+[24] BridgeToken.sol:unwrap L617-622  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x8ebaf22b6f053dffeaf46f4dd9efa95d89ba8580_avax\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: BridgeToken
+    function unwrap(uint256 amount, uint256 chainId) public {
+        require(tx.origin == msg.sender, "Contract calls not supported.");
+        require(chainIds[chainId] == true, "Chain ID not supported.");
+        _burn(msg.sender, amount);
+        emit Unwrap(amount, chainId);
+    }
+// ---- 父合约函数证据 [ERC20._burn] ----
+function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        _balances[account] = accountBalance - amount;
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+    }
+
+==============================================================================
+[25] wBeldex.sol:transferFrom L503-513  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x90bbddbf3223363898065b9c736e2b86c655762b_bsc\wBeldex.sol
+==============================================================================
+// pragma: solidity 0.4.24;
+// contract: PausableToken
+  function transferFrom(
+    address _from,
+    address _to,
+    uint256 _value
+  )
+    public
+    whenNotPaused
+    returns (bool)
+  {
+    return super.transferFrom(_from, _to, _value);
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+    require(!paused);
+    _;
+  
+
+==============================================================================
+[26] OceanToken.sol:transferFrom L536-538  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x967da4048cd07ab37855c090aaf366e4ce1b9f48_eth\OceanToken.sol
+==============================================================================
+// pragma: solidity 0.5.3;
+// contract: ERC20Pausable
+    function transferFrom(address from, address to, uint256 value) public whenNotPaused returns (bool) {
+        return super.transferFrom(from, to, value);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+        require(!_paused);
+        _;
+    
+
+==============================================================================
+[27] OceanToken.sol:transferFrom L687-700  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x967da4048cd07ab37855c090aaf366e4ce1b9f48_eth\OceanToken.sol
+==============================================================================
+// pragma: solidity 0.5.3;
+// contract: OceanToken
+    function transferFrom(
+        address _from,
+        address _to,
+        uint256 _value
+    )
+    public
+    returns (bool)
+    {
+        bool success = super.transferFrom(_from, _to, _value);
+        if (success) {
+            updateTokenHolders(_from, _to);
+        }
+        return success;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [updateTokenHolders] ----
+function updateTokenHolders(
+        address sender,
+        address receiver
+    )
+    private
+    {
+        tryToAddTokenHolder(sender);
+        tryToAddTokenHolder(receiver);
+    }
+
+==============================================================================
+[28] BridgeToken.sol:unwrap L617-622  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x98443b96ea4b0858fdf3219cd13e98c7a4690588_avax\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: BridgeToken
+    function unwrap(uint256 amount, uint256 chainId) public {
+        require(tx.origin == msg.sender, "Contract calls not supported.");
+        require(chainIds[chainId] == true, "Chain ID not supported.");
+        _burn(msg.sender, amount);
+        emit Unwrap(amount, chainId);
+    }
+// ---- 父合约函数证据 [ERC20._burn] ----
+function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        _balances[account] = accountBalance - amount;
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+    }
+
+==============================================================================
+[29] DSToken.sol:setOwner L42-48  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2_eth\DSToken.sol
+==============================================================================
+// pragma: solidity ^0.4.15;
+// contract: DSAuth
+    function setOwner(address owner_)
+        public
+        auth
+    {
+        owner = owner_;
+        LogSetOwner(owner);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier auth {
+        require(isAuthorized(msg.sender, msg.sig));
+        _;
+    
+// ---- 同文件辅助函数证据 [isAuthorized] ----
+function isAuthorized(address src, bytes4 sig) internal view returns (bool) {
+        if (src == address(this)) {
+            return true;
+        } else if (src == owner) {
+            return true;
+        } else if (authority == DSAuthority(0)) {
+            return false;
+        } else {
+            return authority.canCall(src, this, sig);
+        }
+    }
+
+==============================================================================
+[30] CroToken.sol:transferFrom L394-397  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xa0b73e1ff0b80914ab6fe0444e65848c4c34450b_eth\CroToken.sol
+==============================================================================
+// pragma: solidity ^0.4.13;
+// contract: ReleasableToken
+    function transferFrom(address _from, address _to, uint _value) public canTransfer(_from) returns (bool success) {
+        // Call StandardToken.transferForm()
+        return super.transferFrom(_from, _to, _value);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier canTransfer(address _sender) {
+        require(released || transferAgents[_sender], "For the token to be able to transfer: it's required that the crowdsale is in released state; or the sender is a transfer agent.");
+        _;
+    
+
+==============================================================================
+[31] ANTv2.sol:transferFrom L172-180  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xa117000000f279d81a1d3cc75430faa017fa5a2e_eth\ANTv2.sol
+==============================================================================
+// pragma: solidity ^0.5.17;
+// contract: ANTv2
+    function transferFrom(address from, address to, uint256 value) external returns (bool) {
+        uint256 fromAllowance = allowance[from][msg.sender];
+        if (fromAllowance != uint256(-1)) {
+            // Allowance is implicitly checked with SafeMath's underflow protection
+            allowance[from][msg.sender] = fromAllowance.sub(value);
+        }
+        _transfer(from, to, value);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(address from, address to, uint256 value) private {
+        require(to != address(this) && to != address(0), "ANTV2:RECEIVER_IS_TOKEN_OR_ZERO");
+
+                                                                             
+        balanceOf[from] = balanceOf[from].sub(value);
+        balanceOf[to] = balanceOf[to].add(value);
+        emit Transfer(from, to, value);
+    }
+
+==============================================================================
+[32] ANTv2.sol:transferWithAuthorization L191-215  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xa117000000f279d81a1d3cc75430faa017fa5a2e_eth\ANTv2.sol
+==============================================================================
+// pragma: solidity ^0.5.17;
+// contract: ANTv2
+    function transferWithAuthorization(
+        address from,
+        address to,
+        uint256 value,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    )
+        external
+    {
+        require(block.timestamp > validAfter, "ANTV2:AUTH_NOT_YET_VALID");
+        require(block.timestamp < validBefore, "ANTV2:AUTH_EXPIRED");
+        require(!authorizationState[from][nonce],  "ANTV2:AUTH_ALREADY_USED");
+
+        bytes32 encodeData = keccak256(abi.encode(TRANSFER_WITH_AUTHORIZATION_TYPEHASH, from, to, value, validAfter, validBefore, nonce));
+        _validateSignedData(from, encodeData, v, r, s);
+
+        authorizationState[from][nonce] = true;
+        emit AuthorizationUsed(from, nonce);
+
+        _transfer(from, to, value);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer, _validateSignedData] ----
+function _transfer(address from, address to, uint256 value) private {
+        require(to != address(this) && to != address(0), "ANTV2:RECEIVER_IS_TOKEN_OR_ZERO");
+
+                                                                             
+        balanceOf[from] = balanceOf[from].sub(value);
+        balanceOf[to] = balanceOf[to].add(value);
+        emit Transfer(from, to, value);
+    }
+function _validateSignedData(address signer, bytes32 encodeData, uint8 v, bytes32 r, bytes32 s) internal view {
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                getDomainSeparator(),
+                encodeData
+            )
+        );
+        address recoveredAddress = ecrecover(digest, v, r, s);
+                                                                                                                  
+        require(recoveredAddress != address(0) && recoveredAddress == signer, "ANTV2:INVALID_SIGNATURE");
+    }
+
+==============================================================================
+[33] CrowdsaleToken.sol:transferOwnership L319-323  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xb63b606ac810a52cca15e44bb630fd42d8d1d83d_eth\CrowdsaleToken.sol
+==============================================================================
+// contract: Ownable
+  function transferOwnership(address newOwner) onlyOwner {
+    if (newOwner != address(0)) {
+      owner = newOwner;
+    }
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner() {
+    if (msg.sender != owner) {
+      throw;
+    }
+    _;
+  
+
+==============================================================================
+[34] CrowdsaleToken.sol:transferFrom L407-410  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xb63b606ac810a52cca15e44bb630fd42d8d1d83d_eth\CrowdsaleToken.sol
+==============================================================================
+// contract: ReleasableToken
+  function transferFrom(address _from, address _to, uint _value) canTransfer(_from) returns (bool success) {
+    // Call StandardToken.transferForm()
+    return super.transferFrom(_from, _to, _value);
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier canTransfer(address _sender) {
+
+    if(!released) {
+        if(!transferAgents[_sender]) {
+            throw;
+        }
+    }
+
+    _;
+  
+
+==============================================================================
+[35] AXSToken.sol:transferFrom L97-101  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xbb0e17ef65f82ab018d8edd776e8dd940327b28b_eth\AXSToken.sol
+==============================================================================
+// pragma: solidity 0.5.17;
+// contract: ERC20
+  function transferFrom(address _from, address _to, uint256 _value) public returns (bool _success) {
+    _transfer(_from, _to, _value);
+    _approve(_from, msg.sender, _allowance[_from][msg.sender].sub(_value));
+    return true;
+  }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve, _transfer] ----
+function _approve(address _owner, address _spender, uint256 _amount) internal {
+    require(_owner != address(0), "ERC20: approve from the zero address");
+    require(_spender != address(0), "ERC20: approve to the zero address");
+
+    _allowance[_owner][_spender] = _amount;
+    emit Approval(_owner, _spender, _amount);
+  }
+function _transfer(address _from, address _to, uint256 _value) internal {
+    require(_from != address(0), "ERC20: transfer from the zero address");
+    require(_to != address(0), "ERC20: transfer to the zero address");
+    require(_to != address(this), "ERC20: transfer to this contract address");
+
+    balanceOf[_from] = balanceOf[_from].sub(_value);
+    balanceOf[_to] = balanceOf[_to].add(_value);
+    emit Transfer(_from, _to, _value);
+  }
+
+==============================================================================
+[36] AXSToken.sol:transferFrom L170-184  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xbb0e17ef65f82ab018d8edd776e8dd940327b28b_eth\AXSToken.sol
+==============================================================================
+// pragma: solidity 0.5.17;
+// contract: ERC20GatewayWhitelist
+  function transferFrom(
+    address _from,
+    address _to,
+    uint256 _value
+  )
+    public
+    returns (bool _success)
+  {
+    if (allowance(_from, msg.sender) != uint256(-1)) {
+      super._approve(_from, msg.sender, _allowance[_from][msg.sender].sub(_value));
+    }
+
+    _transfer(_from, _to, _value);
+    return true;
+  }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [allowance] ----
+function allowance(address _owner, address _spender)
+    public
+    view
+    returns (uint256 _value)
+  {
+    if (_spender == mainchainGateway) return uint256(-1);
+
+    return _allowance[_owner][_spender];
+  }
+// ---- 父合约函数证据 [ERC20._approve, ERC20._transfer] ----
+function _approve(address _owner, address _spender, uint256 _amount) internal {
+    require(_owner != address(0), "ERC20: approve from the zero address");
+    require(_spender != address(0), "ERC20: approve to the zero address");
+
+    _allowance[_owner][_spender] = _amount;
+    emit Approval(_owner, _spender, _amount);
+  }
+function _transfer(address _from, address _to, uint256 _value) internal {
+    require(_from != address(0), "ERC20: transfer from the zero address");
+    require(_to != address(0), "ERC20: transfer to the zero address");
+    require(_to != address(this), "ERC20: transfer to this contract address");
+
+    balanceOf[_from] = balanceOf[_from].sub(_value);
+    balanceOf[_to] = balanceOf[_to].add(_value);
+    emit Transfer(_from, _to, _value);
+  }
+
+==============================================================================
+[37] BridgeToken.sol:unwrap L617-622  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xbec243c995409e6520d7c41e404da5deba4b209b_avax\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: BridgeToken
+    function unwrap(uint256 amount, uint256 chainId) public {
+        require(tx.origin == msg.sender, "Contract calls not supported.");
+        require(chainIds[chainId] == true, "Chain ID not supported.");
+        _burn(msg.sender, amount);
+        emit Unwrap(amount, chainId);
+    }
+// ---- 父合约函数证据 [ERC20._burn] ----
+function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        _balances[account] = accountBalance - amount;
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+    }
+
+==============================================================================
+[38] ProxyERC20.sol:transferFrom L488-504  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xc011a73ee8576fb46f5e1c5751ca3b9fe0af2a6f_eth\ProxyERC20.sol
+==============================================================================
+// pragma: solidity 0.4.25;
+// contract: ProxyERC20
+    function transferFrom(
+        address from,
+        address to,
+        uint256 value
+    )
+        public
+        returns (bool)
+    {
+        // Mutable state call requires the proxy to tell the target who the msg.sender is.
+        target.setMessageSender(msg.sender);
+
+        // Forward the ERC20 call to the target contract
+        IERC20(target).transferFrom(from, to, value);
+
+        // Event emitting will occur via Synthetix.Proxy._emit()
+        return true;
+    }
+
+==============================================================================
+[39] BridgeToken.sol:unwrap L617-622  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xd501281565bf7789224523144fe5d98e8b28f267_avax\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: BridgeToken
+    function unwrap(uint256 amount, uint256 chainId) public {
+        require(tx.origin == msg.sender, "Contract calls not supported.");
+        require(chainIds[chainId] == true, "Chain ID not supported.");
+        _burn(msg.sender, amount);
+        emit Unwrap(amount, chainId);
+    }
+// ---- 父合约函数证据 [ERC20._burn] ----
+function _burn(address account, uint256 amount) internal virtual {
+        require(account != address(0), "ERC20: burn from the zero address");
+
+        _beforeTokenTransfer(account, address(0), amount);
+
+        uint256 accountBalance = _balances[account];
+        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        _balances[account] = accountBalance - amount;
+        _totalSupply -= amount;
+
+        emit Transfer(account, address(0), amount);
+    }
+
+==============================================================================
+[40] TetherToken.sol:transferFrom L346-353  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xdac17f958d2ee523a2206206994597c13d831ec7_eth\TetherToken.sol
+==============================================================================
+// pragma: solidity ^0.4.17;
+// contract: TetherToken
+    function transferFrom(address _from, address _to, uint _value) public whenNotPaused {
+        require(!isBlackListed[_from]);
+        if (deprecated) {
+            return UpgradedStandardToken(upgradedAddress).transferFromByLegacy(msg.sender, _from, _to, _value);
+        } else {
+            return super.transferFrom(_from, _to, _value);
+        }
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+    require(!paused);
+    _;
+  
+
+==============================================================================
+[41] EURSToken.sol:transferFrom L468-490  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xdb25f211ab05b1c97d595516f45794528a807ad8_eth\EURSToken.sol
+==============================================================================
+// pragma: solidity ^0.4.20;
+// contract: EURSToken
+  function transferFrom (address _from, address _to, uint256 _value)
+  public delegatable payable returns (bool) {
+    if (frozen) return false;
+    else if (
+      (addressFlags [_from] | addressFlags [_to]) & BLACK_LIST_FLAG ==
+      BLACK_LIST_FLAG)
+      return false;
+    else {
+      uint256 fee =
+        (addressFlags [_from] | addressFlags [_to]) & ZERO_FEE_FLAG == ZERO_FEE_FLAG ?
+          0 :
+          calculateFee (_value);
+
+      if (_value <= allowances [_from][msg.sender] &&
+          fee <= safeSub (allowances [_from][msg.sender], _value) &&
+          _value <= accounts [_from] &&
+          fee <= safeSub (accounts [_from], _value)) {
+        require (AbstractToken.transferFrom (_from, _to, _value));
+        require (AbstractToken.transferFrom (_from, feeCollector, fee));
+        return true;
+      } else return false;
+    }
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier delegatable {
+    if (delegate == address (0)) {
+      require (msg.value == 0);                                
+      _;
+    } else {
+      assembly {
+                     
+        let oldOwner := sload (owner_slot)
+
+                        
+        let oldDelegate := sload (delegate_slot)
+
+                                                                          
+        let buffer := mload (0x40)
+
+                                             
+        calldatacopy (buffer, 0, calldatasize)
+
+                                 
+        let result := delegatecall (gas, oldDelegate, buffer, calldatasize, buffer, 0)
+
+                                           
+        switch eq (oldOwner, sload (owner_slot))
+        case 1 {}                               
+        default {revert (0, 0) }                              
+
+                                              
+        switch eq (oldDelegate, sload (delegate_slot))
+        case 1 {}                                  
+        default {revert (0, 0) }                                 
+
+                                          
+        returndatacopy (buffer, 0, returndatasize)
+
+                            
+        switch result
+        case 0 { revert (buffer, returndatasize) }                        
+        default { return (buffer, returndatasize) }                          
+      }
+    }
+  
+// ---- 同文件辅助函数证据 [calculateFee] ----
+function calculateFee (uint256 _amount)
+    public delegatable view returns (uint256 _fee) {
+    require (_amount <= MAX_TOKENS_COUNT);
+
+    _fee = safeMul (_amount, variableFeeNumerator) / FEE_DENOMINATOR;
+    if (_fee < minVariableFee) _fee = minVariableFee;
+    if (_fee > maxVariableFee) _fee = maxVariableFee;
+    _fee = safeAdd (_fee, fixedFee);
+  }
+// ---- 父合约函数证据 [SafeMath.safeSub] ----
+function safeSub (uint256 x, uint256 y)
+  pure internal
+  returns (uint256 z) {
+    assert (x >= y);
+    return x - y;
+  }
+
+==============================================================================
+[42] AVABBC.sol:transferFrom L441-451  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe83ce6bfb580583bd6a62b4be7b34fc25f02910d_avax\AVABBC.sol
+==============================================================================
+// pragma: solidity 0.5.17;
+// contract: PausableToken
+  function transferFrom(
+    address _from,
+    address _to,
+    uint256 _value
+  )
+    public
+    whenNotPaused
+    returns (bool)
+  {
+    return super.transferFrom(_from, _to, _value);
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+    require(!paused);
+    _;
+  
+
+==============================================================================
+[43] BABBC.sol:transferFrom L441-451  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe83ce6bfb580583bd6a62b4be7b34fc25f02910d_bsc\BABBC.sol
+==============================================================================
+// pragma: solidity 0.5.17;
+// contract: PausableToken
+  function transferFrom(
+    address _from,
+    address _to,
+    uint256 _value
+  )
+    public
+    whenNotPaused
+    returns (bool)
+  {
+    return super.transferFrom(_from, _to, _value);
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+    require(!paused);
+    _;
+  
+
+==============================================================================
+[44] WABBC.sol:transferFrom L441-451  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe83ce6bfb580583bd6a62b4be7b34fc25f02910d_eth\WABBC.sol
+==============================================================================
+// pragma: solidity 0.5.17;
+// contract: PausableToken
+  function transferFrom(
+    address _from,
+    address _to,
+    uint256 _value
+  )
+    public
+    whenNotPaused
+    returns (bool)
+  {
+    return super.transferFrom(_from, _to, _value);
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+    require(!paused);
+    _;
+  
+
+==============================================================================
+[45] FABBC.sol:transferFrom L441-451  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe83ce6bfb580583bd6a62b4be7b34fc25f02910d_fantom\FABBC.sol
+==============================================================================
+// pragma: solidity 0.5.17;
+// contract: PausableToken
+  function transferFrom(
+    address _from,
+    address _to,
+    uint256 _value
+  )
+    public
+    whenNotPaused
+    returns (bool)
+  {
+    return super.transferFrom(_from, _to, _value);
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+    require(!paused);
+    _;
+  
+
+==============================================================================
+[46] MABBC.sol:transferFrom L441-451  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe83ce6bfb580583bd6a62b4be7b34fc25f02910d_poly\MABBC.sol
+==============================================================================
+// pragma: solidity 0.5.17;
+// contract: PausableToken
+  function transferFrom(
+    address _from,
+    address _to,
+    uint256 _value
+  )
+    public
+    whenNotPaused
+    returns (bool)
+  {
+    return super.transferFrom(_from, _to, _value);
+  }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+    require(!paused);
+    _;
+  
+
+==============================================================================
+[47] ACH.sol:transferFrom L627-629  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xed04915c23f00a313a544955524eb7dbd823143d_eth\ACH.sol
+==============================================================================
+// pragma: solidity ^0.5.2;
+// contract: ERC20Pausable
+    function transferFrom(address from, address to, uint256 value) public whenNotPaused returns (bool) {
+        return super.transferFrom(from, to, value);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier whenNotPaused() {
+        require(!_paused);
+        _;
+    
+
+==============================================================================
+[48] ENJToken.sol:transferFrom L384-390  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xf629cbd94d3791c9250152bd8dfbdf380e2a3b9c_eth\ENJToken.sol
+==============================================================================
+// pragma: solidity ^0.4.15;
+// contract: ENJToken
+    function transferFrom(address _from, address _to, uint256 _value) public returns (bool success) {
+        if (isTransferAllowed() == true || msg.sender == crowdFundAddress || msg.sender == incentivisationFundAddress) {        
+            assert(super.transferFrom(_from, _to, _value));
+            return true;
+        }
+        revert();
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [isTransferAllowed] ----
+function isTransferAllowed() internal constant returns(bool) {
+        if (now > endTime || isReleasedToPublic == true) {
+            return true;
+        }
+        return false;
+    }
+
+==============================================================================
+[49] ERC20.sol:transfer L113-117  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe3c408bd53c31c085a1746af401a4042954ff740_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function transfer(address to, uint256 amount) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _transfer(owner, to, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+        }
+        _balances[to] += amount;
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[50] ERC20.sol:approve L136-140  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe3c408bd53c31c085a1746af401a4042954ff740_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function approve(address spender, uint256 amount) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[51] ERC20.sol:increaseAllowance L181-185  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe3c408bd53c31c085a1746af401a4042954ff740_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, _allowances[owner][spender] + addedValue);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[52] ERC20.sol:decreaseAllowance L201-210  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe3c408bd53c31c085a1746af401a4042954ff740_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        uint256 currentAllowance = _allowances[owner][spender];
+        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        unchecked {
+            _approve(owner, spender, currentAllowance - subtractedValue);
+        }
+
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[53] ContractOwnershipBase.sol:transferOwnership L21-23  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xbdeae1ca48894a1759a8374d63925f21f2ee2639_bsc\access\base\ContractOwnershipBase.sol
+==============================================================================
+// pragma: solidity ^0.8.8;
+// contract: ContractOwnershipBase
+    function transferOwnership(address newOwner) public virtual override {
+        ContractOwnershipStorage.layout().transferOwnership(_msgSender(), newOwner);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[54] Ownable.sol:transferOwnership L69-72  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x5283d291dbcf85356a21ba090e6db59121208b44_eth\openzeppelin\contracts\access\Ownable.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: Ownable
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        _transferOwnership(newOwner);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner() {
+        _checkOwner();
+        _;
+    
+// ---- 同文件辅助函数证据 [_checkOwner, _transferOwnership] ----
+function _checkOwner() internal view virtual {
+        require(owner() == _msgSender(), "Ownable: caller is not the owner");
+    }
+function _transferOwnership(address newOwner) internal virtual {
+        address oldOwner = _owner;
+        _owner = newOwner;
+        emit OwnershipTransferred(oldOwner, newOwner);
+    }
+
+==============================================================================
+[55] ERC20.sol:transfer L113-117  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x5283d291dbcf85356a21ba090e6db59121208b44_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function transfer(address to, uint256 amount) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _transfer(owner, to, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+                                                                                                                   
+                                              
+            _balances[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[56] ERC20.sol:approve L136-140  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x5283d291dbcf85356a21ba090e6db59121208b44_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function approve(address spender, uint256 amount) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[57] ERC20.sol:increaseAllowance L181-185  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x5283d291dbcf85356a21ba090e6db59121208b44_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, allowance(owner, spender) + addedValue);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve, allowance] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+function allowance(address owner, address spender) public view virtual override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[58] ERC20.sol:decreaseAllowance L201-210  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x5283d291dbcf85356a21ba090e6db59121208b44_eth\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        uint256 currentAllowance = allowance(owner, spender);
+        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        unchecked {
+            _approve(owner, spender, currentAllowance - subtractedValue);
+        }
+
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve, allowance] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+function allowance(address owner, address spender) public view virtual override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[59] ERC20BaseToken.sol:transferFrom L60-74  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3845badade8e6dff049820680d1f14bd3903a5d0_eth\Sand\erc20\ERC20BaseToken.sol
+==============================================================================
+// pragma: solidity 0.5.9;
+// contract: ERC20BaseToken
+    function transferFrom(address from, address to, uint256 amount)
+        public
+        returns (bool success)
+    {
+        if (msg.sender != from && !_superOperators[msg.sender]) {
+            uint256 currentAllowance = _allowances[from][msg.sender];
+            if (currentAllowance != (2**256) - 1) {
+                // save gas when allowance is maximal by not reducing it (see https://github.com/ethereum/EIPs/issues/717)
+                require(currentAllowance >= amount, "Not enough funds allowed");
+                _allowances[from][msg.sender] = currentAllowance - amount;
+            }
+        }
+        _transfer(from, to, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(address from, address to, uint256 amount) internal {
+        require(to != address(0), "Cannot send to 0x0");
+        uint256 currentBalance = _balances[from];
+        require(currentBalance >= amount, "not enough fund");
+        _balances[from] = currentBalance - amount;
+        _balances[to] += amount;
+        emit Transfer(from, to, amount);
+    }
+
+==============================================================================
+[60] ERC20ExecuteExtension.sol:transferAndChargeForGas L117-133  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3845badade8e6dff049820680d1f14bd3903a5d0_eth\Sand\erc20\ERC20ExecuteExtension.sol
+==============================================================================
+// pragma: solidity 0.5.9;
+// contract: ERC20ExecuteExtension
+    function transferAndChargeForGas(
+        address from,
+        address to,
+        uint256 amount,
+        uint256 gasLimit,
+        uint256 tokenGasPrice,
+        uint256 baseGasCharge,
+        address tokenReceiver
+    ) external returns (bool) {
+        uint256 initialGas = gasleft();
+        require(_executionOperators[msg.sender], "only execution operators allowed to perfrom transfer and charge");
+        _transfer(from, to, amount);
+        if (tokenGasPrice > 0) {
+            _charge(from, gasLimit, tokenGasPrice, initialGas, baseGasCharge, tokenReceiver);
+        }
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_charge, _transfer] ----
+function _charge(
+        address from,
+        uint256 gasLimit,
+        uint256 tokenGasPrice,
+        uint256 initialGas,
+        uint256 baseGasCharge,
+        address tokenReceiver
+    ) internal {
+        uint256 gasCharge = initialGas - gasleft();
+        if(gasCharge > gasLimit) {
+            gasCharge = gasLimit;
+        }
+        gasCharge += baseGasCharge;
+        uint256 tokensToCharge = gasCharge * tokenGasPrice;
+        require(tokensToCharge / gasCharge == tokenGasPrice, "overflow");
+        _transfer(from, tokenReceiver, tokensToCharge);
+    }
+
+==============================================================================
+[61] Ownable.sol:transferOwnership L69-72  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_bsc\openzeppelin\contracts\access\Ownable.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: Ownable
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        _transferOwnership(newOwner);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner() {
+        _checkOwner();
+        _;
+    
+// ---- 同文件辅助函数证据 [_checkOwner, _transferOwnership] ----
+function _checkOwner() internal view virtual {
+        require(owner() == _msgSender(), "Ownable: caller is not the owner");
+    }
+function _transferOwnership(address newOwner) internal virtual {
+        address oldOwner = _owner;
+        _owner = newOwner;
+        emit OwnershipTransferred(oldOwner, newOwner);
+    }
+
+==============================================================================
+[62] ERC20.sol:transfer L113-117  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_bsc\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function transfer(address to, uint256 amount) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _transfer(owner, to, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+                                                                                                                   
+                                              
+            _balances[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[63] ERC20.sol:approve L136-140  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_bsc\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function approve(address spender, uint256 amount) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[64] ERC20.sol:increaseAllowance L181-185  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_bsc\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, allowance(owner, spender) + addedValue);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve, allowance] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+function allowance(address owner, address spender) public view virtual override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[65] ERC20.sol:decreaseAllowance L201-210  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_bsc\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        uint256 currentAllowance = allowance(owner, spender);
+        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        unchecked {
+            _approve(owner, spender, currentAllowance - subtractedValue);
+        }
+
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve, allowance] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+function allowance(address owner, address spender) public view virtual override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[66] Ownable.sol:transferOwnership L69-72  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_arbi\openzeppelin\contracts\access\Ownable.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: Ownable
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        _transferOwnership(newOwner);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner() {
+        _checkOwner();
+        _;
+    
+// ---- 同文件辅助函数证据 [_checkOwner, _transferOwnership] ----
+function _checkOwner() internal view virtual {
+        require(owner() == _msgSender(), "Ownable: caller is not the owner");
+    }
+function _transferOwnership(address newOwner) internal virtual {
+        address oldOwner = _owner;
+        _owner = newOwner;
+        emit OwnershipTransferred(oldOwner, newOwner);
+    }
+
+==============================================================================
+[67] ERC20.sol:transfer L113-117  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_arbi\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function transfer(address to, uint256 amount) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _transfer(owner, to, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+                                                                                                                   
+                                              
+            _balances[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[68] ERC20.sol:approve L136-140  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_arbi\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function approve(address spender, uint256 amount) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[69] ERC20.sol:increaseAllowance L181-185  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_arbi\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, allowance(owner, spender) + addedValue);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve, allowance] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+function allowance(address owner, address spender) public view virtual override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[70] ERC20.sol:decreaseAllowance L201-210  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x25d887ce7a35172c62febfd67a1856f20faebb00_arbi\openzeppelin\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        uint256 currentAllowance = allowance(owner, spender);
+        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        unchecked {
+            _approve(owner, spender, currentAllowance - subtractedValue);
+        }
+
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve, allowance] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+function allowance(address owner, address spender) public view virtual override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[71] Ownable.sol:transferOwnership L69-72  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x152649ea73beab28c5b49b26eb48f7ead6d4c898_eth\contracts\access\Ownable.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: Ownable
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        _transferOwnership(newOwner);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyOwner() {
+        _checkOwner();
+        _;
+    
+// ---- 同文件辅助函数证据 [_checkOwner, _transferOwnership] ----
+function _checkOwner() internal view virtual {
+        require(owner() == _msgSender(), "Ownable: caller is not the owner");
+    }
+function _transferOwnership(address newOwner) internal virtual {
+        address oldOwner = _owner;
+        _owner = newOwner;
+        emit OwnershipTransferred(oldOwner, newOwner);
+    }
+
+==============================================================================
+[72] ERC20.sol:transfer L113-117  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x152649ea73beab28c5b49b26eb48f7ead6d4c898_eth\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function transfer(address to, uint256 amount) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _transfer(owner, to, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_transfer] ----
+function _transfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+
+        _beforeTokenTransfer(from, to, amount);
+
+        uint256 fromBalance = _balances[from];
+        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        unchecked {
+            _balances[from] = fromBalance - amount;
+        }
+        _balances[to] += amount;
+
+        emit Transfer(from, to, amount);
+
+        _afterTokenTransfer(from, to, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[73] ERC20.sol:approve L136-140  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x152649ea73beab28c5b49b26eb48f7ead6d4c898_eth\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function approve(address spender, uint256 amount) public virtual override returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, amount);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[74] ERC20.sol:increaseAllowance L181-185  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x152649ea73beab28c5b49b26eb48f7ead6d4c898_eth\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, allowance(owner, spender) + addedValue);
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve, allowance] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+function allowance(address owner, address spender) public view virtual override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+==============================================================================
+[75] ERC20.sol:decreaseAllowance L201-210  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x152649ea73beab28c5b49b26eb48f7ead6d4c898_eth\contracts\token\ERC20\ERC20.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ERC20
+    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        uint256 currentAllowance = allowance(owner, spender);
+        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        unchecked {
+            _approve(owner, spender, currentAllowance - subtractedValue);
+        }
+
+        return true;
+    }
+// ---- 修饰符定义（本合约，供核验）----
+// ---- 同文件辅助函数证据 [_approve, allowance] ----
+function _approve(
+        address owner,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+function allowance(address owner, address spender) public view virtual override returns (uint256) {
+        return _allowances[owner][spender];
+    }
+// ---- 父合约函数证据 [Context._msgSender] ----
+function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }

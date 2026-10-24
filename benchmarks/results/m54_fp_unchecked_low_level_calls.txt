@@ -1,0 +1,1098 @@
+==============================================================================
+[0] Bora20v2.sol:functionCallWithValue L2197-2206  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0ef39e52704ad52e2882bbfa6781167e1b6c4510_poly\Bora20v2.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResultFromTarget(target, success, returndata, errorMessage);
+    }
+
+==============================================================================
+[1] OneInch.sol:functionCallWithValue L785-792  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x111111111117dc0aa78b770fa6a738034120c302_bsc\OneInch.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[2] BridgeToken.sol:functionCallWithValue L212-223  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x156ab3346823b651294766e23e6cf87254d68962_bsc\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[3] CrossChainCanonicalFRAX.sol:functionCallWithValue L382-389  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x17fc002b466eec40dae837fc4be5c67993ddbd6f_arbi\CrossChainCanonicalFRAX.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[4] CrossChainCanonicalFXS.sol:functionCallWithValue L382-389  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x1a3acf6d19267e2d3e7f898f42803e90c9219062_poly\CrossChainCanonicalFXS.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[5] CrossChainCanonicalFXS.sol:execute L1741-1748  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x1a3acf6d19267e2d3e7f898f42803e90c9219062_poly\CrossChainCanonicalFXS.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: CrossChainCanonical
+    function execute(
+        address _to,
+        uint256 _value,
+        bytes calldata _data
+    ) external onlyByOwnGov returns (bool, bytes memory) {
+        (bool success, bytes memory result) = _to.call{value:_value}(_data);
+        return (success, result);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyByOwnGov() {
+        require(msg.sender == timelock_address || msg.sender == owner, "Not owner or timelock");
+        _;
+    
+
+==============================================================================
+[6] CrossChainCanonicalFXS.sol:functionCallWithValue L382-389  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x214db107654ff987ad859f34125307783fc8e387_avax\CrossChainCanonicalFXS.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[7] CrossChainCanonicalFXS.sol:execute L1741-1748  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x214db107654ff987ad859f34125307783fc8e387_avax\CrossChainCanonicalFXS.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: CrossChainCanonical
+    function execute(
+        address _to,
+        uint256 _value,
+        bytes calldata _data
+    ) external onlyByOwnGov returns (bool, bytes memory) {
+        (bool success, bytes memory result) = _to.call{value:_value}(_data);
+        return (success, result);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyByOwnGov() {
+        require(msg.sender == timelock_address || msg.sender == owner, "Not owner or timelock");
+        _;
+    
+
+==============================================================================
+[8] BEP20UpgradeableProxy.sol:functionCallWithValue L202-209  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x2ed9a5c8c13b93955103b9a7c167b67ef4d568a3_bsc\BEP20UpgradeableProxy.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[9] BTT.sol:functionCallWithValue L1287-1294  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x352cb5e19b12fc216548a2677bd0fce83bae434b_bsc\BTT.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[10] TransparentUpgradeableProxy.sol:functionCallWithValue L217-224  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x361c60b7c2828fcab80988d00d1d542c83387b50_bsc\TransparentUpgradeableProxy.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[11] BridgeToken.sol:functionCallWithValue L225-236  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x442f7f22b1ee2c842beaff52880d4573e9201158_avax\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[12] CrossChainCanonicalFRAX.sol:functionCallWithValue L382-389  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x45c32fa6df82ead1e2ef74d17b76547eddfaff89_poly\CrossChainCanonicalFRAX.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[13] CrossChainCanonicalFRAX.sol:execute L1741-1748  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x45c32fa6df82ead1e2ef74d17b76547eddfaff89_poly\CrossChainCanonicalFRAX.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: CrossChainCanonical
+    function execute(
+        address _to,
+        uint256 _value,
+        bytes calldata _data
+    ) external onlyByOwnGov returns (bool, bytes memory) {
+        (bool success, bytes memory result) = _to.call{value:_value}(_data);
+        return (success, result);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyByOwnGov() {
+        require(msg.sender == timelock_address || msg.sender == owner, "Not owner or timelock");
+        _;
+    
+
+==============================================================================
+[14] TRX.sol:functionCallWithValue L1287-1294  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x50327c6c5a14dcade707abad2e27eb517df87ab5_eth\TRX.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[15] BridgeToken.sol:functionCallWithValue L225-236  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x70928e5b188def72817b7775f0bf6325968e563b_avax\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[16] CrossChainCanonicalFXS.sol:functionCallWithValue L382-389  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x7d016eec9c25232b01f23ef992d98ca97fc2af5a_fantom\CrossChainCanonicalFXS.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[17] CrossChainCanonicalFXS.sol:execute L1741-1748  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x7d016eec9c25232b01f23ef992d98ca97fc2af5a_fantom\CrossChainCanonicalFXS.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: CrossChainCanonical
+    function execute(
+        address _to,
+        uint256 _value,
+        bytes calldata _data
+    ) external onlyByOwnGov returns (bool, bytes memory) {
+        (bool success, bytes memory result) = _to.call{value:_value}(_data);
+        return (success, result);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyByOwnGov() {
+        require(msg.sender == timelock_address || msg.sender == owner, "Not owner or timelock");
+        _;
+    
+
+==============================================================================
+[18] DFI.sol:functionCallWithValue L416-423  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x8fc8f8269ebca376d046ce292dc7eac40c8d358a_eth\DFI.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[19] CrossChainCanonicalFRAX.sol:functionCallWithValue L382-389  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x90c97f71e18723b0cf0dfa30ee176ab653e89f40_bsc\CrossChainCanonicalFRAX.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[20] CrossChainCanonicalFRAX.sol:execute L1741-1748  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x90c97f71e18723b0cf0dfa30ee176ab653e89f40_bsc\CrossChainCanonicalFRAX.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: CrossChainCanonical
+    function execute(
+        address _to,
+        uint256 _value,
+        bytes calldata _data
+    ) external onlyByOwnGov returns (bool, bytes memory) {
+        (bool success, bytes memory result) = _to.call{value:_value}(_data);
+        return (success, result);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyByOwnGov() {
+        require(msg.sender == timelock_address || msg.sender == owner, "Not owner or timelock");
+        _;
+    
+
+==============================================================================
+[21] TransparentUpgradeableProxy.sol:functionCallWithValue L218-225  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7_avax\TransparentUpgradeableProxy.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[22] BridgeToken.sol:functionCallWithValue L212-223  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x986854779804799c1d68867f5e03e601e781e41b_bsc\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[23] BridgeToken.sol:functionCallWithValue L214-225  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x9cd6746665d9557e1b9a775819625711d0693439_poly\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[24] CrossChainCanonicalFXS.sol:functionCallWithValue L382-389  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x9d2f299715d94d8a7e6f5eaa8e654e8c74a988a7_arbi\CrossChainCanonicalFXS.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[25] CoinToken.sol:functionCallWithValue L147-152  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xac57de9c1a09fec648e93eb98875b212db0d460b_eth\CoinToken.sol
+==============================================================================
+// pragma: solidity ^0.8.4;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[26] BTT.sol:functionCallWithValue L1287-1294  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xc669928185dbce49d2230cc9b0979be6dc797957_eth\BTT.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[27] TRX.sol:functionCallWithValue L1287-1294  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xce7de646e7208a4ef112cb6ed5038fa6cc6b12e3_bsc\TRX.sol
+==============================================================================
+// pragma: solidity >=0.6.0 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[28] CrossChainCanonicalFRAX.sol:functionCallWithValue L382-389  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xd24c2ad096400b6fbcd2ad8b24e7acbc21a1da64_avax\CrossChainCanonicalFRAX.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[29] CrossChainCanonicalFRAX.sol:execute L1741-1748  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xd24c2ad096400b6fbcd2ad8b24e7acbc21a1da64_avax\CrossChainCanonicalFRAX.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: CrossChainCanonical
+    function execute(
+        address _to,
+        uint256 _value,
+        bytes calldata _data
+    ) external onlyByOwnGov returns (bool, bytes memory) {
+        (bool success, bytes memory result) = _to.call{value:_value}(_data);
+        return (success, result);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyByOwnGov() {
+        require(msg.sender == timelock_address || msg.sender == owner, "Not owner or timelock");
+        _;
+    
+
+==============================================================================
+[30] CrossChainCanonicalFRAX.sol:functionCallWithValue L382-389  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xdc301622e621166bd8e82f2ca0a26c13ad0be355_fantom\CrossChainCanonicalFRAX.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[31] CrossChainCanonicalFRAX.sol:execute L1741-1748  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xdc301622e621166bd8e82f2ca0a26c13ad0be355_fantom\CrossChainCanonicalFRAX.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: CrossChainCanonical
+    function execute(
+        address _to,
+        uint256 _value,
+        bytes calldata _data
+    ) external onlyByOwnGov returns (bool, bytes memory) {
+        (bool success, bytes memory result) = _to.call{value:_value}(_data);
+        return (success, result);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyByOwnGov() {
+        require(msg.sender == timelock_address || msg.sender == owner, "Not owner or timelock");
+        _;
+    
+
+==============================================================================
+[32] CrossChainCanonicalFXS.sol:functionCallWithValue L382-389  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe48a3d7d0bc88d552f730b62c006bc925eadb9ee_bsc\CrossChainCanonicalFXS.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[33] CrossChainCanonicalFXS.sol:execute L1741-1748  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xe48a3d7d0bc88d552f730b62c006bc925eadb9ee_bsc\CrossChainCanonicalFXS.sol
+==============================================================================
+// pragma: solidity >=0.8.0;
+// contract: CrossChainCanonical
+    function execute(
+        address _to,
+        uint256 _value,
+        bytes calldata _data
+    ) external onlyByOwnGov returns (bool, bytes memory) {
+        (bool success, bytes memory result) = _to.call{value:_value}(_data);
+        return (success, result);
+    }
+// ---- 修饰符定义（本合约，供核验）----
+modifier onlyByOwnGov() {
+        require(msg.sender == timelock_address || msg.sender == owner, "Not owner or timelock");
+        _;
+    
+
+==============================================================================
+[34] BridgeToken.sol:functionCallWithValue L214-225  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xecdcb5b88f8e3c15f95c720c51c71c9e2080525d_poly\BridgeToken.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[35] GMX.sol:functionCallWithValue L360-367  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a_arbi\GMX.sol
+==============================================================================
+// pragma: solidity 0.6.12;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[36] TransparentUpgradeableProxy.sol:functionCallWithValue L194-201  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9_arbi\TransparentUpgradeableProxy.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[37] TransparentUpgradeableProxy.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xff970a61a04b1ca14834a43f5de4533ebddb5cc8_arbi\TransparentUpgradeableProxy.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[38] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xfa7f8980b0f1e64a2062791cc3b0871572f1f7f0_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[39] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xf97f4df75117a78c1a5a0dbb814af92458539fb4_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[40] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xd4d42f0b6def4ce0383636770ef773390d85c61a_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[41] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xd17479997f34dd9156deef8f95a52d81d265be9c_bsc\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[42] Address.sol:functionCallWithValue L123-134  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xcdf7028ceab81fa0c6971208e83fa7872994bee5_eth\n\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[43] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xcafcd85d8ca7ad1e1c6f82f651fa15e33aefd07b_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[44] Address.sol:functionCallWithValue L122-133  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xbd31ea8212119f94a611fa969881cba3ea06fa3d_eth\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[45] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xb766039cc6db368759c1e56b79affe831d0cc507_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[46] Address.sol:functionCallWithValue L128-139  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xb50721bcf8d664c30412cfbc6cf7a15145234ad1_eth\utils\Address.sol
+==============================================================================
+// pragma: solidity ^0.8.1;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[47] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0xa0b862f60edef4452f25b4160f177db44deb6cf1_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[48] Address.sol:functionCallWithValue L128-137  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x9c9e5fd8bbc25984b178fdce6117defa39d2db39_poly\utils\Address.sol
+==============================================================================
+// pragma: solidity ^0.8.1;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResultFromTarget(target, success, returndata, errorMessage);
+    }
+
+==============================================================================
+[49] Address.sol:functionCallWithValue L128-137  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x9c9e5fd8bbc25984b178fdce6117defa39d2db39_avax\utils\Address.sol
+==============================================================================
+// pragma: solidity ^0.8.1;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResultFromTarget(target, success, returndata, errorMessage);
+    }
+
+==============================================================================
+[50] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x9623063377ad1b27544c965ccd7342f7ea7e88c7_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[51] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x93b346b6bc2548da6a1e7d98e9a421b42541425b_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[52] Address.sol:functionCallWithValue L128-139  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x912ce59144191c1204e64559fe8253a0e49e6548_arbi\utils\Address.sol
+==============================================================================
+// pragma: solidity ^0.8.1;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[53] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x82e3a8f066a6989666b031d916c43672085b1582_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[54] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x68749665ff8d2d112fa859aa293f07a622782f38_eth\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[55] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x680447595e8b7b3aa1b43beb9f6098c79ac2ab3f_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[56] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x62edc0692bd897d2295872a9ffcac5425011c661_avax\ibraries\utils\Address.sol
+==============================================================================
+// pragma: solidity ^0.6.2;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[57] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x539bde0d7dbd336b79148aa742883198bbf60342_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[58] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x4d15a3a2286d883af0aa1b3f21367843fac63e07_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[59] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x46d0ce7de6247b0a95f67b43b589b4041bae7fbe_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[60] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x4385328cc4d643ca98dfea734360c0f596c83449_eth\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[61] Address.sol:functionCallWithValue L122-133  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x418d75f65a02b3d53b2418fb8e1fe493759c7605_eth\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity ^0.8.0;
+// contract: ?
+    function functionCallWithValue(
+        address target,
+        bytes memory data,
+        uint256 value,
+        string memory errorMessage
+    ) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+        return verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[62] ERC20ExecuteExtension.sol:executeWithSpecificGas L53-57  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3845badade8e6dff049820680d1f14bd3903a5d0_eth\Sand\erc20\ERC20ExecuteExtension.sol
+==============================================================================
+// pragma: solidity 0.5.9;
+// contract: ERC20ExecuteExtension
+    function executeWithSpecificGas(address to, uint256 gasLimit, bytes calldata data) external returns (bool success, bytes memory returnData) {
+        require(_executionOperators[msg.sender], "only execution operators allowed to execute on SAND behalf");
+        (success, returnData) = to.call.gas(gasLimit)(data);
+        assert(gasleft() > gasLimit / 63); // not enough gas provided, assert to throw all gas // TODO use EIP-1930
+    }
+
+==============================================================================
+[63] ERC20ExecuteExtension.sol:_approveAndExecuteWithSpecificGas L153-166  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x3845badade8e6dff049820680d1f14bd3903a5d0_eth\Sand\erc20\ERC20ExecuteExtension.sol
+==============================================================================
+// pragma: solidity 0.5.9;
+// contract: ERC20ExecuteExtension
+    function _approveAndExecuteWithSpecificGas(
+        address from,
+        address to,
+        uint256 amount,
+        uint256 gasLimit,
+        bytes memory data
+    ) internal returns (bool success, bytes memory returnData) {
+
+        if (amount > 0) {
+            _addAllowanceIfNeeded(from, to, amount);
+        }
+        (success, returnData) = to.call.gas(gasLimit)(data);
+        assert(gasleft() > gasLimit / 63); // not enough gas provided, assert to throw all gas // TODO use EIP-1930
+    }
+
+==============================================================================
+[64] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x354a6da3fcde098f8389cad84b0182725c6c91de_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[65] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[66] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x2e9a6df78e42a30712c10a9dc4b1c8656f8f2879_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[67] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x23a941036ae778ac51ab04cea08ed6e2fe103614_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[68] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x13ad51ed4f1b7e9dc168d8a00cb3f4ddd85efa60_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[69] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x11cdb42b0eb46d95f990bedd4695a6e3fa034978_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[70] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x0c10bf8fcb7bf5412187a595ab97a3609160b5c6_eth\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }
+
+==============================================================================
+[71] Address.sol:functionCallWithValue L114-121  proj=C:\myFloders\git\nexus-audit\reference_repos\GPTScan-Top200-dev\0x040d1edc9569d4bab2d15287dc5a4f10f56a56b8_arbi\openzeppelin\contracts\utils\Address.sol
+==============================================================================
+// pragma: solidity >=0.6.2 <0.8.0;
+// contract: ?
+    function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
+        require(address(this).balance >= value, "Address: insufficient balance for call");
+        require(isContract(target), "Address: call to non-contract");
+
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool success, bytes memory returndata) = target.call{ value: value }(data);
+        return _verifyCallResult(success, returndata, errorMessage);
+    }

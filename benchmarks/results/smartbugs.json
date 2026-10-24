@@ -1,13 +1,13 @@
 {
   "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\smartbugs-curated-main",
-  "total_functions": 641,
-  "registered": 639,
-  "safe_denominator": 525,
-  "decided": 180,
-  "correct": 180,
+  "total_functions": 680,
+  "registered": 678,
+  "safe_denominator": 544,
+  "decided": 205,
+  "correct": 205,
   "fp": 0,
   "reverse_fn": 0,
-  "fallback": 459,
+  "fallback": 473,
   "disputed": [
     {
       "file": "parity_wallet_bug_1.sol",
@@ -21,6 +21,6 @@
   "model": {
     "model": null,
     "skipped": "offline",
-    "n_fallback": 459
+    "n_fallback": 473
   }
 }

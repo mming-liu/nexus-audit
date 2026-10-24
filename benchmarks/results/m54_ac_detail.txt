@@ -1,0 +1,69 @@
+##############################################################################
+### transferFrom  x3
+----------------------------------------------------------------------
+FILE: CroToken.sol
+--- func_src ---
+// pragma: solidity ^0.4.13;
+// contract: ReleasableToken
+    function transferFrom(address _from, address _to, uint _value) public canTransfer(_from) returns (bool success) {
+        // Call StandardToken.transferForm()
+        return super.transferFrom(_from, _to, _value);
+    }
+
+--- mod_ev ---
+// ---- 修饰符定义（本合约，供核验）----
+modifier canTransfer(address _sender) {
+        require(released || transferAgents[_sender], "For the token to be able to transfer: it's required that the crowdsale is in released state; or the sender is a transfer agent.");
+        _;
+    }
+--- func_ev ---
+(空)
+----------------------------------------------------------------------
+FILE: CrowdsaleToken.sol
+--- func_src ---
+// contract: ReleasableToken
+  function transferFrom(address _from, address _to, uint _value) canTransfer(_from) returns (bool success) {
+    // Call StandardToken.transferForm()
+    return super.transferFrom(_from, _to, _value);
+  }
+
+--- mod_ev ---
+// ---- 修饰符定义（本合约，供核验）----
+modifier canTransfer(address _sender) {
+
+    if(!released) {
+        if(!transferAgents[_sender]) {
+            throw;
+        }
+    }
+
+    _;
+  }
+--- func_ev ---
+(空)
+----------------------------------------------------------------------
+FILE: ProxyERC20.sol
+--- func_src ---
+// pragma: solidity 0.4.25;
+// contract: ProxyERC20
+    function transferFrom(
+        address from,
+        address to,
+        uint256 value
+    )
+        public
+        returns (bool)
+    {
+        // Mutable state call requires the proxy to tell the target who the msg.sender is.
+        target.setMessageSender(msg.sender);
+
+        // Forward the ERC20 call to the target contract
+        IERC20(target).transferFrom(from, to, value);
+
+        // Event emitting will occur via Synthetix.Proxy._emit()
+        return true;
+    }
+--- mod_ev ---
+(空)
+--- func_ev ---
+(空)

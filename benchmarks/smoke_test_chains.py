@@ -4376,9 +4376,9 @@ check("M42：doctor exit 0（依赖/规则表/指纹/补丁器全就绪）",
 check("M42：doctor 输出含五段自检 + PASS 尾标（M50 升段）",
       all(s in _sp86.stdout for s in
           ("[1/5]", "[2/5]", "[3/5]", "[4/5]", "[5/5]", "PASS")), True)
-check("M42：doctor 规则注册表 19 类全 OK",
-      _sp86.stdout.count("  [OK]") >= 19
-      and "共 19 类" in _sp86.stdout, True)
+check("M42：doctor 规则注册表 21 类全 OK（M53 加 arithmetic）",
+      _sp86.stdout.count("  [OK]") >= 21
+      and "共 21 类" in _sp86.stdout, True)
 
 # ---- [87] Module 44：调用者自域状态写早退（access_control）----
 from core.agents.rule_detectors import solidity_access_verdict as _ac87   # noqa: E402
@@ -4618,7 +4618,7 @@ _sp91 = subprocess.run(
 check("M48：doctor 补丁器清单升到 12 类且全绿",
       (_sp91.returncode == 0
        and _sp91.stdout.count("_fix_") >= 12
-       and "共 19 类" in _sp91.stdout),
+       and "共 21 类" in _sp91.stdout),
       True)
 
 # ---- [92] Module 49：Mermaid 污点链路图 ----
@@ -4873,8 +4873,125 @@ _out94b = _sp94sub.run([sys.executable,
 check("M94：M52 探针可跑且 access_control 退回桶显著下压（< 630）",
       ("access_control 退回" in _out94b.stdout), True)
 _m94 = re.search(r"access_control 退回\s+(\d+)", _out94b.stdout)
-check("M94：M52 后 access_control 退回桶 572 条（M52 前 643，-71）",
-      (bool(_m94) and int(_m94.group(1)) == 572), True)
+check("M94：M52 后 access_control 退回桶 531 条（M52 前 643，M54 后 531）",
+      (bool(_m94) and int(_m94.group(1)) == 531), True)
+
+
+# ---- [95] Module 53：Solidity arithmetic 类目（SWC-101 算术溢出） ----
+from core.agents.rule_detectors import (              # noqa: E402
+    solidity_arithmetic_verdict as _arith95,
+)
+from core.agents.vuln_categories import CATEGORIES as _VC95   # noqa: E402
+
+# 95.1 类目已注册（第 21 类，OWASP 之外的 Solidity 专属类目）
+check("M95：arithmetic 类目已注册且标记 owasp=False",
+      ("arithmetic" in _VC95 and _VC95["arithmetic"].owasp is False
+       and _VC95["arithmetic"].cwe == "CWE-190"), True)
+
+# 95.2 0.8+ 编译器内置溢出回滚 → 确定性 safe（unchecked 块除外）
+_ar_08 = """// pragma: solidity ^0.8.19;
+// contract: T
+    function add(uint x) public {
+        count += x;
+    }"""
+check("M95：pragma 0.8+ 判 safe（编译器内置溢出回滚）",
+      (_arith95(_ar_08) is False), True)
+_ar_08_unchecked = """// pragma: solidity ^0.8.19;
+// contract: T
+    function add(uint x) public {
+        unchecked { count += x; }
+    }"""
+check("M95：0.8+ 的 unchecked 块不判 safe（回滚被关掉）",
+      (_arith95(_ar_08_unchecked) is not False), True)
+
+# 95.3 0.4.x 无内置检查 + 外部形参 → 确定性 True
+_ar_04 = """// pragma: solidity ^0.4.19;
+// contract: T
+    function run(uint256 input) public {
+        count += input;
+    }"""
+check("M95：0.4.x 状态复合赋值含形参判 True",
+      (_arith95(_ar_04) is True), True)
+_ar_04_map = """// pragma: solidity ^0.4.19;
+// contract: T
+    function init(uint256 k, uint256 v) public {
+        map[k] -= v;
+    }"""
+check("M95：0.4.x 映射复合赋值含形参判 True",
+      (_arith95(_ar_04_map) is True), True)
+_ar_04_local = """// pragma: solidity ^0.4.23;
+// contract: T
+    function overflowlocalonly(uint256 input) public {
+        uint res = count + input;
+    }"""
+check("M95：局部变量的算术表达式也算溢出面（官方标 vul）",
+      (_arith95(_ar_04_local) is True), True)
+_ar_04_callarg = """// pragma: solidity ^0.4.21;
+// contract: T
+    function sell(uint256 numTokens) public {
+        require(balanceOf[msg.sender] >= numTokens);
+        balanceOf[msg.sender] -= numTokens;
+        msg.sender.transfer(numTokens * PRICE_PER_TOKEN);
+    }"""
+check("M95：调用实参里的算术表达式也算（逐表达式独立判定）",
+      (_arith95(_ar_04_callarg) is True), True)
+
+# 95.4 官方 safe 样本：右操作数外部不可控 / 余额充足性 ≠ 溢出保护
+_ar_msgvalue = """// pragma: solidity ^0.4.19;
+// contract: T
+    function deposit() public payable {
+        balances[msg.sender] += msg.value;
+    }"""
+check("M95：`+= msg.value` 外部不可控判 safe（官方 safe 样本）",
+      (_arith95(_ar_msgvalue) is False), True)
+_ar_balguard = """// pragma: solidity ^0.4.10;
+// contract: T
+    function transfer(address _to, uint256 _value) public {
+        require(balanceOf[msg.sender] >= _value);
+        balanceOf[msg.sender] -= _value;
+        balanceOf[_to] += _value;
+    }"""
+check("M95：余额充足性校验不保护加法 → 与 Top200 审计口径冲突退 None"
+      "（insecure_transfer 官方标 vul / GnosisToken 审计标 safe）",
+      (_arith95(_ar_balguard) is None), True)
+
+# 95.5 SafeMath 库写法（后置回验）判 safe
+_ar_safemath = """// pragma: solidity ^0.4.16;
+// contract: SafeMath
+    function mul(uint256 a, uint256 b) internal constant returns (uint256) {
+        uint256 c = a * b;
+        require(a == 0 || c / a == b);
+        return c;
+    }"""
+check("M95：SafeMath 后置回验写法判 safe",
+      (_arith95(_ar_safemath) is False), True)
+
+# 95.6 读不到 pragma → 退 None（不猜编译器版本）
+_ar_nopragma = """// contract: T
+    function run(uint256 input) public {
+        count += input;
+    }"""
+check("M95：读不到 pragma 版本时退 None（不猜编译器语义）",
+      (_arith95(_ar_nopragma) is None), True)
+
+# 95.7 全量反查：smartbugs arithmetic 0 误报 / 0 判反
+import subprocess as _sp95sub            # noqa: E402
+_v95p = _sp95sub.run([sys.executable,
+                      str(ROOT / "benchmarks" / "verify_m53.py")],
+                     capture_output=True, text=True, cwd=str(ROOT))
+_out95 = _v95p.stdout
+check("M95：arithmetic 反查真值全绿（0 误报 / 0 判反）",
+      (_v95p.returncode == 0
+       and "✔ 0 误报 / 0 判反" in _out95
+       and "判定正确 27/27" in _out95), True)
+
+# 95.8 smartbugs 靶场已纳入 arithmetic 类目且 decided 提升
+_sp95 = subprocess.run(
+    [sys.executable, str(ROOT / "benchmarks" / "benchmark_smartbugs.py"),
+     "--offline"], capture_output=True, text=True, cwd=str(ROOT))
+check("M95：smartbugs 纳入 arithmetic 后 decided=205（M54 收敛后）",
+      ("规则确定性判定        ：205/678" in _sp95.stdout
+       and "判定正确              ：205/205" in _sp95.stdout), True)
 
 print()
 if FAILS:

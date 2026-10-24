@@ -88,7 +88,8 @@ from core.slicer.web3_slither import SoliditySlicer                 # noqa: E402
 
 DEFAULT_TARGET = ROOT / "reference_repos" / "smartbugs-curated-main"
 
-CATEGORIES = ["reentrancy", "access_control", "unchecked_low_level_calls"]
+CATEGORIES = ["reentrancy", "access_control", "unchecked_low_level_calls",
+              "arithmetic"]
 
 # 口径分歧剔除表：(文件名, 函数名)。同一函数在官方数据集里真值相反。
 DISPUTED = {

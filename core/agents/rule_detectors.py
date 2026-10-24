@@ -5629,14 +5629,52 @@ def python_authz_verdict(source: str) -> bool | None:
 
 
 _SOLIDITY_MOD_SEP = "// ---- 修饰符定义（本合约，供核验）----"
+# 父合约**修饰符**实现体（M39）与父合约**普通函数**实现体（M54）是两种
+# 不同的证据，必须用不同段头隔开 —— 否则父合约函数体会被 modifier 扫描
+# 误当成"本合约的 modifier 保护"（判反方向）。
+_SOLIDITY_INH_MOD_SEP = "// ---- 父合约继承证据 ["
+_SOLIDITY_INH_FUNC_SEP = "// ---- 父合约函数证据 ["
+_SOLIDITY_SAME_FILE_SEP = "// ---- 同文件辅助函数证据 ["
+
+
+def _split_sol_sections(source: str) -> tuple[str, str, str]:
+    """把切片拆成（函数自身源码, 修饰符证据块, 父合约函数证据块）。
+
+    **函数体到第一个证据段头为止**（M54 实测教训）：父合约的代码是
+    **别的函数**的代码，混进本函数的源码里会让判据看到不属于本函数的
+    Sink/漏洞行 —— 0x52d2 的 `withdrawTokens` 就因为父合约证据段里带着
+    兄弟合约 `getTokens` 的 `addr.call.value(0 wei)()` 被误判成
+    unchecked_low_level_calls（真漏洞在 getTokens，不在 withdrawTokens）。
+    """
+    pos: list[tuple[int, str]] = []
+    for sep in (_SOLIDITY_MOD_SEP, _SOLIDITY_INH_MOD_SEP,
+                _SOLIDITY_INH_FUNC_SEP, _SOLIDITY_SAME_FILE_SEP):
+        i = source.find(sep)
+        if i >= 0:
+            pos.append((i, sep))
+    if not pos:
+        return source, "", ""
+    cut = min(p[0] for p in pos)
+    func_src, tail = source[:cut], source[cut:]
+    # 证据段的拼装顺序（切片层）：修饰符证据 → 父合约函数证据 →
+    # 同文件辅助函数证据。把后两段切出来，修饰符证据块里就不会混进
+    # 别的函数的代码（否则 modifier 扫描会误认父合约的检查为本合约的保护）。
+    i_func = tail.find(_SOLIDITY_INH_FUNC_SEP)
+    i_same = tail.find(_SOLIDITY_SAME_FILE_SEP)
+    ends = [i for i in (i_func, i_same) if i >= 0]
+    if ends:
+        return func_src, tail[:min(ends)], tail[min(ends):]
+    return func_src, tail, ""
 
 
 def _split_sol_modifier_block(source: str) -> tuple[str, str]:
-    """把切片拆成（函数自身源码, 修饰符定义块）。无块时块为空串。"""
-    if _SOLIDITY_MOD_SEP in source:
-        a, b = source.split(_SOLIDITY_MOD_SEP, 1)
-        return a, b
-    return source, ""
+    """把切片拆成（函数自身源码, 修饰符证据块）。无块时块为空串。
+
+    修饰符证据块 = 本合约 modifier 定义体 + 父合约 modifier 实现体
+    （M39/M54）；**不含**父合约普通函数实现体。
+    """
+    func_src, mod_ev, _func_ev = _split_sol_sections(source)
+    return func_src, mod_ev
 
 
 def _sol_signature(source: str) -> str:
@@ -5766,6 +5804,42 @@ def solidity_reentrancy_verdict(source: str) -> bool | None:
 _SOLIDITY_OWNERISH_RE = re.compile(
     r"\b(?:owner|creator|owner_|contract_owner|admin)\b(?:\s*\.\s*balance)?\s*"
     r"(?<!=[=!<>])=(?!=)", re.I)
+# 局部变量声明的类型前缀 —— 用来区分"状态变量写"与"局部变量声明"。
+#
+# M54 实测（Top200 33 条误报）：OpenZeppelin ERC20 里
+#   `address owner = _msgSender();`
+# 是**局部变量声明**（函数内的临时量），不是 owner 态写。按名字判
+# "owner 态被改"会凭空造 33 条漏洞。
+#
+# 区分机制（不挂名字，挂**语法位置**）：Solidity 里状态变量的赋值
+# **左侧没有类型前缀**（`owner = newOwner;`），局部变量声明**有**
+# （`address owner = ...;`）。所以看赋值左侧的**前一个 token** 是不是
+# 类型关键字即可。
+_SOL_DECL_TYPE_WORDS = frozenset({
+    "address", "bool", "var", "string", "bytes", "byte", "uint", "int",
+    "uint8", "uint16", "uint32", "uint64", "uint128", "uint256",
+    "int8", "int16", "int32", "int64", "int128", "int256",
+    "bytes1", "bytes2", "bytes3", "bytes4", "bytes8", "bytes16", "bytes20",
+    "bytes24", "bytes28", "bytes32", "payable", "memory", "calldata",
+    "storage", "mapping",
+})
+
+
+def _sol_owner_state_write(func_src: str) -> bool:
+    """是否存在 **owner 态（状态变量）** 的写。
+
+    与 `_SOLIDITY_OWNERISH_RE` 的差别只有一个：排除**局部变量声明**
+    （`address owner = _msgSender();`）。状态变量赋值左侧没有类型
+    前缀，局部变量声明有 —— 看左侧前一个 token 是不是类型关键字。
+    """
+    for m in _SOLIDITY_OWNERISH_RE.finditer(func_src):
+        toks = re.findall(r"[A-Za-z_]\w*", func_src[:m.start()])
+        if toks and toks[-1] in _SOL_DECL_TYPE_WORDS:
+            continue                    # 局部变量声明 → 不是状态写
+        return True
+    return False
+
+
 _SOLIDITY_SELFDESTRUCT_RE = re.compile(r"\b(?:selfdestruct|suicide)\s*\(")
 _SOLIDITY_DRAIN_RE = re.compile(
     r"\.\s*(?:transfer|send)\s*\([^;]*(?:address\s*\(\s*this\s*\)|\bthis)\s*\.\s*balance"
@@ -5774,7 +5848,35 @@ _SOLIDITY_DRAIN_RE = re.compile(
 _SOLIDITY_MSGSENDER_CHECK_RE = re.compile(
     r"require\s*\(\s*(?:msg\s*\.\s*sender\s*==|msg\s*\.\s*sender\s*!=|\w+\s*==\s*msg\s*\.\s*sender)"
     r"|assert\s*\(\s*msg\s*\.\s*sender\s*=="
+    # `if (msg.sender != owner) { throw; }` —— **花括号块**形态
+    # （M54 实测：CrowdsaleToken 的 onlyOwner 写成块，里面是 throw）。
+    # 块里必须真的有中止语义（revert/throw/return），否则不是保护。
+    r"|if\s*\(\s*msg\s*\.\s*sender\s*!=\s*[\w.]+\s*\)\s*\{[^}]{0,200}?"
+    r"\b(?:revert|throw|return)\b"
     r"|if\s*\(\s*msg\s*\.\s*sender\s*!=\s*\w+\s*\)\s*(?:revert|throw|return)")
+# 块形态的**语义核验**：`if (msg.sender != X) { ... }` 的块里到底有没有
+# 中止语义。上面的正则只保证"块里有 revert/throw/return 字样"，
+# 但 `if (msg.sender != owner) { log("not owner"); }` 只是记录日志，
+# 不是保护 —— 需要单独核验块里是**中止**（revert/throw/return）
+# 而不是普通语句。
+_SOL_BLOCK_ABORT_RE = re.compile(
+    r"\b(?:revert\s*\(|revert\b|throw\b|return\b|selfdestruct\s*\(|"
+    r"require\s*\([^;]*(?:false|0)\s*\))", re.S)
+
+
+def _sol_block_aborts(body: str) -> bool:
+    """`if (...) { ... }` 块里是否有**中止**语义。
+
+    判据（挂机制不挂名字）：块里出现 revert / throw / return（裸 return
+    也算 —— 它终止了本函数）/ selfdestruct。
+
+    注意 `return` 的歧义：`return;` 与 `return x;` 都终止本函数，
+    在 modifier 语境下等价于"不执行 `_`"—— 也就是**拒绝了非 owner 的
+    调用**，是保护。但 `if (c) { return someValue; }` 在普通函数里
+    只是提前返回 —— 修饰符语境下仍是"非 owner 走别的分支"，
+    保护性成立（owner 才会继续执行 `_`）。
+    """
+    return bool(_SOL_BLOCK_ABORT_RE.search(body))
 # 权限映射成员检查（M36，430 桶榜首确定性子簇）：msg.sender 作映射键且
 # 做"非零成员"判定 —— `owners[msg.sender] != 0` / 裸真值
 # `require(approvedPlayers[msg.sender])` / 连接词前缀
@@ -5785,7 +5887,511 @@ _SOLIDITY_MSGSENDER_CHECK_RE = re.compile(
 # 比较都不匹配。
 _SOLIDITY_MSGSENDER_MEMBER_RE = re.compile(
     r"(?:require|assert|if)\s*\(\s*\w+\s*\[\s*msg\s*\.\s*sender\s*\]\s*"
-    r"(?:\)|!=\s*(?:0|address\s*\(\s*0\s*\))|&&)")
+    # 末尾可以是 `)`（无消息）/ `,`（require 带错误消息）/ `!= 0` / `&&`
+    # —— M54 实测：`require(_executionOperators[msg.sender], "only ...")`
+    # 的逗号形态原先不匹配 ⇒ 权限映射检查被漏掉。
+    r"(?:\)|,|!=\s*(?:0|address\s*\(\s*0\s*\))|&&)")
+
+# ---- M54：tx.origin 恒等比较（带"另一侧"捕获） ----
+#
+# 判据要区分**比较的另一侧**：另一侧是 msg.sender ⇒ "拒绝合约调用"
+# 语义（收紧访问控制，不是漏洞）；另一侧是存储的主体（owner 等）
+# ⇒ 钓鱼反模式（Phishable）。
+#
+# 两种书写顺序都要抓：`tx.origin == X` 与 `X == tx.origin`。
+# 另一侧的形态：标识符 / `this.owner` / `_owner` / `owner()`。
+_SOL_TXORIGIN_EQ_RE = re.compile(
+    r"(?:require|assert|if)\s*\([^;]{0,160}?"
+    r"(?:([A-Za-z_][\w.]*)\s*==\s*tx\s*\.\s*origin"
+    r"|tx\s*\.\s*origin\s*==\s*([A-Za-z_][\w.]*))", re.S)
+
+# ---- M54：委托形态（限定调用） ----
+#
+# `X.transferFrom(from, ...)` / `X._transfer(from, ...)` —— 接收者是
+# **另一个合约**（`IERC20(target)` / `token` / `super`）⇒ 转出逻辑在
+# 对方那边，本合约看不到授权判定 ⇒ 缺证据。
+#
+# 与本地调用区分：`transferFrom(from, ...)` / `_transfer(from, ...)`
+# （前面没有限定符）是本合约的辅助函数 ⇒ 实现体在切片里 ⇒ 可核验。
+_SOL_DELEGATED_FROM_RE = re.compile(
+    # 接收者形态：`标识符` / `标识符(实参)`（`IERC20(target).transferFrom`）
+    # / `super`。
+    r"(?:[A-Za-z_]\w*(?:\s*\([^()]{0,80}\))?\s*\.\s*|super\s*\.\s*)"
+    r"(?:transferFrom|_transfer|_safeTransfer)\s*\(\s*_?from\b")
+
+# ---- M54：owner 写委托形态 ----
+#
+# `transferOwnership(...)` 作为**裸调用**（前面没有限定符）才是本合约
+# 自己的 owner 写；`X.transferOwnership(...)`（限定调用）是把 owner 写
+# **委托**给别的合约/库 —— 写在哪、谁有权限都在对方那边，本合约看不到
+# ⇒ 不能据此判越权（缺证）。
+#
+# 例（Top200 ContractOwnershipBase）：
+#   ContractOwnershipStorage.layout().transferOwnership(_msgSender(), newOwner);
+# —— owner 实际写在**另一个文件**的 library 里（该库内部有
+# `require(sender == s.contractOwner)` 的授权判定）。
+#
+# 判反风险锚点：smartbugs access_control 真阳 19 条里，
+# `transferOwnership(` 调用形态 **0 条**（裸调用 / 限定调用都没有），
+# 且真阳的 owner 写都是**裸标识符赋值**（owner = xxx）——
+# 那条判据（`_sol_owner_state_write`）不受影响。
+_SOL_BARE_TRANSFER_OWNERSHIP_RE = re.compile(
+    r"transferOwnership\s*\(")
+# 裸调用判定：调用点**前面**不是限定形式。
+# Python 后向断言必须定宽，所以用"取前缀再判断"而不是 lookbehind。
+#
+# 限定形式可以是任意长的链：`X.y()` / `X.layout()` / `X.layout().y()`
+# —— 所以前缀要匹配"以 `.` 或 `)` 结尾的限定链"。
+_SOL_CALL_PREFIX_RE = re.compile(
+    r"((?:[A-Za-z_]\w*(?:\s*\([^()]{0,80}\))?\s*\.\s*)*"
+    r"(?:[A-Za-z_]\w*\s*\([^()]{0,80}\)\s*\.\s*)?)$")
+
+# ---- M54：间接身份检查（父合约函数体核验） ----
+#
+# OpenZeppelin 的 `require(_owner == _msgSender())` 里没有 msg.sender 字面，
+# 但 Context 基类的 `_msgSender()` 实现体就是 `return msg.sender;`。
+# "看实现体不看名字"铁律要求核验实现体 —— 切片层（M54）把父合约的
+# 函数体拼进"父合约继承证据"段，规则层据此认出身份检查。
+#
+# 机制口径（不挂名字）：比较式的一侧是**某个函数调用**，而该函数在
+# 切片证据段里的实现体**返回 msg.sender** → 它就是身份获取。
+_SOL_IDENTITY_FUNC_BODY_RE = re.compile(
+    r"\bfunction\s+([A-Za-z_]\w*)\s*\([^)]*\)[^{;]*\{[^}]*\breturn\s+"
+    r"\(?\s*msg\s*\.\s*sender\s*\)?\s*;", re.S)
+_SOL_COMPARE_CALL_RE = re.compile(
+    r"(?:require|assert|if)\s*\([^;]{0,160}?\b([A-Za-z_]\w*)\s*\(\s*\)"
+    r"\s*(?:==|!=)\s*[^;]{0,80}?\)", re.S)
+# 比较的**另一侧**是身份函数调用：`require(_owner == _msgSender(), '...')`
+# —— 调用后面可能还有 require 的错误消息参数（逗号 + 字符串）。
+_SOL_COMPARE_CALL_RE2 = re.compile(
+    r"(?:require|assert|if)\s*\([^;]{0,160}?(?:==|!=)\s*"
+    r"\b([A-Za-z_]\w*)\s*\(\s*\)\s*(?:,|\))", re.S)
+
+# 谓词式身份函数：`function isOwner() ... { return msg.sender == _owner; }`
+# —— 实现体里**拿 msg.sender 做比较**（不一定是 return msg.sender）。
+# 比较式在函数体内（`msg.sender == x` / `x == msg.sender`），
+# 但函数名不在比较的一侧 —— 消费点在 require(f()) 里。
+_SOL_PREDICATE_BODY_RE = re.compile(
+    r"\bfunction\s+([A-Za-z_]\w*)\s*\([^)]*\)[^{;]*\{[^}]*?"
+    r"msg\s*\.\s*sender\s*(?:==|!=)[^;}]*;[^}]*\}", re.S)
+
+
+def _sol_indirect_identity_check(func_src: str, mod_ev: str,
+                                func_ev: str) -> bool:
+    """切片里是否存在**间接身份检查**（比较的一侧是身份获取函数）。
+
+    两种机制，都挂**机制**不挂名字：
+
+    A. **取值式**：比较的一侧是某个函数 f()，f 的实现体返回 msg.sender
+       （OpenZeppelin `require(_owner == _msgSender())` + Context 的
+       `return msg.sender;`）。
+       判据：① 实现体在切片证据段里；② 本合约自己的代码里拿 f() 做比较。
+
+    B. **谓词式**：本合约代码里出现 `require(f())`，而 f 的实现体里
+       **拿 msg.sender 做比较**（`isOwner()` → `return msg.sender == _owner;`）。
+       判据：① f 的实现体在切片证据段里；② 它的实现体含 msg.sender 比较；
+       ③ 本合约代码里 `require(f())` / `assert(f())` 消费了它。
+       —— 谓词式没有"比较的一侧"，比较**藏在 f 里面**。
+
+    C. **modifier 调用链**（M54）：`modifier onlyOwner() { _checkOwner(); _; }`
+       —— modifier 体里调的 `_checkOwner()`，其实现体（证据段里）
+       含 `require(owner() == _msgSender())`。这条链是**三层**：
+       modifier → 辅助函数 → 身份函数 → `return msg.sender;`。
+       判据：① modifier 体调用的函数 f；② f 的实现体在证据段里；
+       ③ f 的实现体里有身份检查（取值式或谓词式）。
+       —— 与 A/B 的区别：A/B 要求"比较式在本合约代码里"，
+       C 允许比较式在**modifier 调用链的实现体**里。因为 modifier
+       展开后那段代码就**跑在本函数体之前**，它就是本函数的实际保护。
+
+    **比较式只在 func_src + mod_ev 里找**（M54 实测教训）：父合约**函数**
+    实现体里的比较是父合约自己的检查，保护不了子合约的函数 —— 拿它给
+    子函数判"有保护"是判反方向。父合约**修饰符**里的比较则可以（父合约
+    的 onlyOwner 就是子合约函数的实际保护）。C 分支是这条原则的延伸：
+    修饰符**调用链**上的辅助函数（modifier 展开即执行）也算。
+    """
+    own = func_src + "\n" + mod_ev
+    evid = own + "\n" + func_ev
+
+    # ---- A. 取值式：实现体返回 msg.sender ----
+    identity_funcs = {m.group(1)
+                      for m in _SOL_IDENTITY_FUNC_BODY_RE.finditer(evid)}
+    if identity_funcs:
+        for pat in (_SOL_COMPARE_CALL_RE, _SOL_COMPARE_CALL_RE2):
+            for m in pat.finditer(own):
+                if m.group(1) in identity_funcs:
+                    return True
+
+    # ---- B. 谓词式：辅助函数实现体里拿 msg.sender 做比较 ----
+    for m in _SOL_PREDICATE_BODY_RE.finditer(evid):
+        fname = m.group(1)
+        # 消费点：本合约代码里 require(f()) / assert(f()) / if (f())
+        if re.search(rf"(?:require|assert|if)\s*\(\s*{re.escape(fname)}\s*\(",
+                     own):
+            return True
+
+    # ---- C. modifier 调用链上的身份检查 ----
+    # modifier 体里调用的函数 f，其实现体里的身份检查就是本函数的保护。
+    # 判据按**调用链**（modifier → f），不按函数名。
+    for f in _sol_modifier_callees(mod_ev):
+        body = _sol_func_body_by_name(evid, f)
+        if not body:
+            continue
+        # C-a 取值式：body 里比较的一侧是身份函数
+        for pat in (_SOL_COMPARE_CALL_RE, _SOL_COMPARE_CALL_RE2):
+            for m in pat.finditer(body):
+                if m.group(1) in identity_funcs:
+                    return True
+        # C-b 谓词式：body 里 require(g())，g 的实现体拿 msg.sender 比较
+        for m in _SOL_PREDICATE_BODY_RE.finditer(evid):
+            g = m.group(1)
+            if g == f:
+                return True
+            if re.search(rf"(?:require|assert|if)\s*\(\s*{re.escape(g)}\s*\(",
+                         body):
+                return True
+    # ---- D. 身份沿调用链传递到权限判定（角色检查形态） ----
+    #   modifier onlyRole(role) → _checkRole(role)
+    #   → _checkRole(role, _msgSender()) → if (!hasRole(role, account)) revert
+    # 身份被**当实参传下去**，形参参与下游的中止性判定。
+    if _sol_identity_propagated_auth(mod_ev, evid, identity_funcs):
+        return True
+    return False
+
+
+# ---- M54：身份沿调用链传递到权限判定 ----
+#
+# OpenZeppelin 的角色检查把身份**当实参传下去**：
+#   modifier onlyRole(bytes32 role) { _checkRole(role); _; }
+#   → function _checkRole(role) { _checkRole(role, _msgSender()); }
+#   → function _checkRole(role, account) { if (!hasRole(role, account)) revert; }
+# 身份（`_msgSender()`）是**实参**，account 形参在下游参与中止性判定。
+#
+# 与 A/C 的区别：A/C 是"比较的一侧是身份函数"（身份直接参与比较），
+# 这里是"身份被传下去，形参参与判定"（身份经**位置对应**落到形参）。
+#
+# 判据（挂机制不挂名字）：
+#   ① modifier 调用链的某个实现体里，调用 g(..., X, ...) 的实参 X
+#      是身份来源（msg.sender 字面 / 身份函数调用）；
+#   ② g 的形参**按位置**对应到 X；
+#   ③ g 的实现体里，该形参参与了**中止性判定**（出现在 if/require
+#      条件里，且条件为假时中止）。
+_SOL_ABORT_CONTEXT_RE = re.compile(
+    r"(?:require|assert|if)\s*\(", re.S)
+
+
+def _sol_identity_propagated_auth(mod_ev: str, evid: str,
+                                  identity_funcs: set[str]) -> bool:
+    """身份沿调用链传递到权限判定 ⇒ 本函数受保护。
+
+    机制（挂机制不挂名字）：
+      ① modifier 调用链的某个实现体里，调用 `g(..., X, ...)` 的实参 X
+         是**身份来源**（msg.sender 字面，或返回 msg.sender 的函数）；
+      ② g 的**形参按位置**对应到 X（实参下标 → 形参下标）；
+      ③ g 的实现体里，该形参参与了**授权判定**（中止型或放行型）。
+
+    **多跳**（M54）：角色检查链是三层的 ——
+      modifier onlyRole → `_checkRole(role)` →
+      `_checkRole(role, _msgSender())` →
+      `if (!hasRole(role, account)) revert`
+    身份在**第二跳**才被传下去（第一跳的实参是 role，不是身份），
+    且第三跳才出现消费点。所以要沿链**递归**（带 `_visited` 防环）。
+
+    判反风险锚点：smartbugs access_control 真阳 19 条里，modifier 调用
+    链把身份当实参传下去再判定的形态 **0 条**（probe_m54_ac_risk2.py
+    的 M2 命中 0 条）。
+    """
+    return _sol_idprop_walk(mod_ev, evid, identity_funcs,
+                            _sol_modifier_callees(mod_ev), set(), 0)
+
+
+def _sol_idprop_walk(mod_ev: str, evid: str, identity_funcs: set[str],
+                     funcs: set[str], visited: set[tuple],
+                     depth: int) -> bool:
+    """沿调用链递归找"身份 → 形参 → 授权判定"。
+
+    **层次语义**（M54）：
+      · 第 0 层的"调用点"在 **modifier 体**里 —— 形参实参对应要用
+        modifier 体里的**调用表达式**（`require(isAuthorized(msg.sender,
+        msg.sig))`），不是函数定义体；
+      · 第 1 层起进函数**定义体**，找下一跳的调用表达式。
+
+    visited 按 **(函数名, 实参个数)** 记 —— 同名重载是**不同**的
+    实现体（`_checkRole(role)` 与 `_checkRole(role, account)`），
+    按函数名去重会把重载那一跳误判成环。
+
+    depth 上限 3（modifier → g → g2 → g3）。
+    """
+    if depth > 3:
+        return False
+    for f in funcs:
+        # 第 0 层：调用点在 modifier 体；之后：调用点在函数定义体
+        if depth == 0:
+            call_sites = _sol_modifier_bodies(mod_ev)
+            bodies_here = call_sites
+        else:
+            bodies_here = [_sol_func_body_by_name(evid, f)]
+            call_sites = bodies_here
+        for body in bodies_here:
+            if not body:
+                continue
+            for m in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", body):
+                g = m.group(1)
+                args = _sol_parse_args(body, m.end() - 1)
+                if not args:
+                    continue
+                key = (g, len(args))
+                if key in visited:
+                    continue
+                # **按实参个数**取重载版本（位置对应必须用对的实现体）
+                gbody = _sol_func_body_by_name(evid, g, argc=len(args))
+                if not gbody:
+                    continue
+                params = _sol_param_list(gbody)
+                if not params:
+                    continue
+                for i, arg in enumerate(args):
+                    if i >= len(params):
+                        break
+                    pname = params[i]
+                    if not pname:
+                        continue
+                    if not _sol_arg_is_identity(arg, identity_funcs):
+                        continue
+                    # 形参 pname 在 g 的实现体里参与了授权判定？
+                    if _sol_param_in_abort_cond(gbody, pname):
+                        return True
+                # 下一跳：g 的实现体里调的其它函数
+                visited.add(key)
+                nxt: set[str] = set()
+                for m2 in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", gbody):
+                    g2 = m2.group(1)
+                    if g2 in identity_funcs:
+                        continue
+                    a2 = _sol_parse_args(gbody, m2.end() - 1)
+                    if not a2:
+                        continue
+                    if (g2, len(a2)) in visited:
+                        continue
+                    if _sol_func_body_by_name(evid, g2, argc=len(a2)):
+                        nxt.add(g2)
+                if nxt and _sol_idprop_walk(mod_ev, evid, identity_funcs, nxt,
+                                            visited, depth + 1):
+                    return True
+    return False
+
+
+def _sol_arg_is_identity(arg: str, identity_funcs: set[str]) -> bool:
+    """实参是否是**身份来源**。
+
+    两种形态：① msg.sender 字面；② 返回 msg.sender 的函数调用
+    （`_msgSender()`）。后者靠 identity_funcs（实现体核验过的）。
+    """
+    a = arg.strip()
+    if re.fullmatch(r"msg\s*\.\s*sender", a):
+        return True
+    for f in identity_funcs:
+        if re.fullmatch(rf"{re.escape(f)}\s*\(\s*\)", a):
+            return True
+    return False
+
+
+def _sol_param_in_abort_cond(body: str, pname: str) -> bool:
+    """形参 pname 是否参与了**授权判定**。
+
+    两种机制，都算保护：
+
+    ① **中止型**：pname 出现在 `require(...)` / `assert(...)` 的条件里，
+       或 `if (...)` 条件里且条件为假时**中止**（revert/throw/return）。
+       典型：`_checkRole(role, account) { if (!hasRole(role, account)) revert; }`
+
+    ② **放行型**：pname 出现在某个 `if (...)` 条件里，且该分支
+       **放行**（`return true`）—— 这是"授权通过则继续"的写法。
+       典型（DSAuth）：`isAuthorized(src, sig) { if (src == owner) return true; }`
+       modifier 侧是 `require(isAuthorized(msg.sender, msg.sig))`。
+
+    判反风险锚点：smartbugs access_control 真阳 19 条里，"modifier 调用
+    链把 msg.sender 当实参传下去"的形态 **0 条**
+    （probe_m54_ac_risk2.py 的 M2 + 本轮锚点脚本）。
+    """
+    pat = re.compile(rf"\b{re.escape(pname)}\b")
+    for m in _SOL_ABORT_CONTEXT_RE.finditer(body):
+        open_i = m.end() - 1
+        close = _sol_match_paren(body, open_i)
+        if close < 0:
+            continue
+        cond = body[open_i + 1:close]
+        if not pat.search(cond):
+            continue
+        is_require = m.group(0).startswith(("require", "assert"))
+        if is_require:
+            # require/assert 的条件里出现该形参 —— 判定参与了授权
+            return True
+        # 条件为假时中止？
+        # **不能用固定长度截断** —— 块体可能很长（OZ 的 revert 带
+        # 复杂错误信息），截断后配平不到 `}` ⇒ 取不到块 ⇒ 判不出中止。
+        tail = body[close + 1:]
+        stripped = tail.lstrip()
+        blk = _sol_block_body(stripped, 0) if stripped[:1] == "{" else ""
+        if blk:
+            if _sol_block_aborts(blk):
+                return True
+            # 放行型：条件为真时 return true
+            if re.search(r"\breturn\s+true\b", blk):
+                return True
+        elif re.match(r"\s*(?:revert|throw|return)\b", tail):
+            return True
+    return False
+
+
+# ---- M54：签名授权机制 ----
+#
+# ECDSA 签名恢复：`ecrecover(digest, v, r, s)` 恢复出签名者地址。
+# 恢复出来的地址与某个主体比较 ⇒ 该主体的支配权由**私钥**约束。
+#
+# 判据（挂机制不挂名字）：
+#   ① 函数体/辅助函数体里出现**签名恢复**调用；
+#   ② 恢复出的地址（或其载体变量）与某个主体做了**相等比较**，
+#      且该比较出现在**会中止**的语境（require/assert/revert）。
+#
+# 与"直接身份检查"的区别：比较的一侧不是 msg.sender，而是
+# **签名恢复的结果** —— 调用者不需要是那个主体，持有其私钥即可。
+_SOL_SIG_RECOVER_RE = re.compile(
+    r"\b(?:ecrecover|recover|recoverPlain|tryRecover)\s*\(")
+# 恢复结果被赋给某个变量：`address recovered = ecrecover(...)`
+_SOL_SIG_ASSIGN_RE = re.compile(
+    r"\b([A-Za-z_]\w*)\s*=\s*(?:[A-Za-z_]\w*\s*\.\s*)?"
+    r"(?:ecrecover|recover|recoverPlain|tryRecover)\s*\(")
+# 相等比较（恢复结果 vs 主体）
+_SOL_SIG_CMP_RE = re.compile(
+    r"\b([A-Za-z_]\w*)\s*(?:==|!=)\s*([A-Za-z_]\w*)")
+
+
+def _sol_signature_authorized(func_src: str, inh_ev: str) -> bool:
+    """签名授权机制：from 的支配权由 ECDSA 签名约束（permit 形态）。
+
+    实现要点：
+      ① 找出所有**恢复结果变量**（被赋值为 ecrecover(...) 的标识符）；
+      ② 在同一段文本里找这些变量参与的**相等比较**；
+      ③ 比较必须出现在**会中止**的语境里（require/assert/if+revert）。
+
+    只看**函数体 + 同文件/父合约辅助函数体**（inh_ev）—— 签名校验
+    必须在能看到的实现体里，否则不算证据。
+    """
+    evid = func_src + "\n" + inh_ev
+    if not _SOL_SIG_RECOVER_RE.search(evid):
+        return False
+    recovered: set[str] = set()
+    for m in _SOL_SIG_ASSIGN_RE.finditer(evid):
+        recovered.add(m.group(1))
+    if not recovered:
+        # 形态 A：签名恢复结果**直接**参与比较
+        #   `require(ecrecover(digest, v, r, s) == signer)`
+        for m in re.finditer(
+                r"(?:require|assert)\s*\([^;]{0,200}?"
+                r"(?:ecrecover|recover)\s*\([^;]{0,200}?\)\s*==\s*"
+                r"([A-Za-z_]\w*)", evid, re.S):
+            return True
+        return False
+    # 形态 B：恢复结果变量参与比较
+    for m in _SOL_SIG_CMP_RE.finditer(evid):
+        lhs, rhs = m.group(1), m.group(2)
+        if lhs not in recovered and rhs not in recovered:
+            continue
+        # 比较必须伴随中止语义：往前找最近的 require/assert/if
+        head = evid[max(0, m.start() - 160):m.start()]
+        if re.search(r"(?:require|assert)\s*\([^;]{0,160}$", head) or \
+                re.search(r"\bif\s*\([^;]{0,160}$", head):
+            return True
+    return False
+
+
+def _sol_block_body(text: str, open_idx: int) -> str:
+    """取 `text[open_idx]` 处 `{` 开始的配平块内容（不含大括号）。
+
+    open_idx 必须是 `{` 的下标。配平失败返回空串。
+    """
+    if open_idx < 0 or open_idx >= len(text) or text[open_idx] != "{":
+        return ""
+    depth = 0
+    for j in range(open_idx, len(text)):
+        if text[j] == "{":
+            depth += 1
+        elif text[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[open_idx + 1:j]
+    return ""
+
+
+def _sol_modifier_bodies(text: str) -> list[str]:
+    """提取文本里所有 modifier 的**配平实现体**。
+
+    不能用 `re.finditer(r"modifier\\s+\\w+[^{]*\\{(.*)", text, re.S)` ——
+    `(.*)` 贪婪匹配到文件尾，会把**所有** modifier 的体拼成一段，
+    于是 A modifier 的检查被算成 B modifier 的保护。
+    必须按大括号配平逐个切（M54 实测）。
+    """
+    out: list[str] = []
+    for mm in re.finditer(r"\bmodifier\s+[A-Za-z_]\w*\s*(?:\([^)]*\))?\s*"
+                          r"[^{]*\{", text):
+        body = _sol_block_body(text, mm.end() - 1)
+        if body:
+            out.append(body)
+    return out
+
+
+def _sol_modifier_callees(mod_ev: str) -> set[str]:
+    """modifier 定义体里调用的函数名集合。
+
+    口径：modifier 体（`modifier X(...) { ... _; }`）里出现的**函数调用**。
+    modifier 展开后这些调用就执行在本函数体之前 —— 它们调用到的函数
+    实现体里的检查，就是本函数的实际保护。
+
+    只取"被调用"的标识符（后面紧跟左括号），排除 require/assert/
+    revert 这类内建 —— 内建不是"可查实现体的辅助函数"。
+    """
+    out: set[str] = set()
+    for body in _sol_modifier_bodies(mod_ev):
+        for c in re.findall(r"\b([A-Za-z_]\w*)\s*\(", body):
+            if c in {"require", "assert", "revert", "if", "for", "while",
+                     "return", "_"}:
+                continue
+            out.add(c)
+    return out
+
+
+def _sol_func_body_by_name(text: str, fname: str,
+                           argc: int | None = None) -> str:
+    """按名字从文本里取函数的实现体（签名 + 体）。
+
+    找不到返回空串。实现体是"函数名之后第一个大括号到配平结束"。
+
+    **argc**（M54）：按**实参个数**挑重载版本。同名重载（`_checkRole(role)`
+    与 `_checkRole(role, account)`）的实现体不同，位置对应必须用对版本
+    —— 传了 argc 就只在形参数匹配的版本里找；形参数不等就返回空串
+    （位置对应不了，宁可缺证据）。
+    """
+    for fm in re.finditer(rf"\bfunction\s+{re.escape(fname)}\s*\(", text):
+        close = _sol_match_paren(text, fm.end() - 1)
+        if close < 0:
+            continue
+        if argc is not None:
+            args = _sol_split_top_commas(text[fm.end():close])
+            # 无名形参可能写成纯类型 —— 数量对即可
+            if len(args) != argc:
+                continue
+        op = text.find("{", close)
+        if op < 0:
+            continue
+        depth = 0
+        for j in range(op, len(text)):
+            if text[j] == "{":
+                depth += 1
+            elif text[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[fm.start():j + 1]
+    return ""
 
 
 # ---- M44：调用者自域状态写（Caller-Scoped State Mutation）----
@@ -6005,6 +6611,73 @@ def _sol_implicit_view(func_src: str) -> bool:
     return True
 
 
+# allowance 扣减形态：授权槽位被扣减。两种键形态：
+#   ① `_allowed[from][msg.sender] -= v`（老 ERC20：键含 msg.sender）
+#   ② `_spendAllowance(from, spender, v)`（OZ 4.x：辅助函数，键含 spender）
+#
+# M54 实测修正：槽位名拼写是 **allowance**（`_allowances` / `allowance`），
+# 不是 **allowed**。原来的 `_?allowed\w*` 匹配不到 `allowance[...]`
+# —— Top200 靶场 35 条 transferFrom 误报全落在这上面。
+# 正确口径是 `_?allow\w*`（覆盖 allowance / allowed / allowances）。
+_SOL_ALLOWANCE_WRITE_RE = re.compile(
+    r"_?allow\w*\s*\[[^\]]*\]\s*\[[^\]]*\]\s*(?:-=|=)", re.I)
+_SOL_ALLOWANCE_CALL_RE = re.compile(
+    r"\b_?spendAllowance\s*\(", re.I)
+_SOL_ALLOWANCE_SPENDER_RE = re.compile(
+    r"_?allowance\w*\s*\([^)]*\bspender\b", re.I)
+# M54：allowance 槽位的**扣减/读取**形态。上面那条只认"直接写"（`-=` / `=`），
+# 但 ERC20 的扣减有三种等价写法：
+#   ① `_allowed[from][msg.sender] = _allowed[from][msg.sender].sub(v)`（写）
+#   ② `_approve(from, msg.sender, _allowed[from][msg.sender].sub(v))`
+#      —— 槽位值作为**实参**传给扣减辅助函数，槽位本身没被写
+#   ③ `require(_value <= allowed[_from][msg.sender])` —— 只读校验额度
+# ② ③ 都读同一个槽位，键里同样带 msg.sender ⇒ 授权约束成立。
+#
+# 口径（挂机制不挂名字）：**allowance 槽位被读写**（下标里带 msg.sender
+# 或 spender）⇒ from 的支配权受授权约束。
+_SOL_ALLOWANCE_SLOT_RE = re.compile(
+    r"_?allow\w*\s*\[[^\]]*\]\s*\[[^\]]*\]", re.I)
+
+
+def _sol_allowance_scoped(func_src: str, mod_ev: str, inh_ev: str) -> bool:
+    """from 的支配权是否**受 allowance 授权约束**（不是"任意 from"）。
+
+    机制（挂机制不挂名字）：函数体（或它调用的同文件/父合约辅助函数）
+    里有 **allowance 槽位的扣减** —— 键里带着 msg.sender 或 spender，
+    或调用了 `_spendAllowance(owner, spender, amount)` 这类扣减函数。
+
+    找到了 ⇒ 转出 from 的钱需要 allowance 授权 ⇒ access_control 维度
+    确定性 safe（真正的漏洞在 allowance 扣减自身，不在 transferFrom）。
+    """
+    evid = func_src + "\n" + mod_ev + "\n" + inh_ev
+    if _SOL_ALLOWANCE_WRITE_RE.search(evid):
+        return True
+    if _SOL_ALLOWANCE_CALL_RE.search(evid):
+        return True
+    # 辅助函数里 `allowance(owner, spender)` 读了授权额 —— 读了说明
+    # 这个槽位参与了授权判定（配合 _spendAllowance 已是上一条）。
+    if _SOL_ALLOWANCE_SPENDER_RE.search(evid):
+        return True
+    # M54：槽位**被读**也算 —— 扣减可能以实参形式出现（`sub(v)`），
+    # 或只做额度校验（`require(v <= allowed[from][msg.sender])`）。
+    # 只认**二维下标**形态（`slot[owner][spender]`）—— 一维的
+    # `allowed[from]` 不是额度表（老 ERC20 的 `allowed[from][msg.sender]`
+    # 才是），且一维形态易与别的映射混淆。
+    for m in _SOL_ALLOWANCE_SLOT_RE.finditer(evid):
+        tail = evid[m.end():m.end() + 40]
+        # 槽位的下标里必须带 msg.sender 或 spender 才是"额度表"
+        slot = m.group(0)
+        if re.search(r"msg\s*\.\s*sender|spender", slot, re.I):
+            return True
+        # 槽位值被 `.sub(...)` 扣减（OZ 4.x `_allowed[from][msg.sender]
+        # .sub(value)`），下标里没有 msg.sender 但槽位名是 allowance
+        # 且紧跟 .sub → 仍是额度扣减
+        if re.match(r"\s*\.\s*sub\s*\(", tail) and _SOL_ALLOWANCE_SLOT_RE.match(
+                slot):
+            return True
+    return False
+
+
 def _sol_self_scoped_safe(func_src: str) -> bool:
     """函数只改调用者自己名下的槽位 → 不是管理端接口 → 确定性 safe。
 
@@ -6053,6 +6726,40 @@ def _sol_self_scoped_safe(func_src: str) -> bool:
     return True
 
 
+def _sol_delegated_from_transfer(func_src: str) -> bool:
+    """`from` 的转出是否**委托**给本切片看不见的实现。
+
+    判据（挂机制不挂名字）：转出调用是**限定调用** —— 接收者是别的
+    合约（`IERC20(target).transferFrom(...)` / `token.transferFrom(...)`
+    / `super.transferFrom(...)`）。本地调用（`_transfer(from, ...)`）
+    的实现体在切片里，可核验 ⇒ 不算委托。
+
+    委托 ⇒ 授权判定在对方那边 ⇒ 本合约层面缺证据 ⇒ 退 None。
+    """
+    return bool(_SOL_DELEGATED_FROM_RE.search(func_src))
+
+
+def _sol_bare_transfer_ownership(func_src: str) -> bool:
+    """函数体里是否有**裸调用**的 `transferOwnership(...)`。
+
+    裸调用 = 本合约自己的 owner 写；限定调用（`X.transferOwnership(...)`
+    / `super.transferOwnership(...)`）= 把 owner 写**委托**给别的合约
+    —— 写在哪、谁有权限都在对方那边 ⇒ 本合约看不到 ⇒ 不能据此判越权。
+
+    只看**函数体内部**（第一个 `{` 之后）—— 函数**声明**里的
+    `function transferOwnership(...)` 不是调用。
+    """
+    body_start = func_src.find("{")
+    body = func_src[body_start:] if body_start >= 0 else func_src
+    for m in _SOL_BARE_TRANSFER_OWNERSHIP_RE.finditer(body):
+        prefix = body[:m.start()]
+        pm = _SOL_CALL_PREFIX_RE.search(prefix)
+        if pm and pm.group(1):
+            continue                       # 限定调用 → 不算本合约的 owner 写
+        return True
+    return False
+
+
 def solidity_access_verdict(source: str) -> bool | None:
     """Solidity 访问控制（Module 13 按 smartbugs 真实合约重写）。
 
@@ -6069,7 +6776,7 @@ def solidity_access_verdict(source: str) -> bool | None:
       · external/public + selfdestruct / 转出 this.balance 且无 msg.sender
         检查 → True；其余 None。
     """
-    func_src, mod_block = _split_sol_modifier_block(source)
+    func_src, mod_block, _inh_func_block = _split_sol_sections(source)
     sig = _sol_signature(func_src)
     m = re.search(r"function\s+([A-Za-z_]\w*)", sig)
     if not m:
@@ -6103,18 +6810,47 @@ def solidity_access_verdict(source: str) -> bool | None:
         # msg.sender 恒等检查等价（Module 30）。
         protected = True
     if not protected and mod_block:
-        for mb in re.finditer(r"modifier\s+[A-Za-z_]\w*[^{]*\{(.*)", mod_block, re.S):
-            body = mb.group(1)
+        for body in _sol_modifier_bodies(mod_block):
             if (_SOLIDITY_MSGSENDER_CHECK_RE.search(body)
                     or _SOLIDITY_MSGSENDER_MEMBER_RE.search(body)):
                 protected = True
                 break
+            # M54：块形态 `if (msg.sender != owner) { throw; }` ——
+            # 正则只保证"块里有中止字样"，还要核验块里**确实是中止**
+            # （`if (c) { log("x"); }` 只是日志，不是保护）。
+            mm = re.search(r"if\s*\(\s*msg\s*\.\s*sender\s*!=\s*[\w.]+\s*\)"
+                           r"\s*\{", body)
+            if mm:
+                blk = _sol_block_body(body, mm.end() - 1)
+                if blk and _sol_block_aborts(blk):
+                    protected = True
+                    break
             # modifier 里的门形态是 `if (msg.sender == owner) _;` ——
             # 守护动作是占位符 `_` 而不是 revert（rubixi）。恒等比较在
             # 条件里就足以证明"查了身份"。
             if re.search(r"\b(?:require|if)\s*\(\s*msg\s*\.\s*sender\s*==", body):
                 protected = True
                 break
+    # M54：间接身份检查 —— 比较的一侧是"返回 msg.sender 的函数"
+    # （OpenZeppelin `require(_owner == _msgSender())`）。切片层把父合约
+    # 的函数体拼进了"父合约函数证据"段，这里核验**实现体**而不是名字。
+    if not protected and _sol_indirect_identity_check(func_src, mod_block,
+                                                       _inh_func_block):
+        protected = True
+    # M54：**签名授权**机制 —— 用 ECDSA 签名代替 msg.sender 身份。
+    # `transferWithAuthorization(from, to, v, ..., v, r, s)` 这类
+    # "permit" 形态：from 的支配权由**签名**约束（谁持有 from 的私钥，
+    # 谁签了这笔转账），不是"任意 from"。
+    #
+    # 机制口径（挂机制不挂名字）：函数体（或它调的辅助函数）里做了
+    # **签名恢复**（ecrecover / recover）并把恢复出的地址与某个主体
+    # 比较 —— 恢复出的地址不是 msg.sender，是签名者。
+    #
+    # 判反风险锚点（probe_m54_ac_risk2.py + 本轮锚点脚本）：
+    # smartbugs access_control 真阳 19 条里含签名恢复的 **0 条**
+    # ⇒ 本早退不会把真阳判反。
+    if not protected and _sol_signature_authorized(func_src, _inh_func_block):
+        protected = True
     if protected:
         return False
 
@@ -6123,8 +6859,29 @@ def solidity_access_verdict(source: str) -> bool | None:
     # DeFiVulnLabs txorigin.sol、smartbugs phishable/mycontract）。放行
     # 到这里说明 protected 已排除——两者并存时 msg.sender 校验优先
     # （真实的"双保险"写法不是漏洞）。
-    if re.search(r"(?:require|if)\s*\([^;]{0,120}?\btx\s*\.\s*origin\s*==",
-                 func_src):
+    #
+    # **M54 二分：比较的另一侧是不是 msg.sender**。两种 tx.origin 恒等
+    # 比较的语义**完全相反**：
+    #   ① `require(tx.origin == msg.sender)` —— **拒绝合约调用**语义。
+    #      它要求"直接调用者 == 原始交易发起者"，也就是**只允许 EOA
+    #      直调**，合约代理调用会被拒。这是**收紧**访问控制的正确写法，
+    #      不是钓鱼（Top200 的 BridgeToken.unwrap 7 条全落在这）。
+    #   ② `require(tx.origin == owner)` —— **钓鱼**语义。攻击者诱导
+    #      owner 发交易，tx.origin 是 owner（钓鱼合约是 msg.sender），
+    #      于是钓鱼合约通过校验 —— 这才是 Phishable 反模式。
+    #
+    # 判据挂机制不挂名字：**比较的另一侧**是不是"当前调用者身份"
+    # （msg.sender）。是 ⇒ 拒绝合约调用 ⇒ 不是漏洞；否 ⇒ 与某个
+    # **存储的主体**比较 ⇒ 钓鱼面 ⇒ True。
+    # 判反风险锚点（probe_m54_ac_risk2.py M4）：smartbugs access_control
+    # 真阳里的 tx.origin 比较**另一侧全是 owner**（2/2）⇒ 本二分
+    # 不会把真阳判反。
+    for m in _SOL_TXORIGIN_EQ_RE.finditer(func_src):
+        other = (m.group(1) or m.group(2) or "").strip()
+        if re.fullmatch(r"msg\s*\.\s*sender", other):
+            # 拒绝合约调用：调用者被绑定 ⇒ 有保护（不是漏洞）
+            return False
+    if _SOL_TXORIGIN_EQ_RE.search(func_src):
         return True
 
     # M30 之 2）任意 from 的 transferFrom / _transfer：签名收 `address from`
@@ -6134,10 +6891,42 @@ def solidity_access_verdict(source: str) -> bool | None:
     # require(_isApprovedOrOwner(...))，已在 protected 分支判 False）。
     # 注意触发条件要求 from 来自**本函数形参**——调用别处变量的
     # transferFrom 是普通 ERC20 用法，不构成"任意 from"。
+    #
+    # **allowance 扣减是授权机制**（M54 实测，Top200 45 条误报）：
+    # 标准 ERC20 的 `transferFrom(from, to, v)` 形如
+    #   require(v <= _allowed[from][msg.sender]);
+    #   _allowed[from][msg.sender] = _allowed[from][msg.sender].sub(v);
+    #   _transfer(from, to, v);
+    # —— 它把 from 的支配权**按 msg.sender 的 allowance 授权**转出，
+    # 不是"任意 from"。OZ 4.x 的写法是 `_spendAllowance(from, spender, v)`
+    # （辅助函数在同文件证据段里）。
+    # 机制口径：**扣减 allowance 槽位**（键含 msg.sender 或 spender）
+    # ⇒ from 的支配权受授权约束 ⇒ 不是任意 from。
     if re.search(r"address\s+(?:payable\s+)?_?from\b", sig) and re.search(
             r"\b(?:transferFrom|_transfer|_safeTransfer)\s*\(\s*_?from\s*[,)]",
             func_src):
-        return True
+        if not _sol_allowance_scoped(func_src, mod_block, _inh_func_block):
+            # M54：**委托形态** —— `from` 的转出被交给**本切片看不见**的
+            # 实现（外部合约 / 代理目标）。授权判定（allowance 扣减、
+            # 所有者校验）在**对方那边**完成 ⇒ 本合约层面缺证据 ⇒
+            # 按"缺证退 None"铁律退回交模型，**不判 True**。
+            #
+            # 例（Top200 ProxyERC20）：代理合约把调用者身份透传给目标
+            # 合约后转发 `IERC20(target).transferFrom(from, to, value)`，
+            # 目标合约按真实 msg.sender 做 allowance 判定。
+            #
+            # 判据（挂机制不挂名字）：转出调用是**限定调用**
+            # （`接收者.方法(...)`）⇒ 被调方是别的合约。
+            #
+            # 判反风险锚点（probe_m54_ac_delegate2.py）：
+            #   A. smartbugs access_control 真阳 19 条里"from 形参 +
+            #      外部转出"形态 **0 条**；
+            #   B. DeFiVulnLabs NFT-transfer.sol 两条真值（74=True /
+            #      92=False）走的是**本地** `_transfer(from, ...)` 形态，
+            #      不受本早退影响（实测仍 74=True / 92=False）。
+            if _sol_delegated_from_transfer(func_src):
+                return None
+            return True
 
     # M34：借贷池回调缺 initiator 校验（DeFiVulnLabs Flashloan-flaw 精准
     # 收割，M33 退回池榜首可证子簇）。`executeOperation` 是 Aave flashLoan
@@ -6177,8 +6966,8 @@ def solidity_access_verdict(source: str) -> bool | None:
 
     # 危险动作（只看函数自身源码）
     danger = bool(_SOLIDITY_SELFDESTRUCT_RE.search(func_src))
-    owner_write = bool(_SOLIDITY_OWNERISH_RE.search(func_src)) \
-        or bool(re.search(r"\btransferOwnership\s*\(", func_src))
+    owner_write = _sol_owner_state_write(func_src) \
+        or _sol_bare_transfer_ownership(func_src)
     drain = bool(_SOLIDITY_DRAIN_RE.search(func_src))
     if not (danger or owner_write or drain):
         return None
@@ -6212,23 +7001,626 @@ def solidity_access_verdict(source: str) -> bool | None:
     return None
 
 
+# ---- M53：Solidity 算术溢出/下溢（SWC-101，arithmetic 类目） ----
+#
+# 判据挂**编译器事实 + 表达式形态**，不挂变量名：
+#   · 0.8+ 起编译器**内置**溢出回滚（unchecked 块除外）→ 确定性 safe；
+#   · 0.4.x ~ 0.7.x 无内置检查 → 溢出可能发生；
+#   · 算术全部走 SafeMath（.add/.sub/.mul/.div）→ 确定性 safe；
+#   · `a -= b` 前紧邻 `require(a >= b)` / `if (a < b) revert/return`
+#     → 有前置上下界校验 → 确定性 safe；
+#   · 表达式右操作数是**外部形参**（值从外部进来，可控）→ 确定性 True。
+#
+# 探针实测出来的三条关键分辨线（每条都对应一个官方 safe 样本）：
+#   ① `balances[msg.sender] += msg.value`（timelock:deposit，官方 safe）
+#      —— 右操作数是 msg.value 不是形参，外部不可控（投入多少是多少）；
+#   ② `balances[msg.sender] = 0`（timelock:withdraw，官方 safe）
+#      —— `=` 不是算术复合赋值，无溢出面；
+#   ③ `uint256 c = a * b; require(a == 0 || c / a == b);`
+#      （BECToken:mul，官方 safe）—— 纯 SafeMath 库实现。
+# 反过来 `uint res = count - input;`（overflow_single_tx:overflowlocalonly，
+# 官方标 vul）—— **局部变量也算**：溢出表达式本身是漏洞，不因为结果
+# 没逃逸到状态就不算。
+_ARITH_OP_ASSIGN_RE = re.compile(
+    r"(?<![\w.])([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)\s*(\+=|-=|\*=|/=)\s*([^;]+);")
+# 二元算术表达式：`uint res = count - input;` / `uint256 amount = cnt * _value;`
+_ARITH_BINOP_RE = re.compile(
+    r"(?<![\w.])([A-Za-z_]\w*)\s*([-+*])\s*([A-Za-z_]\w*)\s*;")
+_SAFE_MATH_RE = re.compile(r"\.\s*(?:add|sub|mul|div)\s*\(")
+_UNCHECKED_RE = re.compile(r"\bunchecked\s*\{")
+# 前置上下界校验：require(a >= b) / require(b <= a) / if (a < b) revert|return
+#
+# require 可带**错误消息**第二参数：`require(b <= a, errorMessage);`
+# —— OpenZeppelin SafeMath 的标准写法（Top200 靶场 95 条 sub 误报
+# 全落在这个形态上）。比较式后面允许跟 `, "msg"` 或 `, errVar`。
+#
+# M54 实测补三种形态（Top200 134 条 arithmetic 误报全在这三种上）：
+#   ① **assert** 与 require 同级：`assert(x >= y);`（SafeMath 库自身
+#      的实现就是 `assert(x >= y); uint256 z = x - y;`）；
+#   ② **if 条件的余额充足性**：`if (balances[msg.sender] >= _value &&
+#      _value > 0) { balances[msg.sender] -= _value; ... }`
+#      —— 这是老 ERC20 的标准写法，余额充足性就是下溢保护；
+#   ③ **跨行 require**：`require(\n  senderBalance >= amount,\n  "msg"\n);`
+#      —— 原来的正则要求 `)` 紧跟比较式，跨行形态全漏。
+# 三种都挂**机制**（比较式 + 被比较量），不挂变量名。
+_ARITH_GUARD_RE = re.compile(
+    r"require\s*\(\s*([A-Za-z_]\w*(?:\s*\[\s*[^\]]*\s*\])?)\s*>=\s*"
+    r"([A-Za-z_]\w*)\s*\)\s*;?"
+    r"|require\s*\(\s*([A-Za-z_]\w*)\s*<=\s*"
+    r"([A-Za-z_]\w*(?:\s*\[\s*[^\]]*\s*\])?)\s*\)\s*;?"
+    r"|require\s*\(\s*([A-Za-z_]\w*(?:\s*\[\s*[^\]]*\s*\])?)\s*>=\s*"
+    r"([A-Za-z_]\w*)\s*,\s*"
+    r"|require\s*\(\s*([A-Za-z_]\w*)\s*<=\s*"
+    r"([A-Za-z_]\w*(?:\s*\[\s*[^\]]*\s*\])?)\s*,\s*"
+    r"|if\s*\(\s*([A-Za-z_]\w*(?:\s*\[\s*[^\]]*\s*\])?)\s*<\s*"
+    r"([A-Za-z_]\w*)\s*\)\s*(?:revert|throw|return)"
+    # ① assert 与 require 同级（SafeMath 库自身的标准写法）
+    r"|assert\s*\(\s*([A-Za-z_]\w*)\s*>=\s*([A-Za-z_]\w*)\s*\)\s*;?"
+    r"|assert\s*\(\s*([A-Za-z_]\w*)\s*<=\s*([A-Za-z_]\w*)\s*\)\s*;?"
+    # ② if 条件的余额充足性（老 ERC20 标准写法：>= 或 <=）
+    r"|if\s*\(\s*([A-Za-z_]\w*(?:\s*\[\s*[^\]]*\s*\])?)\s*>=\s*"
+    r"([A-Za-z_]\w*)"
+    r"|if\s*\(\s*([A-Za-z_]\w*)\s*<=\s*"
+    r"([A-Za-z_]\w*(?:\s*\[\s*[^\]]*\s*\])?)\s*\)")
+_SOL_PRAGMA_RE = re.compile(r"//\s*pragma:\s*solidity\s+([^;]+);")
+_SOL_FUNC_PARAMS_RE = re.compile(r"\bfunction\s+[A-Za-z_]\w*\s*\(([^)]*)\)")
+# 调用实参内的算术表达式：`msg.sender.transfer(numTokens * PRICE_PER_TOKEN);`
+# 官方真值标的就是这一行（tokensalechallenge:sell L33）—— 溢出发生在
+# 实参求值时，跟同函数里另一条被 require 保护的减法无关。
+_ARITH_CALLARG_RE = re.compile(
+    r"\.\s*(?:transfer|send|call)\s*\(\s*([^;()]*?)\s*([-+*])\s*([^;()]*?)\s*\)")
+
+# 回卷校验（wrap-around check）：`require(A + B > A)` / `require(A + B >= A)` /
+# `if (A + B < A) throw` —— 对**加法表达式本身**的溢出回验（老 ERC20 标准写法，
+# TetherToken:issue / BAToken / HBToken / ZRXToken）。同理减法回卷 `A - B <= A`。
+# 挂机制（A + B 与 A 的比较）不挂名字。
+_ARITH_WRAP_RE = re.compile(
+    r"([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)\s*\+\s*([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)"
+    r"\s*(?:>=|<=|<|>|==|!=)\s*([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)"
+    r"|([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)\s*-\s*([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)"
+    r"\s*(?:>=|<=|<|>|==|!=)\s*([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)")
+# 二元算术左值为全局关键字（now/block.timestamp 等）—— 非状态槽、非声明结果，
+# 时间戳溢出不在本类目的确定性范围内。
+_ARITH_KEYWORD_LHS = {"now", "block", "msg", "tx", "address", "uint", "uint256",
+                      "int", "int256", "this"}
+
+
+def _sol_pragma_major(source: str) -> int | None:
+    """从切片头部的 `// pragma: solidity X;` 注释读主版本号。
+
+    切片层（M53）把这个事实写进头部 —— 函数级切片本来没有文件头，
+    而"0.8 内置溢出回滚 / 0.4 不检查"是**编译器事实**，不能靠猜。
+    读不到（合成夹具/旧切片）→ 返回 None（判据退回 None，不硬判）。
+
+    注意 `^0.8.19` 的**主版本号是 8**（0.x 系列里 x 才是主版本），
+    所以要取小数点后的那个数，不是小数点前的 0。
+    """
+    m = _SOL_PRAGMA_RE.search(source)
+    if not m:
+        return None
+    spec = m.group(1).strip()
+    vm = re.search(r"(\d+)\s*\.\s*(\d+)", spec)
+    if not vm:
+        return None
+    minor = int(vm.group(2))
+    major = int(vm.group(1))
+    # 0.x 系列的"主版本"是小数点后的数（0.8 → 8）；1.x 起是正常语义
+    if major == 0:
+        return minor
+    return major
+
+
+def _sol_param_names(source: str) -> set[str]:
+    """函数签名里的形参名集合。"""
+    m = _SOL_FUNC_PARAMS_RE.search(source)
+    if not m:
+        return set()
+    out = set()
+    for p in m.group(1).split(","):
+        p = p.strip()
+        if not p:
+            continue
+        out.add(p.split()[-1])          # "uint256 input" → "input"
+    return out
+
+
+def solidity_arithmetic_verdict(source: str) -> bool | None:
+    """Solidity 算术溢出/下溢（Module 53，smartbugs arithmetic 类目）。
+
+    判据挂编译器事实 + 表达式形态：
+
+      False（确定性 safe）：
+        · pragma 0.8+ 且算术表达式不在 unchecked 块内（编译器内置回滚）；
+        · 算术全部走 SafeMath（.add/.sub/.mul/.div）；
+        · 每条算术表达式都有对应的溢出校验（前置上下界校验，或结果变量
+          被随后的 require 消费 —— SafeMath 库的标准写法）；
+        · 右操作数不含外部形参（外部不可控，如 `+= msg.value`）；
+        · 没有任何算术表达式（不归本类目管）。
+
+      True（确定性 vul）：
+        · pragma 0.4.x~0.7.x（读不到版本 → 退 None，不硬判）；
+        · 存在算术表达式（复合赋值 / 二元算术 / 调用实参内的算术），
+        · 其右操作数含**外部形参**（值从外部进来，可控），
+        · 且该表达式**没有**任何溢出校验。
+
+    **逐表达式独立判定** —— 不能因函数里某一条表达式受保护就放过另一条：
+    tokensalechallenge:sell 里 `balanceOf[msg.sender] -= numTokens` 有
+    require 保护（官方没标它），但 `msg.sender.transfer(numTokens *
+    PRICE_PER_TOKEN)` 的实参溢出**才是官方标注的漏洞行**（官方标 L33）。
+
+    其余 → None（退回交模型）。
+    """
+    func_src, _mod = _split_sol_modifier_block(source)
+    body = re.sub(r"//[^\n]*", "", func_src)
+    body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+    if not body.strip():
+        return None
+
+    # internal/private 的可见性检查放在**保护分析之后**：受保护的
+    # internal 函数（SafeMath 库自身实现）仍判 False；只有"未保护且
+    # internal"才退 None —— 不可从外部直接到达（须经 public 包装，
+    # 包装侧守卫本单元看不到），确定性不成立。Top200 上 73 条 OZ
+    # `_transfer`/`_mint`/`_burn`/`tryMul` 误报全落在这里；smartbugs
+    # 20 条真阳全部 public/default（锚点探针实测 0 条 internal）。
+    vm = re.search(r"function\s+[A-Za-z_]\w*\s*\([^)]*\)\s*([^{;]*)", func_src)
+    # 构造函数只在部署时执行一次，实参由部署者指定，溢出只会让部署
+    # 回滚 —— 不构成部署后可利用面（编译器/VM 强制事实，铁律 22）。
+    # smartbugs 20 条真阳无一是构造函数（锚点探针实测）。
+    if vm:
+        fname = re.search(r"function\s+([A-Za-z_]\w*)", func_src)
+        cm = re.search(r"//\s*contract:\s*([A-Za-z_]\w*)", source)
+        if fname and ((cm and fname.group(1) == cm.group(1))
+                      or fname.group(1) == "constructor"):
+            return False
+
+    # 0.8+ 编译器内置溢出检查（unchecked 块除外）—— 编译器强制的事实
+    major = _sol_pragma_major(source)
+    if major is not None and major >= 8 and not _UNCHECKED_RE.search(body):
+        return False
+    if major is None:
+        # 读不到 pragma（合成夹具/旧切片）→ 不猜版本
+        return None
+
+    params = _sol_param_names(func_src)
+
+    # ---- 收集算术表达式：(左值/宿主, 运算符, 右操作数文本, 是否复合赋值) ----
+    # 复合赋值（`x += y`）与局部声明（`uint c = a * b;`）的**校验口径不同**：
+    # 前者的结果就是 x 本身（回验 x 是马后炮），后者的结果是新算出来的
+    # c（回验 c 才是有效的溢出证明 —— SafeMath 库的标准写法）。
+    exprs: list[tuple[str, str, str, bool]] = []
+    for m in _ARITH_OP_ASSIGN_RE.finditer(body):
+        exprs.append((m.group(1).strip(), m.group(2), m.group(3).strip(), True))
+    # 二元算术：`uint res = count - input;` / `uint256 amount = cnt * _value;`
+    for m in _ARITH_BINOP_RE.finditer(body):
+        exprs.append((m.group(1), m.group(2), m.group(3), False))
+    # 调用实参内的算术：`msg.sender.transfer(numTokens * PRICE_PER_TOKEN);`
+    for m in _ARITH_CALLARG_RE.finditer(body):
+        exprs.append(("", m.group(2), m.group(1), False))
+
+    if not exprs:
+        return None                          # 不归本类目管
+
+    # ---- 溢出校验集合 ----
+    # ① **前置上下界校验**：require(a >= b) / require(b <= a) /
+    #    if (a < b) revert —— 保护的是**被减的那个量**。
+    #    注意区分"余额充足性"与"溢出"：
+    #      require(balanceOf[msg.sender] >= _value) 是**余额充足性**检查
+    #      （槽位 vs 数量），它保证减法结果非负，但**不防加法溢出**
+    #      （insecure_transfer 官方标 vul：balanceOf[_to] += _value 会溢出）。
+    #      所以只有"被减量与减数直接比较"才算前置溢出校验。
+    guards: set[str] = set()
+    for m in _ARITH_GUARD_RE.finditer(body):
+        for g in m.groups():
+            if g:
+                guards.add(g.strip())
+    # ⑤ if 花括号块形态的守卫：`if (balances[msg.sender] < _value) { throw; }`
+    #    （GnosisToken 老式写法）—— 块内有中止语义才算守卫。
+    #    条件允许 **析取尾随**（`A < B || C < D`）—— 首个析取支仍是
+    #    完整的"槽位 < 数量"比较，块内中止即生效。
+    for im in re.finditer(
+            r"if\s*\(\s*([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)\s*<\s*"
+            r"([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)\s*(?:\|\|[^)]*)?\)\s*\{", body):
+        blk = _sol_block_body(body, im.end() - 1)
+        if blk and _sol_block_aborts(blk):
+            guards.add(im.group(1).strip())
+            guards.add(im.group(2).strip())
+    # ② **后置结果校验**：只对"局部变量声明"形态的结果有效。
+    #    SafeMath 库标准写法：`uint256 c = a * b; require(a == 0 || c / a == b);`
+    #    —— c 是**新算出来的结果**，回验 c 就能证明没溢出。
+    #    但**复合赋值**（`x -= y` / `x += y`）的结果就是 x 本身，"回验 x"
+    #    是马后炮（溢出已经写进 x 了），不能算保护 ——
+    #    `require(balances[msg.sender] - _value >= 0)` 正是这种：0.4.x 下
+    #    减法自身溢出成巨值，`>= 0` 恒真，形同虚设（token.sol 官方标 vul）。
+    #    反例：`require(balanceOf[msg.sender] >= _value)` 是余额充足性检查，
+    #    不含结果变量、也不是回验式，不是溢出保护。
+    checked_results: set[str] = set()
+    for m in re.finditer(r"(?:require|assert)\s*\(([^;()]*)\)", body):
+        arg = m.group(1)
+        if not re.search(r"[-+*/]|\|\||&&", arg):
+            continue                          # 没有运算 → 不是回验式校验
+        for name in re.findall(r"\b([A-Za-z_]\w*)\b", arg):
+            checked_results.add(name)
+    # ③ SafeMath 调用：`.sub(x)` / `.add(x)` —— 库自带溢出检查
+    safemath = bool(_SAFE_MATH_RE.search(body))
+    # ④ 回卷校验：比较式中出现 `A + B` 或 `A - B`，被比较量与表达式左值
+    #    同名同槽 → 该表达式有显式溢出回验（TetherToken:issue 等）。
+    for wm in _ARITH_WRAP_RE.finditer(body):
+        for g in wm.groups():
+            if g:
+                guards.add(g.strip())
+
+    has_unprotected_param_expr = False
+    has_slot_add_uncovered = False
+    for lhs, _op, rhs, is_compound in exprs:
+        # 该表达式的右操作数是否含外部形参（值可控）
+        if not any(re.search(rf"\b{re.escape(p)}\b", rhs) for p in params):
+            continue                          # 外部不可控 → 不是本类目的面
+        # 该表达式是否被校验覆盖？
+        base = lhs.split("[")[0].strip() if lhs else ""
+        if base and (base in guards or lhs in guards):
+            continue                          # 前置上下界校验覆盖
+        # 后置回验校验只对**局部声明**的结果有效（复合赋值的结果就是
+        # 左值本身，回验它是马后炮 —— 见上面 checked_results 的注释）
+        if base and not is_compound and base in checked_results:
+            continue                          # 后置回验校验覆盖（SafeMath 写法）
+        if safemath and not lhs:
+            continue                          # 实参里的算术但整体走 SafeMath
+        if lhs and not is_compound and lhs.split("[")[0].strip() in _ARITH_KEYWORD_LHS:
+            continue                          # 全局关键字左值（now 等）→ 非状态槽
+        has_unprotected_param_expr = True
+        # "部分守护 + 未覆盖的加减法"：函数里存在溢出/充足性守卫，但该
+        # 表达式没有被任何守卫覆盖 —— 与 smartbugs 真阳 insecure_transfer
+        # （官方标 vul）机械同形，而 Top200 已审计代币同形标 safe ——
+        # 两侧真值冲突 ⇒ 确定性不成立，退回模型（铁律：口径冲突不硬判）。
+        # 完全无守卫的加减法（timelock / integer_overflow_minimal 形态）
+        # 仍判 True —— 那是 smartbugs 真阳的主流形态。
+        if _op in ("+=", "-=") and guards:
+            has_slot_add_uncovered = True
+
+    if has_unprotected_param_expr:
+        if has_slot_add_uncovered:
+            return None
+        if vm and re.search(r"\b(?:internal|private)\b", vm.group(1)):
+            return None                       # 未保护 + 不可外部直达 → 退回
+        return True
+    # 有算术表达式但要么外部不可控、要么全被校验覆盖 → 确定性 safe
+    return False
+
+
+# ---- M54：底层调用返回值"是否被消费"（Consumed Return Value）----
+#
+# 判据的**机制内核**：unchecked_low_level_calls（SWC-104）的危害是
+# "底层调用失败被**静默忽略**" —— 返回值被丢弃，失败后代码照常往下走。
+# 只要返回值没有丢弃，危害就不成立。反过来（= 被消费）有四种形态：
+#
+#   ① 内联消费：`if (x.call(...))` / `require(x.send(...))`
+#   ② 同函数消费：赋值给局部变量 V，V 被 require/if/assert 读
+#   ③ **跨函数消费**：V 作为实参传给辅助函数 F，F 的实现体里对应
+#      形参为 false 时会**中止**（revert/require/assert）——
+#      OpenZeppelin `verifyCallResultFromTarget(target, success, ...)`
+#      的 `if (success) {...} else { _revert(...); }` 就是标准形态。
+#   ④ **上交消费**：V 被函数 return 出去（显式 return 或命名返回值）——
+#      失败与否交给调用方判断，入口函数这一层没有丢弃它。
+#
+# ③ 必须**看实现体**（切片证据段里的 helper body），不按名字认
+#    （铁律：判据挂机制不挂名字）。④ 的"上交"不等于调用方一定检查，
+#    但入口函数这一层确实没有丢弃 —— 丢弃发生在别的调用点，超出本单元。
+
+# 失败即中止的语义标记：revert / require / assert。
+_SOL_ABORT_RE = re.compile(r"\brevert\b|\brequire\s*\(|\bassert\s*\(", re.S)
+
+# Solidity 类型关键字 —— 用于分辨"命名返回值"里哪个是名字哪个是类型。
+_SOL_TYPE_WORDS = frozenset({
+    "bool", "uint", "uint8", "uint16", "uint32", "uint64", "uint128", "uint256",
+    "int", "int8", "int16", "int32", "int64", "int128", "int256",
+    "address", "bytes", "byte", "string", "bytes32", "bytes4", "bytes1",
+    "bytes8", "bytes16", "bytes20", "bytes24", "bytes28", "bytes3",
+    "memory", "calldata", "storage", "payable", "indexed", "returns",
+})
+
+
+def _sol_strip_noise(text: str) -> str:
+    """去注释与字符串字面量（保行保偏移）。
+
+    "失败即中止"要看 `revert` / `require` / `assert` 关键字 —— 但错误
+    消息里常写着这些词（"revert" 出现在字符串里），不去噪就会把
+    `require(x, "must revert")` 当成中止语义。
+    """
+    text = re.sub(r"//[^\n]*", lambda m: " " * len(m.group(0)), text)
+    text = re.sub(r"/\*.*?\*/",
+                  lambda m: re.sub(r"[^\n]", " ", m.group(0)), text, flags=re.S)
+    text = re.sub(r'"(?:[^"\\]|\\.)*"',
+                  lambda m: '"' + " " * max(0, len(m.group(0)) - 2) + '"', text)
+    text = re.sub(r"'(?:[^'\\]|\\.)*'",
+                  lambda m: "'" + " " * max(0, len(m.group(0)) - 2) + "'", text)
+    return text
+
+
+def _sol_split_top_commas(s: str) -> list[str]:
+    """按**顶层**逗号切分（跳过括号内的逗号）。"""
+    parts: list[str] = []
+    buf: list[str] = []
+    depth = 0
+    for c in s:
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        if c == "," and depth == 0:
+            parts.append("".join(buf))
+            buf = []
+            continue
+        buf.append(c)
+    parts.append("".join(buf))
+    return parts
+
+
+def _sol_match_paren(text: str, open_idx: int) -> int:
+    """text[open_idx] 处是 '(' —— 返回配平后的 ')' 下标；找不到返回 -1。"""
+    depth = 0
+    for j in range(open_idx, len(text)):
+        if text[j] in "([{":
+            depth += 1
+        elif text[j] in ")]}":
+            depth -= 1
+            if depth == 0:
+                return j
+    return -1
+
+
+def _sol_parse_args(text: str, open_idx: int) -> list[str] | None:
+    """text[open_idx] 处是 '(' —— 返回顶层实参列表。配平失败返回 None。"""
+    close = _sol_match_paren(text, open_idx)
+    if close < 0:
+        return None
+    return _sol_split_top_commas(text[open_idx + 1:close])
+
+
+def _sol_find_func_body(text: str, fname: str) -> str:
+    """在 text 里找 `function fname(...)` 的**整段**（签名 + 实现体）。
+
+    必须带签名 —— 上层要按**实参位置 → 形参位置**对应，
+    只给实现体就没法定位形参。
+    """
+    m = re.search(rf"\bfunction\s+{re.escape(fname)}\s*\(", text)
+    if not m:
+        return ""
+    close = _sol_match_paren(text, m.end() - 1)
+    if close < 0:
+        return ""
+    b = text.find("{", close)
+    if b < 0:
+        return ""
+    depth = 0
+    for j in range(b, len(text)):
+        if text[j] == "{":
+            depth += 1
+        elif text[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[m.start():j + 1]
+    return ""
+
+
+def _sol_param_list(body: str) -> list[str]:
+    """从函数体（以 `function name(...)` 开头）解析**有序**形参名列表。
+
+    与 `_sol_param_names`（集合版，用于"是否含外部形参"）分开：
+    这里是**按位置**对应 —— 实参下标 → 形参下标，不能只按名字碰巧对上。
+
+    无名形参（只写类型）返回空串占位 —— 上层据此判定"无法按位置对应"。
+    """
+    m = re.match(r"\s*function\s+[A-Za-z_]\w*\s*\(", body)
+    if not m:
+        return []
+    args = _sol_parse_args(body, m.end() - 1)
+    if args is None:
+        return []
+    names: list[str] = []
+    for a in args:
+        toks = re.findall(r"[A-Za-z_]\w*", a)
+        if not toks:
+            names.append("")
+            continue
+        last = toks[-1]
+        names.append("" if last in _SOL_TYPE_WORDS else last)
+    return names
+
+
+def _sol_named_returns(text: str) -> dict[str, str]:
+    """解析签名里的**命名返回值**：{名字: 类型}。
+
+    `returns (bool success, bytes memory returnData)` → {"success": "bool",
+    "returnData": "bytes memory"}；`returns (bool, bytes memory)` → {}。
+    """
+    out: dict[str, str] = {}
+    for m in re.finditer(r"\breturns\s*\(", text):
+        args = _sol_parse_args(text, m.end() - 1)
+        if args is None:
+            continue
+        for a in args:
+            toks = re.findall(r"[A-Za-z_]\w*", a)
+            if len(toks) < 2:
+                continue
+            name = toks[-1]
+            if name in _SOL_TYPE_WORDS:
+                continue
+            out[name] = " ".join(toks[:-1])
+    return out
+
+
+def _sol_branch_texts(text: str, pos: int) -> tuple[str, str]:
+    """pos 处开始的一个 if 分支 → (then 文本, else 文本)。"""
+    p = pos
+    while p < len(text) and text[p] in " \t\r\n":
+        p += 1
+    then_txt = ""
+    if p < len(text) and text[p] == "{":
+        depth = 0
+        for j in range(p, len(text)):
+            if text[j] == "{":
+                depth += 1
+            elif text[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    then_txt = text[p:j + 1]
+                    p = j + 1
+                    break
+    else:
+        s = text.find(";", p)
+        then_txt = text[p:s + 1] if s >= 0 else ""
+        p = s + 1 if s >= 0 else p
+    else_txt = ""
+    m2 = re.match(r"\s*else\b", text[p:])
+    if m2:
+        q = p + m2.end()
+        while q < len(text) and text[q] in " \t\r\n":
+            q += 1
+        if re.match(r"if\b", text[q:]):
+            else_txt = ""                    # else if 交给外层循环
+        elif q < len(text) and text[q] == "{":
+            depth = 0
+            for j in range(q, len(text)):
+                if text[j] == "{":
+                    depth += 1
+                elif text[j] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        else_txt = text[q:j + 1]
+                        break
+        else:
+            s = text.find(";", q)
+            else_txt = text[q:s + 1] if s >= 0 else ""
+    return then_txt, else_txt
+
+
+def _sol_has_abort(text: str, evidence: str) -> bool:
+    """这段代码里有没有"失败即中止"的语义。
+
+    两种认法：① 段内直接有 revert/require/assert；② 段内调用了某个
+    helper，而**该 helper 的实现体**（在证据段里）有中止语义 ——
+    OpenZeppelin 的 `_revert(returndata, errorMessage)` 就是这种。
+    """
+    t = _sol_strip_noise(text)
+    if _SOL_ABORT_RE.search(t):
+        return True
+    for m in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", t):
+        body = _sol_find_func_body(evidence, m.group(1))
+        if body and _SOL_ABORT_RE.search(_sol_strip_noise(body)):
+            return True
+    return False
+
+
+def _sol_helper_aborts_on_false(body: str, pname: str,
+                                evidence: str) -> bool:
+    """helper 实现体里，形参 pname 为 false 时会中止吗？
+
+    判据：`if (pname)` 的 else 分支 / `if (!pname)` 的 then 分支里有
+    中止语义（revert/require/assert，或调用了带中止语义的 helper）。
+    """
+    b = _sol_strip_noise(body)
+    for m in _IF_RE.finditer(b):
+        open_i = m.end() - 1
+        depth = 0
+        end_i = -1
+        for j in range(open_i, len(b)):
+            if b[j] == "(":
+                depth += 1
+            elif b[j] == ")":
+                depth -= 1
+                if depth == 0:
+                    end_i = j
+                    break
+        if end_i < 0:
+            continue
+        cond_txt = b[open_i + 1:end_i]
+        if not re.search(rf"\b{re.escape(pname)}\b", cond_txt):
+            continue
+        then_txt, else_txt = _sol_branch_texts(b, end_i + 1)
+        neg = bool(re.search(rf"!\s*{re.escape(pname)}\b", cond_txt)) or \
+            bool(re.search(rf"{re.escape(pname)}\s*==\s*false", cond_txt))
+        fail = then_txt if neg else else_txt
+        if fail and _sol_has_abort(fail, evidence):
+            return True
+    return False
+
+
+def _sol_value_consumed_by_helper(func_src: str, evidence: str,
+                                   var: str) -> bool:
+    """返回值变量 var 是否被**传给辅助函数**并由它消费（失败即中止）。
+
+    位置对应：实参下标 → helper 形参下标 —— 不能只按名字碰巧对上。
+    """
+    for m in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", func_src):
+        fname = m.group(1)
+        args = _sol_parse_args(func_src, m.end() - 1)
+        if not args:
+            continue
+        idx = -1
+        for i, a in enumerate(args):
+            if re.fullmatch(r"\s*" + re.escape(var) + r"\s*", a):
+                idx = i
+                break
+        if idx < 0:
+            continue
+        body = _sol_find_func_body(evidence, fname)
+        if not body:
+            continue
+        params = _sol_param_list(body)
+        if idx >= len(params) or not params[idx]:
+            continue
+        if _sol_helper_aborts_on_false(body, params[idx], evidence):
+            return True
+    return False
+
+
+def _sol_return_yields(text: str, var: str) -> bool:
+    """函数是否把 var **作为返回值**交出去（显式 return 或元组元素）。"""
+    for m in re.finditer(r"\breturn\b([^;]*);", text):
+        expr = m.group(1).strip()
+        if expr.startswith("(") and expr.endswith(")"):
+            inner = expr[1:-1]
+            depth = 0
+            ok = True
+            for c in inner:
+                if c in "([{":
+                    depth += 1
+                elif c in ")]}":
+                    depth -= 1
+                    if depth < 0:
+                        ok = False
+                        break
+            if ok and depth == 0:
+                parts = _sol_split_top_commas(inner)
+            else:
+                parts = [expr]
+        else:
+            parts = [expr]
+        for p in parts:
+            if re.fullmatch(r"\s*" + re.escape(var) + r"\s*", p):
+                return True
+    return False
+
+
 def solidity_unchecked_call_verdict(source: str) -> bool | None:
     """Solidity 未检查底层调用返回值（Module 30，smartbugs
     unchecked_low_level_calls 类目）。
-
     判据挂机制，**按调用点逐个判**（同一函数可能混合 checked/unchecked
     两个调用点——0x5249 的 transfer 正是这样，官方真值只标 unchecked
     那一行；任一调用点未检查即 True，全部检查完才 False）：
       · 内联消费 `if (x.call{...}(...))` / `require(x.send(...))` → checked；
-      · 返回值赋给变量且该变量被 require/if 消费 → checked；
+      · 返回值赋给变量且该变量被 require/if/assert 消费 → checked；
+      · 返回值**传给辅助函数**且该函数失败即中止 → checked（M54）；
+      · 返回值被 **return 上交**给调用方 → checked（M54）；
       · 赋值但从不检查 / 裸调用（fire-and-forget）→ unchecked；
       · 没有底层调用 → None（不归本类目管）。
     """
-    func_src, _mod = _split_sol_modifier_block(source)
+    func_src, _mod_ev, func_ev = _split_sol_sections(source)
     sites = list(re.finditer(
         r"\.\s*call\s*(?:\{|\.|\()|\.\s*send\s*\(", func_src))
     if not sites:
         return None
+    named = _sol_named_returns(func_src)
     any_unchecked = False
     for m in sites:
         stmt_start = max(func_src.rfind(";", 0, m.start()),
@@ -6258,11 +7650,54 @@ def solidity_unchecked_call_verdict(source: str) -> bool | None:
                 in_cond = True
         if in_cond:
             continue                                    # 条件内消费 → checked
-        am = re.match(r"\(?\s*(?:bool|var)\s+(\w+)", stmt)
-        if am and re.search(rf"(?:require|if)\s*\([^;]*\b{am.group(1)}\b",
-                            func_src):
-            continue                                    # 赋值且被检查 → checked
-        any_unchecked = True
+        # 赋值形态 → 变量名被 require/if/assert 消费才算 checked。
+        # 两种赋值形态都要认：
+        #   `bool success = addr.call{...}("");`      —— 普通声明
+        #   `(bool success, ) = addr.call{...}("");`   —— **元组解构**
+        #     （OpenZeppelin Address.sendValue 的标准写法，Top200 靶场
+        #      102 条误报实测全落在这个形态上）
+        # 第三种：**元组赋给已有变量**（`(success, returnData) = call(...)`，
+        # 目标是函数的命名返回值）—— 类型从命名返回值反查。
+        # 用 search 而非 match：stmt 前面常有注释行（已替换成等长空白）
+        # 与空行，match 锚定开头会漏掉整条赋值。
+        cands: list[tuple[str, bool]] = []           # (变量名, 是否 bool)
+        am = re.search(r"\(?\s*(?:bool|var)\s+(\w+)", stmt)
+        if am:
+            cands.append((am.group(1), True))
+        else:
+            tm = re.search(r"\(([^()]*)\)\s*=", stmt)
+            if tm:
+                for part in _sol_split_top_commas(tm.group(1)):
+                    toks = re.findall(r"[A-Za-z_]\w*", part)
+                    if not toks:
+                        continue
+                    last = toks[-1]
+                    if len(toks) >= 2 and last not in _SOL_TYPE_WORDS:
+                        cands.append((last, "bool" in named.get(last, "")))
+                    elif last in named:
+                        cands.append((last, "bool" in named.get(last, "")))
+            else:
+                sm = re.match(r"\s*([A-Za-z_]\w*)\s*=", stmt)
+                if sm:
+                    cands.append((sm.group(1),
+                                  "bool" in named.get(sm.group(1), "")))
+        for var, is_bool in cands:
+            if not is_bool:
+                continue
+            if re.search(rf"(?:require|if|assert)\s*\([^;]*\b{var}\b",
+                         func_src):
+                continue                                # 同函数消费 → checked
+            if _sol_value_consumed_by_helper(func_src, func_ev, var):
+                continue                                # 跨函数消费 → checked
+            if _sol_return_yields(func_src, var):
+                continue                                # 上交调用方 → checked
+            if var in named and "bool" in named.get(var, ""):
+                continue                                # 命名返回值 → 上交
+            any_unchecked = True
+            break
+        else:
+            if not cands:
+                any_unchecked = True                    # 裸调用 → unchecked
     return True if any_unchecked else False
 
 
@@ -6361,6 +7796,11 @@ def verdict(category: str, source: str) -> bool | None:
     if category == "unchecked_low_level_calls":
         if _looks_solidity(source):
             return solidity_unchecked_call_verdict(source)
+        return None
+
+    if category == "arithmetic":
+        if _looks_solidity(source):
+            return solidity_arithmetic_verdict(source)
         return None
 
     return None

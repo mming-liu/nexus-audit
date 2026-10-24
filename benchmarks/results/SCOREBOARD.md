@@ -1,12 +1,12 @@
 # nexus-audit 全语言计分板（规则层·离线可复现）
 
-生成时间：2026-10-24 10:38:18
+生成时间：2026-10-24 15:06:27
 
 | 靶场 | 单元 | 规则判定 | 判对 | 误报 | 判反 | 覆盖率 |
 |---|---|---|---|---|---|---|
-| smartbugs-curated (Solidity) | 641 | 180 | 180 | 0 | 0 | 28% |
-| DeFiVulnLabs (Solidity) | 323 | 9 | 9 | 0 | 0 | 3% |
-| not-so-smart-contracts (Solidity) | 208 | 7 | 7 | 0 | 0 | 3% |
+| smartbugs-curated (Solidity) | 680 | 205 | 205 | 0 | 0 | 30% |
+| DeFiVulnLabs (Solidity) | 314 | 9 | 9 | 0 | 0 | 3% |
+| not-so-smart-contracts (Solidity) | 204 | 7 | 7 | 0 | 0 | 3% |
 | vulpy (Python) | 33 | 6 | 6 | 0 | 0 | 18% |
 | RuoYi (Java 多模块) | 305 | 159 | 159 | 0 | 0 | 52% |
 | pygoat (Python Flask labs) | 119 | 9 | 9 | 0 | 0 | 8% |

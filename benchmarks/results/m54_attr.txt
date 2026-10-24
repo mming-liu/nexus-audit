@@ -1,0 +1,339 @@
+      [cache] 温缓存命中 11066 单元（0.05s）
+[arithmetic] IbcToken.sol:_transfer L392-415
+    major=8 | guards=['amount', 'senderBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[recipient]' += rhs='amount' comp=True
+[arithmetic] IbcToken.sol:_burn L449-464
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[arithmetic] BAToken.sol:safeAdd L12-16
+    major=4 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='x' + rhs='y' comp=False
+[arithmetic] BAToken.sol:safeMult L24-28
+    major=4 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='x' * rhs='y' comp=False
+[arithmetic] BAToken.sol:transfer L47-56
+    major=4 | guards=['_value', 'balances[msg.sender]'] | checked=[] | safemath=False | TRIGGER lhs='balances[_to]' += rhs='_value' comp=True
+[arithmetic] BAToken.sol:transferFrom L58-68
+    major=4 | guards=['_value', 'balances[_from]'] | checked=[] | safemath=False | TRIGGER lhs='balances[_to]' += rhs='_value' comp=True
+[arithmetic] Bora20v2.sol:mulDiv L227-307
+    major=8 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='inverse' *= rhs='2 - denominator * inverse' comp=True | TRIGGER lhs='inverse' *= rhs='2 - denominator * inverse' comp=True | TRIGGER lhs='inverse' *= rhs='2 - denominator * inverse' comp=True | TRIGGER lhs='inverse' *= rhs='2 - denominator * inverse' comp=True | TRIGGER lhs='inverse' *= rhs='2 - denominator * inverse' comp=True | TRIGGER lhs='inverse' *= rhs='2 - denominator * inverse' comp=True
+[access_control] Bora20v2.sol:transferOwnership L900-903
+    owner_write
+[access_control] Bora20v2.sol:transfer L1240-1244
+    owner_write
+[access_control] Bora20v2.sol:approve L1263-1267
+    owner_write
+[access_control] Bora20v2.sol:increaseAllowance L1308-1312
+    owner_write
+[access_control] Bora20v2.sol:decreaseAllowance L1328-1337
+    owner_write
+[arithmetic] Bora20v2.sol:_transfer L1353-1375
+    major=8 | guards=['amount', 'fromBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[to]' += rhs='amount' comp=True
+[arithmetic] Bora20v2.sol:_mint L1386-1399
+    major=8 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' += rhs='amount' comp=True | TRIGGER lhs='_balances[account]' += rhs='amount' comp=True
+[arithmetic] Bora20v2.sol:_burn L1412-1428
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[access_control] Bora20v2.sol:zTransferByAdmin L2932-2936
+    BRANCH_anyfrom_scoped=False
+[access_control] Bora20v2.sol:transferOwnership L2973-2976
+    owner_write
+[access_control] Bora20v2.sol:zDestroy L2988-2991
+    danger
+[access_control] MANAToken.sol:transferFrom L243-245
+    BRANCH_anyfrom_scoped=False
+[arithmetic] MXToken.sol:_transfer L36-52
+    major=4 | guards=['_value', 'balanceOf[_from]'] | checked=['_from', '_to', '_value', 'balanceOf', 'previousBalances'] | safemath=False | TRIGGER lhs='balanceOf[_to]' += rhs='_value' comp=True
+[access_control] MXToken.sol:transferFrom L75-80
+    BRANCH_anyfrom_scoped=False
+[arithmetic] MXToken.sol:burn L122-128
+    major=4 | guards=['_value', 'balanceOf[msg.sender]'] | checked=[] | safemath=False | TRIGGER lhs='totalSupply' -= rhs='_value' comp=True
+[arithmetic] MXToken.sol:burnFrom L138-146
+    major=4 | guards=['_value', 'balanceOf[_from]'] | checked=[] | safemath=False | TRIGGER lhs='totalSupply' -= rhs='_value' comp=True
+[arithmetic] BitDAO.sol:tryMul L47-55
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[access_control] WBTC.sol:transferFrom L493-503
+    BRANCH_anyfrom_scoped=False
+[access_control] BoraToken.sol:transferFrom L165-167
+    BRANCH_anyfrom_scoped=False
+[arithmetic] ETH.sol:transferFrom L71-89
+    major=6 | guards=['balanceOf[src]', 'wad'] | checked=[] | safemath=False | TRIGGER lhs='balanceOf[dst]' += rhs='wad' comp=True
+[access_control] niswapV2ERC20.sol:transferFrom L74-80
+    BRANCH_anyfrom_scoped=False
+[arithmetic] niswapV2Pair.sol:_update L89-102
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='price0CumulativeLast' += rhs='uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed' comp=True | TRIGGER lhs='price1CumulativeLast' += rhs='uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed' comp=True
+[access_control] niswapV2Pair.sol:transferFrom L257-263
+    BRANCH_anyfrom_scoped=False
+[arithmetic] tringHelpers.sol:safeParseInt L125-148
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='mint' *= rhs='10 ** _b' comp=True
+[arithmetic] tringHelpers.sol:parseInt L154-177
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='mint' *= rhs='10 ** _b' comp=True
+[access_control] chiliZ.sol:transferFrom L475-485
+    BRANCH_anyfrom_scoped=False
+[arithmetic] BTT.sol:tryMul L154-162
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[arithmetic] BscToken.sol:divCeil L24-32
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='quotient' * rhs='b' comp=False
+[arithmetic] WootradeNetwork.sol:transfer L42-49
+    major=4 | guards=['_value', 'balances[msg.sender]'] | checked=[] | safemath=False | TRIGGER lhs='balances[_to]' += rhs='_value' comp=True
+[arithmetic] WootradeNetwork.sol:transferFrom L51-59
+    major=4 | guards=['_value', 'balances[_from]'] | checked=[] | safemath=False | TRIGGER lhs='balances[_to]' += rhs='_value' comp=True
+[access_control] FantomToken.sol:transferFrom L601-605
+    BRANCH_anyfrom_scoped=False
+[arithmetic] TRX.sol:tryMul L154-162
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[access_control] LinkToken.sol:transferFrom L279-285
+    BRANCH_anyfrom_scoped=False
+[arithmetic] ERC20.sol:_transfer L209-221
+    major=7 | guards=['amount', 'senderBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[recipient]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_mint L232-240
+    major=7 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' += rhs='amount' comp=True | TRIGGER lhs='_balances[account]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_burn L253-264
+    major=7 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[access_control] BridgeToken.sol:unwrap L648-656
+    BRANCH_txorigin
+[access_control] BridgeToken.sol:unwrap L617-622
+    BRANCH_txorigin
+[arithmetic] GnosisToken.sol:transfer L37-49
+    major=4 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='balances[msg.sender]' -= rhs='_value' comp=True | TRIGGER lhs='balances[_to]' += rhs='_value' comp=True
+[arithmetic] GnosisToken.sol:transferFrom L56-69
+    major=4 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='balances[_to]' += rhs='_value' comp=True | TRIGGER lhs='balances[_from]' -= rhs='_value' comp=True
+[arithmetic] GnosisToken.sol:GnosisToken L130-150
+    major=4 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='assignedTokens' += rhs='tokens[i]' comp=True
+[arithmetic] PepeToken.sol:_transfer L445-465
+    major=8 | guards=['amount', 'senderBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[recipient]' += rhs='amount' comp=True
+[arithmetic] PepeToken.sol:_burn L499-514
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[arithmetic] MaskToken.sol:tryMul L154-162
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[arithmetic] HBToken.sol:transfer L42-50
+    major=4 | guards=['_value', 'balances[msg.sender]'] | checked=[] | safemath=False | TRIGGER lhs='balances[_to]' += rhs='_value' comp=True
+[arithmetic] HBToken.sol:transferFrom L52-60
+    major=4 | guards=['_value', 'balances[_from]'] | checked=[] | safemath=False | TRIGGER lhs='balances[_to]' += rhs='_value' comp=True
+[arithmetic] HBToken.sol:transferFrom L90-109
+    major=4 | guards=['_value', 'balances[_from]'] | checked=[] | safemath=False | TRIGGER lhs='balances[_to]' += rhs='_value' comp=True
+[access_control] IoTeXNetwork.sol:transferFrom L448-452
+    BRANCH_anyfrom_scoped=False
+[arithmetic] ERC20.sol:_transfer L209-221
+    major=7 | guards=['amount', 'senderBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[recipient]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_mint L232-240
+    major=7 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' += rhs='amount' comp=True | TRIGGER lhs='_balances[account]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_burn L253-264
+    major=7 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[access_control] MaticToken.sol:transferFrom L428-430
+    BRANCH_anyfrom_scoped=False
+[arithmetic] ETH.sol:transferFrom L71-89
+    major=6 | guards=['balanceOf[src]', 'wad'] | checked=[] | safemath=False | TRIGGER lhs='balanceOf[dst]' += rhs='wad' comp=True
+[access_control] niswapV2ERC20.sol:transferFrom L74-80
+    BRANCH_anyfrom_scoped=False
+[arithmetic] niswapV2Pair.sol:_update L89-102
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='price0CumulativeLast' += rhs='uint(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed' comp=True | TRIGGER lhs='price1CumulativeLast' += rhs='uint(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed' comp=True
+[access_control] niswapV2Pair.sol:transferFrom L257-263
+    BRANCH_anyfrom_scoped=False
+[arithmetic] tringHelpers.sol:safeParseInt L125-148
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='mint' *= rhs='10 ** _b' comp=True
+[arithmetic] tringHelpers.sol:parseInt L154-177
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='mint' *= rhs='10 ** _b' comp=True
+[access_control] BridgeToken.sol:unwrap L617-622
+    BRANCH_txorigin
+[arithmetic] IbcToken.sol:_transfer L392-415
+    major=8 | guards=['amount', 'senderBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[recipient]' += rhs='amount' comp=True
+[arithmetic] IbcToken.sol:_burn L449-464
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[access_control] BridgeToken.sol:unwrap L617-622
+    BRANCH_txorigin
+[access_control] wBeldex.sol:transferFrom L503-513
+    BRANCH_anyfrom_scoped=False
+[arithmetic] IbcToken.sol:_transfer L392-415
+    major=8 | guards=['amount', 'senderBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[recipient]' += rhs='amount' comp=True
+[arithmetic] IbcToken.sol:_burn L449-464
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[access_control] OceanToken.sol:transferFrom L536-538
+    BRANCH_anyfrom_scoped=False
+[access_control] OceanToken.sol:transferFrom L687-700
+    BRANCH_anyfrom_scoped=False
+[access_control] BridgeToken.sol:unwrap L617-622
+    BRANCH_txorigin
+[access_control] DSToken.sol:setOwner L42-48
+    owner_write
+[arithmetic] DSToken.sol:rpow L149-159
+    major=4 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='n' /= rhs='2) {\n            x = rmul(x, x)' comp=True
+[access_control] CroToken.sol:transferFrom L394-397
+    BRANCH_anyfrom_scoped=False
+[access_control] ANTv2.sol:transferFrom L172-180
+    BRANCH_anyfrom_scoped=False
+[access_control] ANTv2.sol:transferWithAuthorization L191-215
+    BRANCH_anyfrom_scoped=False
+[arithmetic] CoinToken.sol:tryMul L35-45
+    major=8 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[access_control] CrowdsaleToken.sol:transferOwnership L319-323
+    owner_write
+[access_control] CrowdsaleToken.sol:transferFrom L407-410
+    BRANCH_anyfrom_scoped=False
+[access_control] AXSToken.sol:transferFrom L97-101
+    BRANCH_anyfrom_scoped=False
+[access_control] AXSToken.sol:transferFrom L170-184
+    BRANCH_anyfrom_scoped=False
+[arithmetic] WBNB.sol:transferFrom L48-65
+    major=4 | guards=['balanceOf[src]', 'wad'] | checked=[] | safemath=False | TRIGGER lhs='balanceOf[dst]' += rhs='wad' comp=True
+[access_control] BridgeToken.sol:unwrap L617-622
+    BRANCH_txorigin
+[access_control] ProxyERC20.sol:transferFrom L488-504
+    BRANCH_anyfrom_scoped=False
+[arithmetic] ONUSToken.sol:tryMul L139-147
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[arithmetic] BTT.sol:tryMul L154-162
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[arithmetic] CoinToken.sol:lock L443-448
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='now' + rhs='time' comp=False
+[arithmetic] TRX.sol:tryMul L154-162
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[access_control] BridgeToken.sol:unwrap L617-622
+    BRANCH_txorigin
+[access_control] TetherToken.sol:transferFrom L346-353
+    BRANCH_anyfrom_scoped=False
+[arithmetic] TetherToken.sol:issue L402-409
+    major=4 | guards=[] | checked=['_totalSupply', 'amount', 'balances', 'owner'] | safemath=False | TRIGGER lhs='balances[owner]' += rhs='amount' comp=True | TRIGGER lhs='_totalSupply' += rhs='amount' comp=True
+[access_control] EURSToken.sol:transferFrom L468-490
+    BRANCH_anyfrom_scoped=False
+[arithmetic] ZRXToken.sol:transfer L60-68
+    major=4 | guards=['_value', 'balances[msg.sender]'] | checked=[] | safemath=False | TRIGGER lhs='balances[_to]' += rhs='_value' comp=True
+[arithmetic] ZRXToken.sol:transferFrom L70-78
+    major=4 | guards=['_value', 'balances[_from]'] | checked=[] | safemath=False | TRIGGER lhs='balances[_to]' += rhs='_value' comp=True
+[arithmetic] ZRXToken.sol:transferFrom L108-127
+    major=4 | guards=['_value', 'balances[_from]'] | checked=[] | safemath=False | TRIGGER lhs='balances[_to]' += rhs='_value' comp=True
+[access_control] AVABBC.sol:transferFrom L441-451
+    BRANCH_anyfrom_scoped=False
+[access_control] BABBC.sol:transferFrom L441-451
+    BRANCH_anyfrom_scoped=False
+[access_control] WABBC.sol:transferFrom L441-451
+    BRANCH_anyfrom_scoped=False
+[access_control] FABBC.sol:transferFrom L441-451
+    BRANCH_anyfrom_scoped=False
+[access_control] MABBC.sol:transferFrom L441-451
+    BRANCH_anyfrom_scoped=False
+[access_control] ACH.sol:transferFrom L627-629
+    BRANCH_anyfrom_scoped=False
+[access_control] ENJToken.sol:transferFrom L384-390
+    BRANCH_anyfrom_scoped=False
+[access_control] ERC20.sol:transfer L113-117
+    owner_write
+[access_control] ERC20.sol:approve L136-140
+    owner_write
+[access_control] ERC20.sol:increaseAllowance L181-185
+    owner_write
+[access_control] ERC20.sol:decreaseAllowance L201-210
+    owner_write
+[arithmetic] ERC20.sol:_transfer L226-246
+    major=8 | guards=['amount', 'fromBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[to]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_burn L280-295
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[arithmetic] SafeMath.sol:tryMul L45-53
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[arithmetic] SafeMath.sol:tryMul L45-53
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[arithmetic] ERC20.sol:_transfer L220-240
+    major=8 | guards=['amount', 'senderBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[recipient]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_burn L274-289
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[arithmetic] ERC20Storage.sol:increaseAllowance L81-93
+    major=8 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='allowance_' + rhs='value' comp=False
+[arithmetic] ERC20Storage.sol:decreaseAllowance L103-117
+    major=8 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='allowance_' - rhs='value' comp=False
+[arithmetic] ERC20Storage.sol:transfer L127-143
+    major=8 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='balance' - rhs='value' comp=False
+[arithmetic] ERC20Storage.sol:mint L318-330
+    major=8 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='supply' + rhs='value' comp=False
+[arithmetic] ERC20Storage.sol:burn L379-391
+    major=8 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='balance' - rhs='value' comp=False
+[access_control] ContractOwnershipBase.sol:transferOwnership L21-23
+    owner_write
+[arithmetic] ERC20.sol:_transfer L219-239
+    major=8 | guards=['amount', 'senderBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[recipient]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_burn L273-288
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[arithmetic] SafeMath.sol:tryMul L45-53
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[access_control] Ownable.sol:transferOwnership L69-72
+    owner_write
+[arithmetic] Math.sol:mulDiv L55-135
+    major=8 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='inverse' *= rhs='2 - denominator * inverse' comp=True | TRIGGER lhs='inverse' *= rhs='2 - denominator * inverse' comp=True | TRIGGER lhs='inverse' *= rhs='2 - denominator * inverse' comp=True | TRIGGER lhs='inverse' *= rhs='2 - denominator * inverse' comp=True | TRIGGER lhs='inverse' *= rhs='2 - denominator * inverse' comp=True | TRIGGER lhs='inverse' *= rhs='2 - denominator * inverse' comp=True
+[access_control] ERC20.sol:transfer L113-117
+    owner_write
+[access_control] ERC20.sol:approve L136-140
+    owner_write
+[access_control] ERC20.sol:increaseAllowance L181-185
+    owner_write
+[access_control] ERC20.sol:decreaseAllowance L201-210
+    owner_write
+[arithmetic] ERC20.sol:_transfer L226-248
+    major=8 | guards=['amount', 'fromBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[to]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_mint L259-272
+    major=8 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' += rhs='amount' comp=True | TRIGGER lhs='_balances[account]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_burn L285-301
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[arithmetic] ERC20.sol:_transfer L221-241
+    major=8 | guards=['amount', 'senderBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[recipient]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_burn L275-290
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[arithmetic] SafeMath.sol:tryMul L45-53
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[access_control] ERC20BaseToken.sol:transferFrom L60-74
+    BRANCH_anyfrom_scoped=False
+[arithmetic] ERC20BaseToken.sol:_transfer L156-163
+    major=5 | guards=['amount', 'currentBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[to]' += rhs='amount' comp=True
+[arithmetic] ERC20BaseToken.sol:_mint L165-174
+    major=5 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='_balances[to]' += rhs='amount' comp=True | TRIGGER lhs='currentTotalSupply' + rhs='amount' comp=False
+[arithmetic] ERC20BaseToken.sol:_burn L176-195
+    major=5 | guards=['amount', 'currentAllowance', 'currentBalance'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[access_control] ERC20ExecuteExtension.sol:transferAndChargeForGas L117-133
+    BRANCH_anyfrom_scoped=False
+[arithmetic] ERC20ExecuteExtension.sol:_charge L135-151
+    major=5 | guards=[] | checked=['gasCharge', 'overflow', 'tokenGasPrice', 'tokensToCharge'] | safemath=False | TRIGGER lhs='gasCharge' += rhs='baseGasCharge' comp=True
+[arithmetic] BytesUtil.sol:memcpy L4-21
+    major=5 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='len' -= rhs='32) {\n            assembly {\n                mstore(dest, mload(src))\n            }\n            dest += 32' comp=True
+[access_control] Ownable.sol:transferOwnership L69-72
+    owner_write
+[access_control] ERC20.sol:transfer L113-117
+    owner_write
+[access_control] ERC20.sol:approve L136-140
+    owner_write
+[access_control] ERC20.sol:increaseAllowance L181-185
+    owner_write
+[access_control] ERC20.sol:decreaseAllowance L201-210
+    owner_write
+[arithmetic] ERC20.sol:_transfer L226-248
+    major=8 | guards=['amount', 'fromBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[to]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_mint L259-272
+    major=8 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' += rhs='amount' comp=True | TRIGGER lhs='_balances[account]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_burn L285-301
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[access_control] Ownable.sol:transferOwnership L69-72
+    owner_write
+[access_control] ERC20.sol:transfer L113-117
+    owner_write
+[access_control] ERC20.sol:approve L136-140
+    owner_write
+[access_control] ERC20.sol:increaseAllowance L181-185
+    owner_write
+[access_control] ERC20.sol:decreaseAllowance L201-210
+    owner_write
+[arithmetic] ERC20.sol:_transfer L226-248
+    major=8 | guards=['amount', 'fromBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[to]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_mint L259-272
+    major=8 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' += rhs='amount' comp=True | TRIGGER lhs='_balances[account]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_burn L285-301
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[arithmetic] SafeMath.sol:tryMul L45-53
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False
+[access_control] Ownable.sol:transferOwnership L69-72
+    owner_write
+[access_control] ERC20.sol:transfer L113-117
+    owner_write
+[access_control] ERC20.sol:approve L136-140
+    owner_write
+[access_control] ERC20.sol:increaseAllowance L181-185
+    owner_write
+[access_control] ERC20.sol:decreaseAllowance L201-210
+    owner_write
+[arithmetic] ERC20.sol:_transfer L226-246
+    major=8 | guards=['amount', 'fromBalance'] | checked=[] | safemath=False | TRIGGER lhs='_balances[to]' += rhs='amount' comp=True
+[arithmetic] ERC20.sol:_burn L280-295
+    major=8 | guards=['accountBalance', 'amount'] | checked=[] | safemath=False | TRIGGER lhs='_totalSupply' -= rhs='amount' comp=True
+[arithmetic] SafeMath.sol:tryMul L45-53
+    major=6 | guards=[] | checked=[] | safemath=False | TRIGGER lhs='a' * rhs='b' comp=False

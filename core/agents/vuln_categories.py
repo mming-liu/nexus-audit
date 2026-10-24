@@ -305,6 +305,23 @@ CATEGORIES: dict[str, VulnCategory] = {
                   "「仅管理员」不算链上校验；④ 名字叫 onlyOwner 但实现体没比对 "
                   "msg.sender，也不算防护。"),
     ),
+    # M53：Solidity 算术溢出/下溢（SWC-101）。OWASP Benchmark 无此类样本，
+    # 故 owasp=False —— 它的真值来自 smartbugs dataset/arithmetic。
+    "arithmetic": VulnCategory(
+        key="arithmetic", display="算术溢出/下溢", cwe="CWE-190",
+        owasp=False, needs_taint=False,
+        sink_question=("函数中是否存在可能发生整数溢出或下溢的算术运算"
+                       "（对状态变量/映射的 += -= *= /=，或含外部输入的二元"
+                       "算术表达式）？"),
+        property=("该算术运算是否受到有效的溢出保护？有效防护包括："
+                  "① 编译器版本为 0.8 或更高（内置溢出检查，unchecked 块除外）；"
+                  "② 全部算术走 SafeMath 库的 add/sub/mul/div；"
+                  "③ 减法/加法前有显式的上下界校验（require(a >= b) / "
+                  "require(b <= a) / if (a < b) revert）。"
+                  "注意：① 0.4.x ~ 0.7.x 编译器不检查溢出；"
+                  "② 只在注释里写「注意溢出」不算防护；"
+                  "③ 对加法用 require(a >= b) 不构成溢出防护。"),
+    ),
 }
 
 ALL_KEYS = list(CATEGORIES.keys())

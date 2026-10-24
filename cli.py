@@ -1261,6 +1261,29 @@ _SOLID_DED_LINE_RE = re.compile(
     r"^\s*[\w\[\]\.]+\s*(?:-=|\s*=\s*0\s*;)")
 
 
+def _sol_slice_line_to_file(u, src_idx: int) -> int:
+    """切片 source_code 的行索引 → 源文件的行号（1-based）。
+
+    切片头部可能有多行注入注释（`// contract: X` / `// pragma: solidity …`
+    —— M53 加了后者），它们**不属于**源文件。直接用
+    `u.start_line + src_idx - 1` 会整体偏移 1 行，补丁写到错误的行上
+    （实测 CEI 补丁自检因此判不出"规则翻转 False"）。
+
+    口径：切片头部的连续注释行（以 `//` 开头）数 = 偏移量，源文件行号
+    从 `u.start_line` 起算，头部行不算。
+    """
+    src_lines = u.source_code.splitlines()
+    header = 0
+    for ln in src_lines:
+        if ln.lstrip().startswith("//"):
+            header += 1
+        else:
+            break
+    # 切片第 header 行（0-based）= 源文件第 u.start_line 行，逐行 +1 对应。
+    # 实测锚点：Bank.sol withdraw start_line=4，切片 idx3 的外转行 = 文件第 5 行。
+    return u.start_line + (src_idx - header)
+
+
 def _fix_solidity_reentrancy(repo: Path, targets: list, lines: list) -> int:
     """Solidity CEI 补丁：把"外转之后的清零/扣减行"移到外转之前。
 
@@ -1276,8 +1299,8 @@ def _fix_solidity_reentrancy(repo: Path, targets: list, lines: list) -> int:
         with open(f, encoding="utf-8", newline="") as fh:
             original = fh.read()
         file_lines = original.splitlines(keepends=True)
-        # 切片首行是 "// contract: X" 注入行；source_code 第 idx 行对应
-        # 文件第 u.start_line + idx - 1 行。
+        # 切片首行是 "// contract: X" 注入行（可能还有 "// pragma:"）；
+        # source_code 第 idx 行对应文件第 _sol_slice_line_to_file 行。
         src_lines = u.source_code.splitlines()
         ext_idx = ded_idx = None
         for i, ln in enumerate(src_lines):
@@ -1291,8 +1314,8 @@ def _fix_solidity_reentrancy(repo: Path, targets: list, lines: list) -> int:
         if ext_idx is None or ded_idx is None or ded_idx - ext_idx > 6 \
                 or ext_idx == 0:
             continue
-        f_ext = u.start_line + ext_idx - 1
-        f_ded = u.start_line + ded_idx - 1
+        f_ext = _sol_slice_line_to_file(u, ext_idx)
+        f_ded = _sol_slice_line_to_file(u, ded_idx)
         if not (1 <= f_ext <= len(file_lines) and 1 <= f_ded <= len(file_lines)):
             continue
         patched_lines = list(file_lines)
@@ -2054,11 +2077,10 @@ def load_dotenv(path: str | Path = ".env") -> None:
             os.environ.setdefault(k.strip(), v.strip())
 
 
-DOCTOR_RULE_CATEGORIES = [
-    "crypto", "hash", "weakrand", "securecookie", "cors", "deserial", "spel",
-    "xxe", "sqli", "redir", "xss", "ssrf", "cmdi", "pathtraver", "xpathi",
-    "authz", "reentrancy", "access_control", "unchecked_low_level_calls",
-]
+# doctor 的规则注册表检查直接从 vuln_categories.CATEGORIES 派生 ——
+# 单一事实源，避免两份清单漂移（M54 实测：手抄清单漏类目导致 20 vs 21）。
+from core.agents.vuln_categories import CATEGORIES  # noqa: E402
+DOCTOR_RULE_CATEGORIES = sorted(CATEGORIES.keys())
 
 DOCTOR_PATCHERS = [
     "_fix_sqli_targets", "_fix_xss_targets", "_fix_deserial_targets",
