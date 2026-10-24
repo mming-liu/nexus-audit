@@ -1,4 +1,4 @@
-"""M69/M78：九个真实开源项目的野战数据采集（scan --auto + benchmark --strict）。
+"""M69/M86：十一个真实开源项目的野战数据采集（scan --auto + benchmark --strict）。
 
 所有数字由本脚本实跑产出，报告只引用 results/wild_hunt.json：
 
@@ -41,6 +41,10 @@ REPOS = [
      "reference_repos/employee-management-system", "flaskcrud", ["--strict"]),
     ("Compound", "reference_repos/compound-protocol/contracts",
      "compound", ["--strict"]),
+    ("UniswapV3", "reference_repos/uniswap-v3-core/contracts",
+     "uniswapv3", ["--strict"]),
+    ("FastAPI", "reference_repos/fastapi-sql-template",
+     "fastapi_wild", ["--strict"]),
 ]
 
 P0_LINE = re.compile(r"^- \*\*\[([a-z_]+)\]\*\* `")
@@ -89,7 +93,17 @@ def collect_benchmark(key: str, extra: list[str]) -> dict:
     cmd = [PY, f"benchmarks/benchmark_{key}.py", *extra]
     rc, log, wall = _run(cmd)
     tail = "\n".join([ln for ln in log.strip().splitlines() if ln.strip()][-3:])
-    return {"rc": rc, "wall_s": round(wall, 2), "tail": tail}
+    meta = {}
+    result = ROOT / "benchmarks" / "results" / f"{key}.json"
+    if result.exists():
+        try:
+            meta = json.loads(result.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            meta = {}
+    return {"rc": rc, "wall_s": round(wall, 2), "tail": tail,
+            "decided": meta.get("decided"),
+            "fp": meta.get("fp", 0),
+            "total_units": meta.get("total_units")}
 
 
 def main() -> int:

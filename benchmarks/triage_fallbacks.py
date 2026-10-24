@@ -134,6 +134,8 @@ FLOORS = {
     "litemall": 908,          # litemall 野战实弹 908 项判定（M64）
     "flaskcrud": 15,          # M72 真实 Flask CRUD 15 项判定
     "compound": 444,          # M73 compound-protocol 450 入口 / 444 单元覆盖
+    "uniswapv3": 66,          # M79 Uniswap V3 生产 67 入口 / 66 单元覆盖
+    "fastapi_wild": 9,        # M80 FastAPI 9 异步入口全部覆盖
 }
 
 

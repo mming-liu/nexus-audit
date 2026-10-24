@@ -246,6 +246,21 @@ CATEGORIES: dict[str, VulnCategory] = {
                   "（可猜测性是危害）；② 占位符（your-secret/xxx/123456）"
                   "不算；③ 单元只从 config/env 读取、不定义字面量的不算。"),
     ),
+    "jwt_weakness": VulnCategory(
+        key="jwt_weakness", display="JWT 验签绕过", cwe="CWE-347",
+        owasp=False, needs_taint=False,
+        # 配置型缺陷：问题出在验签调用本身，与外部输入是否可达无关。
+        sink_question=("代码是否在解析 JWT 时关闭了签名校验或允许无签名算法？"
+                       "包括 Python `jwt.decode(..., options={\"verify_signature\": False})`、"
+                       "`verify=False`、`algorithms=[\"none\"]`；Java "
+                       "`.parseClaimsJwt(`（未验签解析器）等。"),
+        property=("解析 JWT 时是否强制验签并限定安全算法？"
+                  "有效防护包括：`jwt.decode(..., algorithms=[\"HS256\"])` 且未关"
+                  "`verify_signature`；Java `.setSigningKey(...).parseClaimsJws(`。"
+                  "注意：① `algorithms=[\"none\"]` 本身即无验签；② 只把 token "
+                  "当不透明字符串解码（base64）不算 JWT 验签；"
+                  "③ `jwt.get_unverified_header` 只读头不算验签入口。"),
+    ),
     "authz": VulnCategory(
         key="authz", display="越权与未授权访问", cwe="CWE-285",
         owasp=False,

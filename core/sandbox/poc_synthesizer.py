@@ -314,6 +314,17 @@ def test_forged_admin_token_with_hardcoded_secret(client):
     assert resp.status_code != 200, "硬编码密钥可伪造管理员 Token"
 '''
 
+_PY_JWT = '''
+
+def test_alg_none_forged_admin_token(client):
+    """构造 alg=none 的无签名管理员 JWT，验证服务端是否真的验签。"""
+    import jwt
+    forged = jwt.encode({{"sub": "admin", "role": "admin"}},
+                        key=None, algorithm="none")
+    resp = client.get({call}, headers={{"Authorization": "Bearer " + forged}})
+    assert resp.status_code != 200, "alg=none 的无签名 Token 被接受"
+'''
+
 
 def _extract_secret(unit: CodeUnit) -> str:
     from core.agents.rule_detectors import SECRET_ASSIGN_RE
@@ -326,7 +337,8 @@ def _synth_python(unit: CodeUnit, category: str) -> str:
     route = _route_or_name(unit)
     call = f'"{route}", params={{"{arg}": "1"}}'
     tpl = {"sqli": _PY_SQLI, "cors": _PY_CORS,
-           "hardcoded_secret": _PY_SECRET}.get(category, _PY_AUTHZ)
+           "hardcoded_secret": _PY_SECRET,
+           "jwt_weakness": _PY_JWT}.get(category, _PY_AUTHZ)
     return _PY_HEADER.format(target=unit.unit_name, category=category,
                               file=Path(unit.file_path).name,
                               line=unit.start_line,
@@ -404,6 +416,19 @@ _JAVA_SECRET = """
 }}
 """
 
+_JAVA_JWT = """
+    @Test
+    void algNoneForgedAdminToken() throws Exception {{
+        String forged = io.jsonwebtoken.Jwts.builder()
+            .setSubject("admin").claim("role", "admin")
+            .compact();   // 无签名，alg=none
+        mockMvc.perform(get("{route}")
+                .header("Authorization", "Bearer " + forged))
+            .andExpect(status().is4xxClientError());
+    }}
+}}
+"""
+
 
 def _synth_java(unit: CodeUnit, category: str) -> str:
     cls = _safe_name(unit.unit_name).capitalize()
@@ -412,7 +437,8 @@ def _synth_java(unit: CodeUnit, category: str) -> str:
     if not route.startswith("/"):
         route = "/" + route
     tpl = {"sqli": _JAVA_SQLI, "cors": _JAVA_CORS,
-           "hardcoded_secret": _JAVA_SECRET}.get(category, _JAVA_AUTHZ)
+           "hardcoded_secret": _JAVA_SECRET,
+           "jwt_weakness": _JAVA_JWT}.get(category, _JAVA_AUTHZ)
     secret = _extract_secret(unit).replace("\\", "\\\\").replace('"', '\\"')
     body = tpl.format(route=route, arg=arg, secret=secret)
     return _JAVA_HEADER.format(target=unit.unit_name, category=category,

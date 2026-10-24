@@ -155,6 +155,19 @@ if [ -d reference_repos/compound-protocol/contracts ]; then
   echo "pre-push: compound-protocol 基线通过 ✔"
 fi
 
+# M79/M80：Uniswap V3 状态锁 + FastAPI async/ORM 基线
+if [ -d reference_repos/uniswap-v3-core/contracts ]; then
+  echo "pre-push: uniswap-v3-core 基线 ..."
+  "$PY" benchmarks/benchmark_uniswapv3.py --strict > /dev/null
+  echo "pre-push: uniswap-v3-core 基线通过 ✔"
+fi
+
+if [ -d reference_repos/fastapi-sql-template ]; then
+  echo "pre-push: FastAPI 基线 ..."
+  "$PY" benchmarks/benchmark_fastapi_wild.py --strict > /dev/null
+  echo "pre-push: FastAPI 基线通过 ✔"
+fi
+
 # 覆盖地板门禁（Module 41）：确定性命中数下限
 echo "pre-push: 覆盖地板门禁 ..."
 "$PY" benchmarks/triage_fallbacks.py --check-floor > /dev/null

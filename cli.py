@@ -236,6 +236,14 @@ _SOLIDITY_AUTO_CATS = ["reentrancy", "access_control",
                        "unchecked_low_level_calls", "arithmetic"]
 
 
+_TEST_PATH_PARTS = {"test", "tests", "__tests__", "mock", "mocks", "testing"}
+
+
+def _is_test_path(path: str | Path) -> bool:
+    """测试/夹具路径：生产扫描默认排除（M79 Uniswap `contracts/test/`）。"""
+    return any(part.lower() in _TEST_PATH_PARTS for part in Path(path).parts)
+
+
 _SECRET_FILE_EXTS = {
     ".py", ".java", ".sol", ".properties", ".yml", ".yaml", ".xml",
     ".json", ".js", ".ts", ".go", ".php", ".rb", ".env", ".conf",
@@ -275,6 +283,53 @@ def _root_cause_key(unit, cat: str) -> tuple[str, str, str]:
     p = str(Path(unit.file_path).resolve())
     return (f"{cat}:{p}:{unit.start_line}:{unit.unit_name}", "endpoint",
             unit.file_path)
+
+
+def _baseline_keys(path: str | Path, repo: Path) -> set[tuple[str, str, str]]:
+    """读 SARIF / --summary-json 基线，返回 (类目, uri, 根因签名) 集合。"""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    keys: set[tuple[str, str, str]] = set()
+    if isinstance(data, dict) and "runs" in data:
+        for run in data.get("runs", []):
+            for r in run.get("results", []):
+                rule = str(r.get("ruleId") or "").upper()
+                locs = r.get("locations") or []
+                uri = ""
+                if locs:
+                    pl = locs[0].get("physicalLocation") or {}
+                    uri = (pl.get("artifactLocation") or {}).get("uri", "")
+                root = (r.get("properties") or {}).get("root_cause")
+                if root:
+                    keys.add((rule, uri, str(root)))
+                unit = (r.get("properties") or {}).get("unit")
+                if unit:
+                    keys.add((rule, uri, str(unit)))
+    elif isinstance(data, dict):
+        for rc in data.get("root_causes", []):
+            keys.add((str(rc.get("category") or "").upper(),
+                      _sarif_rel(rc.get("file", ""), repo),
+                      str(rc.get("signature") or "")))
+    return keys
+
+
+def _apply_baseline(root_causes: list[dict], p0: list[tuple],
+                    path: str | Path, repo: Path) -> tuple[list, list, int, int]:
+    """按 (类目, uri, 根因签名) 抑制存量，返回
+    (new_p0, new_roots, suppressed_routes, suppressed_roots)。"""
+    keys = _baseline_keys(path, repo)
+    kept_roots: list[dict] = []
+    suppressed_routes = 0
+    for rc in root_causes:
+        k = (str(rc["category"]).upper(),
+             _sarif_rel(rc["file"], repo), str(rc["signature"]))
+        if k in keys:
+            suppressed_routes += int(rc["affected_routes"])
+        else:
+            kept_roots.append(rc)
+    kept_sigs = {rc["signature"] for rc in kept_roots}
+    new_p0 = [(u, c) for u, c in p0 if _root_cause_key(u, c)[0] in kept_sigs]
+    return (new_p0, kept_roots, suppressed_routes,
+            len(root_causes) - len(kept_roots))
 
 
 def _build_root_causes(p0: list[tuple]) -> list[dict]:
@@ -364,7 +419,10 @@ def cmd_scan_auto(args, repo: Path):
     units += list(SoliditySlicer(repo).extract_entry_units(repo))
     from core.slicer.java_servlet import JavaSlicer
     units += list(JavaSlicer(repo).extract_entry_units())
-    print(f"      共 {len(units)} 个入口")
+    test_units = [u for u in units if _is_test_path(u.file_path)]
+    units = [u for u in units if not _is_test_path(u.file_path)]
+    print(f"      共 {len(units)} 个入口"
+          + (f"（已排除测试/夹具 {len(test_units)} 个）" if test_units else ""))
 
     web_cats = sorted(c for c in CATEGORIES if c not in _SOLIDITY_AUTO_CATS)
     p0: list[tuple] = []            # [(unit, cat)] 规则实锤
@@ -398,6 +456,12 @@ def cmd_scan_auto(args, repo: Path):
                     if Path(x.file_path).resolve() not in secret_covered]
     p0 += [(u, "hardcoded_secret") for u in secret_units]
     root_causes = _build_root_causes(p0)
+    all_root_causes = list(root_causes)
+    suppressed_routes = 0
+    suppressed_roots = 0
+    if getattr(args, "baseline", None):
+        p0, root_causes, suppressed_routes, suppressed_roots = _apply_baseline(
+            root_causes, p0, args.baseline, repo)
     elapsed_ms = (time.monotonic() - t0) * 1000
     per_unit_ms = elapsed_ms / max(len(units), 1)
     n_pairs = (len(p0) - len(secret_units) + n_false
@@ -412,6 +476,9 @@ def cmd_scan_auto(args, repo: Path):
     if secret_units:
         print(f"      另：配置/工具类硬编码密钥文件 {len(secret_units)} 个"
               "（文件级普查，不计入路由单元）")
+    if getattr(args, "baseline", None):
+        print(f"      基线抑制 {suppressed_roots} 个独立根因 / "
+              f"{suppressed_routes} 条路由级命中；本次净增 {len(p0)} 条")
 
     # --- 产出（P0 落报告；模型候选在 --offline 下标 P2 待复核）---
     lines = [f"# 野战扫描报告（--auto 全类目普查）—— {repo}", "",
@@ -421,6 +488,11 @@ def cmd_scan_auto(args, repo: Path):
              f"规则排除：{n_false}",
              f"- Sink 漏斗：过滤 {n_filtered}，模型候选 {len(model_candidates)}"
              f"（过滤率 {filter_rate:.0%}）"]
+    if test_units:
+        lines.append(f"- 已排除测试/夹具路径：{len(test_units)} 个入口")
+    if getattr(args, "baseline", None):
+        lines.append(f"- 基线抑制：{suppressed_roots} 个独立根因 / "
+                     f"{suppressed_routes} 条路由级命中；本次净增 {len(p0)} 条")
     if secret_units:
         lines.append(f"- 文件级硬编码密钥：{len(secret_units)} 个"
                      "（配置/工具类，不占路由入口）")
@@ -505,6 +577,7 @@ def cmd_scan_auto(args, repo: Path):
         summary = {
             "repo": str(repo),
             "total_units": len(units),
+            "test_units_skipped": len(test_units),
             "total_pairs_evaluated": n_pairs,
             # 兼容既有门禁：p0_confirmed 仍是路由级命中数。
             "p0_confirmed": len(p0),
@@ -531,6 +604,10 @@ def cmd_scan_auto(args, repo: Path):
             } for u, cat in model_candidates[:20]],
             "patches_verified": patches_verified,
             "pocs_generated": pocs_generated,
+            "baseline": str(getattr(args, "baseline", "") or ""),
+            "suppressed_by_baseline": suppressed_routes,
+            "suppressed_root_causes": suppressed_roots,
+            "new_findings": len(p0),
             "elapsed_ms": round(elapsed_ms, 1),
         }
         Path(args.summary_json).write_text(
@@ -675,11 +752,21 @@ def build_sarif(entries: list[dict], repo: str | Path = ".") -> dict:
     """
     rules: dict[str, dict] = {}
     results: list[dict] = []
+    from core.context.cvss import compute_cvss31
     for e in entries:
         cat = str(e.get("category") or "UNKNOWN").upper()
         if cat not in rules:
-            rules[cat] = {"id": cat,
-                          "shortDescription": {"text": f"{cat} 漏洞候选"}}
+            cvss = compute_cvss31(cat.lower())
+            rules[cat] = {
+                "id": cat,
+                "shortDescription": {"text": f"{cat} 漏洞候选"},
+                # GitHub Code Scanning 原生读取 security-severity（0.0–10.0）
+                "properties": {
+                    "security-severity": f"{cvss['score']:.1f}",
+                    "cvss": cvss["vector"],
+                    "severity": cvss["severity"],
+                },
+            }
         uri = _sarif_rel(e.get("file", "."), repo)
         line = int(e.get("line") or 1)
         phys = {"artifactLocation": {"uri": uri},
@@ -690,6 +777,10 @@ def build_sarif(entries: list[dict], repo: str | Path = ".") -> dict:
                # M60：置信度分档进 properties（GitHub Code Scanning 会透出）
                "properties": {"priority": e.get("priority")
                               or ("P0" if e.get("level") != "note" else "P2"),
+                              **({"unit": e["unit"]} if e.get("unit") else {}),
+                              **({"security-severity":
+                                  f"{compute_cvss31(cat.lower())['score']:.1f}"}
+                                 if e.get("level") != "note" else {}),
                               **({"affected_routes_count":
                                   int(e["affected_routes_count"])}
                                  if e.get("affected_routes_count") else {}),
@@ -888,6 +979,13 @@ def cmd_scan_java(args, repo: Path):
         print(f"      反方挑刺：推翻 {len(skeptic_rejected)} 项，保留 {len(model_flagged)} 项")
 
     print(f"      命中 {len(flagged)} 处")
+    if getattr(args, "baseline", None):
+        _keys = _baseline_keys(args.baseline, repo)
+        _before = len(flagged)
+        flagged = [(u, c) for u, c in flagged
+                   if (c.upper(), _sarif_rel(u.file_path, repo),
+                       u.unit_name) not in _keys]
+        print(f"      基线抑制 {_before - len(flagged)} 条；本次净增 {len(flagged)} 条")
     if failed:
         print(f"      [警告] {len(failed)} 项判定失败（不计为无漏洞，需重跑）："
               f"{', '.join(f'{u.unit_name}:{c}' for u, c in failed[:5])}"
@@ -1176,6 +1274,7 @@ def cmd_pr_scan(args):
         github_comment=getattr(args, "github_comment", False),
         sarif=getattr(args, "sarif", None),
         html=getattr(args, "html", None),
+        baseline=getattr(args, "baseline", None),
         auto=getattr(args, "auto", False))
     print("\n进入审计（仅上述受影响路由）...")
     cmd_scan_java(ns, repo)
@@ -1463,6 +1562,7 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
             and not _looks_solidity(u.source_code)]
     n = 0
     report: list[str] = ["# 补丁自检（Python 参数化 / Solidity CEI）", ""]
+    n += _fix_jwt_weakness(repo, units, report)
     if py:
         n += _fix_python_sqli(repo, py, report)
         n += _fix_python_deserial(repo, py, report)
@@ -2453,6 +2553,89 @@ def _ensure_os_import(lines: list[str]) -> list[str]:
     return lines
 
 
+def _fix_jwt_weakness(repo: Path, targets: list, lines: list) -> int:
+    """第 17 类补丁（M82）：关验签/alg none/未签名解析器 → 强制验签。
+
+    Python：`verify_signature: False` → True；`verify=False` → True；
+            `algorithms=["none"]` → `["HS256"]`。
+    Java：`parseClaimsJwt(` → `setSigningKey(env).parseClaimsJws(`。
+    写入后重切片、重跑规则翻 False，finally 字节级还原。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    by_file: dict[Path, object] = {}
+    for u in targets:
+        if rule_verdict("jwt_weakness", u.source_code) is not True:
+            continue
+        by_file.setdefault(Path(u.file_path), u)
+    fixed = 0
+    for path, rep in by_file.items():
+        with open(path, encoding="utf-8", errors="replace", newline="") as fh:
+            original = fh.read()
+        patched = original
+        if path.suffix == ".py":
+            patched = re.sub(
+                r'(["\'])verify_signature\1\s*:\s*False',
+                lambda m: f'{m.group(1)}verify_signature{m.group(1)}: True',
+                patched)
+            patched = re.sub(r"\bverify\s*=\s*False", "verify=True", patched)
+            patched = re.sub(
+                r"(algorithms\s*=\s*\[)([^\]]*)(\])",
+                lambda m: (m.group(1)
+                           + m.group(2).replace('"none"', '"HS256"')
+                           .replace("'none'", "'HS256'")
+                           + m.group(3)), patched)
+        else:
+            if "setSigningKey" not in patched:
+                patched = re.sub(
+                    r"Jwts\s*\.\s*parser\s*\(\s*\)",
+                    'Jwts.parser().setSigningKey('
+                    'System.getenv("JWT_SECRET"))', patched)
+            patched = re.sub(r"\.parseClaimsJwt\s*\(", ".parseClaimsJws(",
+                             patched)
+        if patched == original:
+            lines += [f"## [jwt_weakness] `{path.name}`",
+                      "- 未找到可确定性替换的验签开关，跳过", ""]
+            continue
+        try:
+            with open(path, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            if path.suffix == ".py":
+                from core.slicer.web_treesitter import WebTreeSitterSlicer
+                fresh = {x.unit_name: x for x in
+                         WebTreeSitterSlicer(repo).extract_entry_units(repo)}
+            else:
+                from core.context.java_impl_resolver import _FILE_CACHE
+                _FILE_CACHE.clear()
+                from core.slicer.java_servlet import JavaSlicer
+                fresh = {x.unit_name: x for x in
+                         JavaSlicer(repo).extract_entry_units()}
+            u2 = fresh.get(rep.unit_name)
+            v2 = (rule_verdict("jwt_weakness", u2.source_code) if u2 else None)
+        finally:
+            with open(path, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            if path.suffix != ".py":
+                from core.context.java_impl_resolver import _FILE_CACHE
+                _FILE_CACHE.clear()
+        rel = path.relative_to(repo).as_posix() if path.is_relative_to(repo) \
+            else path.name
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(
+                original.splitlines(), patched.splitlines(),
+                fromfile=f"a/{rel}", tofile=f"b/{rel}", lineterm="")
+            lines += [f"## [jwt_weakness] `{rel}`",
+                      "```diff", *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 `jwt_weakness` → False。",
+                      "> 验签开关已强制开启 / 算法已限定 HS256；"
+                      "Java 需注入 `JWT_SECRET` 环境变量。", ""]
+        else:
+            lines += [f"## [jwt_weakness] `{rel}`",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）",
+                      ""]
+    return fixed
+
+
 def _fix_hardcoded_secret(repo: Path, targets: list, lines: list) -> int:
     """补丁第 15 类（Module 68）：硬编码密钥改环境变量读取。
 
@@ -2930,7 +3113,7 @@ DOCTOR_PATCHERS = [
     "_fix_python_yaml", "_fix_solidity_reentrancy", "_fix_solidity_initiator",
     "_fix_solidity_onlyowner", "_fix_solidity_txorigin", "_fix_mp_concat",
     "_fix_solidity_arith_guard", "_fix_solidity_unchecked_wrap",
-    "_fix_hardcoded_secret", "_fix_cors_config",
+    "_fix_hardcoded_secret", "_fix_cors_config", "_fix_jwt_weakness",
 ]
 
 
@@ -2948,7 +3131,7 @@ def cmd_doctor(args) -> int:
     """只读自检：依赖 / 规则注册表 / 缓存指纹 / 补丁器就位。exit 0 = 全部就绪。"""
     ok = True
 
-    print("== [1/5] 依赖就位 ==")
+    print("== [1/6] 依赖就位 ==")
     print(f"  [OK] python {sys.version.split()[0]}")
     for name in ["httpx", "tree_sitter(可选·缺省正则降级)", "pyyaml(可选)", "slither(可选)"]:
         try:
@@ -2960,7 +3143,7 @@ def cmd_doctor(args) -> int:
             if "(可选" not in name:
                 ok = False
 
-    print("== [2/5] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
+    print("== [2/6] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
     from core.agents import rule_detectors
     for cat in DOCTOR_RULE_CATEGORIES:
         try:
@@ -2974,7 +3157,7 @@ def cmd_doctor(args) -> int:
             print(f"  [FAIL] {cat}: 路由异常 {type(e).__name__}: {e}")
             ok = False
     print(f"  共 {len(DOCTOR_RULE_CATEGORIES)} 类，全部走 verdict() 路由")
-    print("== [3/5] 缓存指纹自检 ==")
+    print("== [3/6] 缓存指纹自检 ==")
     try:
         from benchmarks.diag_owasp_sqli_fp import _slicer_fingerprint
         fp1, fp2 = _slicer_fingerprint(), _slicer_fingerprint()
@@ -2987,7 +3170,7 @@ def cmd_doctor(args) -> int:
         print(f"  [FAIL] 指纹不可用: {type(e).__name__}: {e}")
         ok = False
 
-    print(f"== [4/5] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
+    print(f"== [4/6] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
     for fn_name in DOCTOR_PATCHERS:
         fn = globals().get(fn_name)
         if callable(fn):
@@ -3002,6 +3185,7 @@ def cmd_doctor(args) -> int:
         ok = False
 
     ok = _doctor_extended_checks(ok)
+    ok = _doctor_wild_hunt_check(ok)
 
     print("doctor:", "PASS（全部就绪）" if ok else "FAIL（存在缺失项）")
     return 0 if ok else 1
@@ -3016,7 +3200,7 @@ def _doctor_extended_checks(ok: bool) -> bool:
     root = Path(__file__).resolve().parent
 
     # ---- 5.1 PoC 合成器：可导入 + 三语言模板自检通过 ----
-    print("== [5/5] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
+    print("== [5/6] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
     print("  -- PoC 合成器 --")
     try:
         from core.sandbox.poc_synthesizer import PocSynthesizer, PocArtifact
@@ -3131,6 +3315,56 @@ def _doctor_extended_checks(ok: bool) -> bool:
     return ok
 
 
+def _doctor_wild_hunt_check(ok: bool) -> bool:
+    """doctor 第六段（M85）：wild_hunt.json ↔ WILD_HUNT_REPORT.md 对账。
+
+    核对核心汇总数字：仓库数、入口总数、独立根因数、零误报计数。
+    报告是给人和上游看的，json 是机器事实源；两者漂了 doctor 当场 FAIL。
+    """
+    root = Path(__file__).resolve().parent
+    print("== [6/6] 野战白皮书对账（wild_hunt.json ↔ WILD_HUNT_REPORT.md）==")
+    agg = root / "benchmarks" / "results" / "wild_hunt.json"
+    report = root / "WILD_HUNT_REPORT.md"
+    if not agg.exists() or not report.exists():
+        print(f"  [FAIL] 缺少 {agg.name} 或 WILD_HUNT_REPORT.md")
+        return False
+    try:
+        data = json.loads(agg.read_text(encoding="utf-8"))
+        repos = data.get("repos", [])
+        n_repos = len(repos)
+        n_units = sum(int(r.get("summary", {}).get("total_units") or 0)
+                      for r in repos)
+        n_roots = sum(int(r.get("p0_unique_root_causes")
+                          or r.get("summary", {})
+                          .get("p0_unique_root_causes") or 0)
+                      for r in repos)
+        n_fp = sum(int((r.get("benchmark") or {}).get("fp") or 0)
+                   for r in repos)
+        text = report.read_text(encoding="utf-8")
+        missing = []
+        for label, needle in (
+                ("仓库数", f"**{n_repos} 个**"),
+                ("入口总数", f"**{n_units:,} 个**"),
+                ("独立根因数", f"**{n_roots} 个**"),
+                ("零误报", "**0 条**")):
+            if needle not in text:
+                missing.append(f"{label}（{needle}）")
+        print(f"  json：{n_repos} 仓 / {n_units:,} 入口 / "
+              f"{n_roots} 根因 / {n_fp} 条 benchmark 误报")
+        if n_fp:
+            print(f"  [FAIL] benchmark 误报 {n_fp} 条（应为 0）")
+            ok = False
+        if missing:
+            print("  [FAIL] 报告缺核心数字：" + "；".join(missing))
+            ok = False
+        if not missing and not n_fp:
+            print("  [OK]  仓库数 / 入口总数 / 独立根因数 / 零误报 四处一致")
+    except Exception as e:  # noqa: BLE001
+        print(f"  [FAIL] 野战对账异常: {type(e).__name__}: {e}")
+        ok = False
+    return ok
+
+
 def main():
     load_dotenv(Path(__file__).resolve().parent / ".env")
     parser = argparse.ArgumentParser(prog="nexus-audit", description="AI 自动化漏洞挖掘审计框架")
@@ -3165,6 +3399,8 @@ def main():
                         help="M66：输出机器可读的狩猎漏斗统计（Hunt Dossier）")
     p_scan.add_argument("--advisory-dir", default=None, metavar="DIR",
                         help="M77：按独立根因导出 GitHub Security Advisory 草稿")
+    p_scan.add_argument("--baseline", default=None, metavar="PREV.sarif",
+                        help="M84：抑制基线中的存量根因，只报本次净增 P0")
     p_scan.add_argument("--no-llm-cache", dest="no_llm_cache", action="store_true",
                         help="M59：禁用大模型响应磁盘缓存（默认开）")
     p_scan.add_argument("--auto", action="store_true",
@@ -3193,6 +3429,8 @@ def main():
                            "生成补丁并重跑规则自检（写 fix_report.md，不改仓库文件）")
     p_pr.add_argument("--sarif", default=None, metavar="OUT.sarif",
                       help="将命中结果导出为 SARIF v2.1.0（GitHub Code Scanning 格式）")
+    p_pr.add_argument("--baseline", default=None, metavar="PREV.sarif",
+                      help="M84：抑制基线中的存量根因（透传到增量扫描）")
     p_pr.add_argument("--no-llm-cache", dest="no_llm_cache", action="store_true",
                       help="M59：禁用大模型响应磁盘缓存（默认开）")
     p_pr.add_argument("--html", default=None, metavar="OUT.html",

@@ -1,10 +1,10 @@
 # 真实野生开源项目实弹审计档案（WILD_HUNT_REPORT）
 
-**首轮 + 扩军野战：M63–M78｜2026-10-24**
+**首轮 + 扩军野战：M63–M86｜2026-10-24**
 
 > 本档案的 scan / benchmark 数字由 `benchmarks/wild_hunt.py` 实跑产出，落盘在
 > `benchmarks/results/wild_hunt.json` 与 `benchmarks/results/wild_hunt/<项目>/`；
-> 三条自动修复来自单独的 `--fix` 实跑（不混进 scan 漏斗统计）。样本是 9 个
+> 三条自动修复来自单独的 `--fix` 实跑（不混进 scan 漏斗统计）。样本是 11 个
 > **从未为 nexus-audit 改造过**的真实开源仓库，横跨 Java / Python / Solidity
 > 三种语言，不是漏洞靶场：没有 expectedresults、没有作者标注的漏洞行、
 > 没有预埋的测试夹具。
@@ -15,9 +15,9 @@
 
 | 指标 | 数值 |
 |---|---|
-| 真实仓库 | **9 个**（Java 7 + Python 1 + Solidity 1） |
-| 路由/合约入口 | **1,478 个** |
-| 规则层判定对（unit × 类目） | **21,332 次** |
+| 真实仓库 | **11 个**（Java 7 + Python 2 + Solidity 2） |
+| 路由/合约入口 | **1,554 个** |
+| 规则层判定对（unit × 类目） | **22,808 次** |
 | P0 规则实锤（路由级） | **630 条** |
 | 去重后的独立根因 P0 | **42 个**（4 份全局 CORS + 38 条端点/文件级） |
 | 其中：全局 CORS 配置继承 | **592 条路由 / 4 个根因**（非 592 个独立缺陷） |
@@ -25,14 +25,14 @@
 | 人工复核后确认缺陷 | **626 条** |
 | 设计功能 / 流程待确认（单列、不静默） | 4 条（RuoYi 管理员建表 1；eladmin 找回密码流程 3） |
 | 确认的规则层误报 | **0 条** |
-| 二级 Sink 漏斗派发模型 | **0 条**（mall 的 2 条支付 SDK 候选已确定性判 False） |
-| 漏斗过滤率 | **100%**（16,007 / 16,007） |
+| 二级 Sink 漏斗派发模型 | **0 条**（17,317 条假候选全过滤；Uniswap/FastAPI 新增 1,310 条同样 0 派发） |
+| 漏斗过滤率 | **100%**（17,317 / 17,317） |
 | 自动修复自检通过 | **3 条**（litemall CORS 配置 + JWT 密钥；Employee 弱密钥） |
-| `benchmark_* --strict` | **9/9 exit 0**（零误报 / 零漏报 / 零判反） |
-| 规则普查耗时 | **21.6 s**（21,332 次判定）；含冷切片总墙钟 **62.8 s** |
+| `benchmark_* --strict` | **11/11 exit 0**（零误报 / 零漏报 / 零判反） |
+| 规则普查耗时 | **13.2 s**（22,808 次判定）；含冷切片总墙钟 **71.3 s** |
 
-一句话：**在 1,478 个从未见过的真实入口上，规则层没有确认误报；42 个独立
-根因替代了 630 张重复卡片，二级漏斗把 16,007 条假候选全部挡在模型之外。**
+一句话：**在 1,554 个从未见过的真实入口上，规则层没有确认误报；42 个独立
+根因替代了 630 张重复卡片，二级漏斗把 17,317 条假候选全部挡在模型之外。**
 
 ---
 
@@ -60,24 +60,27 @@ python cli.py scan <repo> --auto --offline \
 
 ---
 
-## 2. 九项目总表
+## 2. 十一项目总表
 
 | 项目 | 技术栈 | 入口 | 判定对 | P0 | 根因 | CORS | 非 CORS | 过滤 | 规则耗时 | 墙钟 | strict |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| newbee-mall | Spring Boot + Thymeleaf + MyBatis | 73 | 1,387 | 6 | 6 | 0 | 6 | 100% | 2,205 ms | 3.8 s | ✔ |
-| newbee-mall-api | Spring Boot + JWT + MyBatis | 62 | 1,178 | 66 | 5 | 62 | 4 | 100% | 553 ms | 2.1 s | ✔ |
-| RuoYi | Spring Boot + Shiro + MyBatis 多模块 | 305 | 5,795 | 1 | 1 | 0 | 1 | 100% | 4,949 ms | 14.6 s | ✔ |
-| eladmin-mp | Spring Security + MyBatis-Plus | 65 | 1,235 | 76 | 12 | 65 | 11 | 100% | 2,065 ms | 4.3 s | ✔ |
-| mall | Spring Boot + MyBatis Generator | 246 | 4,674 | 253 | 8 | 246 | 7 | 100% | 1,580 ms | 9.1 s | ✔ |
-| My-Blog | Spring Boot + Thymeleaf + MyBatis | 54 | 1,026 | 3 | 3 | 0 | 3 | 100% | 7,764 ms | 9.0 s | ✔ |
-| litemall | Spring Boot 多模块 + 微信小程序 | 219 | 4,161 | 223 | 5 | 219 | 4 | 100% | 2,240 ms | 18.0 s | ✔ |
-| Employee-Management-System | Flask + Flask-SQLAlchemy + Jinja2 | 4 | 76 | 2 | 2 | 0 | 2 | 100% | 30 ms | 0.4 s | ✔ |
-| Compound | Solidity 0.5/0.6 生产 DeFi | 450 | 1,800 | 0 | 0 | 0 | 0 | 100% | 251 ms | 1.4 s | ✔ |
-| **合计** | — | **1,478** | **21,332** | **630** | **42** | **592** | **38** | **100%** | **21.6 s** | **62.8 s** | **9/9** |
+| newbee-mall | Spring Boot + Thymeleaf + MyBatis | 73 | 1,460 | 6 | 6 | 0 | 6 | 100% | 1,875 ms | 3.2 s | ✔ |
+| newbee-mall-api | Spring Boot + JWT + MyBatis | 62 | 1,240 | 66 | 5 | 62 | 4 | 100% | 511 ms | 1.9 s | ✔ |
+| RuoYi | Spring Boot + Shiro + MyBatis 多模块 | 305 | 6,100 | 1 | 1 | 0 | 1 | 100% | 2,285 ms | 16.4 s | ✔ |
+| eladmin-mp | Spring Security + MyBatis-Plus | 65 | 1,300 | 76 | 12 | 65 | 11 | 100% | 1,486 ms | 3.5 s | ✔ |
+| mall | Spring Boot + MyBatis Generator | 246 | 4,920 | 253 | 8 | 246 | 7 | 100% | 2,539 ms | 13.1 s | ✔ |
+| My-Blog | Spring Boot + Thymeleaf + MyBatis | 54 | 1,080 | 3 | 3 | 0 | 3 | 100% | 667 ms | 1.9 s | ✔ |
+| litemall | Spring Boot 多模块 + 微信小程序 | 219 | 4,380 | 223 | 5 | 219 | 4 | 100% | 3,507 ms | 29.0 s | ✔ |
+| Employee-Management-System | Flask + Flask-SQLAlchemy + Jinja2 | 4 | 80 | 2 | 2 | 0 | 2 | 100% | 25 ms | 0.3 s | ✔ |
+| Compound | Solidity 0.5/0.6 生产 DeFi | 450 | 1,800 | 0 | 0 | 0 | 0 | 100% | 226 ms | 1.2 s | ✔ |
+| Uniswap V3 | Solidity 0.7 生产 DEX | 67 | 268 | 0 | 0 | 0 | 0 | 100% | 53 ms | 0.4 s | ✔ |
+| FastAPI | FastAPI + async SQLAlchemy 2.0 | 9 | 180 | 0 | 0 | 0 | 0 | 100% | 32 ms | 0.3 s | ✔ |
+| **合计** | — | **1,554** | **22,808** | **630** | **42** | **592** | **38** | **100%** | **13.2 s** | **71.3 s** | **11/11** |
 
-> 墙钟含冷切片；规则耗时是 `cmd_scan_auto` 的 22 类判定本身。`根因` 列是
+> 墙钟含冷切片；规则耗时是 `cmd_scan_auto` 的 23 类判定本身。`根因` 列是
 > M71 折叠后的独立根因（CORS 同配置合 1，端点/文件级各 1）。`mall` 的 2 条
-> 支付 SDK 候选已在 M74 判 False，因此 9 仓合计派发模型 **0 条**。
+> 支付 SDK 候选已在 M74 判 False，`UniswapV3`/`FastAPI` 新增 1,310 条假候选
+> 也全部被漏斗过滤，因此 11 仓合计派发模型 **0 条**。
 
 ---
 
@@ -277,6 +280,37 @@ flowchart LR
 
 ---
 
+### 4.10 Uniswap V3（67 入口 / 0 条 P0）—— 自定义状态互斥锁
+
+`uniswap-v3-core/contracts/` 排除 `contracts/test/` 后 67 个生产入口、268 次
+判定，四类 Solidity 判据 **0 条 True**。关键不是"没报"，而是：
+
+| 函数 | `lock()` 结构 | reentrancy |
+|---|---|---|
+| `UniswapV3Pool.mint` | `require(slot0.unlocked)` + `slot0.unlocked=false` + `_;` + `=true` | False |
+| `burn` / `swap` / `flash` / `collect` | 同上 | False |
+
+规则在 `modifier` **体**上识别"前检 → 加锁 → `_;` → 解锁"，不认
+`nonReentrant` 名字；只有赋值、没有前置检查的 modifier 不算锁（冒烟 `[116]`
+正反断言）。67 个入口中 `FullMath`/`TickMath`/`SqrtPriceMath` 等库函数也
+全部零算术误报。
+
+### 4.11 FastAPI（9 入口 / 0 条 P0）—— async + Depends + SQLAlchemy 2.0
+
+`fastapi-sql-template` 是分层 FastAPI 模板：`async def` 路由、`APIRouter`、
+`Depends(require_superuser)`、`AsyncSession.execute(select(...))`。
+
+- 9 个异步入口全部被 Web 切片器识别（含 `router = APIRouter()` 与
+  `@router.get/post/put/delete`）；
+- 5 个 users 管理端入口的 `Depends(require_superuser)` 被识别为框架级授权
+  声明 → `authz=False`；`Depends(get_current_user)` 只作为主体注入，不直接
+  判安全（保留 BOLA 的 None 语义）；
+- `session.execute(select(UserModel).where(...))` 被识别为 SQLAlchemy 2.0
+  绑定参数表达式 → `sqli=False`，不再把 ORM 表达式误当 SQL 文本拼接；
+- 全类目 0 条 True，接入 `run_all` 第 27 项与冒烟 `[117]`。
+
+---
+
 ## 5. 自动修复：3 条真实仓库补丁
 
 M75 第 16 类补丁器把全局 CORS 通配降为固定白名单，M68 第 15 类补丁器把
@@ -343,7 +377,7 @@ Employee 弱密钥补丁：
 ## 6. 误报审计：本轮抓出并修掉的五个通用机制
 
 M69/M74 的价值不只在"扫出多少"，更在**真实项目把规则的宽形态打回原形**。
-本轮修掉的五个机制都不是项目特判：
+本轮修掉的七个机制都不是项目特判：
 
 1. **SpEL 的裸 `.getValue()`**（RuoYi 2 条 FP）
    `Cookie.getValue()` / `Map.Entry.getValue()` 被当成 SpEL Sink。修法：
@@ -368,16 +402,26 @@ M69/M74 的价值不只在"扫出多少"，更在**真实项目把规则的宽�
    `app.secret_key = "123"` 是会话签名上下文，旧规则只认
    `config['SECRET_KEY']`/JWT，且要求值 ≥4 字符；补 `app.secret_key`
    上下文并把最小值降到 1，弱密钥才被判 True。
+6. **SQLAlchemy 2.0 表达式被当成 SQL 文本**（FastAPI 4 条 FP）
+   `session.execute(select(UserModel).where(...))` 是绑定参数表达式，
+   不是字符串拼接。修法：`execute(` 首参以 `select/insert/update/delete`
+   开头时判 `False`；`text("..." + x)` 仍走原拼接判据。
+7. **JWT 未验签解析器**（M81 新增第 23 类）
+   PyJWT `options={"verify_signature": False}` / `verify=False` /
+   `algorithms=["none"]`，JJWT `.parseClaimsJwt(` 与无 `setSigningKey` 的
+   `.parse(` → `True`；`algorithms=["HS256"]`、
+   `.setSigningKey(...).parseClaimsJws(` → `False`。
 
-五个机制修完后，9 个真实仓库 + 全部 25 个靶场的 `--strict` 均零误报、零判反；
-冒烟新增 `[108]`/`[112]`/`[115]` 把 FP 形态与披露去重锁成回归断言。
+七个机制修完后，11 个真实仓库 + 全部 27 个靶场的 `--strict` 均零误报、零判反；
+冒烟新增 `[108]`/`[112]`/`[115]`–`[122]` 把 FP 形态、状态互斥锁、CVSS 与
+基线抑制锁成回归断言。
 
 ---
 
 ## 7. 复现
 
 ```bash
-# 1) 采集 9 个仓库的 scan --auto + benchmark strict 数据
+# 1) 采集 11 个仓库的 scan --auto + benchmark strict 数据
 python benchmarks/wild_hunt.py
 
 # 2) 生成单个仓库的四件套（报告 / HTML / SARIF / 简报）
@@ -397,18 +441,18 @@ python cli.py scan reference_repos/litemall-master --auto --offline --fix \
 python benchmarks/run_all.py --offline --jobs 4
 ```
 
-环境：Python 3.14 / Windows；9 个仓库以 `git clone --depth 1` 放到
+环境：Python 3.14 / Windows；11 个仓库以 `git clone --depth 1` 放到
 `reference_repos/`，规则层完全离线。
 
 ---
 
 ## 8. 结论与边界
 
-**结论**：在 1,478 个从未见过的真实入口（Java 7 仓 + Python 1 仓 +
-Solidity 1 仓）上，规则层确认误报 0 条；M71 根因折叠把 630 条路由级 P0
+**结论**：在 1,554 个从未见过的真实入口（Java 7 仓 + Python 2 仓 +
+Solidity 2 仓）上，规则层确认误报 0 条；M71 根因折叠把 630 条路由级 P0
 收敛为 42 个独立根因（4 份全局 CORS + 38 条端点/文件级）；二级漏斗把
-16,007 条"无外部输入流向 Sink"的假候选全部挡在模型之外（100%），M74 又把
-mall 仅剩的 2 条支付 SDK 候选确定性判 False，9 仓合计模型派发 **0 条**。
+17,317 条"无外部输入流向 Sink"的假候选全部挡在模型之外（100%），M74 又把
+mall 仅剩的 2 条支付 SDK 候选确定性判 False，11 仓合计模型派发 **0 条**。
 自动修复闭环在真实仓库上产出并验证了 3 条补丁（litemall CORS + JWT 密钥、
 Employee 弱密钥）。
 
@@ -420,7 +464,7 @@ Employee 弱密钥）。
 - 设计功能（RuoYi 管理员建表）与流程语义（eladmin 找回密码）单列，
   不混进"确认缺陷"；
 - Compound 只扫生产 `contracts/`，`tests/` 下的 harness 故意暴露 admin
-  setter，不属生产面；
+  setter，不属生产面；Uniswap 同样排除 `contracts/test/`（123 个测试入口）；
 - 模型层未参与本轮数字；披露草稿是人工复核前的 GHSA 模板，提交上游前
   仍需维护者确认。
 

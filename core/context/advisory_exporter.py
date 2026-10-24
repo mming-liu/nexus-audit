@@ -18,6 +18,7 @@ import re
 from pathlib import Path
 
 from core.agents.vuln_categories import CATEGORIES
+from core.context.cvss import compute_cvss31
 from core.context.taint_graph import build_taint_graph
 from core.sandbox.poc_synthesizer import PocSynthesizer
 
@@ -76,6 +77,8 @@ def export_advisories(root_causes: list[dict], repo: Path,
         cat = rc["category"]
         rep = rc["representative"]
         cwe = CATEGORIES[cat].cwe if cat in CATEGORIES else "CWE-000"
+        cvss = compute_cvss31(cat, rc["unit_name"],
+                              rc["kind"] == "global-config")
         rel = _rel(rc["file"], repo)
         comp = Path(rc["file"]).name
         graph = build_taint_graph(rep, cat) or _fallback_flow(rc)
@@ -95,6 +98,7 @@ def export_advisories(root_causes: list[dict], repo: Path,
         body = f"""# {cwe} · {cat} in {comp}
 
 **{_ghsa_id(rc["signature"])}** ｜ 规则层 P0 ｜ {rc["kind"]}
+**CVSS v3.1：{cvss["score"]:.1f} {cvss["severity"]}** ｜ `{cvss["vector"]}`
 
 ## Affected Component
 

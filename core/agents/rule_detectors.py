@@ -3437,6 +3437,52 @@ SECRET_JWT_CTX_RE = re.compile(
     r"|config\s*\[[^\]\n]*SECRET_KEY|app\s*\.\s*secret_key", re.I)
 
 
+def jwt_weakness_verdict(source: str) -> bool | None:
+    """JWT 验签绕过（M81）：显式关验签/允许 none/未签名解析器 → True。
+
+    Python PyJWT：
+      · `jwt.decode(..., options={"verify_signature": False})` → True
+      · `jwt.decode(..., verify=False)` → True
+      · `jwt.decode(..., algorithms=["none"])` → True
+      · 指定 HS256/RS256 且未关验签 → False（安全）
+    Java JJWT/Auth0：
+      · `.parseClaimsJwt(`（unsecured parser）→ True
+      · `Jwts.parser().parse(` 且无 `setSigningKey` → True
+      · `.setSigningKey(...).parseClaimsJws(` → False
+    无 JWT 解析调用 → None。
+    """
+    weak = False
+    seen = False
+    for m in re.finditer(r"\bjwt\s*\.\s*decode\s*\(", source):
+        seen = True
+        args = _balanced_cond(source, m.end())
+        if args is None:
+            continue
+        if re.search(r"[\"']verify_signature[\"']\s*:\s*False", args) \
+                or re.search(r"\bverify\s*=\s*False", args) \
+                or re.search(r"[\"']algorithms[\"']\s*:\s*\[[^\]]*"
+                             r"[\"']none[\"']", args, re.I) \
+                or re.search(r"\balgorithms\s*=\s*\[[^\]]*[\"']none[\"']",
+                             args, re.I):
+            weak = True
+    if weak:
+        return True
+
+    # Java：未签名解析器优先于验签解析器
+    if re.search(r"\.parseClaimsJwt\s*\(", source):
+        return True
+    if re.search(r"\.parseClaimsJws\s*\(", source):
+        if re.search(r"setSigningKey|verifyWith", source):
+            return False
+        return None
+    if re.search(r"Jwts\s*\.\s*parser\s*\(|JwtParser", source) \
+            and re.search(r"\.parse\s*\(", source):
+        if re.search(r"setSigningKey|verifyWith", source):
+            return False
+        return True
+    return False if seen else None
+
+
 def hardcoded_secret_verdict(source: str) -> bool | None:
     body = re.sub(r"//[^\n]*", "", source)
     body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
@@ -5194,6 +5240,13 @@ def authz_verdict(source: str) -> bool | None:
     if "@AnonymousAccess" in source:
         return None
 
+    # 1a) FastAPI `Depends(require_superuser)` / `Depends(get_current_user)`
+    #     是框架级认证/权限依赖（M80 实测）。依赖名必须是认证语义；
+    #     只认 `Depends(get_db)` 这类资源依赖时不得误判安全。
+    if re.search(r"Depends\s*\(\s*(?:require|get_current|current_user|auth"
+                 r"|permission|login_required)\w*", body, re.I):
+        return False
+
     # 1) 声明式校验：`@PreAuthorize("hasRole('ADMIN')")` 这类。
     #    注解不在 entry_body 里，必须扫整份切片 —— 但只在**入口方法自身**
     #    的注解范围内找，避免把同文件别的方法的注解算到当前路由头上。
@@ -5518,6 +5571,10 @@ def _py_func_params(source: str) -> set[str]:
 
 
 _PY_SQL_SINK_RE = re.compile(r"\.\s*execute(?:script)?\s*\(|\.\s*executemany\s*\(")
+# SQLAlchemy 2.0 Core/ORM 表达式：`session.execute(select(Model).where(...))`
+# 是绑定参数，不是 SQL 文本（M80 FastAPI 实测）。
+_PY_ORM_EXPR_RE = re.compile(
+    r"^\s*(?:select|insert|update|delete)\s*\(", re.I)
 
 
 def python_sqli_verdict(source: str) -> bool | None:
@@ -5547,6 +5604,9 @@ def python_sqli_verdict(source: str) -> bool | None:
             saw_safe = True            # 带参数元组/字典 → 参数化
             continue
         sql = parts[0].strip()
+        if _PY_ORM_EXPR_RE.match(sql):
+            saw_safe = True            # SQLAlchemy 2.0 表达式，绑定参数
+            continue
         nat = _py_value_text_capable(sql, source, pos=m.start())
         if nat is True:
             return True
@@ -5863,6 +5923,14 @@ def python_authz_verdict(source: str) -> bool | None:
     """Python Authz：FastAPI `Depends(get_current_user)` / Flask
     `@login_required` + 归属比对（current_user.id 参与查询或比较）→ False；
     路由形参直接查改删且无任何主体 → True；其余退 None。"""
+    # FastAPI 依赖注入的认证/权限门（M80）：
+    # `current_user: User = Depends(require_superuser)` 是框架级授权声明；
+    # 但 `Depends(get_current_user)` 只证明"知道是谁"，主体可能继续下沉到
+    # Service 做归属比对 —— 不能直接判安全（否则会吃掉 BOLA 的 None）。
+    body = entry_body(source)
+    if re.search(r"Depends\s*\(\s*(?:require|permission|login_required"
+                 r"|auth_required|authorize)\w*", body, re.I):
+        return False
     has_subject = (_PY_SUBJECT_RE.search(source) is not None
                    or _PY_SUBJECT_RE_JWT.search(source) is not None)
     if has_subject:
@@ -6024,10 +6092,44 @@ def _sol_is_internal_only(sig: str) -> bool:
     return bool(re.search(r"\b(?:internal|private)\b", tail))
 
 
+def _sol_mutex_modifier_names(mod_block: str) -> set[str]:
+    """识别"状态位互斥锁" modifier（M79 UniswapV3 `lock()` 实测）。
+
+    通用结构（不看名字）：
+        require(<state>, ...) / if (<state>) ...   // 前置检查
+        <state> = false;                           // `_` 之前加锁
+        _;
+        <state> = true;                            // `_` 之后解锁
+
+    只认**同一个状态变量**在 `_;` 前后分别被置 false/0 与 true/1，且前面
+    有 require/if 读取；只有赋值没有前检 → 不算锁（防"半吊子互斥"误判安全）。
+    """
+    names: set[str] = set()
+    for mm in re.finditer(r"\bmodifier\s+([A-Za-z_]\w*)\s*(?:\([^)]*\))?"
+                          r"\s*[^{]*\{", mod_block):
+        body = _sol_block_body(mod_block, mm.end() - 1)
+        if not body:
+            continue
+        pre, sep, post = body.partition("_;")
+        if not sep:
+            continue
+        locked = set(re.findall(
+            r"([\w.\[\]]+)\s*=\s*(?:false|0)\s*;", pre))
+        unlocked = set(re.findall(
+            r"([\w.\[\]]+)\s*=\s*(?:true|1)\s*;", post))
+        if not (locked & unlocked):
+            continue
+        if not re.search(r"\b(?:require|if)\s*\(", pre):
+            continue
+        names.add(mm.group(1))
+    return names
+
+
 def solidity_reentrancy_verdict(source: str) -> bool | None:
     """Solidity 重入：CEI 顺序是逐行可核对的事实。
 
     · 签名带 `nonReentrant`（或体内有重入锁）→ False
+    · 签名引用**状态位互斥锁 modifier**（M79：`lock()` 结构）→ False
     · 只读函数（view/pure/constant）→ False（编译器保证不写状态，无重入窗口）
     · 显式 internal/private → False（外部调不到，没有入口就没有重入）
     · 所有外部转账调用的行号**严格大于**状态扣减行号 → False（CEI 正序）
@@ -6038,13 +6140,18 @@ def solidity_reentrancy_verdict(source: str) -> bool | None:
     （0.4.x 时代的主流写法）必须与 `.call{value:` 同等对待，否则
     PrivateBank/CashOut、SimpleBank/Collect 这批经典真漏洞全部静默退回。
     """
-    func_src, _mod_block = _split_sol_modifier_block(source)
+    func_src, mod_block = _split_sol_modifier_block(source)
     sig = _sol_signature(func_src)
     if _sol_is_readonly(sig) or _sol_is_internal_only(sig):
         return False
     if re.search(r"\bnonReentrant\b|locked|entered|_status\s*==\s*1|_reentrancyGuard",
                  func_src):
         return False
+    # M79：自定义状态位互斥锁（UniswapV3 `lock()`）—— 看 modifier 体结构，
+    # 不看名字；只有签名真的引用了该 modifier 才生效。
+    for mname in _sol_mutex_modifier_names(mod_block):
+        if re.search(rf"\b{re.escape(mname)}\b", sig):
+            return False
     # 外部调用分类：硬外转（可携带任意 gas，回调能重入）vs 津贴外转。
     # `.transfer(x)` / `.send(x)` 单参形态是 address 内建方法 —— EVM 固定
     # 只给 2300 gas 津贴，fallback 连发起一次新的外部调用都不够，重入在
@@ -8065,6 +8172,9 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category == "hardcoded_secret":
         return hardcoded_secret_verdict(source)
+
+    if category == "jwt_weakness":
+        return jwt_weakness_verdict(source)
 
     if category == "cmdi":
         if _looks_python(source):

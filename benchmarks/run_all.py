@@ -36,7 +36,7 @@ SCOREBOARD = ROOT / "benchmarks" / "results" / "SCOREBOARD.md"
 # (名称, 命令, 前置目录检查, 类别, 可并发)
 #   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
 JOBS = [
-    ("冒烟测试 [1]-[115]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
+    ("冒烟测试 [1]-[122]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke", False),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target", True),
@@ -138,6 +138,16 @@ JOBS = [
     ("compound-protocol (Solidity 生产协议)",
      ["benchmarks/benchmark_compound.py", "--strict"],
      "reference_repos/compound-protocol/contracts", "target", True),
+    # 第 27 靶场（Module 79）：Uniswap V3 生产 contracts/。
+    # 自定义状态互斥锁 lock() 通用识别；67 入口 / 0 True。
+    ("uniswap-v3-core (Solidity DEX)",
+     ["benchmarks/benchmark_uniswapv3.py", "--strict"],
+     "reference_repos/uniswap-v3-core/contracts", "target", True),
+    # 第 28 靶场（Module 80）：FastAPI async + Depends + SQLAlchemy 2.0。
+    # 9 异步入口 / users 全 authz False / 0 True。
+    ("FastAPI (Python 异步真实模板)",
+     ["benchmarks/benchmark_fastapi_wild.py", "--strict"],
+     "reference_repos/fastapi-sql-template", "target", True),
 ]
 
 
@@ -205,6 +215,8 @@ def build_scoreboard() -> str:
         ("mall (生产级多模块对照)", "mall.json", "total_units"),
         ("WebGoat (教学关卡成对真值)", "webgoat.json", "total_units"),
         ("compound-protocol (Solidity 生产协议)", "compound.json", "total_units"),
+        ("uniswap-v3-core (Solidity DEX)", "uniswapv3.json", "total_units"),
+        ("FastAPI (Python 异步真实模板)", "fastapi_wild.json", "total_units"),
     ]
     total_fp = total_rev = 0
     for label, fname, unit_key in WHITELIST:

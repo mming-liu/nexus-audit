@@ -4375,9 +4375,9 @@ _sp86 = subprocess.run(
      "doctor"], capture_output=True, text=True)
 check("M42：doctor exit 0（依赖/规则表/指纹/补丁器全就绪）",
       _sp86.returncode, 0)
-check("M42：doctor 输出含五段自检 + PASS 尾标（M50 升段）",
+check("M42：doctor 输出含六段自检 + PASS 尾标（M85 升段）",
       all(s in _sp86.stdout for s in
-          ("[1/5]", "[2/5]", "[3/5]", "[4/5]", "[5/5]", "PASS")), True)
+          ("[1/6]", "[2/6]", "[3/6]", "[4/6]", "[5/6]", "[6/6]", "PASS")), True)
 check(f"M42：doctor 规则注册表 {len(_CATS)} 类全 OK（从 CATEGORIES 派生，免手工改数）",
       _sp86.stdout.count("  [OK]") >= len(_CATS)
       and f"共 {len(_CATS)} 类" in _sp86.stdout, True)
@@ -4726,9 +4726,9 @@ _sp93 = subprocess.run(
     [sys.executable, str(ROOT / "cli.py"), "doctor"],
     capture_output=True, text=True)
 _out93 = _sp93.stdout
-check("M93：doctor 退出码 0 且五段标题齐全",
+check("M93：doctor 退出码 0 且六段标题齐全",
       (_sp93.returncode == 0
-       and all(f"[{i}/5]" in _out93 for i in range(1, 6))), True)
+       and all(f"[{i}/6]" in _out93 for i in range(1, 7))), True)
 from cli import DOCTOR_PATCHERS as _DP93                            # noqa: E402
 check("M93：doctor 补丁器清单从 DOCTOR_PATCHERS 派生且全绿",
       (_out93.count("[OK] _fix_") == len(_DP93)
@@ -5426,8 +5426,8 @@ finally:
 
 # ---- [106] Module 67：hardcoded_secret 第 22 类规则 ----
 from core.agents.vuln_categories import CATEGORIES as _VC106   # noqa: E402
-check("M106：hardcoded_secret 已注册为第 22 类（doctor 单一事实源）",
-      ("hardcoded_secret" in _VC106 and len(_VC106) == 22), True)
+check("M106：hardcoded_secret 已注册（第 23 类，M81 加 jwt_weakness 后单一事实源）",
+      ("hardcoded_secret" in _VC106 and len(_VC106) == 23), True)
 # VAmPI 形态：Flask SECRET_KEY 短弱密钥（JWT 签名上下文，无长度门槛）
 _vampi106 = ("import jwt\n"
              "vuln_app.app.config['SECRET_KEY'] = 'random'\n"
@@ -5838,6 +5838,247 @@ try:
            and "```diff" in _adv_text), True)
 finally:
     shutil.rmtree(_d115, ignore_errors=True)
+
+# ---- [116] Module 79：Uniswap V3 自定义状态互斥锁 modifier ----
+_MUTEX116 = """pragma solidity ^0.8.0;
+contract P {
+  struct Slot0 { bool unlocked; }
+  Slot0 public slot0;
+  modifier lock() { require(slot0.unlocked, "LOK");
+                    slot0.unlocked = false; _; slot0.unlocked = true; }
+  function mint(address to) external lock {
+    slot0.unlocked = false;
+    to.call("");
+  }
+}
+"""
+check("M116：require+加锁+_;+解锁 的自定义 modifier 判 False",
+      _verdict("reentrancy", _MUTEX116), False)
+_MUTEX116_BAD = """pragma solidity ^0.8.0;
+contract P {
+  bool x;
+  modifier lock() { x = false; _; x = true; }
+  function f(address to) external lock { to.call(""); }
+}
+"""
+check("M116：只有赋值、没有前置检查的 modifier 不算锁",
+      (_verdict("reentrancy", _MUTEX116_BAD) is not False), True)
+_univ116 = ROOT / "reference_repos" / "uniswap-v3-core" / "contracts"
+if _univ116.exists():
+    _r116 = subprocess.run(
+        [sys.executable, str(ROOT / "benchmarks" / "benchmark_uniswapv3.py"),
+         "--strict"], capture_output=True, text=True, encoding="utf-8")
+    check("M116：Uniswap V3 生产 67 入口 / 0 True 误报",
+          (_r116.returncode == 0
+           and "生产入口              ：67" in (_r116.stdout or "")
+           and "规则层 True（误报）   ：0" in (_r116.stdout or "")), True)
+    check("M116：mint/burn/swap/flash/collect 的 reentrancy 全 False",
+          all(f"'{x}': False" in (_r116.stdout or "")
+              for x in ("mint", "burn", "swap", "flash", "collect")), True)
+else:
+    print("  -- uniswap-v3-core 不在 reference_repos，跳过 M116 E2E")
+
+# ---- [117] Module 80：FastAPI async + Depends + SQLAlchemy 2.0 ----
+_fast117 = ROOT / "reference_repos" / "fastapi-sql-template"
+if _fast117.exists():
+    _r117 = subprocess.run(
+        [sys.executable, str(ROOT / "benchmarks" /
+                          "benchmark_fastapi_wild.py"), "--strict"],
+        capture_output=True, text=True, encoding="utf-8")
+    _s117 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_fast117),
+         "--auto", "--offline", "--summary-json", str(_fast117 / ".s117.json"),
+         "--output", str(_fast117 / ".r117.md")],
+        capture_output=True, text=True, encoding="utf-8")
+    _j117 = json.loads((_fast117 / ".s117.json").read_text(encoding="utf-8"))
+    check("M117：FastAPI benchmark --strict 退出码 0（async 9 入口 / 0 True）",
+          (_r117.returncode == 0
+           and "异步入口              ：9" in (_r117.stdout or "")
+           and "规则层 True（误报）   ：0" in (_r117.stdout or "")), True)
+    check("M117：Depends(require_superuser) 的 5 个 users 入口 authz 全 False",
+          ("'list_users_endpoint': False" in (_r117.stdout or "")
+           and "'delete_user_endpoint': False" in (_r117.stdout or "")), True)
+    check("M117：scan --auto 9 入口 / 0 P0（SQLAlchemy 2.0 表达式零误报）",
+          (_j117["total_units"], _j117["p0_confirmed"]), (9, 0))
+    for _p117 in (_fast117 / ".s117.json", _fast117 / ".r117.md"):
+        try:
+            _p117.unlink()
+        except OSError:
+            pass
+else:
+    print("  -- fastapi-sql-template 不在 reference_repos，跳过 M117 E2E")
+
+# ---- [118] Module 81：第 23 类 jwt_weakness ----
+check("M118：PyJWT algorithms=['none'] 判 True",
+      _verdict("jwt_weakness",
+               'def f(t):\n    return jwt.decode(t, algorithms=["none"])\n'),
+      True)
+check("M118：PyJWT options={'verify_signature': False} 判 True",
+      _verdict("jwt_weakness",
+               'def f(t):\n    return jwt.decode(t, '
+               'options={"verify_signature": False})\n'), True)
+check("M118：PyJWT verify=False 判 True",
+      _verdict("jwt_weakness",
+               'def f(t):\n    return jwt.decode(t, verify=False)\n'), True)
+check("M118：PyJWT 指定 HS256 且未关验签判 False",
+      _verdict("jwt_weakness",
+               'def f(t):\n    return jwt.decode(t, algorithms=["HS256"])\n'),
+      False)
+check("M118：JJWT parseClaimsJwt 未签名解析器判 True",
+      _verdict("jwt_weakness",
+               'public void f(String t) { Jwts.parser().parseClaimsJwt(t); }\n'),
+      True)
+check("M118：JJWT setSigningKey(...).parseClaimsJws 判 False",
+      _verdict("jwt_weakness",
+               'public void f(String t) { Jwts.parser().setSigningKey(k)'
+               '.parseClaimsJws(t); }\n'), False)
+check("M118：非 JWT 解析调用退 None（不误伤）",
+      _verdict("jwt_weakness", 'public void f() { return; }\n'), None)
+
+# ---- [119] Module 82：第 17 类 JWT 补丁 + alg=none PoC ----
+_d119 = Path(_tmod.mkdtemp(prefix="nexus_t119_"))
+try:
+    (_d119 / "app.py").write_text(
+        "from flask import Flask\nimport jwt\n\napp = Flask(__name__)\n\n"
+        "@app.route(\"/admin\")\ndef admin():\n"
+        "    token = \"abc\"\n"
+        "    return jwt.decode(token, "
+        "options={\"verify_signature\": False})\n", encoding="utf-8")
+    _r119 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d119),
+         "--auto", "--offline", "--fix", "--emit-poc", str(_d119 / "pocs"),
+         "--summary-json", str(_d119 / "s.json"),
+         "--output", str(_d119 / "r.md")],
+        capture_output=True, text=True, encoding="utf-8")
+    _s119 = json.loads((_d119 / "s.json").read_text(encoding="utf-8"))
+    _fix119 = (_d119 / "fix_report_auto.md").read_text(encoding="utf-8")
+    _poc119 = next((_d119 / "pocs").glob("*.py"), None)
+    _poc_text = _poc119.read_text(encoding="utf-8") if _poc119 else ""
+    check("M119：JWT 关验签补丁自检翻转（patches_verified=1）",
+          _s119["patches_verified"], 1)
+    check("M119：补丁把 verify_signature 改成 True",
+          'verify_signature": True' in _fix119, True)
+    check("M119：alg=none PoC 合成并过 ast.parse",
+          (_poc_text and "algorithm=\"none\"" in _poc_text
+           and "def test_alg_none" in _poc_text), True)
+finally:
+    shutil.rmtree(_d119, ignore_errors=True)
+
+# ---- [120] Module 83：CVSS v3.1 进 GHSA / SARIF / HTML ----
+_d120 = Path(_tmod.mkdtemp(prefix="nexus_t120_"))
+try:
+    (_d120 / "CorsConfig.java").write_text(
+        "@Configuration\n"
+        "public class CorsConfig {\n"
+        "  @Bean\n"
+        "  public CorsFilter corsFilter() {\n"
+        "    CorsConfiguration config = new CorsConfiguration();\n"
+        "    config.addAllowedOrigin(\"*\");\n"
+        "    config.setAllowCredentials(true);\n"
+        "    UrlBasedCorsConfigurationSource source ="
+        " new UrlBasedCorsConfigurationSource();\n"
+        "    source.registerCorsConfiguration(\"/**\", config);\n"
+        "    return new CorsFilter(source);\n"
+        "  }\n"
+        "}\n", encoding="utf-8")
+    for i in range(2):
+        (_d120 / f"Api{i}.java").write_text(
+            "@RestController\n"
+            f"public class Api{i} {{\n"
+            f"  @GetMapping(\"/r{i}\")\n"
+            f"  public String r{i}() {{ return \"ok\"; }}\n"
+            "}\n", encoding="utf-8")
+    _r120 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d120),
+         "--auto", "--offline", "--advisory-dir", str(_d120 / "adv"),
+         "--sarif", str(_d120 / "r.sarif"),
+         "--html", str(_d120 / "r.html"),
+         "--summary-json", str(_d120 / "s.json"),
+         "--output", str(_d120 / "r.md")],
+        capture_output=True, text=True, encoding="utf-8")
+    _adv120 = next((_d120 / "adv").glob("*.md"), None)
+    _adv120_t = _adv120.read_text(encoding="utf-8") if _adv120 else ""
+    _sar120 = json.loads((_d120 / "r.sarif").read_text(encoding="utf-8"))
+    _rule120 = _sar120["runs"][0]["tool"]["driver"]["rules"][0]
+    _res120 = _sar120["runs"][0]["results"][0]
+    _html120 = (_d120 / "r.html").read_text(encoding="utf-8")
+    check("M120：GHSA 草稿含 CVSS v3.1 向量与 6.5 MEDIUM",
+          ("CVSS v3.1：6.5 MEDIUM" in _adv120_t
+           and "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:N/A:N"
+           in _adv120_t), True)
+    check("M120：SARIF rule 带 security-severity=6.5 + cvss 向量",
+          (_rule120.get("properties", {}).get("security-severity") == "6.5"
+           and _rule120["properties"].get("cvss", "").startswith("CVSS:3.1/")
+           and _res120["properties"].get("security-severity") == "6.5"), True)
+    check("M120：HTML 卡片展示 6.5 MEDIUM 徽章",
+          ('class="badge sev-medium">6.5 MEDIUM' in _html120), True)
+finally:
+    shutil.rmtree(_d120, ignore_errors=True)
+
+# ---- [121] Module 84：--baseline 增量抑制 ----
+_d121 = Path(_tmod.mkdtemp(prefix="nexus_t121_"))
+try:
+    (_d121 / "CorsConfig.java").write_text(
+        "@Configuration\n"
+        "public class CorsConfig {\n"
+        "  @Bean\n"
+        "  public CorsFilter corsFilter() {\n"
+        "    CorsConfiguration config = new CorsConfiguration();\n"
+        "    config.addAllowedOrigin(\"*\");\n"
+        "    config.setAllowCredentials(true);\n"
+        "    UrlBasedCorsConfigurationSource source ="
+        " new UrlBasedCorsConfigurationSource();\n"
+        "    source.registerCorsConfiguration(\"/**\", config);\n"
+        "    return new CorsFilter(source);\n"
+        "  }\n"
+        "}\n", encoding="utf-8")
+    for i in range(3):
+        (_d121 / f"Api{i}.java").write_text(
+            "@RestController\n"
+            f"public class Api{i} {{\n"
+            f"  @GetMapping(\"/r{i}\")\n"
+            f"  public String r{i}() {{ return \"ok\"; }}\n"
+            "}\n", encoding="utf-8")
+    subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d121),
+         "--auto", "--offline", "--sarif", str(_d121 / "base.sarif"),
+         "--summary-json", str(_d121 / "base.json"),
+         "--output", str(_d121 / "base.md")],
+        capture_output=True, text=True)
+    subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d121),
+         "--auto", "--offline", "--baseline", str(_d121 / "base.sarif"),
+         "--summary-json", str(_d121 / "s2.json"),
+         "--output", str(_d121 / "s2.md")],
+        capture_output=True, text=True)
+    _s121 = json.loads((_d121 / "s2.json").read_text(encoding="utf-8"))
+    check("M121：二次扫描净增 P0=0，基线抑制 1 个根因 / 3 条路由",
+          (_s121["new_findings"], _s121["suppressed_root_causes"],
+           _s121["suppressed_by_baseline"]), (0, 1, 3))
+    (_d121 / "Secret.java").write_text(
+        "public class Secret {\n"
+        "  static final String apiSecret = \"sk_live_1234567890\";\n"
+        "}\n", encoding="utf-8")
+    subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d121),
+         "--auto", "--offline", "--baseline", str(_d121 / "base.sarif"),
+         "--summary-json", str(_d121 / "s3.json"),
+         "--output", str(_d121 / "s3.md")],
+        capture_output=True, text=True)
+    _s121b = json.loads((_d121 / "s3.json").read_text(encoding="utf-8"))
+    check("M121：注入 1 个新密钥后仅报 1 条净增 P0",
+          (_s121b["new_findings"], _s121b["p0_unique_root_causes"]), (1, 1))
+finally:
+    shutil.rmtree(_d121, ignore_errors=True)
+
+# ---- [122] Module 85：doctor 第六段野战白皮书对账 ----
+_r122 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
+                       capture_output=True, text=True, encoding="utf-8")
+check("M122：doctor 第六段存在且整体 exit 0",
+      (_r122.returncode == 0 and "[6/6]" in (_r122.stdout or "")), True)
+check("M122：wild_hunt.json ↔ WILD_HUNT_REPORT 四处核心数字一致",
+      ("仓库数 / 入口总数 / 独立根因数 / 零误报 四处一致"
+       in (_r122.stdout or "")), True)
 
 print()
 if FAILS:

@@ -7,8 +7,8 @@
 `--strict` 离线门禁，`pre-push` 与 `run_all.py`（21 项）各有一道（见
 [多语言靶场](#多语言靶场21-个仓库全部离线门禁)）。
 
-开工前可跑只读自检：`python cli.py doctor` —— 依赖就位 / 22 类规则注册表
-verdict 路由全覆盖 / 缓存指纹算法稳定 / 16 类补丁器就位 / PoC 合成器三语言自检 /
+开工前可跑只读自检：`python cli.py doctor` —— 依赖就位 / 23 类规则注册表
+verdict 路由全覆盖 / 缓存指纹算法稳定 / 17 类补丁器就位 / PoC 合成器三语言自检 /
 覆盖地板达标 / SCOREBOARD 与现算结果同步 / 正则卫生零死正则，五段报告，
 exit 0 即全部就绪。
 
@@ -49,8 +49,8 @@ nexus-audit/
 | `core/context/config_resolver.py` | 解析 .properties/.yaml/.json，把代码里引用的配置键回填进切片 |
 | `core/context/java_impl_resolver.py` | MyBatis 注解/XML、接口实现体的跨文件证据（`#{}` vs `${}` 的真值在这里） |
 | `core/context/taint_chain.py` | 跨路由串接：按介质+键名把「写入点」与「读取点」配对，存储型 XSS 靠它判定 |
-| `core/agents/vuln_categories.py` | 22 类漏洞的 Scenario/Property 定义（11 类 OWASP + Java 生态 + Python Web + Solidity 链上 + 凭证类） |
-| `core/agents/rule_detectors.py` | 客观事实的确定性判定（22 类判据入口，先于 LLM 执行） |
+| `core/agents/vuln_categories.py` | 23 类漏洞的 Scenario/Property 定义（11 类 OWASP + Java 生态 + Python Web + Solidity 链上 + 凭证/JWT 类） |
+| `core/agents/rule_detectors.py` | 客观事实的确定性判定（23 类判据入口，先于 LLM 执行） |
 | `benchmarks/benchmark_owasp.py` | OWASP Benchmark 跑分（TPR/FPR/Score，含断点续跑与误差归因） |
 | `benchmarks/benchmark_javaseccode.py` | 真实项目（java-sec-code）评测，真值取自路由命名 + 作者注释 |
 | `benchmarks/benchmark_vulpy.py` | Python Web 靶场（bad/good 成对真值），`--strict` 零退回门禁 |
@@ -79,15 +79,15 @@ python benchmarks/benchmark_owasp.py --categories sqli,xss --no-rules
 口径：`Score = TPR − FPR`（OWASP 官方）。调用失败的样本会被标记并剔除，
 不计入分数 —— 否则限流会被伪装成极低的误报率。
 
-## 野战模式：一键扫描未知仓库（M58–M77）
+## 野战模式：一键扫描未知仓库（M58–M84）
 
 ```bash
 # 野战一键：全类目规则普查 + 根因折叠 + 确定性补丁 + PoC + 披露草稿 + 四类产物
 python cli.py scan <目标仓库> --auto --fix --emit-poc poc_out \
     --advisory-dir advisories --graph --sarif report.sarif --html report.html
 
-# 断点续扫：LLM 响应按内容寻址落盘（.cache/llm_responses.jsonl），
-# 中断重跑毫秒级命中，不重复消耗 Token；--no-llm-cache 可禁用
+# 增量 CI：只报基线之后的新增根因（存量技术债不刷屏）
+python cli.py scan <目标仓库> --auto --baseline baseline.sarif
 ```
 
 工作方式（两级漏斗，规则先行、模型兜底）：
@@ -102,17 +102,24 @@ python cli.py scan <目标仓库> --auto --fix --emit-poc poc_out \
   （实测过滤率 100%，毫秒级/单元）；
 - **第 16 类补丁（M75）**：全局 CORS 通配 + 凭据 → 固定白名单，一条配置
   补丁消解整组继承路由；
+- **状态互斥锁（M79）**：Solidity 自定义 `modifier lock()`（前检 + 加锁 +
+  `_;` + 解锁）按结构识别为安全，Uniswap V3 67 个生产入口 0 误报；
+- **JWT 验签（M81/M82）**：`jwt_weakness` 命中 `alg=none` / 关验签 /
+  `parseClaimsJwt`；第 17 类补丁器强制验签并重切自检；
+- **CVSS 3.1（M83）**：GHSA/SARIF/HTML 统一输出标准向量、浮点分值与
+  `security-severity`（GitHub Code Scanning 原生徽章）；
+- **增量基线（M84）**：`--baseline prev.sarif` 抑制存量根因，只报本次净增；
 - **披露草稿（M77）**：`--advisory-dir` 按独立根因生成 GHSA 草稿，含
-  Affected Component / CWE / Mermaid / PoC / Verified Patch；
+  Affected Component / CWE / CVSS / Mermaid / PoC / Verified Patch；
 - 报告固定按 **P0 [Confirmed] → P1 [High-Confidence 模型双引证] →
   P2 [Review-Needed 存疑候选]** 三档渲染（Markdown 分区 / HTML 折叠
   卡片 / SARIF `properties.priority`），HTML 为零外部依赖单文件。
 
-九个真实开源项目（1,478 个入口，Java + Python + Solidity 三语言）的实弹数据与逐条源码复核见
+十一个真实开源项目（1,554 个入口，Java 7 + Python 2 + Solidity 2）的实弹数据与逐条源码复核见
 [`WILD_HUNT_REPORT.md`](WILD_HUNT_REPORT.md)；复现脚本
 `benchmarks/wild_hunt.py`（所有数字落盘 `benchmarks/results/wild_hunt.json`）。
 
-## 多语言靶场：25 项离线门禁（22 个靶场 + 冒烟 / 争议 / 地板）
+## 多语言靶场：27 项离线门禁（24 个靶场 + 冒烟 / 争议 / 地板）
 
 ```bash
 # 一键跑全部（不调模型，约 1 分钟；任一靶场 strict 失败即退出非零）
@@ -139,6 +146,8 @@ python benchmarks/benchmark_vulpy.py --strict
 | Java | litemall（20k Star 小程序商城） | M64 盲测逐条人工核查 + 全局 CORS 配置继承 | `--strict` 零误报 / 真值 3/3 |
 | Python | Employee-Management-System（真实 Flask CRUD） | M72 盲测逐条人工核查 | `--strict` 零误报 / 真值 2/2 |
 | Solidity | compound-protocol（生产级 DeFi） | M73 生产 `contracts/` 零 True 压测 | 450 入口 / 四类 0 误报 / 三锚点 False |
+| Solidity | Uniswap V3（生产级 DEX） | M79 自定义状态互斥锁 `lock()` 结构识别 | 67 生产入口 / 0 True / mint/burn/swap/flash/collect 全 False |
+| Python | FastAPI + SQLAlchemy 2.0（真实模板） | M80 async / Depends / ORM 表达式 | 9 异步入口 / 0 True / users authz 全 False |
 | Solidity | damn-vulnerable-defi | 无真值（经济逻辑漏洞） | 健壮性抽检：切片 164 单元、True ≤8 |
 | Solidity | smartbugs-curated | 官方行号 `vulnerabilities.json` | safe 零误报、零判反（parity kill 记 DISPUTED） |
 | Solidity | DeFiVulnLabs | **成对 vuln/fixed，按行号标定** | 零误报 / 零判反 / 真值表全命中（9/9 满贯） |
@@ -155,9 +164,9 @@ python benchmarks/benchmark_vulpy.py --strict
 `pre-push` 会依次跑 **17 道门禁**（14 段靶场基线 + 冒烟 + 争议登记核对 + 覆盖地板）；
 CI 上没有靶场仓库，因此全量 strict 由本地钩子承担（见 `.githooks/pre-push`）。
 
-规则层现状：**22 类判据入口**（`rule_detectors.verdict()` 统一路由，空源码必须
-退 None）+ **16 类确定性补丁器**（命中→补丁→重切片→规则翻 False→finally 字节级
-还原的自检闭环，`--fix` 触发）。冒烟断言 `[1]`-`[115]` 共 678 项，秒级不调模型。
+规则层现状：**23 类判据入口**（`rule_detectors.verdict()` 统一路由，空源码必须
+退 None）+ **17 类确定性补丁器**（命中→补丁→重切片→规则翻 False→finally 字节级
+还原的自检闭环，`--fix` 触发）。冒烟断言 `[1]`-`[122]` 共 702 项，秒级不调模型。
 
 第四层另有 **PoC Harness 合成器**（`--emit-poc`）：把"规则层已判 True 的那条"
 翻译成离线可跑的验证骨架 —— Solidity Foundry `.t.sol` / Python pytest /

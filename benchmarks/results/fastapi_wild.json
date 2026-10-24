@@ -1,0 +1,24 @@
+{
+  "bench": "fastapi_wild",
+  "units": 9,
+  "total_units": 9,
+  "decided": 9,
+  "correct": 9,
+  "fp": 0,
+  "reverse_fn": 0,
+  "authz": {
+    "list_users_endpoint": false,
+    "get_user_endpoint": false,
+    "create_user_endpoint": false,
+    "update_user_endpoint": false,
+    "delete_user_endpoint": false
+  },
+  "sqli": {
+    "list_users_endpoint": false,
+    "get_user_endpoint": false,
+    "create_user_endpoint": false,
+    "update_user_endpoint": false,
+    "delete_user_endpoint": null
+  },
+  "true_rows": []
+}

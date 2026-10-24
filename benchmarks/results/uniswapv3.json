@@ -1,0 +1,18 @@
+{
+  "bench": "uniswapv3",
+  "units": 67,
+  "total_units": 67,
+  "decided": 66,
+  "correct": 66,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 129,
+  "lock_functions": {
+    "mint": false,
+    "burn": false,
+    "swap": false,
+    "flash": false,
+    "collect": false
+  },
+  "true_rows": []
+}

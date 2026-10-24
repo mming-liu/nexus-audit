@@ -45,6 +45,10 @@ details.card > summary:hover { background: #f0f4fa; }
 .badge.p1 { background: #b06f1f; }
 .badge.p2 { background: #5c6b80; }
 .badge.p0 { background: #c23934; }
+.badge.sev-critical { background: #8b0000; }
+.badge.sev-high { background: #c23934; }
+.badge.sev-medium { background: #b06f1f; }
+.badge.sev-low { background: #5c6b80; }
 .fileinfo { font-weight: 400; color: #5a6675; font-size: 13px; }
 pre.code { background: #101826; color: #d6e2f3; padding: 12px 14px;
            overflow-x: auto; font-size: 12.5px; line-height: 1.55;
@@ -103,6 +107,11 @@ def _card(e: dict) -> str:
     level = "note" if e.get("level") == "note" else "hit"
     prio = str(e.get("priority") or ("P0" if level == "hit" else "P2"))
     badge_cls = {"P0": "p0", "P1": "p1", "P2": "p2"}.get(prio, "")
+    from core.context.cvss import compute_cvss31
+    _cv = compute_cvss31(str(e.get("category") or "").lower(),
+                         str(e.get("unit") or ""),
+                         str(e.get("root_kind") or "") == "global-config")
+    _sev = _cv["severity"].lower()
     code = e.get("code")
     code_from = int(e.get("code_from") or 1)
     parts = [
@@ -110,6 +119,8 @@ def _card(e: dict) -> str:
         "<summary>"
         f'<span class="badge {badge_cls or level}">{html.escape(prio)}</span>'
         f'<span class="badge {level}">{cat}</span>'
+        f'<span class="badge sev-{_sev}">{_cv["score"]:.1f} '
+        f'{html.escape(_cv["severity"])}</span>'
         f"<span>{unit}</span>"
         f'<span class="fileinfo">{file_}'
         f'{":" + str(line) if line else ""}</span>'
