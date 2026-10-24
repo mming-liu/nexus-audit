@@ -2,11 +2,12 @@
 
 **首轮 + 扩军野战：M63–M78｜2026-10-24**
 
-> 本档案的每一个数字均由 `benchmarks/wild_hunt.py` 实跑产出，落盘在
-> `benchmarks/results/wild_hunt.json` 与 `benchmarks/results/wild_hunt/<项目>/`，
-> 可随时一键复现。样本是 9 个**从未为 nexus-audit 改造过**的真实开源仓库，
-> 横跨 Java / Python / Solidity 三种语言，不是漏洞靶场：没有 expectedresults、
-> 没有作者标注的漏洞行、没有预埋的测试夹具。
+> 本档案的 scan / benchmark 数字由 `benchmarks/wild_hunt.py` 实跑产出，落盘在
+> `benchmarks/results/wild_hunt.json` 与 `benchmarks/results/wild_hunt/<项目>/`；
+> 三条自动修复来自单独的 `--fix` 实跑（不混进 scan 漏斗统计）。样本是 9 个
+> **从未为 nexus-audit 改造过**的真实开源仓库，横跨 Java / Python / Solidity
+> 三种语言，不是漏洞靶场：没有 expectedresults、没有作者标注的漏洞行、
+> 没有预埋的测试夹具。
 
 ---
 
