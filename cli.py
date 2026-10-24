@@ -175,7 +175,7 @@ def cmd_scan(args):
         # 免费模型优先：探测 FREE_CANDIDATES，全不可用再走付费降级链
         from core.agents.model_selector import auto_select_and_print
         tier1_model = auto_select_and_print(tier=1)
-        tier1 = TwoTierRouter()
+        tier1 = _router_with_cache(args)
         tier1.tier1.model = tier1_model
         matcher = ScenarioMatcher(router=tier1)
         hypotheses = asyncio.run(matcher.audit_repo(units))
@@ -189,7 +189,7 @@ def cmd_scan(args):
         skeptic = SkepticReviewer(llm=lambda p: '{"rejected": false, "reason": "offline 模式默认放行进入沙箱"}')
         kept = asyncio.run(skeptic.filter_false_positives(hypotheses))
     else:
-        kept = asyncio.run(SkepticReviewer(router=TwoTierRouter()).filter_false_positives(hypotheses))
+        kept = asyncio.run(SkepticReviewer(router=_router_with_cache(args)).filter_false_positives(hypotheses))
     print(f"      保留 {len(kept)} 个假设进入沙箱")
 
     print(f"[5/5] 沙箱动态验证 ...")
@@ -308,9 +308,17 @@ def cmd_scan_auto(args, repo: Path):
             lines.append(f"- **[{cat}]** `{u.unit_name}` @ "
                          f"`{u.file_path}:{u.start_line}`")
         lines.append("")
+    # M60：报告固定按 P0 → P1 → P2 三档渲染（段序即优先级）。
+    # P1 [High-Confidence]：规则退 None、含敏感 Sink、经模型 Cite-Before-Verdict
+    # 双引证且 Skeptic 未推翻 —— 模型阶段产出；--offline 下留空段。
+    lines.append("## P1 [High-Confidence] 模型双引证通过")
+    lines.append("")
+    if not args.offline:
+        pass  # 模型阶段接入点：双引证通过者在此归档
+    lines.append("")
+    lines.append("## P2 [Review-Needed] Sink 门控候选（模型复核队列）")
+    lines.append("")
     if model_candidates:
-        lines.append("## P2 [Review-Needed] Sink 门控候选（模型复核队列）")
-        lines.append("")
         for u, cat in model_candidates[:50]:
             lines.append(f"- [{cat}] `{u.unit_name}` @ "
                          f"`{u.file_path}:{u.start_line}`")
@@ -347,6 +355,8 @@ def cmd_scan_auto(args, repo: Path):
                           "message": f"{cat} Sink 门控候选（待模型复核）",
                           "code": u.source_code, "code_from": u.start_line}
                          for u, cat in model_candidates]
+        prio_rank = {"P0": 0, "P1": 1, "P2": 2}
+        html_entries.sort(key=lambda e: prio_rank.get(str(e.get("priority")), 3))
         _write_html(args, html_entries, repo)
 
 
@@ -382,6 +392,22 @@ def emit_github_annotations(flagged, failed, repo: Path) -> int:
               f"{cat.upper()} 判定失败（限流/超时），需重跑，不是无漏洞")
         n += 1
     return n
+
+
+def _router_with_cache(args) -> "TwoTierRouter":
+    """M59：构造带磁盘缓存的路由器（--no-llm-cache 禁用）。
+
+    缓存键 = sha256(model + messages + temperature)，只缓存成功响应；
+    扫描中断后重跑，已完成的调用毫秒级命中，不重复消耗 Token。
+    """
+    from core.agents.router import TwoTierRouter, CachedLLMClient, LLMDiskCache
+    r = TwoTierRouter()
+    if getattr(args, "no_llm_cache", False):
+        return r
+    cache = LLMDiskCache(path=getattr(args, "llm_cache_path", None)
+                         or ".cache/llm_responses.jsonl")
+    r.tier1 = CachedLLMClient(r.tier1, cache)
+    return r
 
 
 def _write_html(args, entries: list[dict], repo: Path) -> None:
@@ -427,6 +453,9 @@ def build_sarif(entries: list[dict], repo: str | Path = ".") -> dict:
         res = {"ruleId": cat,
                "level": e.get("level") or "warning",
                "message": {"text": e.get("message") or f"{cat} @ {e.get('unit', '')}"},
+               # M60：置信度分档进 properties（GitHub Code Scanning 会透出）
+               "properties": {"priority": e.get("priority")
+                              or ("P0" if e.get("level") != "note" else "P2")},
                "locations": [{"physicalLocation": phys}],
                # codeFlows 常驻：哪怕是单点链路，GitHub 的 "Code flow" 面板
                # 也要有东西可渲染；多跳链路把 flow 传进来即可。
@@ -2626,6 +2655,8 @@ def main():
                         help="将命中结果导出为 SARIF v2.1.0（GitHub Code Scanning 格式）")
     p_scan.add_argument("--html", default=None, metavar="OUT.html",
                         help="M57：产出零外部依赖的单文件交互式 HTML 报告")
+    p_scan.add_argument("--no-llm-cache", dest="no_llm_cache", action="store_true",
+                        help="M59：禁用大模型响应磁盘缓存（默认开）")
     p_scan.add_argument("--auto", action="store_true",
                         help="M58 野战模式：全类目规则普查 + Sink 门控漏斗，"
                              "无需人工指定类目")
@@ -2649,6 +2680,8 @@ def main():
                            "生成补丁并重跑规则自检（写 fix_report.md，不改仓库文件）")
     p_pr.add_argument("--sarif", default=None, metavar="OUT.sarif",
                       help="将命中结果导出为 SARIF v2.1.0（GitHub Code Scanning 格式）")
+    p_pr.add_argument("--no-llm-cache", dest="no_llm_cache", action="store_true",
+                      help="M59：禁用大模型响应磁盘缓存（默认开）")
     p_pr.add_argument("--html", default=None, metavar="OUT.html",
                       help="M57：产出零外部依赖的单文件交互式 HTML 报告")
     p_pr.add_argument("--output", default=None, help="报告输出路径")

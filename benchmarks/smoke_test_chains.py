@@ -5162,6 +5162,99 @@ try:
 finally:
     shutil.rmtree(_d99, ignore_errors=True)
 
+# ---- [100] Module 59/60：LLM 响应磁盘缓存 + P0/P1/P2 三档分桶 ----
+import asyncio as _aio100                        # noqa: E402
+from core.agents.router import (                 # noqa: E402
+    LLMDiskCache as _Cache100, CachedLLMClient as _CClient100)
+
+
+class _Stub100:
+    model = "stub-model"
+
+    def __init__(self):
+        self.calls = 0
+
+    async def chat(self, messages, temperature=0.0):
+        self.calls += 1
+        if messages and "fail" in str(messages[-1].get("content")):
+            raise RuntimeError("stub failure")
+        return f"resp-{self.calls}"
+
+
+_cache100_file = ROOT / ".workbuddy" / "tmp_llm_cache_test.jsonl"
+try:
+    _cache100_file.unlink(missing_ok=True)
+    _cache100 = _Cache100(_cache100_file)
+    _stub = _Stub100()
+    _cc = _CClient100(_stub, _cache100)
+    _msg = [{"role": "user", "content": "hello"}]
+    _r1 = _aio100.run(_cc.chat(_msg))
+    _r2 = _aio100.run(_cc.chat(_msg))
+    check("M100：相同 Prompt 第二次命中磁盘缓存（底层请求计数=1）",
+          (_stub.calls == 1 and _r1 == _r2 == "resp-1"), True)
+    _r3 = _aio100.run(_cc.chat([{"role": "user", "content": "other"}]))
+    check("M100：不同 Prompt 透传底层（计数=2）并落盘",
+          (_stub.calls == 2 and _cache100_file.exists()
+           and len(_cache100_file.read_text(encoding="utf-8").strip().splitlines())
+           == 2), True)
+    try:
+        _aio100.run(_cc.chat([{"role": "user", "content": "fail"}]))
+        _failed100 = False
+    except RuntimeError:
+        _failed100 = True
+    _cnt_before = _stub.calls
+    try:
+        _aio100.run(_cc.chat([{"role": "user", "content": "fail"}]))
+    except RuntimeError:
+        pass
+    check("M100：失败响应绝不写缓存（重试仍走底层，计数递增）",
+          (_failed100 and _stub.calls == _cnt_before + 1), True)
+    # 断点续扫：新缓存实例从磁盘加载，命中不再发请求
+    _stub2 = _Stub100()
+    _cache2 = _Cache100(_cache100_file)
+    _cc2 = _CClient100(_stub2, _cache2)
+    _r4 = _aio100.run(_cc2.chat(_msg))
+    check("M100：重启后秒级断点续扫（磁盘加载命中，计数=0）",
+          (_stub2.calls == 0 and _r4 == "resp-1"), True)
+    _cc_off = _CClient100(_Stub100(), _Cache100(_cache100_file, enabled=False))
+    _aio100.run(_cc_off.chat(_msg))
+    check("M100：--no-llm-cache 语义（enabled=False 强制透传）",
+          (_cc_off.inner.calls == 1), True)
+finally:
+    _cache100_file.unlink(missing_ok=True)
+
+# P0/P1/P2 分桶渲染排序
+_d100 = Path(_tmod.mkdtemp(prefix="nexus_t100_"))
+try:
+    (_d100 / "dao.py").write_text(
+        "from flask import request\n"
+        "@app.route('/q', methods=['GET'])\n"
+        "def vul_sqli():\n"
+        "    import sqlite3\n"
+        "    uid = request.args.get('uid')\n"
+        "    c = sqlite3.connect('a.db')\n"
+        "    return c.execute('SELECT * FROM users WHERE id=' + uid).fetchall()\n",
+        encoding="utf-8")
+    (_d100 / "math.py").write_text("def g(a):\n    return a * 2\n",
+                                   encoding="utf-8")
+    _r100 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d100),
+         "--auto", "--offline", "--output", str(_d100 / "ra.md"),
+         "--html", str(_d100 / "ra.html"), "--sarif", str(_d100 / "ra.sarif")],
+        capture_output=True, text=True)
+    _md100 = (_d100 / "ra.md").read_text(encoding="utf-8") \
+        if (_d100 / "ra.md").exists() else ""
+    _i_p0 = _md100.find("## P0 [Confirmed]")
+    _i_p1 = _md100.find("## P1 [High-Confidence]")
+    _i_p2 = _md100.find("## P2 [Review-Needed]")
+    check("M100：Markdown 严格按 P0 → P1 → P2 分区渲染",
+          (0 <= _i_p0 < _i_p1 < _i_p2), True)
+    check("M100：SARIF 含 priority 分档（P0 实锤）",
+          ((_d100 / "ra.sarif").exists()
+           and '"P0"' in (_d100 / "ra.sarif").read_text(encoding="utf-8")), True)
+finally:
+    shutil.rmtree(_d100, ignore_errors=True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

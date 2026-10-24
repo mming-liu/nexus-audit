@@ -195,3 +195,102 @@ class TwoTierRouter:
     async def deep_review(self, messages: list[dict[str, str]]) -> str:
         """Tier-2 深度复核调用（Skeptic / PoC 生成等）。"""
         return await self._deepseek().chat(messages, temperature=0.2)
+
+
+# ---- Module 59：大模型响应内容寻址磁盘缓存（断点续扫） ----
+#
+# 缓存键 = sha256(model_name + 全部 messages + temperature)—— 内容寻址：
+# 同样的 prompt 永远命中同一条缓存，扫描中断后重跑，已完成的调用毫秒级
+# 返回，不再消耗 Token。**只缓存成功响应**：失败/超时在 chat() 里以异常
+# 形态向上传播，根本走不到 put() —— call_failed 天然不污染缓存。
+import hashlib
+import threading
+
+
+class LLMDiskCache:
+    """JSONL 追加式内容寻址缓存（.cache/llm_responses.jsonl）。
+
+    键：sha256(model + messages + temperature)。加载时全量读入内存 dict，
+    命中 O(1)；未命中调用后追加落盘。线程锁保护并发追加。
+    """
+
+    def __init__(self, path: str | os.PathLike = ".cache/llm_responses.jsonl",
+                 enabled: bool = True):
+        self.path = os.fspath(path)
+        self.enabled = enabled
+        self._lock = threading.Lock()
+        self._data: dict[str, str] = {}
+        if enabled and os.path.isfile(self.path):
+            try:
+                with open(self.path, encoding="utf-8") as fh:
+                    for ln in fh:
+                        ln = ln.strip()
+                        if not ln:
+                            continue
+                        try:
+                            rec = json.loads(ln)
+                        except json.JSONDecodeError:
+                            continue          # 半行（上次中断）→ 跳过
+                        k, v = rec.get("key"), rec.get("resp")
+                        if k and v is not None:
+                            self._data[k] = v
+            except OSError:
+                pass
+
+    @staticmethod
+    def key_of(model: str, messages: list[dict[str, str]],
+               temperature: float = 0.0) -> str:
+        h = hashlib.sha256()
+        h.update(model.encode("utf-8"))
+        h.update(f"\x00{temperature}\x00".encode("utf-8"))
+        for m in messages or []:
+            h.update(m.get("role", "").encode("utf-8"))
+            h.update("\x01".encode("utf-8"))
+            h.update((m.get("content") or "").encode("utf-8"))
+            h.update("\x02".encode("utf-8"))
+        return h.hexdigest()
+
+    def get(self, key: str) -> str | None:
+        if not self.enabled:
+            return None
+        with self._lock:
+            return self._data.get(key)
+
+    def put(self, key: str, resp: str) -> None:
+        if not self.enabled:
+            return
+        with self._lock:
+            self._data[key] = resp
+            try:
+                os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
+                with open(self.path, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps({"key": key, "resp": resp},
+                                        ensure_ascii=False) + "\n")
+            except OSError:
+                pass                        # 落盘失败不影响本次结果返回
+
+
+class CachedLLMClient:
+    """LLMClient 装饰器：命中磁盘缓存毫秒级返回，未命中透传并写缓存。
+
+    成功响应（非空字符串）才写缓存；异常向上抛 —— call_failed 不缓存。
+    """
+
+    def __init__(self, inner: LLMClient, cache: LLMDiskCache | None = None):
+        self.inner = inner
+        self.cache = cache or LLMDiskCache()
+
+    def __getattr__(self, name):            # 透传 model / breaker 等属性
+        return getattr(self.inner, name)
+
+    async def chat(self, messages: list[dict[str, str]],
+                   temperature: float = 0.0) -> str:
+        model = getattr(self.inner, "model", "")
+        key = LLMDiskCache.key_of(model, messages, temperature)
+        hit = self.cache.get(key)
+        if hit is not None:
+            return hit
+        resp = await self.inner.chat(messages, temperature=temperature)
+        if resp and resp.strip():           # 空内容不缓存（与客户端语义一致）
+            self.cache.put(key, resp)
+        return resp
