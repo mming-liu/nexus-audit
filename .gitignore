@@ -26,3 +26,6 @@ benchmarks/results/.owasp_units.pkl.fp
 fix_sqli.md
 report_pr.md
 fix_report.md
+
+# M59 LLM 响应磁盘缓存（本地派生数据）
+.cache/

@@ -79,6 +79,28 @@ python benchmarks/benchmark_owasp.py --categories sqli,xss --no-rules
 口径：`Score = TPR − FPR`（OWASP 官方）。调用失败的样本会被标记并剔除，
 不计入分数 —— 否则限流会被伪装成极低的误报率。
 
+## 野战模式：一键扫描未知仓库（M58–M61）
+
+```bash
+# 野战一键：全类目规则普查 + Sink 门控漏斗 + 确定性补丁 + PoC + 四类产物
+python cli.py scan <目标仓库> --auto --fix --emit-poc poc_out \
+    --graph --sarif report.sarif --html report.html
+
+# 断点续扫：LLM 响应按内容寻址落盘（.cache/llm_responses.jsonl），
+# 中断重跑毫秒级命中，不重复消耗 Token；--no-llm-cache 可禁用
+```
+
+工作方式（两级漏斗，规则先行、模型兜底）：
+- 第一级：按语言自动遍历全部规则类目（Java/Python 走 Web 类目全集，
+  Solidity 走合约 4 类目）。规则判 True 直接归 **P0 [Confirmed]**（不调
+  模型），判 False 静默排除；
+- 第二级：规则退 None 的对用"外部输入行 + 敏感 Sink 行"静态事实门控 ——
+  无事实（纯计算函数等）直接过滤，真有 Sink 的才进模型复核队列
+  （实测过滤率 100%，毫秒级/单元）；
+- 报告固定按 **P0 [Confirmed] → P1 [High-Confidence 模型双引证] →
+  P2 [Review-Needed 存疑候选]** 三档渲染（Markdown 分区 / HTML 折叠
+  卡片 / SARIF `properties.priority`），HTML 为零外部依赖单文件。
+
 ## 多语言靶场：21 个仓库、全部离线门禁
 
 ```bash
