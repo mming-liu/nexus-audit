@@ -1,7 +1,7 @@
 {
   "bench": "litemall",
   "units": 219,
-  "decided": 908,
+  "decided": 909,
   "cors_truth": 219,
   "truth_n": 3,
   "fp": 0,

@@ -2,11 +2,11 @@
   "bench": "compound",
   "units": 450,
   "total_units": 450,
-  "decided": 444,
-  "correct": 444,
+  "decided": 445,
+  "correct": 445,
   "fp": 0,
   "reverse_fn": 0,
-  "rule_evaluations": 976,
+  "rule_evaluations": 978,
   "anchors": [
     {
       "unit": "Timelock.sol:setPendingAdmin",

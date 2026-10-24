@@ -272,7 +272,17 @@ def _root_cause_key(unit, cat: str) -> tuple[str, str, str]:
     if cat == "cors" and "Access-Control-Allow-Origin" not in entry_body(src):
         blk = wiring_block(src)
         if blk:
-            norm = re.sub(r"\s+", " ", blk).strip()
+            # M97：装配证据的**第一行标题**带路由别名
+            # （`…（别名 system/user、system/user/{userId} 全部命中）`），
+            # 同一份全局 CORS 配置在不同路由上因此算出不同签名 ——
+            # waynboot 实测 162 条折成 1 个根因、另 1 条因为别名不同单列。
+            # 根因的物理载体是**配置体**，不是别名清单，所以先剥掉标题行
+            # 再归一化。
+            body_only = re.sub(r"(?s)^.*?----\s*\n", "", blk, count=1) \
+                if blk.lstrip().startswith("----") else blk
+            if not body_only.strip():
+                body_only = blk
+            norm = re.sub(r"\s+", " ", body_only).strip()
             m = _WIRING_SOURCE_RE.search(blk)
             evidence = m.group(1) if m else ""
             return (f"cors:{hashlib.sha256(norm.encode()).hexdigest()[:12]}",
@@ -1710,6 +1720,164 @@ def cmd_benchmark_gen(args) -> int:
           f"True 锚点 {len(true_keys)} / False 锚点 {len(false_keys)}")
     print(f"  单元地板 {max(1, int(len(units) * 0.8))} / "
           f"判定地板 {max(1, int(n_decided * 0.8))}")
+    return 0
+
+
+def _matrix_probe_units() -> dict[str, list]:
+    """三语言探针语料（M100）：每种语言取**两个**小靶场的切片。
+
+    为什么两个：单库覆盖不全就会在矩阵里报出**假的缺口**（java-sec-code
+    没有 crypto/hash/weakrand 样本，矩阵会显示这三类"Java 不支持"）。
+    拼两个互补的库才能让 "—" 真的表示"判据缺失"而不是"语料没样本"。
+    刻意不用大靶场：矩阵问的是能力有没有，不是准确率。
+    """
+    root = Path(__file__).resolve().parent / "reference_repos"
+    out: dict[str, list] = {}
+    try:
+        from core.slicer.java_servlet import JavaSlicer
+        units: list = []
+        for name in ("java-sec-code", "Hello-Java-Sec-master"):
+            p = root / name
+            if p.exists():
+                units += list(JavaSlicer(p).extract_entry_units())
+        if units:
+            out["java"] = units
+    except Exception:                                        # noqa: BLE001
+        pass
+    try:
+        from core.slicer.web_treesitter import WebTreeSitterSlicer
+        units = []
+        for name in ("vulpy-master", "pygoat-master"):
+            p = root / name
+            if p.exists():
+                units += list(WebTreeSitterSlicer(p).extract_entry_units(p))
+        if units:
+            out["python"] = units
+    except Exception:                                        # noqa: BLE001
+        pass
+    try:
+        from core.slicer.web3_slither import SoliditySlicer
+        units = []
+        for name in ("DeFiVulnLabs-main", "smartbugs-curated-main"):
+            p = root / name
+            if p.exists():
+                units += list(SoliditySlicer(p).extract_entry_units(p))
+        if units:
+            out["solidity"] = units
+    except Exception:                                        # noqa: BLE001
+        pass
+    return out
+
+
+# 类目 → 确定性补丁器（--fix）。没有补丁器的类目在矩阵里显示 "—"。
+MATRIX_FIX_MAP: dict[str, tuple[str, ...]] = {
+    "sqli": ("_fix_sqli_targets", "_fix_python_sqli", "_fix_mp_concat"),
+    "xss": ("_fix_xss_targets",),
+    "deserial": ("_fix_deserial_targets", "_fix_python_deserial",
+                 "_fix_python_yaml"),
+    "cmdi": ("_fix_python_shell",),
+    "redir": ("_fix_python_redirect",),
+    "cors": ("_fix_cors_config",),
+    "hardcoded_secret": ("_fix_hardcoded_secret",),
+    "jwt_weakness": ("_fix_jwt_weakness",),
+    "reentrancy": ("_fix_solidity_reentrancy",),
+    "access_control": ("_fix_solidity_onlyowner", "_fix_solidity_initiator"),
+    "arithmetic": ("_fix_solidity_arith_guard",),
+    "unchecked_low_level_calls": ("_fix_solidity_unchecked_wrap",),
+}
+
+
+def cmd_matrix(args) -> int:
+    """M100：24 类 × 三语言 ×（规则 / --fix / --emit-poc / CVSS）能力矩阵。
+
+    口径说清楚：**"✓" 表示"该语言下这个类目至少有一条真实入口被规则判出
+    确定性结论（True 或 False）"**，不是"准确率 100%"。矩阵回答的是覆盖
+    缺口（哪一类在哪一门语言上根本判不出来），不是质量。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    from core.agents.vuln_categories import CATEGORIES
+    from core.context.cvss import compute_cvss31
+
+    probes = _matrix_probe_units()
+    if not probes:
+        print("! 三语言探针语料都不可用（reference_repos 缺失）")
+        return 2
+    langs = ["java", "python", "solidity"]
+    print("== nexus-audit 能力覆盖矩阵（规则 / --fix / --emit-poc / CVSS）==")
+    print("   ✓ = 该语言下有真实入口被判出确定性结论（True/False）")
+    print("   — = 覆盖缺口（该类目在该语言上一条判据都没有）")
+    print()
+    hdr = (f"{'类目':<26}{'Java':>6}{'Python':>8}{'Solidity':>10}"
+           f"{' --fix':>8}{' --emit-poc':>12}{' CVSS':>7}")
+    print(hdr)
+    print("-" * len(hdr))
+
+    gaps: list[tuple[str, str]] = []
+    n_fix_total = 0
+    for cat in sorted(CATEGORIES):
+        cells = []
+        for lang in langs:
+            units = probes.get(lang) or []
+            hit = 0
+            for u in units:
+                if rule_verdict(cat, u.source_code) is not None:
+                    hit += 1
+                    break
+            cells.append("✓" if hit else "—")
+            if not hit:
+                gaps.append((cat, lang))
+        fixes = MATRIX_FIX_MAP.get(cat, ())
+        fix_cell = "✓" if fixes else "—"
+        if fixes:
+            n_fix_total += 1
+        try:
+            from core.models import CodeUnit, Language
+            from core.sandbox.poc_synthesizer import PocSynthesizer
+            _synth = PocSynthesizer()
+            _probes = (
+                ("OrderController", Language.JAVA_WEB,
+                 "public void f(String q) { jdbc.query(q); }"),
+                ("app", Language.PYTHON_WEB,
+                 "def f():\n    cur.execute('select ' + x)"),
+                ("Contract", Language.SOLIDITY_WEB3,
+                 "function f() public { msg.sender.transfer(1); }"),
+            )
+            _ok = 0
+            for _tgt, _lg, _body in _probes:
+                _u = CodeUnit(file_path="X", language=_lg, unit_name=_tgt,
+                              start_line=1, end_line=2, decorators_or_modifiers=[],
+                              called_symbols=[], source_code=_body, own_body=_body)
+                _art = _synth.synthesize(_u, cat)
+                if _art is not None and _art.self_check_ok:
+                    _ok += 1
+            poc_cell = "✓" if _ok == len(_probes) else ("~" if _ok else "—")
+        except Exception:                                    # noqa: BLE001
+            poc_cell = "—"
+        cv = compute_cvss31(cat, "x", False)
+        cv_cell = "✓" if str(cv.get("vector", "")).startswith("CVSS:3.1/") else "—"
+        print(f"{cat:<26}{cells[0]:>6}{cells[1]:>8}{cells[2]:>10}"
+              f"{fix_cell:>8}{poc_cell:>12}{cv_cell:>7}")
+
+    print()
+    print(f"类目总数 {len(CATEGORIES)} ｜ 有确定性补丁器的类目 {n_fix_total} ｜ "
+          f"MATRIX_FIX_MAP 登记的补丁器 {len(DOCTOR_PATCHERS)} 个")
+    print(f"覆盖缺口（类目 × 语言）：{len(gaps)} 处")
+    for cat, lang in gaps[:20]:
+        print(f"    - {cat} / {lang}")
+    if len(gaps) > 20:
+        print(f"    …（共 {len(gaps)} 处）")
+    # 缺口数与门禁的互锁：写进 json 供冒烟断言"缺口不增长"
+    if args.summary_json:
+        Path(args.summary_json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.summary_json).write_text(json.dumps({
+            "categories": sorted(CATEGORIES),
+            "languages": langs,
+            "gaps": [{"category": c, "language": l} for c, l in gaps],
+            "gap_count": len(gaps),
+            "fix_map": {k: list(v) for k, v in MATRIX_FIX_MAP.items()},
+            "patchers": len(DOCTOR_PATCHERS),
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"矩阵 JSON → {args.summary_json}")
     return 0
 
 
@@ -4086,6 +4254,10 @@ def main():
     p_gen.add_argument("--bench-key", default=None,
                        help="urn：结果 json 与切片缓存键（默认由目录名派生）")
     p_gen.add_argument("--no-cache", action="store_true", help="禁用切片温缓存")
+    p_matrix = sub.add_parser(
+        "matrix", help="M100：24 类 × 三语言 ×（规则/--fix/PoC/CVSS）能力矩阵")
+    p_matrix.add_argument("--summary-json", default=None, metavar="OUT.json",
+                          help="矩阵 JSON（供冒烟断言缺口不增长）")
     args = parser.parse_args()
     if args.command == "scan":
         cmd_scan(args)
@@ -4095,6 +4267,8 @@ def main():
         sys.exit(cmd_hunt(args))
     elif args.command == "benchmark-gen":
         sys.exit(cmd_benchmark_gen(args))
+    elif args.command == "matrix":
+        sys.exit(cmd_matrix(args))
     else:
         cmd_pr_scan(args)
 

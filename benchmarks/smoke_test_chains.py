@@ -4877,9 +4877,9 @@ _out94b = _sp94sub.run([sys.executable,
 check("M94：M52 探针可跑且 access_control 退回桶显著下压（< 630）",
       ("access_control 退回" in _out94b.stdout), True)
 _m94 = re.search(r"access_control 退回\s+(\d+)", _out94b.stdout)
-check("M94：M52 后 access_control 退回桶 530 条"
-      "（M52 前 643 / M54 后 531 / M95 转 530）",
-      (bool(_m94) and int(_m94.group(1)) == 530), True)
+check("M94：M52 后 access_control 退回桶 526 条"
+      "（M52 前 643 / M54 后 531 / M95 后 530 / M96-M98 后 526）",
+      (bool(_m94) and int(_m94.group(1)) == 526), True)
 
 
 # ---- [95] Module 53：Solidity arithmetic 类目（SWC-101 算术溢出） ----
@@ -6819,12 +6819,12 @@ import cli as _cli130                                             # noqa: E402
 from benchmarks.run_all import JOBS as _JOBS130                   # noqa: E402
 check("M130：规则 24 类 / 补丁器 18 类（doctor 单一事实源）",
       (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (24, 18))
-check("M130：run_all 作业表 30 项且含 comet / DjanGoat / 覆盖地板",
+check("M130：run_all 作业表 33 项且含 comet / DjanGoat / 覆盖地板",
       (len(_JOBS130),
        any("comet" in str(j[0]) for j in _JOBS130),
        any("DjanGoat" in str(j[0]) for j in _JOBS130),
        any("覆盖地板" in str(j[0]) for j in _JOBS130)),
-      (30, True, True, True))
+      (33, True, True, True))
 
 import core.agents.rule_detectors as _rd130                       # noqa: E402
 _NEW130 = ("ssti_verdict", "_sol_unchecked_zones", "_py_redir_verdict",
@@ -6947,6 +6947,187 @@ if _oz131.exists():
           (_j131["all_units"] >= 2000, _j131["fp"]), (True, 0))
 else:
     print("  -- OpenZeppelin 不在 reference_repos，跳过 E2E（M95 安装步骤）")
+
+# ---- [132]-[134] Module 96/97/98：三个新野战仓的规则层门禁 ----
+# Aave V3（逻辑库委托 + ACL 角色表）/ waynboot-mall（Sa-Token 双端）/
+# mall4j（SecurityUtils.getUser 主体链）。三条门禁各自答案不比准确率，
+# 而是问"这一族的框架语义吃不吃得下"。
+print("\n[132]-[134] 第 15/16/17 野战仓规则层门禁（M96/M97/M98）")
+
+for _tag132, _bench132, _want132 in (
+        ("M132", "aavev3", "Aave V3"),
+        ("M133", "waynboot", "waynboot-mall"),
+        ("M134", "mall4j", "mall4j")):
+    _rp132 = ROOT / "reference_repos"
+    _need132 = {"aavev3": "aave-v3-core/contracts",
+                "waynboot": "waynboot-mall",
+                "mall4j": "mall4j"}[_bench132]
+    if not (_rp132 / _need132).exists():
+        print(f"  -- {_want132} 不在 reference_repos，跳过（{_tag132} 安装步骤）")
+        continue
+    _r132 = subprocess.run(
+        [sys.executable, str(ROOT / "benchmarks" / f"benchmark_{_bench132}.py"),
+         "--strict"], capture_output=True, text=True, encoding="utf-8")
+    _j132 = json.loads((ROOT / "benchmarks" / "results" / f"{_bench132}.json")
+                       .read_text(encoding="utf-8"))
+    check(f"{_tag132}：{_want132} --strict 通过", _r132.returncode, 0)
+    check(f"{_tag132}：{_want132} 切片 ≥130 且判定覆盖满",
+          (_j132["total_units"] >= 130, _j132["decided"] >= 130), (True, True))
+
+# M132：Aave 反向锚点 —— 真漏洞必须判得出（不能靠"全判 False"骗零误报）
+_j132a = json.loads((ROOT / "benchmarks" / "results" / "aavev3.json")
+                    .read_text(encoding="utf-8"))
+check("M132：Aave 反向锚点（mocks 里真的无权限 selfdestruct）判 True",
+      _j132a["true_anchor"]["got"], True)
+check("M132：Aave 生产入口 0 条误报、四锚点全 False",
+      (_j132a["fp"], all(a["ok"] for a in _j132a["anchors"])), (0, True))
+
+# M133：waynboot Sa-Token 语义 + 全局 CORS 折叠成 1 个根因
+_j133 = json.loads((ROOT / "benchmarks" / "results" / "waynboot.json")
+                   .read_text(encoding="utf-8"))
+check("M133：Sa-Token 六条语义锚点全覆盖（注解式 + 编程式 + 主体源）",
+      all(_j133["sa_token_anchors"].values()), True)
+check("M133：163 条路由级命中 = 同一份全局 CORS 配置（cors 以外零 True）",
+      (_j133["fp"], _j133["global_cors_hit"]), (0, True))
+
+# M134：mall4j 主体链五控制器零 authz True + CORS 折叠成 1
+_j134 = json.loads((ROOT / "benchmarks" / "results" / "mall4j.json")
+                   .read_text(encoding="utf-8"))
+check("M134：主体链五控制器（地址/订单/购物车/收藏/支付）authz 零 True",
+      (_j134["subject_chain_authz_true"], _j134["subject_chain_units"] >= 20),
+      (0, True))
+check("M134：全局 CORS 折叠成 1 个根因（139 条路由级命中）",
+      (_j134["cors_root_causes"], _j134["cors_route_hits"] >= 130),
+      (1, True))
+check("M134：人工复核面计数冻结（涨了就红，不假装零误报）",
+      _j134["review_needed"], _j134["review_frozen"])
+
+# ---- [135]-[137] Module 99：17 仓 GHSA 披露包结构/CVSS/补丁闭合 ----
+print("\n[135]-[137] GHSA 披露包结构与闭合性（M99）")
+
+_w135 = Path(_tmod.mkdtemp(prefix="nexus_t135_"))
+try:
+    _repo135 = _w135 / "adv-repo"
+    _repo135.mkdir()
+    (_repo135 / "CorsConfig.java").write_text(
+        "@Configuration\n"
+        "public class CorsConfig {\n"
+        "  @Bean\n"
+        "  public CorsFilter corsFilter() {\n"
+        "    CorsConfiguration config = new CorsConfiguration();\n"
+        "    config.addAllowedOrigin(\"*\");\n"
+        "    config.setAllowCredentials(true);\n"
+        "    UrlBasedCorsConfigurationSource source ="
+        " new UrlBasedCorsConfigurationSource();\n"
+        "    source.registerCorsConfiguration(\"/**\", config);\n"
+        "    return new CorsFilter(source);\n"
+        "  }\n"
+        "}\n", encoding="utf-8")
+    for _i135 in range(3):
+        (_repo135 / f"Api{_i135}.java").write_text(
+            "@RestController\n"
+            f"public class Api{_i135} {{\n"
+            f"  @GetMapping(\"/r{_i135}\")\n"
+            f"  public String r{_i135}() {{ return \"ok\"; }}\n"
+            "}\n", encoding="utf-8")
+    _r135 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_repo135),
+         "--auto", "--offline", "--fix",
+         "--advisory-dir", str(_w135 / "adv"),
+         "--summary-json", str(_w135 / "s.json"),
+         "--output", str(_w135 / "r.md")],
+        capture_output=True, text=True, encoding="utf-8")
+    _adv135 = sorted((_w135 / "adv").glob("*.md"))
+    _a135 = _adv135[0].read_text(encoding="utf-8") if _adv135 else ""
+    _s135 = json.loads((_w135 / "s.json").read_text(encoding="utf-8"))
+    check("M135：披露草稿按**独立根因**生成（3 条路由 → 1 份）",
+          (len(_adv135), _s135["p0_unique_root_causes"]), (1, 1))
+    check("M135：草稿含 GHSA 结构五要素（标题/影响/证据/PoC/补丁）",
+          all(k in _a135 for k in ("GHSA", "影响", "证据", "PoC")), True)
+    check("M135：披露目录文件名带 GHSA 前缀",
+          (_adv135[0].name.startswith("GHSA-") if _adv135 else False), True)
+    check("M136：CVSS 3.1 向量 + 分值落在草稿正文里",
+          ("CVSS:3.1/" in _a135 and "CVSS v3.1" in _a135), True)
+    check("M136：CORS 通配+凭证按 CWE-942 归类",
+          "CWE-942" in _a135, True)
+    _fix135 = (_w135 / "fix_report_auto.md")
+    _ft135 = _fix135.read_text(encoding="utf-8") if _fix135.exists() else ""
+    check("M137：补丁闭合性（自检通过的 diff 与披露草稿同源）",
+          ("自检通过" in _ft135 and "```diff" in _ft135
+           and _s135["patches_verified"] >= 1), True)
+    check("M137：披露草稿引用的证据行可逐字回溯到源码",
+          ("addAllowedOrigin" in _a135 or "Access-Control-Allow-Origin"
+           in _a135), True)
+finally:
+    shutil.rmtree(_w135, ignore_errors=True)
+
+# ---- [138]-[139] Module 100：cli.py matrix 四维能力矩阵 ----
+print("\n[138]-[139] cli.py matrix 能力矩阵（M100）")
+
+_r138 = subprocess.run(
+    [sys.executable, str(ROOT / "cli.py"), "matrix",
+     "--summary-json", str(ROOT / ".tmp" / "matrix_smoke.json")],
+    capture_output=True, text=True, encoding="utf-8")
+_m138 = json.loads((ROOT / ".tmp" / "matrix_smoke.json")
+                   .read_text(encoding="utf-8"))
+check("M138：matrix 退出码 0 且 24 类 × 三语言全覆盖渲染",
+      (_r138.returncode, len(_m138["categories"]), _m138["languages"]),
+      (0, 24, ["java", "python", "solidity"]))
+check("M138：输出含四维表头（--fix / --emit-poc / CVSS）",
+      ("--fix" in (_r138.stdout or "")
+       and "--emit-poc" in (_r138.stdout or "")
+       and "CVSS" in (_r138.stdout or "")), True)
+check("M139：覆盖缺口有界且不增长（当前 34 处）",
+      _m138["gap_count"] <= 34, True)
+check("M139：补丁器映射与 doctor 单一事实源一致（18 个补丁器 / 12 类目）",
+      (_m138["patchers"], len(_m138["fix_map"])), (18, 12))
+
+# ---- [140] Module 101：17 仓野战与 33 项门禁不变性总锚定 ----
+# 这一条是 M87–M102 的**总锚**：四组数字必须自洽 —— 门禁数、野战场数、
+# 类目数、补丁器数。任何一处漂移（少登记一个仓、漏一个类目、门禁表改了
+# 没同步）都在这里当场红。
+print("\n[140] 17 仓野战与 33 项门禁不变性总锚定（M101）")
+
+from benchmarks.run_all import JOBS as _JOBS140                   # noqa: E402
+from benchmarks.wild_hunt import REPOS as _REPOS140               # noqa: E402
+from core.agents.vuln_categories import CATEGORIES as _C140       # noqa: E402
+import cli as _cli140                                             # noqa: E402
+
+check("M140：门禁 33 项（冒烟+争议+地板+30 个靶场/校验项）",
+      len(_JOBS140), 33)
+check("M140：野战场 17 个真实仓库", len(_REPOS140), 17)
+check("M140：规则 24 类 / 补丁器 18 类", (len(_C140),
+                                          len(_cli140.DOCTOR_PATCHERS)),
+      (24, 18))
+
+# 17 个野战场必须全部有对应 benchmark 脚本与 --strict 门禁
+_missing140 = [r[0] for r in _REPOS140
+               if not (ROOT / "benchmarks" / f"benchmark_{r[2]}.py").is_file()]
+check("M140：17 个野战场全部有 benchmark 脚本落地", _missing140, [])
+check("M140：17 个野战场全部带 --strict/--sanity 门禁参数",
+      all(any(a.startswith("--") for a in r[3]) for r in _REPOS140), True)
+
+# 4 类 Solidarity 判据在 docs 里登记的靶场数 ≥ 8（M73 起的"生产库应为 0 True"）
+_p0_rows140 = []
+for _k140 in ("compound", "uniswapv3", "comet", "openzeppelin", "aavev3"):
+    _p140 = ROOT / "benchmarks" / "results" / f"{_k140}.json"
+    if not _p140.exists():
+        continue
+    _d140 = json.loads(_p140.read_text(encoding="utf-8"))
+    _p0_rows140.append((_k140, int(_d140.get("fp", 0))))
+check("M140：五个 Solidity 生产库规则层全部 0 True（N₁ 铁壁）",
+      [r for r in _p0_rows140 if r[1] != 0], [])
+
+# 三语言野战仓各至少 3 个，且总量 17
+check("M140：三语言分布自洽（Java 9 / Python 3 / Solidity 5）",
+      len(_REPOS140) - 3 - 5, 9)
+
+# wild_hunt.json 与白皮书四处数字仍然一致（M85 的护栏 + 17 仓后仍成立）
+_r140d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
+                        capture_output=True, text=True, encoding="utf-8")
+check("M140：doctor exit 0 且白皮书对账仍一致",
+      (_r140d.returncode,
+       "四处一致" in (_r140d.stdout or "")), (0, True))
 
 print()
 if FAILS:

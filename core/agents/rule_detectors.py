@@ -3423,8 +3423,17 @@ _SECRET_TOKEN = (
     r"|api[_-]?secret|app[_-]?secret|secret[_-]?key|secretkey"
     r"|private[_-]?key|signing[_-]?key|secret)")
 SECRET_ASSIGN_RE = re.compile(
-    r"(?i)(?P<name>[\w.$\[\]'\"]*?" + _SECRET_TOKEN + r")"
-    r"['\"]?\]?\s*[:=]\s*['\"](?P<val>[^'\"]{1,})['\"]")
+    # M97：三条收紧，全部来自 waynboot `WxController.jsSdkInit` 的实测误报：
+    #   ① 名字前加 `(?<![\w$])` —— 否则可以从 `appSecret` 中间起配，
+    #      把末尾的 `secret` 当成名字；
+    #   ② `[:=]` 两侧只允许**行内空白** `[ \t]*` —— `\s*` 会跨行，于是
+    #      `appSecret;` 后面下一行的 `resultJsonStr = "https://…"` 被拼成
+    #      "secret = …" 的假赋值；
+    #   ③ 值不允许跨行 `[^'\"\n]` —— 同理，把下一行的字符串当成密钥值。
+    # 收紧后单行写法（`SECRET_KEY = 'random'` / `app.secret_key = "123"`）
+    # 一字不受影响，跨语句拼出来的幽灵密钥不再命中。
+    r"(?i)(?P<name>(?<![\w$])[\w.$\[\]'\"]*?" + _SECRET_TOKEN + r")"
+    r"['\"]?\]?[ \t]*[:=][ \t]*['\"](?P<val>[^'\"\n]{1,})['\"]")
 SECRET_ENV_READ_RE = re.compile(
     r"\bos\s*\.\s*environ\b|\bos\s*\.\s*getenv\b|System\s*\.\s*getenv\b"
     r"|System\s*\.\s*getProperty\b|@Value\s*\(\s*\"\$\{"
@@ -4948,6 +4957,21 @@ def _path_sink_param_linked(body: str, source: str,
     return False
 
 
+def _path_sink_identifiers(text: str) -> set[str]:
+    """所有文件 sink 语句（所在行）上出现的标识符集合（M97）。
+
+    用于回答一个很窄的问题：入口体与 sink 语句**有没有用到同一个名字**。
+    没有 ⇒ 路径与入口外部输入之间没有任何可见的关联。
+    """
+    out: set[str] = set()
+    for m in PATH_SINK_RE.finditer(text):
+        start = text.rfind("\n", 0, m.start()) + 1
+        end = text.find("\n", m.end())
+        line = text[start: end if end >= 0 else len(text)]
+        out |= set(re.findall(r"\b([A-Za-z_]\w*)\b", line))
+    return out
+
+
 def pathtraver_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not body:
@@ -4984,8 +5008,27 @@ def pathtraver_verdict(source: str) -> bool | None:
                 return None      # 出现了文件相关名字但没命中 sink 形态，交给模型
             return False
 
-    # M64 淬火⑧：路径 sink 必须与外部输入相关（sink 行/赋值链含形参）。
-    # 弱形态（new FileInputStream(file) 等）在切片证据段里到处可能命中，
+    # M97：sink 只出现在**跨跳辅助段**里时，要求它跟入口体真有交集。
+    #
+    # 这是 waynboot 实测出来的形态：`DictTypeController.export` 的入口体里
+    # 一个文件 API 都没有，唯一的 `new File(...)` 来自 Hop 2 的
+    # `ExcelUtil.getAbsoluteFile(String filename, String path)`：
+    #     String downloadPath = path + File.separator + filename;
+    #     File desc = new File(downloadPath);
+    # 而 `path` / `filename` 在中转层由**服务端配置 + 常量**填充（路径不是
+    # 用户可控的），入口体里根本没有这些名字。判 True 是把"切片把无关实现体
+    # 拼进来了"当成"用户能控制路径"。
+    #
+    # 判据：sink 行上的标识符与入口体标识符**零交集** ⇒ 外部输入与路径 sink
+    # 无关联 ⇒ 退回 None（不硬判 False —— 我们只是看不到关联，没证明无关）。
+    #
+    # 反例保护：java-sec-code 的 `return getImgBase64(filepath);` 入口体里有
+    # `filepath`，与 sink 行交集非空 ⇒ 不受本早退影响（回归门禁盯着这条）。
+    if sink_in is not body:
+        _sink_ids = _path_sink_identifiers(sink_in)
+        if _sink_ids and not (_sink_ids & _path_sink_identifiers(body)):
+            return None
+
     # 1) 规范化 + 前缀校验 / 只取文件名 → 目录逃逸被物理阻断
     if PATH_SAFE_RE.search(body):
         return False
@@ -5181,6 +5224,12 @@ _AUTHZ_SUBJECT_RE = re.compile(
     r"|@SessionAttribute|@RequestAttribute"
     r"|\bJwtUtils\s*\.|\bjwtUtils\s*\."
     r"|StpUtil\s*\.\s*getLoginId|SecurityUtils\s*\.\s*getSubject"
+    # M98：mall4j / 常见国产脚手架的 `SecurityUtils.getUser()` —— 与 Shiro 的
+    # `SecurityUtils.getSubject()` 同一机制（从服务端 ThreadLocal / 会话取
+    # 当前登录主体，客户端伪造不了），只是方法名不同。C 端 22 个"按
+    # userId 查自己的地址/订单/购物车"的接口此前因主体源缺失整批判 True。
+    r"|SecurityUtils\s*\.\s*getUser\s*\("
+    r"|\bgetLoginIdAsLong\s*\(|\bgetLoginIdAsString\s*\("
     # Shiro 体系（RuoYi 实测，Module 23）：BaseController/ShiroUtils 的
     # 主体获取助手。裸 getSysUser() 只在 Shiro 项目里是主体链
     # （ShiroUtils.getSysUser → getSubject().getPrincipal()），Java 线
@@ -5192,7 +5241,12 @@ _AUTHZ_SUBJECT_RE = re.compile(
 # / `SysUser user = getSysUser();`。供 2g（主体值直接作 Service 实参）使用。
 _AUTHZ_SUBJECT_CHAIN_VAR_RE = re.compile(
     r"(\w+)\s*=\s*[^;\n]*\b(?:getSysUser\s*\(\s*\)|getSubject\s*\(\s*\)"
-    r"|getPrincipal\s*\(\s*\)|ShiroUtils\s*\.)", re.I)
+    r"|getPrincipal\s*\(\s*\)|ShiroUtils\s*\."
+    # M98：mall4j 形态 —— `String userId = SecurityUtils.getUser().getUserId();`
+    # SecurityUtils 已在 `_AUTHZ_SUBJECT_RE` 里是可信主体源，但"赋给局部变量"
+    # 这条正则此前没登记它，于是 2g（主体值直接作 Service 实参）整批落空，
+    # C 端 22 个按主体查库的接口被当成"入参直查"判 True。
+    r"|SecurityUtils\s*\.)", re.I)
 # Module 38：Spring Security 服务端取主体（mall-portal 形态）——
 # `memberService.getCurrentMember().getId()` 直接作 Service 实参。
 # getCurrentMember 实现里是 SecurityContextHolder 取当前用户（服务端
@@ -5224,6 +5278,12 @@ _AUTHZ_AUTHN_ROUTE_RE = re.compile(
 _AUTHZ_ROLE_RE = re.compile(
     r"@PreAuthorize|@PostAuthorize|@Secured|@RolesAllowed"
     r"|@RequiresRoles|@RequiresPermissions|@PreFilter|@PostFilter"
+    # M97：国产主流鉴权框架 **Sa-Token**。注解式（`@SaCheckPermission` /
+    # `@SaCheckRole` / `@SaCheckLogin` / `@SaIgnore`）在方法签名上，
+    # `entry_body` 里看不到，必须扫 source；编程式 `StpUtil.checkXxx()`
+    # 与注解同义（会话身份已在 StpUtil 里）。
+    r"|@SaCheckPermission|@SaCheckRole|@SaCheckLogin|@SaCheckSafe"
+    r"|@SaCheckDisable|StpUtil\s*\.\s*check(?:Permission|Role|Login|Safe|Disable)"
     r"|\bhasRole\s*\(|\bhasAuthority\s*\(|\bhasAnyRole\s*\("
     r"|checkPermission\s*\(|checkRole\s*\(", re.I)
 
@@ -5285,11 +5345,25 @@ def _ownership_compared(body: str, subject: str) -> bool:
     k = rf"\b{re.escape(subject)}\s*\.\s*get\w*[Ii]d\s*\(\s*\)"
     for m in _IF_RE.finditer(body):
         cond = _balanced_cond(body, m.end())
-        if not cond or not re.search(k, cond):
+        if not cond:
             continue
-        others = set(re.findall(r"([A-Za-z_]\w*)\s*\.\s*get\w*[Ii]d\s*\(\s*\)", cond))
-        if others - {subject}:
-            return True
+        if re.search(k, cond):
+            others = set(re.findall(
+                r"([A-Za-z_]\w*)\s*\.\s*get\w*[Ii]d\s*\(\s*\)", cond))
+            if others - {subject}:
+                return True
+            continue
+        # M98：主体 id 已经**落到局部变量**上的形态（mall4j 实测）。
+        #     `String userId = SecurityUtils.getUser().getUserId();`
+        #     `if (!Objects.equals(order.getUserId(), userId)) throw …`
+        # 此时条件里没有 `subject.getXxxId()`，只有裸变量 userId ——
+        # 上面那条 `k` 正则接不住，而这是"归属写死在 Controller 里比对"
+        # 的标准写法之一（另一侧仍是**另一个对象**的 id 取值）。
+        if re.search(rf"\b{re.escape(subject)}\b", cond):
+            others = set(re.findall(
+                r"([A-Za-z_]\w*)\s*\.\s*get\w*[Ii]d\s*\(\s*\)", cond))
+            if others:
+                return True
     return False
 
 
@@ -6366,6 +6440,37 @@ _SOL_BLOCK_ABORT_RE = re.compile(
     r"require\s*\([^;]*(?:false|0)\s*\))", re.S)
 
 
+# M96：身份**函数**形态的恒等校验 —— `require(_msgSender() == address(POOL))`。
+#
+# Aave V3 / OpenZeppelin / solmate 都把调用者身份封成零参函数（`_msgSender()`、
+# `msgSender()`、`_sender()`）。此时比较的一侧不是 `msg.sender` 字面量，
+# `_SOLIDITY_MSGSENDER_CHECK_RE` 看不见 —— 于是把 `onlyPool` 修饰的函数
+# 判成"缺访问控制"（实测 Aave `AToken.transferOnLiquidation`：修饰符
+# 定义体就在父合约证据段里，`require(_msgSender() == address(POOL), ...)`）。
+#
+# 判据挂机制：require/assert 的条件里出现**恒等**比较（`==`）且一侧是
+# 身份函数。只认 `==` 不认 `!=` —— `require(_msgSender() != address(0))`
+# 是"调用者非零地址"，不是授权判定（把它算成保护会造出假阴性）。
+_SOL_IDENTITY_FN_RE = re.compile(
+    r"\bmsg\s*\.\s*sender\b|_msgSender\s*\(\s*\)|msgSender\s*\(\s*\)|"
+    r"_sender\s*\(\s*\)")
+
+
+def _sol_identity_call_check(text: str) -> bool:
+    """require/assert 条件里是否有"身份函数 == 主体"的恒等比较（M96）。"""
+    for m in re.finditer(r"\b(?:require|assert)\s*\(", text):
+        close = _sol_match_paren(text, m.end() - 1)
+        if close < 0:
+            continue
+        cond = text[m.end():close]
+        if "==" not in cond:
+            continue
+        if not _SOL_IDENTITY_FN_RE.search(cond):
+            continue
+        return True
+    return False
+
+
 def _sol_block_aborts(body: str) -> bool:
     """`if (...) { ... }` 块里是否有**中止**语义。
 
@@ -7303,7 +7408,8 @@ def solidity_access_verdict(source: str) -> bool | None:
     # only_uninitialized 只查 m_numOwners）也**不算**保护 —— 把状态门
     # 当保护会把 initWallet 判反，方向错误比退回恶劣得多。
     protected = bool(_SOLIDITY_MSGSENDER_CHECK_RE.search(func_src)
-                     or _SOLIDITY_MSGSENDER_MEMBER_RE.search(func_src))
+                     or _SOLIDITY_MSGSENDER_MEMBER_RE.search(func_src)
+                     or _sol_identity_call_check(func_src))
     if not protected and _sol_identity_alias_check(func_src):
         protected = True
     if not protected and re.search(
@@ -7316,7 +7422,8 @@ def solidity_access_verdict(source: str) -> bool | None:
     if not protected and mod_block:
         for body in _sol_modifier_bodies(mod_block):
             if (_SOLIDITY_MSGSENDER_CHECK_RE.search(body)
-                    or _SOLIDITY_MSGSENDER_MEMBER_RE.search(body)):
+                    or _SOLIDITY_MSGSENDER_MEMBER_RE.search(body)
+                    or _sol_identity_call_check(body)):
                 protected = True
                 break
             # M54：块形态 `if (msg.sender != owner) { throw; }` ——

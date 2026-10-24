@@ -46,6 +46,11 @@ REPOS = [
     ("OpenZeppelin",
      "reference_repos/openzeppelin-contracts/contracts",
      "openzeppelin", ["--strict"]),
+    ("AaveV3", "reference_repos/aave-v3-core/contracts",
+     "aavev3", ["--strict"]),
+    ("waynboot-mall", "reference_repos/waynboot-mall",
+     "waynboot", ["--strict"]),
+    ("mall4j", "reference_repos/mall4j", "mall4j", ["--strict"]),
     ("UniswapV3", "reference_repos/uniswap-v3-core/contracts",
      "uniswapv3", ["--strict"]),
     ("FastAPI", "reference_repos/fastapi-sql-template",
@@ -62,7 +67,7 @@ def _run(cmd: list[str], timeout: int = 900) -> tuple[int, str, float]:
     return p.returncode, (p.stdout or "") + (p.stderr or ""), time.monotonic() - t0
 
 
-def collect_scan(name: str, rel: str) -> dict:
+def collect_scan(name: str, rel: str, advisory_root: str | None = None) -> dict:
     repo = ROOT / rel
     out = OUTDIR / name
     out.mkdir(parents=True, exist_ok=True)
@@ -71,6 +76,10 @@ def collect_scan(name: str, rel: str) -> dict:
            "--output", str(out / "report.md"),
            "--html", str(out / "report.html"),
            "--sarif", str(out / "report.sarif")]
+    # M99：按独立根因导出 GHSA 披露草稿（每仓一个子目录）。
+    # 与 --advisory-dir 单仓用法同一口径：按根因去重，不按路由。
+    if advisory_root:
+        cmd += ["--advisory-dir", str(Path(advisory_root) / name)]
     rc, log, wall = _run(cmd)
     summary = {}
     if (out / "summary.json").exists():
@@ -115,6 +124,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--skip-bench", action="store_true")
     ap.add_argument("--only", default=None, help="只跑一个仓库（显示名）")
+    ap.add_argument("--advisory-dir", default=None,
+                    help="M99：把全部确认根因导出成 GHSA 披露草稿（每仓一子目录）")
     args = ap.parse_args()
 
     records = []
@@ -125,7 +136,7 @@ def main() -> int:
             print(f"SKIP {name}（缺少 {rel}）")
             continue
         print(f"[scan] {name} ...", flush=True)
-        rec = collect_scan(name, rel)
+        rec = collect_scan(name, rel, args.advisory_dir)
         print(f"       rc={rec['scan_rc']} units={rec['summary'].get('total_units')}"
               f" p0={rec['summary'].get('p0_confirmed')}"
               f" wall={rec['wall_s']}s", flush=True)
@@ -138,6 +149,14 @@ def main() -> int:
 
     agg = {"generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
            "repos": records}
+    if args.advisory_dir:
+        adv = Path(args.advisory_dir)
+        n_adv = sum(1 for _ in adv.rglob("GHSA-*.md")) if adv.exists() else 0
+        n_repos_adv = (sum(1 for p in adv.iterdir() if p.is_dir())
+                       if adv.exists() else 0)
+        agg["advisories"] = {"dir": str(adv), "files": n_adv,
+                             "repos": n_repos_adv}
+        print(f"\n披露草稿：{n_adv} 份 / {n_repos_adv} 个仓 → {adv}")
     if not args.only:
         AGG.write_text(json.dumps(agg, ensure_ascii=False, indent=2),
                        encoding="utf-8")

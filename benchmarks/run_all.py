@@ -158,6 +158,27 @@ JOBS = [
     ("DjanGoat (Django urls.py 路由表)",
      ["benchmarks/benchmark_djangoat.py", "--strict"],
      "reference_repos/DjanGoat", "target", True),
+    # 第 32 靶场（Module 97）：waynboot-mall（Sa-Token 双端商城）。
+    # 国产鉴权框架注解/编程式语义 + 全局 CORS 缺陷折叠：163 条路由级命中
+    # 全部来自同一份 `allowedOriginPatterns("*") + allowCredentials(true)`，
+    # 必须折叠成 **1 个**全局根因；cors 以外的 True 一律算误报。
+    ("waynboot-mall (Sa-Token 双端商城)",
+     ["benchmarks/benchmark_waynboot.py", "--strict"],
+     "reference_repos/waynboot-mall", "target", True),
+    # 第 33 靶场（Module 98）：mall4j（主体链 `SecurityUtils.getUser()`）。
+    # C 端五个"我的资源"控制器必须 authz 零 True（归属写死在查询条件里）；
+    # 公开资源查询与后台上传如实登记为人工复核面（计数冻结，涨一条就红）。
+    ("mall4j (主体链多模块商城)",
+     ["benchmarks/benchmark_mall4j.py", "--strict"],
+     "reference_repos/mall4j", "target", True),
+    # 第 31 靶场（Module 96）：Aave V3 逻辑库委托架构 + ACL 角色表。
+    # 修 `id" 身份函数形态（`require(_msgSender() == address(POOL))`）——
+    # Aave/OZ/solmate 都把调用者身份封成零参函数，只认 msg.sender 字面量会
+    # 把 onlyPool 修饰的函数判成缺访问控制。275 生产入口 / 0 True，
+    # 另立一条**反向锚点**（mocks 里真的无权限 selfdestruct 必须判得出 True）。
+    ("Aave V3 (借贷协议·逻辑库委托)",
+     ["benchmarks/benchmark_aavev3.py", "--strict"],
+     "reference_repos/aave-v3-core/contracts", "target", True),
     # 第 30 靶场（Module 95）：OpenZeppelin 标准安全基元库。这条门禁的问法
     # 与别处相反：不是"漏洞找得准不准"，而是"**会不会把安全写法当成漏洞**"。
     # M95 实测 8 条 True 全为框架级安全写法，逐条补判据后收到 0 条：

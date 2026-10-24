@@ -7,8 +7,8 @@
 `--strict` 离线门禁，`pre-push` 与 `run_all.py`（21 项）各有一道（见
 [多语言靶场](#多语言靶场21-个仓库全部离线门禁)）。
 
-开工前可跑只读自检：`python cli.py doctor` —— 依赖就位 / 23 类规则注册表
-verdict 路由全覆盖 / 缓存指纹算法稳定 / 17 类补丁器就位 / PoC 合成器三语言自检 /
+开工前可跑只读自检：`python cli.py doctor` —— 依赖就位 / 24 类规则注册表
+verdict 路由全覆盖 / 缓存指纹算法稳定 / 18 类补丁器就位 / PoC 合成器三语言自检 /
 覆盖地板达标 / SCOREBOARD 与现算结果同步 / 正则卫生零死正则，五段报告，
 exit 0 即全部就绪。
 
@@ -49,8 +49,8 @@ nexus-audit/
 | `core/context/config_resolver.py` | 解析 .properties/.yaml/.json，把代码里引用的配置键回填进切片 |
 | `core/context/java_impl_resolver.py` | MyBatis 注解/XML、接口实现体的跨文件证据（`#{}` vs `${}` 的真值在这里） |
 | `core/context/taint_chain.py` | 跨路由串接：按介质+键名把「写入点」与「读取点」配对，存储型 XSS 靠它判定 |
-| `core/agents/vuln_categories.py` | 23 类漏洞的 Scenario/Property 定义（11 类 OWASP + Java 生态 + Python Web + Solidity 链上 + 凭证/JWT 类） |
-| `core/agents/rule_detectors.py` | 客观事实的确定性判定（23 类判据入口，先于 LLM 执行） |
+| `core/agents/vuln_categories.py` | 24 类漏洞的 Scenario/Property 定义（11 类 OWASP + Java 生态 + Python Web + Solidity 链上 + 凭证/JWT 类） |
+| `core/agents/rule_detectors.py` | 客观事实的确定性判定（24 类判据入口，先于 LLM 执行） |
 | `benchmarks/benchmark_owasp.py` | OWASP Benchmark 跑分（TPR/FPR/Score，含断点续跑与误差归因） |
 | `benchmarks/benchmark_javaseccode.py` | 真实项目（java-sec-code）评测，真值取自路由命名 + 作者注释 |
 | `benchmarks/benchmark_vulpy.py` | Python Web 靶场（bad/good 成对真值），`--strict` 零退回门禁 |
@@ -105,7 +105,7 @@ python cli.py scan <目标仓库> --auto --baseline baseline.sarif
 - **状态互斥锁（M79）**：Solidity 自定义 `modifier lock()`（前检 + 加锁 +
   `_;` + 解锁）按结构识别为安全，Uniswap V3 67 个生产入口 0 误报；
 - **JWT 验签（M81/M82）**：`jwt_weakness` 命中 `alg=none` / 关验签 /
-  `parseClaimsJwt`；第 17 类补丁器强制验签并重切自检；
+  `parseClaimsJwt`；第 18 类补丁器强制验签并重切自检；
 - **CVSS 3.1（M83）**：GHSA/SARIF/HTML 统一输出标准向量、浮点分值与
   `security-severity`（GitHub Code Scanning 原生徽章）；
 - **增量基线（M84）**：`--baseline prev.sarif` 抑制存量根因，只报本次净增；
@@ -115,11 +115,11 @@ python cli.py scan <目标仓库> --auto --baseline baseline.sarif
   P2 [Review-Needed 存疑候选]** 三档渲染（Markdown 分区 / HTML 折叠
   卡片 / SARIF `properties.priority`），HTML 为零外部依赖单文件。
 
-十一个真实开源项目（1,554 个入口，Java 7 + Python 2 + Solidity 2）的实弹数据与逐条源码复核见
+**十七个**真实开源项目（4,791 个入口，Java 9 + Python 3 + Solidity 5）的实弹数据与逐条源码复核见
 [`WILD_HUNT_REPORT.md`](WILD_HUNT_REPORT.md)；复现脚本
 `benchmarks/wild_hunt.py`（所有数字落盘 `benchmarks/results/wild_hunt.json`）。
 
-## 多语言靶场：27 项离线门禁（24 个靶场 + 冒烟 / 争议 / 地板）
+## 多语言靶场：33 项离线门禁（30 个靶场/校验 + 冒烟 / 争议 / 地板）
 
 ```bash
 # 一键跑全部（不调模型，约 1 分钟；任一靶场 strict 失败即退出非零）
@@ -148,6 +148,12 @@ python benchmarks/benchmark_vulpy.py --strict
 | Solidity | compound-protocol（生产级 DeFi） | M73 生产 `contracts/` 零 True 压测 | 450 入口 / 四类 0 误报 / 三锚点 False |
 | Solidity | Uniswap V3（生产级 DEX） | M79 自定义状态互斥锁 `lock()` 结构识别 | 67 生产入口 / 0 True / mint/burn/swap/flash/collect 全 False |
 | Python | FastAPI + SQLAlchemy 2.0（真实模板） | M80 async / Depends / ORM 表达式 | 9 异步入口 / 0 True / users authz 全 False |
+| Solidity | compound-finance/comet（Compound V3） | M87 0.8.15 unchecked + 自定义错误 | 435 入口 / 0 True / 四锚点 False |
+| Python | DjanGoat（OWASP RailsGoat 的 Django 版） | M88 urls.py 路由表真值 11 条 + M90 redir 1 条 | 36 入口 / 23 路由证据 / 真值 12/12 / 0 误报 |
+| Solidity | OpenZeppelin 标准安全基元库 | M95 零误报极限压测（**反向门禁**） | 576 生产入口 / 0 True / 全库 2558 也 0 True |
+| Solidity | Aave V3（逻辑库委托 + ACL 角色表） | M96 身份函数形态 + 反向锚点 | 275 生产入口 / 0 True / mocks 真漏洞仍判 True |
+| Java | waynboot-mall（Sa-Token 双端商城） | M97 Sa-Token 语义 + 全局 CORS 折叠 | 163 入口 / 163 命中折叠成 1 根因 / cors 外零 True |
+| Java | mall4j（SecurityUtils.getUser() 主体链） | M98 主体链全覆盖 | 139 入口 / C 端五控制器 authz 零 True / CORS 折叠成 1 |
 | Solidity | damn-vulnerable-defi | 无真值（经济逻辑漏洞） | 健壮性抽检：切片 164 单元、True ≤8 |
 | Solidity | smartbugs-curated | 官方行号 `vulnerabilities.json` | safe 零误报、零判反（parity kill 记 DISPUTED） |
 | Solidity | DeFiVulnLabs | **成对 vuln/fixed，按行号标定** | 零误报 / 零判反 / 真值表全命中（9/9 满贯） |
@@ -164,7 +170,7 @@ python benchmarks/benchmark_vulpy.py --strict
 `pre-push` 会依次跑 **17 道门禁**（14 段靶场基线 + 冒烟 + 争议登记核对 + 覆盖地板）；
 CI 上没有靶场仓库，因此全量 strict 由本地钩子承担（见 `.githooks/pre-push`）。
 
-规则层现状：**23 类判据入口**（`rule_detectors.verdict()` 统一路由，空源码必须
+规则层现状：**24 类判据入口**（`rule_detectors.verdict()` 统一路由，空源码必须
 退 None）+ **17 类确定性补丁器**（命中→补丁→重切片→规则翻 False→finally 字节级
 还原的自检闭环，`--fix` 触发）。冒烟断言 `[1]`-`[122]` 共 702 项，秒级不调模型。
 

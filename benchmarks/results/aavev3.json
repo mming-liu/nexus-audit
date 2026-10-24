@@ -1,0 +1,53 @@
+{
+  "bench": "aavev3",
+  "units": 275,
+  "total_units": 275,
+  "all_units": 672,
+  "decided": 275,
+  "correct": 275,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 610,
+  "anchors": [
+    {
+      "unit": "protocol/tokenization/AToken.sol:transferOnLiquidation",
+      "category": "access_control",
+      "want": "False",
+      "got": false,
+      "ok": true,
+      "missing": false
+    },
+    {
+      "unit": "protocol/tokenization/AToken.sol:burn",
+      "category": "access_control",
+      "want": "False",
+      "got": false,
+      "ok": true,
+      "missing": false
+    },
+    {
+      "unit": "protocol/tokenization/VariableDebtToken.sol:mint",
+      "category": "access_control",
+      "want": "False",
+      "got": false,
+      "ok": true,
+      "missing": false
+    },
+    {
+      "unit": "protocol/libraries/logic/LiquidationLogic.sol:executeLiquidationCall",
+      "category": "arithmetic",
+      "want": "False",
+      "got": false,
+      "ok": true,
+      "missing": false
+    }
+  ],
+  "true_anchor": {
+    "unit": "mocks/helpers/SelfDestructTransfer.sol:destroyAndTransfer",
+    "category": "access_control",
+    "want": "True",
+    "got": true,
+    "ok": true
+  },
+  "true_rows": []
+}

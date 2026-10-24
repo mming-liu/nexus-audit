@@ -1,0 +1,837 @@
+{
+  "bench": "waynboot",
+  "units": 163,
+  "total_units": 163,
+  "decided": 163,
+  "correct": 163,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 687,
+  "global_cors_hit": true,
+  "sa_token_anchors": {
+    "@SaCheckPermission": true,
+    "@SaCheckRole": true,
+    "@SaCheckLogin": true,
+    "StpUtil.checkPermission": true,
+    "StpUtil.checkLogin": true,
+    "StpUtil.getLoginIdAsLong 主体来源": true
+  },
+  "true_rows": [
+    {
+      "file": "SeckillOrderCallbackController.java",
+      "unit": "SeckillOrderCallbackController.submit",
+      "category": "cors"
+    },
+    {
+      "file": "SeckillOrderCallbackController.java",
+      "unit": "SeckillOrderCallbackController.unpaid",
+      "category": "cors"
+    },
+    {
+      "file": "SubmitOrderController.java",
+      "unit": "SubmitOrderController.submit",
+      "category": "cors"
+    },
+    {
+      "file": "UnpaidOrderController.java",
+      "unit": "UnpaidOrderController.unpaid",
+      "category": "cors"
+    },
+    {
+      "file": "CategoryController.java",
+      "unit": "CategoryController.index",
+      "category": "cors"
+    },
+    {
+      "file": "CategoryController.java",
+      "unit": "CategoryController.content",
+      "category": "cors"
+    },
+    {
+      "file": "CategoryController.java",
+      "unit": "CategoryController.firstCateGoods",
+      "category": "cors"
+    },
+    {
+      "file": "CategoryController.java",
+      "unit": "CategoryController.secondCateGoods",
+      "category": "cors"
+    },
+    {
+      "file": "CommentController.java",
+      "unit": "CommentController.list",
+      "category": "cors"
+    },
+    {
+      "file": "CommentController.java",
+      "unit": "CommentController.tagNum",
+      "category": "cors"
+    },
+    {
+      "file": "GoodsController.java",
+      "unit": "GoodsController.detail",
+      "category": "cors"
+    },
+    {
+      "file": "HomeController.java",
+      "unit": "HomeController.index",
+      "category": "cors"
+    },
+    {
+      "file": "HomeController.java",
+      "unit": "HomeController.mallConfig",
+      "category": "cors"
+    },
+    {
+      "file": "HomeController.java",
+      "unit": "HomeController.recommonGoodsList",
+      "category": "cors"
+    },
+    {
+      "file": "SearchController.java",
+      "unit": "SearchController.sugguest",
+      "category": "cors"
+    },
+    {
+      "file": "SearchController.java",
+      "unit": "SearchController.result",
+      "category": "cors"
+    },
+    {
+      "file": "SearchController.java",
+      "unit": "SearchController.hotKeywords",
+      "category": "cors"
+    },
+    {
+      "file": "SearchHistoryController.java",
+      "unit": "SearchHistoryController.list",
+      "category": "cors"
+    },
+    {
+      "file": "SearchHistoryController.java",
+      "unit": "SearchHistoryController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SearchHistoryController.java",
+      "unit": "SearchHistoryController.delete#2",
+      "category": "cors"
+    },
+    {
+      "file": "CouponController.java",
+      "unit": "CouponController.fontList",
+      "category": "cors"
+    },
+    {
+      "file": "CouponController.java",
+      "unit": "CouponController.receive",
+      "category": "cors"
+    },
+    {
+      "file": "CouponController.java",
+      "unit": "CouponController.myList",
+      "category": "cors"
+    },
+    {
+      "file": "DiamondController.java",
+      "unit": "DiamondController.getGoodsList",
+      "category": "cors"
+    },
+    {
+      "file": "SeckillController.java",
+      "unit": "SeckillController.list",
+      "category": "cors"
+    },
+    {
+      "file": "SeckillController.java",
+      "unit": "SeckillController.detail",
+      "category": "cors"
+    },
+    {
+      "file": "SeckillController.java",
+      "unit": "SeckillController.token",
+      "category": "cors"
+    },
+    {
+      "file": "SeckillController.java",
+      "unit": "SeckillController.submit",
+      "category": "cors"
+    },
+    {
+      "file": "SeckillController.java",
+      "unit": "SeckillController.result",
+      "category": "cors"
+    },
+    {
+      "file": "AddressController.java",
+      "unit": "AddressController.list",
+      "category": "cors"
+    },
+    {
+      "file": "AddressController.java",
+      "unit": "AddressController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.login",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.logout",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.captcha",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.genMobileCode",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.getInfo",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.updateProfile",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.uploadAvatar",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.updatePassword",
+      "category": "cors"
+    },
+    {
+      "file": "CartController.java",
+      "unit": "CartController.list",
+      "category": "cors"
+    },
+    {
+      "file": "CartController.java",
+      "unit": "CartController.addDefaultGoodsProduct",
+      "category": "cors"
+    },
+    {
+      "file": "CartController.java",
+      "unit": "CartController.changeNum",
+      "category": "cors"
+    },
+    {
+      "file": "CartController.java",
+      "unit": "CartController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "CartController.java",
+      "unit": "CartController.goodsCount",
+      "category": "cors"
+    },
+    {
+      "file": "CartController.java",
+      "unit": "CartController.getCheckedGoods",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.detail",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.list",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.statusCount",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.submit",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.searchResult",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.cancel",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.confirm",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "OrderRefundController.java",
+      "unit": "OrderRefundController.refund",
+      "category": "cors"
+    },
+    {
+      "file": "PayController.java",
+      "unit": "PayController.prepay",
+      "category": "cors"
+    },
+    {
+      "file": "PayNotifyController.java",
+      "unit": "PayNotifyController.wxPayNotify",
+      "category": "cors"
+    },
+    {
+      "file": "PayNotifyController.java",
+      "unit": "PayNotifyController.aliPayNotify",
+      "category": "cors"
+    },
+    {
+      "file": "PayNotifyController.java",
+      "unit": "PayNotifyController.epayNotify",
+      "category": "cors"
+    },
+    {
+      "file": "WxController.java",
+      "unit": "WxController.jsSdkInit",
+      "category": "cors"
+    },
+    {
+      "file": "CommonFileController.java",
+      "unit": "CommonFileController.fileDownload",
+      "category": "cors"
+    },
+    {
+      "file": "CommonFileController.java",
+      "unit": "CommonFileController.downloadTemplate",
+      "category": "cors"
+    },
+    {
+      "file": "CommonFileController.java",
+      "unit": "CommonFileController.uploadFile",
+      "category": "cors"
+    },
+    {
+      "file": "CommonFileController.java",
+      "unit": "CommonFileController.base64uploadFile",
+      "category": "cors"
+    },
+    {
+      "file": "CommonFileController.java",
+      "unit": "CommonFileController.base64uploadFileList",
+      "category": "cors"
+    },
+    {
+      "file": "TradeOpsController.java",
+      "unit": "TradeOpsController.listFailedLocalMessages",
+      "category": "cors"
+    },
+    {
+      "file": "TradeOpsController.java",
+      "unit": "TradeOpsController.retryFailedLocalMessage",
+      "category": "cors"
+    },
+    {
+      "file": "TradeOpsController.java",
+      "unit": "TradeOpsController.countLocalMessageMetric",
+      "category": "cors"
+    },
+    {
+      "file": "TradeOpsController.java",
+      "unit": "TradeOpsController.refreshStockSnapshot",
+      "category": "cors"
+    },
+    {
+      "file": "TradeOpsController.java",
+      "unit": "TradeOpsController.reconcileInventory",
+      "category": "cors"
+    },
+    {
+      "file": "TradeOpsController.java",
+      "unit": "TradeOpsController.reconcilePayment",
+      "category": "cors"
+    },
+    {
+      "file": "AddressController.java",
+      "unit": "AddressController.list",
+      "category": "cors"
+    },
+    {
+      "file": "AddressController.java",
+      "unit": "AddressController.info",
+      "category": "cors"
+    },
+    {
+      "file": "BannerController.java",
+      "unit": "BannerController.list",
+      "category": "cors"
+    },
+    {
+      "file": "BannerController.java",
+      "unit": "BannerController.getBanner",
+      "category": "cors"
+    },
+    {
+      "file": "BannerController.java",
+      "unit": "BannerController.deleteBanner",
+      "category": "cors"
+    },
+    {
+      "file": "CategoryController.java",
+      "unit": "CategoryController.list",
+      "category": "cors"
+    },
+    {
+      "file": "CategoryController.java",
+      "unit": "CategoryController.getCategory",
+      "category": "cors"
+    },
+    {
+      "file": "CategoryController.java",
+      "unit": "CategoryController.deleteCategory",
+      "category": "cors"
+    },
+    {
+      "file": "ColumnController.java",
+      "unit": "ColumnController.list",
+      "category": "cors"
+    },
+    {
+      "file": "ColumnController.java",
+      "unit": "ColumnController.listAll",
+      "category": "cors"
+    },
+    {
+      "file": "ColumnController.java",
+      "unit": "ColumnController.getColumn",
+      "category": "cors"
+    },
+    {
+      "file": "ColumnController.java",
+      "unit": "ColumnController.deleteColumn",
+      "category": "cors"
+    },
+    {
+      "file": "ColumnController.java",
+      "unit": "ColumnController.bindGoodsList",
+      "category": "cors"
+    },
+    {
+      "file": "ColumnController.java",
+      "unit": "ColumnController.unBindGoodsList",
+      "category": "cors"
+    },
+    {
+      "file": "ColumnController.java",
+      "unit": "ColumnController.addGoods",
+      "category": "cors"
+    },
+    {
+      "file": "ColumnController.java",
+      "unit": "ColumnController.deleteGoods",
+      "category": "cors"
+    },
+    {
+      "file": "CommentController.java",
+      "unit": "CommentController.list",
+      "category": "cors"
+    },
+    {
+      "file": "CommentController.java",
+      "unit": "CommentController.getComment",
+      "category": "cors"
+    },
+    {
+      "file": "CommentController.java",
+      "unit": "CommentController.delComment",
+      "category": "cors"
+    },
+    {
+      "file": "CouponController.java",
+      "unit": "CouponController.list",
+      "category": "cors"
+    },
+    {
+      "file": "CouponController.java",
+      "unit": "CouponController.getShopCoupon",
+      "category": "cors"
+    },
+    {
+      "file": "CouponController.java",
+      "unit": "CouponController.deleteShopCoupon",
+      "category": "cors"
+    },
+    {
+      "file": "CouponController.java",
+      "unit": "CouponController.giveUser",
+      "category": "cors"
+    },
+    {
+      "file": "DashboardController.java",
+      "unit": "DashboardController.stats",
+      "category": "cors"
+    },
+    {
+      "file": "DashboardController.java",
+      "unit": "DashboardController.trend",
+      "category": "cors"
+    },
+    {
+      "file": "DashboardController.java",
+      "unit": "DashboardController.period",
+      "category": "cors"
+    },
+    {
+      "file": "DashboardController.java",
+      "unit": "DashboardController.paymentChannel",
+      "category": "cors"
+    },
+    {
+      "file": "DashboardController.java",
+      "unit": "DashboardController.topGoods",
+      "category": "cors"
+    },
+    {
+      "file": "DashboardController.java",
+      "unit": "DashboardController.lowStockGoods",
+      "category": "cors"
+    },
+    {
+      "file": "DashboardController.java",
+      "unit": "DashboardController.memberTrend",
+      "category": "cors"
+    },
+    {
+      "file": "DashboardController.java",
+      "unit": "DashboardController.recent",
+      "category": "cors"
+    },
+    {
+      "file": "DiamondController.java",
+      "unit": "DiamondController.list",
+      "category": "cors"
+    },
+    {
+      "file": "DiamondController.java",
+      "unit": "DiamondController.getDiamond",
+      "category": "cors"
+    },
+    {
+      "file": "DiamondController.java",
+      "unit": "DiamondController.deleteDiamond",
+      "category": "cors"
+    },
+    {
+      "file": "GoodsController.java",
+      "unit": "GoodsController.list",
+      "category": "cors"
+    },
+    {
+      "file": "GoodsController.java",
+      "unit": "GoodsController.getGoods",
+      "category": "cors"
+    },
+    {
+      "file": "GoodsController.java",
+      "unit": "GoodsController.deleteGoods",
+      "category": "cors"
+    },
+    {
+      "file": "GoodsController.java",
+      "unit": "GoodsController.syncEs",
+      "category": "cors"
+    },
+    {
+      "file": "KeywordController.java",
+      "unit": "KeywordController.list",
+      "category": "cors"
+    },
+    {
+      "file": "KeywordController.java",
+      "unit": "KeywordController.getKeyword",
+      "category": "cors"
+    },
+    {
+      "file": "KeywordController.java",
+      "unit": "KeywordController.deleteKeyword",
+      "category": "cors"
+    },
+    {
+      "file": "MemberController.java",
+      "unit": "MemberController.list",
+      "category": "cors"
+    },
+    {
+      "file": "MemberController.java",
+      "unit": "MemberController.getMember",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.list",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.info",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.deleteOrder",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.refund",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.channel",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.ship",
+      "category": "cors"
+    },
+    {
+      "file": "OrderController.java",
+      "unit": "OrderController.export",
+      "category": "cors"
+    },
+    {
+      "file": "SeckillController.java",
+      "unit": "SeckillController.list",
+      "category": "cors"
+    },
+    {
+      "file": "SeckillController.java",
+      "unit": "SeckillController.detail",
+      "category": "cors"
+    },
+    {
+      "file": "SeckillController.java",
+      "unit": "SeckillController.publish",
+      "category": "cors"
+    },
+    {
+      "file": "SeckillController.java",
+      "unit": "SeckillController.offline",
+      "category": "cors"
+    },
+    {
+      "file": "SeckillController.java",
+      "unit": "SeckillController.preheat",
+      "category": "cors"
+    },
+    {
+      "file": "SeckillController.java",
+      "unit": "SeckillController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "DeptController.java",
+      "unit": "DeptController.list",
+      "category": "cors"
+    },
+    {
+      "file": "DeptController.java",
+      "unit": "DeptController.treeselect",
+      "category": "cors"
+    },
+    {
+      "file": "DeptController.java",
+      "unit": "DeptController.getDept",
+      "category": "cors"
+    },
+    {
+      "file": "DeptController.java",
+      "unit": "DeptController.deleteDept",
+      "category": "cors"
+    },
+    {
+      "file": "DictDataController.java",
+      "unit": "DictDataController.list",
+      "category": "cors"
+    },
+    {
+      "file": "DictDataController.java",
+      "unit": "DictDataController.selectTypeList",
+      "category": "cors"
+    },
+    {
+      "file": "DictDataController.java",
+      "unit": "DictDataController.dictType",
+      "category": "cors"
+    },
+    {
+      "file": "DictDataController.java",
+      "unit": "DictDataController.getDict",
+      "category": "cors"
+    },
+    {
+      "file": "DictDataController.java",
+      "unit": "DictDataController.deleteDict",
+      "category": "cors"
+    },
+    {
+      "file": "DictTypeController.java",
+      "unit": "DictTypeController.list",
+      "category": "cors"
+    },
+    {
+      "file": "DictTypeController.java",
+      "unit": "DictTypeController.getDict",
+      "category": "cors"
+    },
+    {
+      "file": "DictTypeController.java",
+      "unit": "DictTypeController.deleteDict",
+      "category": "cors"
+    },
+    {
+      "file": "DictTypeController.java",
+      "unit": "DictTypeController.export",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.login",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.userInfo",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.getRouters",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.captcha",
+      "category": "cors"
+    },
+    {
+      "file": "MenuController.java",
+      "unit": "MenuController.list",
+      "category": "cors"
+    },
+    {
+      "file": "MenuController.java",
+      "unit": "MenuController.treeselect",
+      "category": "cors"
+    },
+    {
+      "file": "MenuController.java",
+      "unit": "MenuController.roleMenuTreeselect",
+      "category": "cors"
+    },
+    {
+      "file": "MenuController.java",
+      "unit": "MenuController.getMenu",
+      "category": "cors"
+    },
+    {
+      "file": "MenuController.java",
+      "unit": "MenuController.deleteMenu",
+      "category": "cors"
+    },
+    {
+      "file": "ProfileController.java",
+      "unit": "ProfileController.updatePwd",
+      "category": "cors"
+    },
+    {
+      "file": "ProfileController.java",
+      "unit": "ProfileController.avatar",
+      "category": "cors"
+    },
+    {
+      "file": "RoleController.java",
+      "unit": "RoleController.list",
+      "category": "cors"
+    },
+    {
+      "file": "RoleController.java",
+      "unit": "RoleController.changeStatus",
+      "category": "cors"
+    },
+    {
+      "file": "RoleController.java",
+      "unit": "RoleController.getRole",
+      "category": "cors"
+    },
+    {
+      "file": "RoleController.java",
+      "unit": "RoleController.deleteRole",
+      "category": "cors"
+    },
+    {
+      "file": "RoleController.java",
+      "unit": "RoleController.export",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.list",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.getInfo",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.resetPwd",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.changeStatus",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.deleteUser",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.export",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.importData",
+      "category": "cors"
+    },
+    {
+      "file": "EmailConfigController.java",
+      "unit": "EmailConfigController.sendMail",
+      "category": "cors"
+    }
+  ],
+  "fp_rows": []
+}
