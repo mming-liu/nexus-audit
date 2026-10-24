@@ -126,7 +126,7 @@ FLOORS = {
     "vampi": 7,             # VAmPI 7/7（M37）
     "mall": 16,             # mall 16/16（M38）
     "vulpy": 6,
-    "pygoat": 9,
+    "pygoat": 10,           # M69 补登 command_injection_lab:lab2 eval()
     "ruoyi": 159,
     "eladminmp": 53,
     "webgoat": 6,             # WebGoat 6/6（M46，教学关卡成对真值）

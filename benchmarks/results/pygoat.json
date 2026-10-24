@@ -1,10 +1,10 @@
 {
   "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\pygoat-master",
   "total_units": 119,
-  "truth_rows": 9,
+  "truth_rows": 10,
   "missing": [],
-  "decided": 9,
-  "correct": 9,
+  "decided": 10,
+  "correct": 10,
   "fp": 0,
   "reverse_fn": 0,
   "fallback": [],

@@ -60,6 +60,11 @@ TRUTH: list[tuple[str, str, str, bool, str]] = [
      "# Vulnerable SQL query construction (intentional)"),
     ("command_injection_lab", "lab1", "cmdi", True,
      "# Intentionally vulnerable command execution"),
+    # M69 补登：lab2 的 eval() 是作者写明的代码执行面（既有真值表漏收，
+    # 规则层补上 Python 裸 eval sink 后被"计划外 True"挡下 —— 收真值，
+    # 不静默放行）。
+    ("command_injection_lab", "lab2", "spel", True,
+     '"""Lab 2: Python eval() Code Execution"""'),
     ("insec_des_lab", "deserialize_data", "deserial", True,
      "# Intentionally vulnerable deserialization, matching PyGoat"),
     ("software_integrity_lab", "lab1", "deserial", True,
@@ -202,7 +207,8 @@ def main() -> int:
         if bad:
             print("STRICT FAIL ✘ " + "；".join(bad))
             return 1
-        print("STRICT PASS ✔ （作者指名 9/9 全 True / 零计划外 True / 覆盖在线）")
+        print(f"STRICT PASS ✔ （作者指名 {len(rows)}/{len(rows)} 全 True"
+              " / 零计划外 True / 覆盖在线）")
     return 0
 
 

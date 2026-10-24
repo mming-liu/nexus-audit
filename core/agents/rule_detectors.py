@@ -622,8 +622,12 @@ def deserial_verdict(source: str) -> bool | None:
 
 EXPR_SINK_RE = re.compile(
     r"parseExpression\s*\(|SpelExpressionParser|ExpressionParser|"
-    r"\.getValue\s*\(|\.evaluate\s*\(|GroovyShell|"
-    r"ScriptEngine.*\.eval\s*\(|engine\s*\.\s*eval\s*\(", re.I)
+    r"GroovyShell|ScriptEngine.*\.eval\s*\(|engine\s*\.\s*eval\s*\(|"
+    r"ImageMath\s*\.\s*eval\s*\(|(?<![\w.])eval\s*\(|"
+    # 裸 `.getValue()` 太宽：Cookie.getValue() / Map.Entry.getValue() 都会
+    # 命中（RuoYi 实测 2 条 FP）。只认 SpEL 表达式变量名的接收者。
+    r"\b(?:ex|exp|expr|expression|spel|parser)\w*\s*\.\s*"
+    r"(?:getValue|evaluate)\s*\(", re.I)
 EXPR_STANDARD_CTX_RE = re.compile(r"new\s+StandardEvaluationContext\s*\(", re.I)
 EXPR_SIMPLE_CTX_RE = re.compile(r"SimpleEvaluationContext|"
                                 r"forReadOnlyDataBinding|forPropertyAccessors", re.I)
@@ -4728,6 +4732,28 @@ def _path_suffix_cut_masks_taint(body: str, helpers: str = "") -> bool:
     return checked
 
 
+def _sink_call_args(line: str, start: int) -> str:
+    """取 sink 调用括号内的实参文本（从 match 起点后第一个 `(` 起配平）。"""
+    i = line.find("(", start)
+    if i < 0:
+        return line[start:]
+    depth = 0
+    for j in range(i, len(line)):
+        if line[j] == "(":
+            depth += 1
+        elif line[j] == ")":
+            depth -= 1
+            if depth == 0:
+                return line[i + 1:j]
+    return line[i + 1:]
+
+
+_PATH_REQUEST_READ_RE = re.compile(
+    r"\brequest\s*\.\s*(?:getParameter|getParameterMap|getParameterValues|"
+    r"getHeader|getQueryString|getPathInfo|getRequestURI|getInputStream|"
+    r"getCookies)\s*\(", re.I)
+
+
 def _path_sink_param_linked(body: str, source: str,
                             params: set[str]) -> bool:
     """路径 sink 与外部输入的相关性（M64 淬火⑧，litemall 实测）。
@@ -4737,25 +4763,31 @@ def _path_sink_param_linked(body: str, source: str,
     内部临时路径（`createWxaCodeUnlimit("goods," + goodId, ...)`），与
     username/id 等形参毫无交集 —— 形态上命中弱 sink，机制上无遍历面。
     不相关 → 交模型（不硬判 safe）。
+
+    M69 RuoYi 实测：只看整行标识符会把局部变量 `File file = new
+    File(filePath)` 里的 `file` 当成入口形参 `MultipartFile file`（同名
+    遮蔽），把只会删服务端头像文件的路径判成遍历。只取 **sink 调用括号
+    内的实参**，局部变量声明名不参与匹配。
     """
     if not params:
         return True                # 无形参可判 → 不设门
     for seg in (body, _sibling_methods(source)):
         for line in seg.splitlines():
-            if not PATH_SINK_RE.search(line):
-                continue
-            ids = set(re.findall(r"\b([A-Za-z_]\w*)\b", line))
-            if ids & params:
-                return True
-            # sink 行里的每个标识符都上溯一层赋值链（`String filePath =
-            # ... + filename;` —— 参数不直接出现在 sink 行，但出现在
-            # 它的赋值右值里）
-            for v in ids:
-                for am in re.finditer(
-                        rf"\b{re.escape(v)}\s*=(?!=)[^;]*;", seg):
-                    if set(re.findall(r"\b([A-Za-z_]\w*)\b",
-                                      am.group(0))) & params:
-                        return True
+            for m in PATH_SINK_RE.finditer(line):
+                args = _sink_call_args(line, m.start())
+                ids = set(re.findall(r"\b([A-Za-z_]\w*)\b", args))
+                if ids & params or _PATH_REQUEST_READ_RE.search(args):
+                    return True
+                # sink 实参里的每个标识符都上溯一层赋值链（`String filePath =
+                # ... + filename;` —— 参数不直接出现在实参里，但出现在
+                # 它的赋值右值里）
+                for v in ids:
+                    for am in re.finditer(
+                            rf"\b{re.escape(v)}\s*=(?!=)[^;]*;", seg):
+                        if (set(re.findall(r"\b([A-Za-z_]\w*)\b",
+                                           am.group(0))) & params
+                                or _PATH_REQUEST_READ_RE.search(am.group(0))):
+                            return True
     return False
 
 

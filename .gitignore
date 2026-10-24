@@ -27,5 +27,8 @@ fix_sqli.md
 report_pr.md
 fix_report.md
 
+# M69 野战采集原始产物（HTML/SARIF 共 7.5MB，可由 wild_hunt.py 重建）
+benchmarks/results/wild_hunt/
+
 # M59 LLM 响应磁盘缓存（本地派生数据）
 .cache/

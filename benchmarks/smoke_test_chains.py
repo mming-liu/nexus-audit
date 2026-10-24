@@ -3808,7 +3808,7 @@ _r72 = _sp72.run([sys.executable, str(Path(__file__).resolve().parent
                                      / "benchmark_pygoat.py"), "--strict", "--offline"],
                  capture_output=True, text=True, encoding="utf-8")
 check("M24：pygoat benchmark --strict --offline 退出码 0", _r72.returncode, 0)
-check("M24：pygoat 作者指名 9/9 全 True（STRICT PASS）",
+check("M24：pygoat 作者指名真值全 True（STRICT PASS，M69 补登 eval 后 10/10）",
       "STRICT PASS" in (_r72.stdout or ""), True)
 
 
@@ -5523,6 +5523,45 @@ check("M107：doctor 补丁器升到 15 类全绿（M68 加 hardcoded_secret）"
       (_sp107.returncode == 0
        and "补丁器就位（15 类）" in _sp107.stdout
        and _sp107.stdout.count("[OK] _fix_") == 15), True)
+
+# ---- [108] M69 野战 FP 回归锁：SpEL 裸 getValue / 路径 sink 同名遮蔽 ----
+# RuoYi 305 路由实测：`Cookie.getValue()`（以及 Map.Entry.getValue()）被
+# EXPR_SINK_RE 的裸 `.getValue()` 当成 SpEL sink，判出 2 条 P0。SpEL 只看
+# 表达式型接收者（exp/expr/expression/parser）或 SpelExpressionParser。
+_spel_fp108 = """@GetMapping("/x")
+public String x(HttpServletRequest req) {
+    Cookie cookie = req.getCookies()[0];
+    return cookie.getValue();
+}
+"""
+check("M108：Cookie.getValue() 不再被当成 SpEL sink（RuoYi FP）",
+      _verdict("spel", _spel_fp108) is None, True)
+_spel_tp108 = """@GetMapping("/x")
+public String x(String ex) {
+    Expression exp = new SpelExpressionParser().parseExpression(ex);
+    return exp.getValue().toString();
+}
+"""
+check("M108：Expression.getValue() 仍判 True（真 SpEL 不误杀）",
+      _verdict("spel", _spel_tp108), True)
+# RuoYi updateAvatar 实测：局部 `File file = new File(filePath)` 与入口形参
+# `MultipartFile file` 同名遮蔽，旧逻辑按整行标识符相交判成路径遍历。
+_path_shadow108 = """@PostMapping("/avatar")
+public String upload(@RequestParam MultipartFile file) {
+    String filePath = FileUtils.stripPrefix(oldAvatar);
+    File file = new File(filePath);
+    return file.delete() ? "ok" : "no";
+}
+"""
+check("M108：同名局部变量不构成路径遍历相关（RuoYi FP）",
+      _verdict("pathtraver", _path_shadow108) is None, True)
+_path_tp108 = """@GetMapping("/read")
+public byte[] read(@RequestParam String path) throws Exception {
+    return Files.readAllBytes(Paths.get(path));
+}
+"""
+check("M108：形参直接进 Paths.get 仍判 True（真遍历不误杀）",
+      _verdict("pathtraver", _path_tp108), True)
 
 print()
 if FAILS:

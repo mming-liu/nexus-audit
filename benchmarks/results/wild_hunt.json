@@ -1,0 +1,214 @@
+{
+  "generated_at": "2026-10-24 19:21:31",
+  "repos": [
+    {
+      "name": "newbee-mall",
+      "path": "reference_repos/newbee-mall-master",
+      "scan_rc": 0,
+      "wall_s": 1.91,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-master",
+        "total_units": 73,
+        "total_pairs_evaluated": 1387,
+        "p0_confirmed": 6,
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 1117,
+        "funnel_filter_rate": 1.0,
+        "llm_dispatched": 0,
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "elapsed_ms": 577.8
+      },
+      "p0_by_cat": {
+        "hash": 2,
+        "weakrand": 2,
+        "redir": 1,
+        "authz": 1
+      },
+      "scan_tail": "      P0 实锤 6 ｜ 规则排除 264 ｜ 模型候选 0 ｜ Sink 漏斗过滤 1117（过滤率 100%）\n\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall\\report.md\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall\\report.sarif（6 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall\\report.html（6 条）",
+      "benchmark": {
+        "rc": 0,
+        "wall_s": 1.78,
+        "tail": "   cmdi           0 /    0 /   73\n   ssrf           0 /    0 /   73\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\newbeemall.json"
+      }
+    },
+    {
+      "name": "newbee-mall-api",
+      "path": "reference_repos/newbee-mall-api-master",
+      "scan_rc": 0,
+      "wall_s": 1.91,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-api-master",
+        "total_units": 62,
+        "total_pairs_evaluated": 1178,
+        "p0_confirmed": 66,
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 885,
+        "funnel_filter_rate": 1.0,
+        "llm_dispatched": 0,
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "elapsed_ms": 495.6
+      },
+      "p0_by_cat": {
+        "cors": 62,
+        "weakrand": 2,
+        "hash": 1,
+        "xss": 1
+      },
+      "scan_tail": "      P0 实锤 66 ｜ 规则排除 227 ｜ 模型候选 0 ｜ Sink 漏斗过滤 885（过滤率 100%）\n\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall-api\\report.md\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall-api\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall-api\\report.sarif（66 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall-api\\report.html（66 条）",
+      "benchmark": {
+        "rc": 0,
+        "wall_s": 1.96,
+        "tail": "   ssrf           0 /    0 /   62\n   deserial       0 /    0 /   62\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\newbeemallapi.json"
+      }
+    },
+    {
+      "name": "RuoYi",
+      "path": "reference_repos/RuoYi-master",
+      "scan_rc": 0,
+      "wall_s": 16.75,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\RuoYi-master",
+        "total_units": 305,
+        "total_pairs_evaluated": 5795,
+        "p0_confirmed": 1,
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 4540,
+        "funnel_filter_rate": 1.0,
+        "llm_dispatched": 0,
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "elapsed_ms": 2229.3
+      },
+      "p0_by_cat": {
+        "sqli": 1
+      },
+      "scan_tail": "      P0 实锤 1 ｜ 规则排除 1254 ｜ 模型候选 0 ｜ Sink 漏斗过滤 4540（过滤率 100%）\n\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\RuoYi\\report.md\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\RuoYi\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\RuoYi\\report.sarif（1 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\RuoYi\\report.html（1 条）",
+      "benchmark": {
+        "rc": 0,
+        "wall_s": 0.24,
+        "tail": "authz 注解行 159 条中被直接判 False 159 条\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\ruoyi.json\nSTRICT PASS ✔ （零误报 / 零判反 / 跨模块穿透在线 / 注解语义在线）"
+      }
+    },
+    {
+      "name": "eladmin-mp",
+      "path": "reference_repos/eladmin-mp-master",
+      "scan_rc": 0,
+      "wall_s": 3.37,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\eladmin-mp-master",
+        "total_units": 65,
+        "total_pairs_evaluated": 1235,
+        "p0_confirmed": 76,
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 885,
+        "funnel_filter_rate": 1.0,
+        "llm_dispatched": 0,
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "elapsed_ms": 1192.9
+      },
+      "p0_by_cat": {
+        "authz": 9,
+        "cors": 65,
+        "crypto": 2
+      },
+      "scan_tail": "      P0 实锤 76 ｜ 规则排除 274 ｜ 模型候选 0 ｜ Sink 漏斗过滤 885（过滤率 100%）\n\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-mp\\report.md\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-mp\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-mp\\report.sarif（76 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-mp\\report.html（76 条）",
+      "benchmark": {
+        "rc": 0,
+        "wall_s": 1.94,
+        "tail": "    GeneratorController.java:GeneratorController.generatorCode\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\eladminmp.json\nSTRICT PASS ✔ （零误报 / 零判反 / @el.check 注解语义在线）"
+      }
+    },
+    {
+      "name": "mall",
+      "path": "reference_repos/mall-main",
+      "scan_rc": 0,
+      "wall_s": 13.62,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\mall-main",
+        "total_units": 246,
+        "total_pairs_evaluated": 4674,
+        "p0_confirmed": 253,
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 3606,
+        "funnel_filter_rate": 0.9994,
+        "llm_dispatched": 2,
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "elapsed_ms": 2568.4
+      },
+      "p0_by_cat": {
+        "cors": 246,
+        "ssrf": 7
+      },
+      "scan_tail": "      P0 实锤 253 ｜ 规则排除 813 ｜ 模型候选 2 ｜ Sink 漏斗过滤 3606（过滤率 100%）\n\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall\\report.md\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall\\report.sarif（255 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall\\report.html（255 条）",
+      "benchmark": {
+        "rc": 0,
+        "wall_s": 0.55,
+        "tail": "  全库 True（安全项目应恒为 0）：0\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\mall.json\nSTRICT 门禁：通过 ✔（登记全判对 / 全库零 True / 零退回）"
+      }
+    },
+    {
+      "name": "My-Blog",
+      "path": "reference_repos/My-Blog-master",
+      "scan_rc": 0,
+      "wall_s": 1.81,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\My-Blog-master",
+        "total_units": 54,
+        "total_pairs_evaluated": 1026,
+        "p0_confirmed": 3,
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 835,
+        "funnel_filter_rate": 1.0,
+        "llm_dispatched": 0,
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "elapsed_ms": 618.9
+      },
+      "p0_by_cat": {
+        "hash": 1,
+        "weakrand": 2
+      },
+      "scan_tail": "      P0 实锤 3 ｜ 规则排除 188 ｜ 模型候选 0 ｜ Sink 漏斗过滤 835（过滤率 100%）\n\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog\\report.md\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog\\report.sarif（3 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog\\report.html（3 条）",
+      "benchmark": {
+        "rc": 0,
+        "wall_s": 0.67,
+        "tail": "  漏报                  ：0\nSTRICT 门禁：通过 ✔（零误报 / 真值全命中）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\myblog.json"
+      }
+    },
+    {
+      "name": "litemall",
+      "path": "reference_repos/litemall-master",
+      "scan_rc": 0,
+      "wall_s": 30.04,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\litemall-master",
+        "total_units": 219,
+        "total_pairs_evaluated": 4161,
+        "p0_confirmed": 223,
+        "secret_files_flagged": 1,
+        "funnel_filtered_out": 3253,
+        "funnel_filter_rate": 1.0,
+        "llm_dispatched": 0,
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "elapsed_ms": 3626.0
+      },
+      "p0_by_cat": {
+        "cors": 219,
+        "deserial": 1,
+        "xss": 2,
+        "hardcoded_secret": 1
+      },
+      "scan_tail": "      另：配置/工具类硬编码密钥文件 1 个（文件级普查，不计入路由单元）\n\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\litemall\\report.md\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\litemall\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\litemall\\report.sarif（223 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\litemall\\report.html（223 条）",
+      "benchmark": {
+        "rc": 0,
+        "wall_s": 0.96,
+        "tail": "  漏报                  ：0\nSTRICT 门禁：通过 ✔（零误报 / 真值全命中）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\litemall.json"
+      }
+    }
+  ]
+}

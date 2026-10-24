@@ -124,6 +124,20 @@ if [ -d reference_repos/WebGoat-master ]; then
   echo "pre-push: WebGoat 基线通过 ✔"
 fi
 
+# 第 23/24 靶场（Module 63/64）：My-Blog / litemall 野战实弹。
+# 真实开源项目盲测收敛后的真值表：0 误报 / 0 漏报 / 0 判反。
+if [ -d reference_repos/My-Blog-master ]; then
+  echo "pre-push: My-Blog 基线 ..."
+  "$PY" benchmarks/benchmark_myblog.py --strict > /dev/null
+  echo "pre-push: My-Blog 基线通过 ✔"
+fi
+
+if [ -d reference_repos/litemall-master ]; then
+  echo "pre-push: litemall 基线 ..."
+  "$PY" benchmarks/benchmark_litemall.py --strict > /dev/null
+  echo "pre-push: litemall 基线通过 ✔"
+fi
+
 # 覆盖地板门禁（Module 41）：确定性命中数下限
 echo "pre-push: 覆盖地板门禁 ..."
 "$PY" benchmarks/triage_fallbacks.py --check-floor > /dev/null

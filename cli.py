@@ -235,6 +235,54 @@ _SOLIDITY_AUTO_CATS = ["reentrancy", "access_control",
                        "unchecked_low_level_calls", "arithmetic"]
 
 
+_SECRET_FILE_EXTS = {
+    ".py", ".java", ".sol", ".properties", ".yml", ".yaml", ".xml",
+    ".json", ".js", ".ts", ".go", ".php", ".rb", ".env", ".conf",
+    ".ini", ".toml",
+}
+_SECRET_FILE_SKIP = {
+    ".git", "__pycache__", "node_modules", "target", "build", "dist",
+    "vendor", "tests", "test",
+}
+
+
+def _scan_secret_files(repo: Path) -> list:
+    """M67 补充：配置文件/工具类里的硬编码密钥不挂在路由入口上。
+
+    `scan --auto` 的切片单位是路由函数，VAmPI 的 `config.py`、litemall 的
+    `JwtHelper.java` 这类"密钥定义在入口之外"的文件永远不会进切片。这里
+    做一遍文件级 hardcoded_secret 普查（只收规则层 True），作为伪单元并入
+    P0；不参与 unit×类目漏斗计数，单独在简报里记 `secret_files_flagged`。
+    """
+    from core.models import CodeUnit, Language
+    from core.agents.rule_detectors import verdict as rule_verdict
+    out: list = []
+    for p in repo.rglob("*"):
+        if not p.is_file() or p.suffix.lower() not in _SECRET_FILE_EXTS:
+            continue
+        if any(part in _SECRET_FILE_SKIP for part in p.parts):
+            continue
+        try:
+            if p.stat().st_size > 300_000:
+                continue
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if rule_verdict("hardcoded_secret", text) is not True:
+            continue
+        suffix = p.suffix.lower()
+        lang = (Language.JAVA_WEB if suffix == ".java"
+                else Language.SOLIDITY_WEB3 if suffix == ".sol"
+                else Language.PYTHON_WEB)
+        u = CodeUnit(file_path=str(p), language=lang,
+                     unit_name=f"[secret-file] {p.name}",
+                     start_line=1, end_line=text.count("\n") + 1,
+                     source_code=text, own_body=text)
+        u.file_level = True                      # 供补丁器识别，免重切片
+        out.append(u)
+    return out
+
+
 def cmd_scan_auto(args, repo: Path):
     """M58 野战模式：全类目毫秒级规则普查 + Sink 门控漏斗。
 
@@ -263,6 +311,7 @@ def cmd_scan_auto(args, repo: Path):
 
     web_cats = sorted(c for c in CATEGORIES if c not in _SOLIDITY_AUTO_CATS)
     p0: list[tuple] = []            # [(unit, cat)] 规则实锤
+    secret_covered: set[Path] = set()   # 已被路由切片判过硬编码密钥的文件
     model_candidates: list[tuple] = []   # None + 有 Sink/输入事实
     n_filtered = 0                  # None 且无 Sink 事实 → 不派发
     n_false = 0                     # 规则确定性排除
@@ -278,6 +327,8 @@ def cmd_scan_auto(args, repo: Path):
             v = rule_verdict(cat, u.source_code)
             if v is True:
                 p0.append((u, cat))
+                if cat == "hardcoded_secret":
+                    secret_covered.add(Path(u.file_path).resolve())
             elif v is False:
                 n_false += 1
             else:
@@ -286,15 +337,22 @@ def cmd_scan_auto(args, repo: Path):
                     model_candidates.append((u, cat))
                 else:
                     n_filtered += 1
+    secret_units = [x for x in _scan_secret_files(repo)
+                    if Path(x.file_path).resolve() not in secret_covered]
+    p0 += [(u, "hardcoded_secret") for u in secret_units]
     elapsed_ms = (time.monotonic() - t0) * 1000
     per_unit_ms = elapsed_ms / max(len(units), 1)
-    n_pairs = len(p0) + n_false + len(model_candidates) + n_filtered
+    n_pairs = (len(p0) - len(secret_units) + n_false
+               + len(model_candidates) + n_filtered)
     filter_rate = n_filtered / max(n_filtered + len(model_candidates), 1)
     print(f"      {n_pairs} 次（unit × 类目）判定，耗时 {elapsed_ms:.0f} ms"
           f"（均值 {per_unit_ms:.2f} ms/单元）")
     print(f"      P0 实锤 {len(p0)} ｜ 规则排除 {n_false} ｜ "
           f"模型候选 {len(model_candidates)} ｜ Sink 漏斗过滤 {n_filtered}"
           f"（过滤率 {filter_rate:.0%}）")
+    if secret_units:
+        print(f"      另：配置/工具类硬编码密钥文件 {len(secret_units)} 个"
+              "（文件级普查，不计入路由单元）")
 
     # --- 产出（P0 落报告；模型候选在 --offline 下标 P2 待复核）---
     lines = [f"# 野战扫描报告（--auto 全类目普查）—— {repo}", "",
@@ -302,7 +360,11 @@ def cmd_scan_auto(args, repo: Path):
              f"- 判定对：{n_pairs}（unit × 类目），规则普查 {elapsed_ms:.0f} ms",
              f"- P0 实锤：{len(p0)}；规则排除：{n_false}",
              f"- Sink 漏斗：过滤 {n_filtered}，模型候选 {len(model_candidates)}"
-             f"（过滤率 {filter_rate:.0%}）", ""]
+             f"（过滤率 {filter_rate:.0%}）"]
+    if secret_units:
+        lines.append(f"- 文件级硬编码密钥：{len(secret_units)} 个"
+                     "（配置/工具类，不占路由入口）")
+    lines.append("")
     if p0:
         lines.append("## P0 [Confirmed] 规则实锤")
         lines.append("")
@@ -357,6 +419,7 @@ def cmd_scan_auto(args, repo: Path):
             "total_units": len(units),
             "total_pairs_evaluated": n_pairs,
             "p0_confirmed": len(p0),
+            "secret_files_flagged": len(secret_units),
             "funnel_filtered_out": n_filtered,
             "funnel_filter_rate": round(filter_rate, 4),
             "llm_dispatched": len(model_candidates),
@@ -1279,6 +1342,7 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_solidity_arith_guard(repo, sol, report)
         n += _fix_solidity_unchecked_wrap(repo, sol, report)
     if rest:
+        n += _fix_hardcoded_secret(repo, rest, report)
         n += _fix_mp_concat(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
     if n:
@@ -2230,20 +2294,26 @@ def _fix_hardcoded_secret(repo: Path, targets: list, lines: list) -> int:
             # Java 切片器按路径缓存源码，不看 mtime；重切片前必须清掉
             from core.context.java_impl_resolver import _FILE_CACHE
             _FILE_CACHE.clear()
+            if getattr(u, "file_level", False):
+                # 文件级伪单元（配置/工具类）：没有路由可重切，直接对补丁后
+                # 的全文重跑规则。
+                v2 = rule_verdict("hardcoded_secret", patched)
             # 重切片按语言分流：py 用 WebTreeSitterSlicer，java 用 JavaSlicer
-            if str(f).endswith(".py"):
+            elif str(f).endswith(".py"):
                 from core.slicer.web_treesitter import WebTreeSitterSlicer
                 u2 = next((x for x in WebTreeSitterSlicer(repo)
                            .extract_entry_units(repo)
                            if x.unit_name == u.unit_name
                            and Path(x.file_path) == f), None)
+                v2 = (rule_verdict("hardcoded_secret", u2.source_code)
+                      if u2 else None)
             else:
                 from core.slicer.java_servlet import JavaSlicer
                 u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
                            if x.unit_name == u.unit_name
                            and Path(x.file_path) == f), None)
-            v2 = (rule_verdict("hardcoded_secret", u2.source_code)
-                  if u2 else None)
+                v2 = (rule_verdict("hardcoded_secret", u2.source_code)
+                      if u2 else None)
         finally:
             with open(f, "w", encoding="utf-8", newline="") as fh:
                 fh.write(original)
