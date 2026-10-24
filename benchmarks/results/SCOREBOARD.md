@@ -1,6 +1,6 @@
 # nexus-audit 全语言计分板（规则层·离线可复现）
 
-生成时间：2026-10-24 22:34:49
+生成时间：2026-10-24 23:24:07
 
 | 靶场 | 单元 | 规则判定 | 判对 | 误报 | 判反 | 覆盖率 |
 |---|---|---|---|---|---|---|
@@ -9,7 +9,7 @@
 | not-so-smart-contracts (Solidity) | 204 | 7 | 7 | 0 | 0 | 3% |
 | vulpy (Python) | 33 | 6 | 6 | 0 | 0 | 18% |
 | RuoYi (Java 多模块) | 305 | 159 | 159 | 0 | 0 | 52% |
-| pygoat (Python Flask labs) | 119 | 10 | 10 | 0 | 0 | 8% |
+| pygoat (Python Flask labs) | 129 | 10 | 10 | 0 | 0 | 8% |
 | eladmin-mp (MyBatis-Plus) | 65 | 53 | 53 | 0 | 0 | 82% |
 | VAmPI (Connexion/OpenAPI) | 14 | 7 | 7 | 0 | 0 | 50% |
 | mall (生产级多模块对照) | 246 | 16 | 16 | 0 | 0 | 7% |

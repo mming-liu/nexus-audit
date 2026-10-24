@@ -5772,7 +5772,12 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0,
         return False
     # Flask 请求读取就是外部输入（vulpy：request.form.get('username')）。
     # 判据挂机制不挂写法：form/args/values/cookies/headers/json/data/files。
-    if re.search(r"\brequest\s*\.\s*(?:form|args|values|cookies|headers|json|data|files)\b", e):
+    # M88 增量：Django 的 `request.GET` / `request.POST` / `request.FILES` /
+    # `request.body` / `request.META`，以及 DRF 的 `request.query_params`。
+    # 前三者在 Django 里是 QueryDict（`.get('x')` / `['x']` 两种取法），
+    # `request.body` 是原始字节流 —— 与 Flask 的 `request.data` 同级。
+    if re.search(r"\brequest\s*\.\s*(?:form|args|values|cookies|headers|json|"
+                 r"data|files|GET|POST|FILES|body|META|query_params)\b", e):
         return True
     mm = re.match(r"[\w.]+\s*\(", e)
     if mm:
@@ -6263,7 +6268,14 @@ _SOLIDITY_MSGSENDER_CHECK_RE = re.compile(
 # 不是保护 —— 需要单独核验块里是**中止**（revert/throw/return）
 # 而不是普通语句。
 _SOL_BLOCK_ABORT_RE = re.compile(
-    r"\b(?:revert\s*\(|revert\b|throw\b|return\b|selfdestruct\s*\(|"
+    r"\b(?:revert\s*\(|"
+    # M87：0.8.x 的**自定义错误**中止。`revert NotOwner();` /
+    # `revert InsufficientBalance(from, to);` 是 0.8.4 起的标准守卫写法，
+    # 与 `revert("msg")` / 裸 `revert;` 并列的**第三种**语法形态。
+    # 此前它靠 `revert\b` 碰巧命中 —— 显式列出后，判据才是"挂了机制"
+    # 而不是"撞上了巧合"（一旦有人给 `revert\b` 加负向断言就会静默失效）。
+    r"revert\s+[A-Za-z_]\w*|"
+    r"revert\b|throw\b|return\b|selfdestruct\s*\(|"
     r"require\s*\([^;]*(?:false|0)\s*\))", re.S)
 
 
@@ -7431,6 +7443,44 @@ _ARITH_BINOP_RE = re.compile(
     r"(?<![\w.])([A-Za-z_]\w*)\s*([-+*])\s*([A-Za-z_]\w*)\s*;")
 _SAFE_MATH_RE = re.compile(r"\.\s*(?:add|sub|mul|div)\s*\(")
 _UNCHECKED_RE = re.compile(r"\bunchecked\s*\{")
+
+
+def _sol_unchecked_zones(body: str) -> list[str]:
+    """提取文本里所有 `unchecked { ... }` 的**配平块体**（M87）。
+
+    0.8+ 的溢出语义是"编译器检查 + unchecked 块内部豁免"：
+      · 块**外**的算术由编译器插入回滚，属确定性 safe；
+      · 只有块**内**的算术才可能回卷（SWC-101 在 0.8 的唯一残存面）。
+
+    没有这个分区，判据会把块外的算术式也当成候选 —— 实测（probe_m87）
+    两个合成样本都因此被判 True：`unchecked { counter++; }` 之后的
+    `uint256 x = total + amount;` 明明是编译器保护的安全写法。
+
+    返回空列表表示"文本里有 `unchecked` 字样但没有可配平的块"
+    （例如注释里的提及）—— 调用方据此退回全量分析。
+    """
+    zones: list[str] = []
+    for m in _UNCHECKED_RE.finditer(body):
+        blk = _sol_block_body(body, m.end() - 1)      # m.end()-1 就是 `{`
+        if blk.strip():
+            zones.append(blk)
+    return zones
+
+
+# M87：0.8.x 的**镜像形态**前置守卫 `if (A > B) revert CustomError();`
+#
+# 语义等价于 `if (B < A) revert ...`（即 `B < A` 时中止 ⇒ 后续 `B -= A`
+# 不可能下溢）。`_ARITH_GUARD_RE` 只收 `<` 方向，因为 0.4.x 时代没有
+# 自定义错误、老代码习惯写 `if (a < b) throw;`；0.8 起审计习惯倒过来写
+# `if (amount > balance) revert InsufficientBalance();`。
+#
+# **只在 0.8+ 生效**（见 solidity_arithmetic_verdict）：老版本靶场的真值
+# 是既有门禁锁死的，判据不得因一条新形态而漂移。
+_ARITH_GUARD_MIRROR_RE = re.compile(
+    r"if\s*\(\s*([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)\s*>\s*"
+    r"([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)\s*\)\s*\{?\s*(?:revert|throw|return)"
+    r"|if\s*\(\s*([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)\s*>=\s*"
+    r"([A-Za-z_]\w*(?:\s*\[[^\]]*\])?)\s*\)\s*\{?\s*(?:revert|throw|return)")
 # 前置上下界校验：require(a >= b) / require(b <= a) / if (a < b) revert|return
 #
 # require 可带**错误消息**第二参数：`require(b <= a, errorMessage);`
@@ -7584,6 +7634,18 @@ def solidity_arithmetic_verdict(source: str) -> bool | None:
         # 读不到 pragma（合成夹具/旧切片）→ 不猜版本
         return None
 
+    # ---- M87：0.8+ 的 `unchecked` 分区 -------------------------------
+    # 有 unchecked 块时**只有块内**算术可能回卷：块外由编译器插桩回滚。
+    # 表达式从块内收集；守卫仍从**全函数体**收集 —— 守卫写在块外正是
+    # `if (amount > balance) revert ...; unchecked { balance -= amount; }`
+    # 的标准形态（probe_m87 P2c）。
+    scoped_unchecked = major >= 8
+    expr_src = body
+    if scoped_unchecked:
+        zones = _sol_unchecked_zones(body)
+        if zones:
+            expr_src = "\n".join(zones)
+
     params = _sol_param_names(func_src)
 
     # ---- 收集算术表达式：(左值/宿主, 运算符, 右操作数文本, 是否复合赋值) ----
@@ -7591,17 +7653,20 @@ def solidity_arithmetic_verdict(source: str) -> bool | None:
     # 前者的结果就是 x 本身（回验 x 是马后炮），后者的结果是新算出来的
     # c（回验 c 才是有效的溢出证明 —— SafeMath 库的标准写法）。
     exprs: list[tuple[str, str, str, bool]] = []
-    for m in _ARITH_OP_ASSIGN_RE.finditer(body):
+    for m in _ARITH_OP_ASSIGN_RE.finditer(expr_src):
         exprs.append((m.group(1).strip(), m.group(2), m.group(3).strip(), True))
     # 二元算术：`uint res = count - input;` / `uint256 amount = cnt * _value;`
-    for m in _ARITH_BINOP_RE.finditer(body):
+    for m in _ARITH_BINOP_RE.finditer(expr_src):
         exprs.append((m.group(1), m.group(2), m.group(3), False))
     # 调用实参内的算术：`msg.sender.transfer(numTokens * PRICE_PER_TOKEN);`
-    for m in _ARITH_CALLARG_RE.finditer(body):
+    for m in _ARITH_CALLARG_RE.finditer(expr_src):
         exprs.append(("", m.group(2), m.group(1), False))
 
     if not exprs:
-        return None                          # 不归本类目管
+        # 0.8+ 的 unchecked 分区里没有任何算术式（只有普通赋值或循环游标
+        # `i++` / `i += 1`）⇒ 编译器保护块外 + 块内无回卷面 ⇒ 确定性 safe。
+        # 老版本（scoped_unchecked=False）保持原语义：不归本类目管 → None。
+        return False if scoped_unchecked else None
 
     # ---- 溢出校验集合 ----
     # ① **前置上下界校验**：require(a >= b) / require(b <= a) /
@@ -7616,6 +7681,13 @@ def solidity_arithmetic_verdict(source: str) -> bool | None:
         for g in m.groups():
             if g:
                 guards.add(g.strip())
+    # M87：0.8+ 的镜像形态守卫 `if (amount > balance) revert CustomError();`。
+    # 只在 0.8+ 收 —— 老版本靶场真值已由既有门禁锁死，判据不得漂移。
+    if scoped_unchecked:
+        for m in _ARITH_GUARD_MIRROR_RE.finditer(body):
+            for g in m.groups():
+                if g:
+                    guards.add(g.strip())
     # ⑤ if 花括号块形态的守卫：`if (balances[msg.sender] < _value) { throw; }`
     #    （GnosisToken 老式写法）—— 块内有中止语义才算守卫。
     #    条件允许 **析取尾随**（`A < B || C < D`）—— 首个析取支仍是

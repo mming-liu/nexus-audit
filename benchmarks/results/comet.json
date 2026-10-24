@@ -1,0 +1,35 @@
+{
+  "bench": "comet",
+  "units": 435,
+  "total_units": 435,
+  "decided": 432,
+  "correct": 432,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 1016,
+  "unchecked_units": 37,
+  "custom_error_units": 206,
+  "anchors": [
+    {
+      "unit": "CometWithExtendedAssetList.sol:getAssetInfoByAddress",
+      "category": "arithmetic",
+      "verdict": false
+    },
+    {
+      "unit": "Configurator.sol:updateAsset",
+      "category": "access_control",
+      "verdict": false
+    },
+    {
+      "unit": "CometWithExtendedAssetList.sol:transferInternal",
+      "category": "reentrancy",
+      "verdict": false
+    },
+    {
+      "unit": "BaseBulker.sol:invoke",
+      "category": "unchecked_low_level_calls",
+      "verdict": false
+    }
+  ],
+  "true_rows": []
+}

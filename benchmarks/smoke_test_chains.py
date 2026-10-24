@@ -6080,6 +6080,188 @@ check("M122：wild_hunt.json ↔ WILD_HUNT_REPORT 四处核心数字一致",
       ("仓库数 / 入口总数 / 独立根因数 / 零误报 四处一致"
        in (_r122.stdout or "")), True)
 
+# ---- [123] Module 87：0.8.x `unchecked` 分区 + 自定义 `revert Error()` ----
+# 现代 Solidity 的两块语法拼图。M53 那套判据是 0.4.x 词表：`unchecked` 只在
+# "有没有出现过"这一层被当成开关，块**内**与块**外**不分。实测（probe_m87）
+# 两个合成样本因此判反：块外 `uint x = total + amount;` 在 0.8 由编译器
+# 插桩回滚，属确定性 safe，却因为函数里另有一个 `unchecked { counter++; }`
+# 而被当成溢出候选判 True。
+print("\n[123] 0.8.x unchecked 分区与自定义错误中止（M87）")
+
+from core.agents.rule_detectors import (            # noqa: E402
+    _sol_block_aborts as _aborts123,
+    _sol_unchecked_zones as _zones123,
+    solidity_access_verdict as _ac123,
+    solidity_arithmetic_verdict as _arith123,
+)
+
+_P123 = "// pragma: solidity ^0.8.15;\n// contract: X\ncontract X {\n"
+
+
+def _sol123(body: str) -> str:
+    return _P123 + body + "\n}\n"
+
+
+# ① 分区本身：块内/块外要分得开（配平 + 嵌套大括号）
+_z123 = _zones123("unchecked { if (a) { b = 1; } c = 2; }\nx = 3;\n")
+check("M123：unchecked 分区取出配平块体（不含块外语句）",
+      (len(_z123), "b = 1" in _z123[0], "x = 3" in _z123[0]), (1, True, False))
+check("M123：无 unchecked 时分区为空（退回全量分析）",
+      _zones123("uint x = a + b;\n"), [])
+
+# ② 块外算术由编译器保护 ⇒ False（修复前这里是 True 的两处判反）
+check("M123：0.8 块外加法不再判溢出（编译器内置回滚）",
+      _arith123(_sol123("function f(uint256 amount) public {\n"
+                        "    unchecked { counter++; }\n"
+                        "    uint256 x = total + amount;\n"
+                        "}\n")), False)
+check("M123：0.8 块外复合赋值减法不再判溢出",
+      _arith123(_sol123("function g(uint256 amount) public {\n"
+                        "    unchecked { i++; }\n"
+                        "    total -= amount;\n"
+                        "}\n")), False)
+# ③ 块内仍是真面：外部形参 + 无守卫 ⇒ True
+check("M123：0.8 块内无守卫加法仍判溢出 True",
+      _arith123(_sol123("function h(uint256 amount) public {\n"
+                        "    unchecked { total += amount; }\n"
+                        "}\n")), True)
+# ④ 块内仅循环游标 ⇒ False（Solidity 官方推荐写法）
+check("M123：块内仅循环游标 i++ 判 safe",
+      _arith123(_sol123("function k(uint256 n) public {\n"
+                        "    for (uint256 i = 0; i < n; i++) {\n"
+                        "        unchecked { i++; }\n"
+                        "    }\n"
+                        "}\n")), False)
+check("M123：块内仅循环游标 i += 1 判 safe",
+      _arith123(_sol123("function k2(uint256 n) public {\n"
+                        "    for (uint256 i = 0; i < n; ) {\n"
+                        "        unchecked { i += 1; }\n"
+                        "    }\n"
+                        "}\n")), False)
+# ⑤ 0.8 镜像形态守卫 `if (amount > balance) revert CustomError();` 覆盖块内减法
+check("M123：块外 `if (A > B) revert E();` 守卫覆盖块内减法",
+      _arith123(_sol123("error InsufficientBalance();\n"
+                        "function m(uint256 amount) public {\n"
+                        "    if (amount > balance) revert InsufficientBalance();\n"
+                        "    unchecked { balance -= amount; }\n"
+                        "}\n")), False)
+check("M123：require 带自定义错误第二参数覆盖块内减法",
+      _arith123(_sol123("function n(uint256 amount) public {\n"
+                        "    require(balance >= amount, InsufficientBalance());\n"
+                        "    unchecked { balance -= amount; }\n"
+                        "}\n")), False)
+
+# ⑥ 自定义错误是**第三种**中止语法（与 revert("msg") / 裸 revert 并列）
+check("M123：`revert NotOwner();` 认作中止",
+      _aborts123("revert NotOwner();"), True)
+check("M123：`revert A(from, to);`（带参自定义错误）认作中止",
+      _aborts123("revert InsufficientBalance(from, to);"), True)
+check("M123：`emit Log();` 不是中止（无假阳性）",
+      _aborts123("emit Log();"), False)
+# ⑦ 自定义错误守卫要能挡下 access_control（裸语句 / 花括号块 / 修饰器体三形态）
+_ACC123 = ("error NotOwner();\naddress owner;\n")
+check("M123：access_control 认裸语句形态 `if (..) revert E();`",
+      _ac123(_sol123(_ACC123 + "function o1() public {\n"
+                     "    if (msg.sender != owner) revert NotOwner();\n"
+                     "    selfdestruct(payable(msg.sender));\n"
+                     "}\n")), False)
+check("M123：access_control 认花括号块形态 `{ revert E(); }`",
+      _ac123(_sol123(_ACC123 + "function o2() public {\n"
+                     "    if (msg.sender != owner) { revert NotOwner(); }\n"
+                     "    selfdestruct(payable(msg.sender));\n"
+                     "}\n")), False)
+check("M123：access_control 认修饰器体里的自定义错误",
+      _ac123(_sol123(_ACC123 + "modifier onlyOwnerM() {\n"
+                     "    if (msg.sender != owner) revert NotOwner();\n"
+                     "    _;\n"
+                     "}\n"
+                     "function drain() public onlyOwnerM {\n"
+                     "    selfdestruct(payable(msg.sender));\n"
+                     "}\n")), False)
+
+# ⑧ E2E：Comet（Compound V3）0.8.15 生产合约全库零误报
+_comet123 = ROOT / "reference_repos" / "comet" / "contracts"
+if _comet123.exists():
+    _r123 = subprocess.run(
+        [sys.executable, str(ROOT / "benchmarks" / "benchmark_comet.py"),
+         "--strict"], capture_output=True, text=True, encoding="utf-8")
+    _j123 = json.loads((ROOT / "benchmarks" / "results" / "comet.json")
+                       .read_text(encoding="utf-8"))
+    check("M123：comet 0.8.x 生产合约 --strict 通过",
+          (_r123.returncode, "STRICT PASS" in (_r123.stdout or "")), (0, True))
+    check("M123：comet 435 入口 / 0 True / 四锚点全 False",
+          (_j123["total_units"] >= 380, _j123["fp"],
+           [a["verdict"] for a in _j123["anchors"]], _j123["unchecked_units"] >= 30),
+          (True, 0, [False, False, False, False], True))
+else:
+    print("  -- comet 仓库不在 reference_repos，跳过 E2E（M87 安装步骤）")
+
+# ---- [124] Module 88：Django `urls.py` 路由表通道 ----
+# 第三条路由发现通道。Django 把路由整体外置到 `urlpatterns`，视图零装饰器；
+# 只看装饰器时 DjanGoat 只剩 13 个入口（9 个还是 `@require_http_methods(["GET"])`
+# 里 "GET" 碰巧命中 route_kw 的 `get` 才被收进来，证据位是错的）。
+print("\n[124] Django urls.py 路由表通道（M88）")
+
+from core.slicer.web_treesitter import (            # noqa: E402
+    WebTreeSitterSlicer as _W124, _dj_call_args as _dja124,
+    _dj_split_args as _djs124, _dj_module_rel as _djm124,
+)
+
+# ① 实参切分必须引号感知：Django 正则路由串里天然含 `(`/`)`/`,`
+_dj_args124 = _djs124(_dja124(
+    "url(r'^(?P<user_id>[0-9]+)/messages.json', include(messages), name='x')",
+    3))
+check("M124：正则路由串里的括号不切错实参",
+      (len(_dj_args124), _dj_args124[0]),
+      (3, "r'^(?P<user_id>[0-9]+)/messages.json'"))
+check("M124：逗号在引号内不切分",
+      _djs124("r'^a,b/', views.f"), ["r'^a,b/'", "views.f"])
+
+# ② 点号链解析：`from app.views.users import views` → 真实模块路径
+_dg124 = ROOT / "reference_repos" / "DjanGoat"
+if _dg124.exists():
+    _s124 = _W124(_dg124)
+    _units124 = _s124.extract_entry_units(_dg124)
+    _dj124 = [u for u in _units124
+              if any(d.startswith("django:") for d in u.decorators_or_modifiers)]
+    _paths124 = {Path(u.file_path).as_posix() for u in _dj124}
+    check("M124：DjanGoat 切片 ≥30 入口（装饰器通道只有 13）",
+          len(_units124) >= 30, True)
+    check("M124：≥20 条带 django: 路由证据",
+          len(_dj124) >= 20, True)
+    check("M124：点号链经 __init__ 再导出落到真实模块",
+          any(p.endswith("app/views/users/views.py") for p in _paths124), True)
+    check("M124：include(...) 与 as_view(...) 不进通道（无假入口）",
+          all("include" not in d and "as_view" not in d
+              for u in _dj124 for d in u.decorators_or_modifiers), True)
+    # ③ E2E：真值 11/11 + 零误报
+    _r124 = subprocess.run(
+        [sys.executable, str(ROOT / "benchmarks" / "benchmark_djangoat.py"),
+         "--strict"], capture_output=True, text=True, encoding="utf-8")
+    _j124 = json.loads((ROOT / "benchmarks" / "results" / "djangoat.json")
+                       .read_text(encoding="utf-8"))
+    check("M124：DjanGoat --strict 通过（真值 11/11 / 零误报）",
+          (_r124.returncode, _j124["fp"], _j124["reverse_fn"],
+           _j124["truth_n"], _j124["django_routed"] >= 20),
+          (0, 0, 0, 11, True))
+else:
+    print("  -- DjanGoat 不在 reference_repos，跳过 E2E（M88 安装步骤）")
+
+# ④ Django 请求读取算外部输入（request.GET/POST/FILES/body/META）
+from core.agents.rule_detectors import (            # noqa: E402
+    _py_value_text_capable as _pv124,
+)
+for _expr124, _want124 in [
+        ("request.GET.get('name')", True),
+        ("request.POST['user']", True),
+        ("request.FILES['myfile']", True),
+        ("request.body", True),
+        ("request.query_params.get('x')", True),
+        # 值域锁死（int()）仍是 False —— 确认新分支没把既有的取值域判定带偏
+        ("int(x)", False)]:
+    check(f"M124：{_expr124} 的值域 = {_want124!r}",
+          _pv124(_expr124, "def f(request):\n    pass\n"), _want124)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

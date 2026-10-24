@@ -24,7 +24,7 @@ import re
 from pathlib import Path
 from typing import List
 
-from core.context.symbol_indexer import SymbolIndexer
+from core.context.symbol_indexer import IGNORE_DIRS, SymbolIndexer
 from core.models import CodeUnit
 
 try:  # 可选增强：tree-sitter 就绪时切换精确解析
@@ -41,6 +41,184 @@ _CALL_EXCLUDE = {"if", "for", "while", "with", "range", "len", "str", "int",
                  "float", "bool", "print", "set", "dict", "list", "sorted",
                  "isinstance", "super", "enumerate", "zip", "open",
                  "getattr", "hasattr", "type", "id", "repr", "format"}
+
+
+# ---------------- Module 88：Django `urls.py` 路由表通道 ----------------
+#
+# 第三条路由发现通道（前两条：装饰器 → Connexion/OpenAPI yml）。
+#
+# Django 把路由**整体外置**到 `urls.py` 的 `urlpatterns` 列表里，视图函数
+# 本体零装饰器。只看装饰器时，DjanGoat 这类纯 Django 应用的绝大多数视图
+# 根本进不了切片（实测只有 13 个入口，其中 9 个还是 `@require_http_methods`
+# 里"GET"三个字母碰巧命中 route_kw 的 `get` 才被收进来的 —— 证据位是错的）。
+#
+# 三代路由函数语义等价，全部收：
+#   `url(r'^x/', views.f)`      —— Django 1.x（DjanGoat/pygoat 用的就是这个）
+#   `re_path(r'^x/', views.f)`  —— Django 2.0+
+#   `path('x/', views.f)`       —— Django 2.0+ 简写
+_DJ_URL_CALL_RE = re.compile(r"(?<![\w.])(?:url|re_path|path)\s*\(")
+# 只认 `urlpatterns` 真的被赋值成列表的文件 —— 否则 `pathlib.Path(...)`、
+# `re_path` 之类同名词在任何 Python 文件里都会触发本通道。
+_DJ_URLPATTERNS_RE = re.compile(r"(?m)^\s*urlpatterns\s*(?:\+?=)\s*\[")
+_DJ_IMPORT_RE = re.compile(
+    r"(?m)^[ \t]*from[ \t]+([\w.]+)[ \t]+import[ \t]+([^\n#]+)"
+    r"|^[ \t]*import[ \t]+([\w.]+)")
+
+
+def _dj_split_args(s: str) -> list[str]:
+    """按**顶层**逗号切分（引号与括号感知）。
+
+    Django 的正则路由串里天然含 `(`、`)` 与 `,`：
+    `url(r'^(?P<user_id>[0-9]+)/messages/', ...)`。朴素的 `split(",")`
+    会把 `(?P<user_id>` 当成一个实参切出去。
+    """
+    out: list[str] = []
+    buf: list[str] = []
+    depth = 0
+    quote = ""
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if quote:
+            buf.append(c)
+            if c == "\\" and i + 1 < len(s):
+                buf.append(s[i + 1])
+                i += 2
+                continue
+            if c == quote:
+                quote = ""
+        elif c in "'\"":
+            quote = c
+            buf.append(c)
+        elif c in "([{":
+            depth += 1
+            buf.append(c)
+        elif c in ")]}":
+            depth -= 1
+            buf.append(c)
+        elif c == "," and depth == 0:
+            out.append("".join(buf))
+            buf = []
+        else:
+            buf.append(c)
+        i += 1
+    if "".join(buf).strip():
+        out.append("".join(buf))
+    return [x.strip() for x in out]
+
+
+def _dj_call_args(text: str, open_idx: int) -> str:
+    """取 `text[open_idx]` 处 `(` 开始的配平实参串（引号感知）。"""
+    depth = 0
+    quote = ""
+    i = open_idx
+    while i < len(text):
+        c = text[i]
+        if quote:
+            if c == "\\":
+                i += 2
+                continue
+            if c == quote:
+                quote = ""
+        elif c in "'\"":
+            quote = c
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return text[open_idx + 1:i]
+        i += 1
+    return ""
+
+
+def _dj_module_rel(mod: str, leaf: str, base: Path, repo: Path) -> str | None:
+    """把 `from <mod> import <leaf>` 解析成仓库内相对路径。解析不出返回 None。
+
+    三种形态：
+      · 绝对点号模块 `app.views.users` + leaf `views` → `app/views/users/views.py`
+      · 相对导入 `from . import views`（mod=".", leaf="views"）→ `pkg/views/...`
+      · 相对导入 `from .users import views`（mod=".users"）→ `pkg/users/views.py`
+    包则落到 `__init__.py`（后面还要沿再导出解析一层）。
+    """
+    if mod.startswith("."):
+        dots = len(mod) - len(mod.lstrip("."))
+        rest = mod[dots:]
+        d = base
+        for _ in range(dots - 1):
+            d = d.parent
+        for comp in ([c for c in rest.split(".") if c] + [leaf]):
+            d = d / comp
+        for cand in (d.with_suffix(".py"), d / "__init__.py"):
+            if cand.is_file():
+                return cand.relative_to(repo).as_posix()
+        return None
+    parts = [p for p in mod.split(".") if p] + [leaf]
+    # 包的根可能是仓库根，也可能被仓库根下的一层目录包着（DjanGoat/app/...）；
+    # 从最长的解释开始试，逐层剥掉前导组件，命中即用。
+    for skip in range(0, len(parts)):
+        rel = "/".join(parts[skip:])
+        for cand in (repo / (rel + ".py"), repo / rel / "__init__.py"):
+            if cand.is_file():
+                return cand.relative_to(repo).as_posix()
+    return None
+
+
+def _dj_alias_map(text: str, path: Path, repo: Path) -> dict[str, str]:
+    """单个 `urls.py` 的局部名字 → 模块相对路径（含 `as` 别名）。"""
+    aliases: dict[str, str] = {}
+    base = path.parent
+    for m in _DJ_IMPORT_RE.finditer(text):
+        mod, names = m.group(1), m.group(2)
+        if not mod or not names:
+            continue                     # `import a.b.c` 只绑 a，路由里用不到
+        for nm in _dj_split_args(names.strip().strip("()")):
+            nm = nm.strip().strip("()").strip()
+            if not nm or nm in ("(", ")"):
+                continue
+            bits = [b.strip() for b in nm.split(" as ")]
+            orig = bits[0]
+            alias = bits[1] if len(bits) > 1 else orig
+            rel = _dj_module_rel(mod, orig, base, repo)
+            if rel:
+                aliases[alias] = rel
+    return aliases
+
+
+def _dj_reexport(rel_path: str, attr: str, repo: Path) -> str | None:
+    """包的 `__init__.py` 里 `from X import ... as attr` 的再导出解析。
+
+    DjanGoat 的 `app/views/__init__.py` 就是这个形态：
+      `from app.views.users import views as users_views`
+    于是 `app/urls.py` 里的 `views.users_views.signup` 要两跳才落到
+    `app/views/users/views.py`。
+    """
+    p = repo / rel_path
+    if not p.is_file():
+        return None
+    try:
+        text = p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    return _dj_alias_map(text, p, repo).get(attr)
+
+
+def _dj_resolve(parts: list[str], aliases: dict[str, str],
+                repo: Path) -> str | None:
+    """把点号属性链解析成模块相对路径（最长前缀匹配 + 逐层再导出）。"""
+    for k in range(len(parts), 0, -1):
+        head = ".".join(parts[:k])
+        if head not in aliases:
+            continue
+        path = aliases[head]
+        for attr in parts[k:]:
+            nxt = _dj_reexport(path, attr, repo)
+            if not nxt:
+                return None
+            path = nxt
+        return path
+    return None
+
 
 
 class WebTreeSitterSlicer:
@@ -73,6 +251,14 @@ class WebTreeSitterSlicer:
             filtered = self._connexion_entries(indexer)
             for u in filtered:
                 self._expand_helpers(indexer, u)
+        # Module 88：Django `urls.py` 路由表通道。**追加式**：装饰器命中集
+        # 原样保留（既有靶场的切片不缩水），路由表指向但装饰器没覆盖到的
+        # 视图补进来。DjanGoat 实测 13 → 全量视图入口。
+        repo = Path(repo_path or self.repo_path)
+        extra = self._django_entries(indexer, filtered, repo)
+        for u in extra:
+            self._expand_helpers(indexer, u)
+        filtered = filtered + extra
         return filtered
 
     @staticmethod
@@ -134,6 +320,97 @@ class WebTreeSitterSlicer:
                     sym, [f"connexion:{hit}"], name=name)
                 if unit:
                     out.append(unit)
+        return out
+
+    # ---------------- Module 88：Django 路由表通道 ----------------
+
+    @staticmethod
+    def _django_route_label(pattern: str) -> str:
+        """路由证据标签：`r'^signup/'` → `^signup/`（去前缀字母与引号）。"""
+        p = pattern.strip()
+        if p[:1] in ("r", "u", "b", "f"):
+            p = p[1:]
+        return p.strip().strip("'\"") or "?"
+
+    @classmethod
+    def _django_routes(cls, repo_path: Path) -> list[tuple[str, str | None, str]]:
+        """解析全仓 `urls.py`，返回 [(view 函数名, 模块相对路径 or None, 路由标签)]。
+
+        只认 `urlpatterns = [` / `+=` 真的被赋值的文件；`include(...)`、
+        `Xxx.as_view(...)`（类视图）与解析不出的点号链一律跳过 ——
+        宁可这条路由不进来，也不拿一个猜的模块名去匹同名函数。
+        """
+        routes: list[tuple[str, str | None, str]] = []
+        for pf in sorted(repo_path.rglob("*.py")):
+            if any(part in IGNORE_DIRS for part in pf.parts):
+                continue
+            try:
+                text = pf.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if not _DJ_URLPATTERNS_RE.search(text):
+                continue
+            aliases = _dj_alias_map(text, pf, repo_path)
+            for m in _DJ_URL_CALL_RE.finditer(text):
+                args = _dj_split_args(_dj_call_args(text, m.end() - 1))
+                if len(args) < 2:
+                    continue
+                view = args[1].strip()
+                if not view or "include" in view or "as_view" in view:
+                    continue
+                vm = re.fullmatch(r"([A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)*)",
+                                  view)
+                if not vm:
+                    continue
+                dotted = [p.strip() for p in vm.group(1).split(".") if p.strip()]
+                if not dotted:
+                    continue
+                func = dotted[-1]
+                if len(dotted) == 1:
+                    mod = aliases.get(func)
+                else:
+                    mod = _dj_resolve(dotted[:-1], aliases, repo_path)
+                routes.append((func, mod, cls._django_route_label(args[0])))
+        return routes
+
+    def _django_entries(self, indexer: SymbolIndexer, existing: list,
+                        repo_path: Path) -> List["CodeUnit"]:
+        """把路由表指向的视图函数补成入口 CodeUnit（**追加**，不替换前两条通道）。
+
+        匹配语义（铁律：判据挂机制不挂名字）：
+          · 模块解析出来 → 按「函数名 + 文件路径后缀」精确命中；
+          · 模块解析不出但全仓只有**唯一**同名定义 → 接受（无歧义）；
+          · 同名多处且模块解析不出 → **跳过**，不猜。
+        """
+        routes = self._django_routes(repo_path)
+        if not routes:
+            return []
+        if not indexer._built:
+            indexer.build()
+        have = {(Path(u.file_path).resolve(), u.start_line) for u in existing}
+        out: List[CodeUnit] = []
+        for func, mod, label in routes:
+            cands = indexer.symbol_table.get(func, [])
+            if not cands:
+                continue
+            picked = None
+            if mod:
+                for c in cands:
+                    if Path(c["file"]).as_posix().endswith(mod):
+                        picked = c
+                        break
+            if picked is None:
+                if len(cands) == 1:
+                    picked = cands[0]
+                else:
+                    continue
+            key = (Path(picked["file"]).resolve(), picked["start"])
+            if key in have:
+                continue
+            unit = indexer.make_code_unit(picked, [f"django:{label}"], name=func)
+            if unit:
+                out.append(unit)
+                have.add(key)
         return out
 
     # ---------------- 多跳展开 ----------------

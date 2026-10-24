@@ -143,6 +143,21 @@ JOBS = [
     ("uniswap-v3-core (Solidity DEX)",
      ["benchmarks/benchmark_uniswapv3.py", "--strict"],
      "reference_repos/uniswap-v3-core/contracts", "target", True),
+    # 第 28 靶场（Module 87）：compound-finance/comet（Compound V3）生产 contracts/。
+    # 0.8.15 时代的旗舰协议：437 入口里 37 个含 `unchecked {}`、206 个含
+    # `revert CustomError()` —— M53 那套 0.4.x 溢出词表的**反面样本**。
+    # 锁两件事：unchecked 分区语义（块外编译器保护 / 块内游标安全）与
+    # 自定义错误中止识别。435 入口 / 0 True。
+    ("compound-finance/comet (Solidity 0.8.x)",
+     ["benchmarks/benchmark_comet.py", "--strict"],
+     "reference_repos/comet/contracts", "target", True),
+    # 第 29 靶场（Module 88）：DjanGoat（OWASP RailsGoat 的 Django 移植版）。
+    # 纯 Django 应用：路由全部外置在 urls.py 的 urlpatterns 里、视图零装饰器。
+    # M88 之前只认装饰器 → 13 个入口（其中 9 个还是 "GET" 碰巧命中 `get`）；
+    # 路由表通道上线后 36 入口 / 23 条路由证据 / 真值 11/11 / 0 误报。
+    ("DjanGoat (Django urls.py 路由表)",
+     ["benchmarks/benchmark_djangoat.py", "--strict"],
+     "reference_repos/DjanGoat", "target", True),
     # 第 28 靶场（Module 80）：FastAPI async + Depends + SQLAlchemy 2.0。
     # 9 异步入口 / users 全 authz False / 0 True。
     ("FastAPI (Python 异步真实模板)",

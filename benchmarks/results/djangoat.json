@@ -1,0 +1,13 @@
+{
+  "bench": "djangoat",
+  "units": 36,
+  "total_units": 36,
+  "django_routed": 23,
+  "decided": 132,
+  "correct": 11,
+  "fp": 0,
+  "reverse_fn": 0,
+  "truth_n": 11,
+  "secret_ok": true,
+  "rows": []
+}
