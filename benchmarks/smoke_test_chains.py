@@ -5033,6 +5033,48 @@ check("M96：doctor 补丁器升到 14 类全绿",
        and "补丁器就位（14 类）" in _sp96.stdout
        and _sp96.stdout.count("[OK] _fix_") == 14), True)
 
+# ---- [97] Module 56：PoC 合成器 arithmetic / unchecked 模板 + 组合参数互不干扰 ----
+from core.sandbox.poc_synthesizer import PocSynthesizer as _Synth97   # noqa: E402
+_d97 = Path(_tmod.mkdtemp(prefix="nexus_t97_"))
+try:
+    (_d97 / "V.sol").write_text(
+        "pragma solidity ^0.4.24;\n"
+        "contract V {\n"
+        "    uint count;\n"
+        "    function dec(uint amt) public {\n"
+        "        count -= amt;\n"
+        "    }\n"
+        "    function send() public {\n"
+        "        msg.sender.call.value(1)();\n"
+        "    }\n"
+        "}\n", encoding="utf-8")
+    _u97 = SoliditySlicer(_d97).extract_entry_units(_d97)
+    _synth97 = _Synth97()
+    _a97 = _synth97.synthesize(_u97[0], "arithmetic")
+    _b97 = _synth97.synthesize(
+        next(x for x in _u97 if x.unit_name == "send"),
+        "unchecked_low_level_calls")
+    check("M97：arithmetic PoC 模板合成 + 结构自检通过",
+          (_a97.language == "solidity" and _a97.self_check_ok
+           and "type(uint256).max" in _a97.content), True)
+    check("M97：unchecked PoC 模板合成 + 结构自检通过（RevertReceiver 拒收）",
+          (_b97.language == "solidity" and _b97.self_check_ok
+           and "RevertReceiver" in _b97.content), True)
+    # 组合参数互不干扰：先 --fix（finally 还原）再 --emit-poc，原文件逐字节不变
+    _orig97 = (_d97 / "V.sol").read_text(encoding="utf-8")
+    _rep97: list = []
+    _fix96a(_d97, _u97, _rep97)
+    _fix96b(_d97, _u97, _rep97)
+    _out97 = _synth97.synthesize_many([( _u97[0], "arithmetic")], _d97 / "poc")
+    check("M97：--fix 与 --emit-poc 组合下原文件逐字节未变",
+          (_d97 / "V.sol").read_text(encoding="utf-8"), _orig97)
+    check("M97：PoC 落盘合规（.t.sol 存在且含 pragma）",
+          (( _d97 / "poc" / _a97.path).exists()
+           and "pragma solidity" in (_d97 / "poc" / _a97.path).read_text(
+               encoding="utf-8")), True)
+finally:
+    shutil.rmtree(_d97, ignore_errors=True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
