@@ -4378,9 +4378,9 @@ check("M42：doctor exit 0（依赖/规则表/指纹/补丁器全就绪）",
 check("M42：doctor 输出含五段自检 + PASS 尾标（M50 升段）",
       all(s in _sp86.stdout for s in
           ("[1/5]", "[2/5]", "[3/5]", "[4/5]", "[5/5]", "PASS")), True)
-check("M42：doctor 规则注册表 21 类全 OK（M53 加 arithmetic）",
-      _sp86.stdout.count("  [OK]") >= 21
-      and "共 21 类" in _sp86.stdout, True)
+check(f"M42：doctor 规则注册表 {len(_CATS)} 类全 OK（从 CATEGORIES 派生，免手工改数）",
+      _sp86.stdout.count("  [OK]") >= len(_CATS)
+      and f"共 {len(_CATS)} 类" in _sp86.stdout, True)
 
 # ---- [87] Module 44：调用者自域状态写早退（access_control）----
 from core.agents.rule_detectors import solidity_access_verdict as _ac87   # noqa: E402
@@ -4617,10 +4617,11 @@ finally:
 _sp91 = subprocess.run(
     [sys.executable, str(Path(__file__).resolve().parent.parent / "cli.py"),
      "doctor"], capture_output=True, text=True)
-check("M48：doctor 补丁器清单升到 14 类且全绿（M55 加 arithmetic/unchecked）",
+from cli import DOCTOR_PATCHERS as _DP48                            # noqa: E402
+check("M48：doctor 补丁器清单从 DOCTOR_PATCHERS 派生且全绿",
       (_sp91.returncode == 0
-       and _sp91.stdout.count("_fix_") >= 14
-       and "共 21 类" in _sp91.stdout),
+       and _sp91.stdout.count("[OK] _fix_") == len(_DP48)
+       and f"补丁器就位（{len(_DP48)} 类）" in _sp91.stdout),
       True)
 
 # ---- [92] Module 49：Mermaid 污点链路图 ----
@@ -4728,9 +4729,10 @@ _out93 = _sp93.stdout
 check("M93：doctor 退出码 0 且五段标题齐全",
       (_sp93.returncode == 0
        and all(f"[{i}/5]" in _out93 for i in range(1, 6))), True)
-check("M93：doctor 补丁器清单 14 类全绿（M55 后）",
-      (_out93.count("[OK] _fix_") == 14
-       and "补丁器就位（14 类）" in _out93), True)
+from cli import DOCTOR_PATCHERS as _DP93                            # noqa: E402
+check("M93：doctor 补丁器清单从 DOCTOR_PATCHERS 派生且全绿",
+      (_out93.count("[OK] _fix_") == len(_DP93)
+       and f"补丁器就位（{len(_DP93)} 类）" in _out93), True)
 check("M93：doctor 校验 PoC 合成器三语言自检",
       ("-- PoC 合成器 --" in _out93
        and _out93.count("自检通过") >= 3), True)
@@ -5030,10 +5032,11 @@ finally:
 _sp96 = subprocess.run(
     [sys.executable, str(ROOT / "cli.py"), "doctor"],
     capture_output=True, text=True)
-check("M96：doctor 补丁器升到 14 类全绿",
+from cli import DOCTOR_PATCHERS as _DP96                            # noqa: E402
+check("M96：doctor 补丁器清单从 DOCTOR_PATCHERS 派生且全绿",
       (_sp96.returncode == 0
-       and "补丁器就位（14 类）" in _sp96.stdout
-       and _sp96.stdout.count("[OK] _fix_") == 14), True)
+       and f"补丁器就位（{len(_DP96)} 类）" in _sp96.stdout
+       and _sp96.stdout.count("[OK] _fix_") == len(_DP96)), True)
 
 # ---- [97] Module 56：PoC 合成器 arithmetic / unchecked 模板 + 组合参数互不干扰 ----
 from core.sandbox.poc_synthesizer import PocSynthesizer as _Synth97   # noqa: E402
@@ -5420,6 +5423,106 @@ try:
           ("SQLI" in _h105 and "background:#e0524b" in _h105), True)
 finally:
     shutil.rmtree(_d105, ignore_errors=True)
+
+# ---- [106] Module 67：hardcoded_secret 第 22 类规则 ----
+from core.agents.vuln_categories import CATEGORIES as _VC106   # noqa: E402
+check("M106：hardcoded_secret 已注册为第 22 类（doctor 单一事实源）",
+      ("hardcoded_secret" in _VC106 and len(_VC106) == 22), True)
+# VAmPI 形态：Flask SECRET_KEY 短弱密钥（JWT 签名上下文，无长度门槛）
+_vampi106 = ("import jwt\n"
+             "vuln_app.app.config['SECRET_KEY'] = 'random'\n"
+             "def encode(user_id):\n"
+             "    return jwt.encode({'sub': user_id}, SECRET_KEY,"
+             " algorithm='HS256')\n")
+check("M106：VAmPI 形态（'random' 短弱 JWT 密钥）判 True（可猜测性是危害）",
+      (_verdict("hardcoded_secret", _vampi106) is True), True)
+_java106 = ('String jwtSecret = "my-super-secret-signing-key-2026";\n'
+            "return Jwts.builder().setSubject(sub).compact();\n")
+check("M106：Java Jwts 签名密钥字面量判 True", (_verdict(
+    "hardcoded_secret", _java106) is True), True)
+_env106 = ("secret = os.environ.get('JWT_SECRET')\n"
+           "jwt.encode({'a': 1}, secret)\n")
+check("M106：os.environ 读取判 False", (_verdict(
+    "hardcoded_secret", _env106) is False), True)
+_ph106 = "app.config['SECRET_KEY'] = 'your-secret-here-please-change'\n"
+check("M106：占位符（your-secret）不算泄露（退 None）", (_verdict(
+    "hardcoded_secret", _ph106) is None), True)
+check("M106：无密钥标识符退 None（不归本类目管）", (_verdict(
+    "hardcoded_secret", "def f(a):\n    return a + 1\n") is None), True)
+# VAmPI 实测 FP 回归锁：secret_content 是书籍正文字段，不是凭证；十六进制
+# 密钥里出现 123456 子串也不能当占位符。
+check("M106：数据字段 secret_content 不判 True（凭证词须在标识符末尾）",
+      (_verdict("hardcoded_secret",
+                'Book(secret_content="secret for bookTitle" + randomint)\n')
+       is None), True)
+check("M106：十六进制私钥含 123456 子串仍判 True（不误当占位符）",
+      (_verdict("hardcoded_secret",
+                'privateKey = "0x0123456789abcdef0123456789abcdef"\n')
+       is True), True)
+check("M106：短通用密钥（无签发上下文）退 None（交模型）",
+      (_verdict("hardcoded_secret", 'secret_key = "short"\n') is None), True)
+
+# ---- [107] Module 68：--fix 第 15 类（硬编码密钥转环境变量） ----
+from cli import _fix_hardcoded_secret as _fix107   # noqa: E402
+_d107 = Path(_tmod.mkdtemp(prefix="nexus_t107_"))
+try:
+    (_d107 / "api.py").write_text(
+        "import jwt\nfrom flask import request\napp = None\n"
+        "@app.route('/token')\ndef token():\n"
+        "    app.config['SECRET_KEY'] = 'random'\n"
+        "    uid = request.args.get('uid')\n"
+        "    return jwt.encode({'sub': uid}, app.config.get('SECRET_KEY'),"
+        " algorithm='HS256')\n", encoding="utf-8")
+    _u107 = WebTreeSitterSlicer(_d107).extract_entry_units(_d107)
+    _orig107 = (_d107 / "api.py").read_text(encoding="utf-8")
+    _rep107: list = []
+    _n107 = _fix107(_d107, _u107, _rep107)
+    check("M107：第 15 类补丁自检通过（True → 写入 → 规则 False）", _n107, 1)
+    check("M107：补丁把字面量改为 os.environ.get（SECRET_KEY）",
+          any("os.environ.get(\"SECRET_KEY\")" in x for x in _rep107), True)
+    check("M107：补丁自动补齐 import os（语法自洽）",
+          any(x.strip().startswith("+import os") for x in _rep107), True)
+    check("M107：文件字节级无损还原",
+          (_d107 / "api.py").read_text(encoding="utf-8"), _orig107)
+finally:
+    shutil.rmtree(_d107, ignore_errors=True)
+# Java 分支：验证按语言分流 + Java 切片器文件缓存清空（否则重切片读旧内容）
+_d107j = Path(_tmod.mkdtemp(prefix="nexus_t107j_"))
+try:
+    _j107 = _d107j / "src" / "main" / "java" / "demo"
+    _j107.mkdir(parents=True)
+    (_j107 / "ApiController.java").write_text(
+        "package demo;\n"
+        "import org.springframework.web.bind.annotation.*;\n"
+        "@RestController\n"
+        "public class ApiController {\n"
+        "  @GetMapping(\"/token\")\n"
+        "  public String token() {\n"
+        "    String jwtSecret = \"my-super-secret-signing-key-2026\";\n"
+        "    return Jwts.builder().setSubject(\"x\")"
+        ".signWith(jwtSecret).compact();\n"
+        "  }\n"
+        "}\n", encoding="utf-8")
+    _u107j = JavaSlicer(_d107j).extract_entry_units()
+    _orig107j = (_j107 / "ApiController.java").read_text(encoding="utf-8")
+    _rep107j: list = []
+    _n107j = _fix107(_d107j, _u107j, _rep107j)
+    check("M107：Java 分支自检通过（True → System.getenv → False）",
+          _n107j, 1)
+    check("M107：Java 补丁写入 System.getenv(\"JWT_SECRET\")",
+          any("System.getenv(\"JWT_SECRET\")" in x for x in _rep107j), True)
+    check("M107：Java 文件字节级无损还原",
+          (_j107 / "ApiController.java").read_text(encoding="utf-8"),
+          _orig107j)
+finally:
+    shutil.rmtree(_d107j, ignore_errors=True)
+_sp107 = subprocess.run(
+    [sys.executable, str(ROOT / "cli.py"), "doctor"],
+    capture_output=True, text=True)
+check("M107：doctor 补丁器升到 15 类全绿（M68 加 hardcoded_secret）",
+      (_sp107.returncode == 0
+       and "补丁器就位（15 类）" in _sp107.stdout
+       and _sp107.stdout.count("[OK] _fix_") == 15), True)
 
 print()
 if FAILS:

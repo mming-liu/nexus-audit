@@ -1270,6 +1270,7 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_python_deserial(repo, py, report)
         n += _fix_python_shell(repo, py, report)
         n += _fix_python_yaml(repo, py, report)
+        n += _fix_hardcoded_secret(repo, py, report)
     if sol:
         n += _fix_solidity_txorigin(repo, sol, report)
         n += _fix_solidity_reentrancy(repo, sol, report)
@@ -2098,6 +2099,172 @@ def _fix_solidity_unchecked_wrap(repo: Path, targets: list, lines: list) -> int:
     return fixed
 
 
+# ---- Module 68：第 15 类（hardcoded_secret → 环境变量读取） ----
+
+# Python：SECRET_KEY = "..." / secret_key = '...' / config['SECRET_KEY'] = "..."
+# 凭证词必须落在标识符末尾（`secret_content` 是数据字段，不是密钥）。
+_SECRET_NAME_RE = (
+    r"(?:jwt[_-]?secret|access[_-]?key[_-]?secret|client[_-]?secret"
+    r"|api[_-]?secret|app[_-]?secret|secret[_-]?key|secretkey"
+    r"|private[_-]?key|signing[_-]?key|secret)")
+_SECRET_PY_ASSIGN_RE = re.compile(
+    r"^(?P<prefix>[ \t]*[^=\n]*?" + _SECRET_NAME_RE + r")"
+    r"(?P<tail>(?![\w])[^=\n]*?=\s*)['\"](?P<val>[^'\"]{4,})['\"]"
+    r"(?P<suffix>\s*)$", re.I)
+# Java：String jwtSecret = "..."; / String API_SECRET = "...";
+_SECRET_JAVA_ASSIGN_RE = re.compile(
+    r"^(?P<prefix>[ \t]*(?:(?:private|public|protected|static|final)"
+    r"\s+)*String\s+(?P<name>\w*?" + _SECRET_NAME_RE + r"))"
+    r"(?P<tail>(?![\w])\s*=\s*)['\"](?P<val>[^'\"]{4,})['\"]"
+    r"(?P<suffix>\s*;\s*)$", re.I)
+
+
+def _env_name(var: str) -> str:
+    """从赋值左侧推导环境变量名。
+
+    优先取**引号内的键名**（`config['SECRET_KEY']` → SECRET_KEY）；
+    否则取最后一个标识符并转大写蛇形（`jwtSecret` → JWT_SECRET）。
+    """
+    km = re.search(r"['\"]([A-Za-z_]\w*)['\"]", var)
+    if km:
+        return km.group(1).upper()
+    names = re.findall(r"[A-Za-z_]\w*", var)
+    ident = names[-1] if names else "APP"
+    env = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", ident).upper()
+    return env or "APP_SECRET"
+
+
+def _ensure_os_import(lines: list[str]) -> list[str]:
+    """Python 补丁引用 `os.environ` 时，缺 `import os` 就补一行。
+
+    插入点跳过模块 docstring 与 `from __future__`（后者必须位于文件最前，
+    放它前面会直接 SyntaxError）；已有 `import os` / `from os import` 则不动。
+    """
+    if any(re.match(r"\s*(?:import\s+os\b|from\s+os\s+import\b)", ln)
+           for ln in lines):
+        return lines
+    idx, n = 0, len(lines)
+    while idx < n and (not lines[idx].strip()
+                       or lines[idx].lstrip().startswith("#")):
+        idx += 1
+    if idx < n:
+        m = re.match(r'\s*[rRuUbBfF]{0,2}("""|\'\'\')', lines[idx])
+        if m:
+            q = m.group(1)
+            if q in lines[idx][m.end():]:
+                idx += 1
+            else:
+                idx += 1
+                while idx < n and q not in lines[idx]:
+                    idx += 1
+                idx = min(idx + 1, n)
+    while idx < n:
+        s = lines[idx].strip()
+        if not s or s.startswith("#") or re.match(
+                r"from\s+__future__\s+import\b", s):
+            idx += 1
+            continue
+        break
+    lines.insert(idx, "import os\n")
+    return lines
+
+
+def _fix_hardcoded_secret(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 15 类（Module 68）：硬编码密钥改环境变量读取。
+
+    Python：`SECRET_KEY = "xxx"` → `SECRET_KEY = os.environ.get("XXX")`
+    Java：  `String jwtSecret = "xxx";` →
+            `String jwtSecret = System.getenv("JWT_SECRET");`
+    自检闭环：重切片 + 重跑 hardcoded_secret 规则 → False。
+    占位符值（your-secret/123456 等）不修（本来就不构成泄露）。
+    """
+    from core.agents.rule_detectors import (verdict as rule_verdict,
+                                            SECRET_PLACEHOLDER_RE)
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("hardcoded_secret", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        is_py = str(f).endswith(".py")
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        file_lines = original.splitlines(keepends=True)
+        patched_lines = list(file_lines)
+        changed = False
+        lo = max(0, u.start_line - 1)
+        hi = min(u.end_line, len(patched_lines))
+        for i in range(lo, hi):
+            raw = patched_lines[i].rstrip("\r\n")
+            if is_py:
+                m = _SECRET_PY_ASSIGN_RE.match(raw)
+                if not m:
+                    continue
+                if SECRET_PLACEHOLDER_RE.search(m.group("val")):
+                    continue
+                env = _env_name(m.group("prefix"))
+                patched_lines[i] = (f'{m.group("prefix")}{m.group("tail")}'
+                                    f'os.environ.get("{env}")'
+                                    f'{m.group("suffix") or ""}\n')
+                changed = True
+            else:
+                m = _SECRET_JAVA_ASSIGN_RE.match(raw)
+                if not m:
+                    continue
+                if SECRET_PLACEHOLDER_RE.search(m.group("val")):
+                    continue
+                env = _env_name(m.group("name"))
+                patched_lines[i] = (f'{m.group("prefix")}{m.group("tail")}'
+                                    f'System.getenv("{env}");\n')
+                changed = True
+        if not changed:
+            continue
+        if is_py and any("os.environ.get" in ln for ln in patched_lines):
+            patched_lines = _ensure_os_import(patched_lines)
+        patched = "".join(patched_lines)
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            # Java 切片器按路径缓存源码，不看 mtime；重切片前必须清掉
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+            # 重切片按语言分流：py 用 WebTreeSitterSlicer，java 用 JavaSlicer
+            if str(f).endswith(".py"):
+                from core.slicer.web_treesitter import WebTreeSitterSlicer
+                u2 = next((x for x in WebTreeSitterSlicer(repo)
+                           .extract_entry_units(repo)
+                           if x.unit_name == u.unit_name
+                           and Path(x.file_path) == f), None)
+            else:
+                from core.slicer.java_servlet import JavaSlicer
+                u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                           if x.unit_name == u.unit_name
+                           and Path(x.file_path) == f), None)
+            v2 = (rule_verdict("hardcoded_secret", u2.source_code)
+                  if u2 else None)
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(),
+                                        patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [hardcoded-secret] {u.unit_name}（`{f.name}`）",
+                      "```diff", *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 hardcoded_secret 规则 →",
+                      "> False。密钥移出代码由环境注入（CWE-798 消解）；",
+                      "> 注意同步更新部署环境与密钥轮换。", ""]
+        else:
+            lines += [f"## [hardcoded-secret] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）",
+                      ""]
+    return fixed
+
+
 _MP_CONCAT_RE = re.compile(
     r'(\.apply|\.last)\s*\(\s*"([^"]*)"\s*\+\s*([A-Za-z_]\w*)'
     r'(?:\s*\+\s*"([^"]*)")?\s*\)')
@@ -2473,6 +2640,7 @@ DOCTOR_PATCHERS = [
     "_fix_python_yaml", "_fix_solidity_reentrancy", "_fix_solidity_initiator",
     "_fix_solidity_onlyowner", "_fix_solidity_txorigin", "_fix_mp_concat",
     "_fix_solidity_arith_guard", "_fix_solidity_unchecked_wrap",
+    "_fix_hardcoded_secret",
 ]
 
 

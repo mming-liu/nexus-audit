@@ -3396,6 +3396,78 @@ def _ob_exit_safety(source: str, validated: set[str]) -> str:
     return "safe"
 
 
+# ---- M67：硬编码密钥与敏感凭证泄露（hardcoded_secret） ----
+#
+# 真实项目审计里最常见的 P0 之一：JWT 签名密钥 / API Secret / 私钥直接
+# 写死在代码里。判据挂"赋值目标 + 赋值来源"的机制：
+#   True  —— 密钥型变量名（secret / private_key / signing_key / jwt_secret
+#            / access_key_secret 等）被赋**字符串字面量**；JWT/会话签名
+#            上下文（单元内出现 jwt.encode/decode、Jwts、Flask SECRET_KEY）
+#            无长度门槛（'random' 这种短弱密钥本身就是缺陷——可猜测性
+#            才是危害，不是熵）；通用密钥字面量 len ≥ 16；
+#   False —— 密钥来自环境/配置读取（os.environ / os.getenv /
+#            System.getenv / System.getProperty / @Value("${...}") /
+#            .config.get(...)），单元只消费不定义；
+#   None  —— 单元里没有密钥型标识符，或只有短通用密钥（交模型）。
+#
+# 变量名必须**以凭证词结尾**（secret / secret_key / jwtSecret /
+# accessKeySecret / privateKey / signingKey ...）。这条锚定是 VAmPI 实测
+# 逼出来的：`secret_content="secret for bookTitle"` 是书籍正文字段，不是
+# 凭证；早期"标识符里含 secret 即可"的写法会把数据字段判成 P0。
+_SECRET_TOKEN = (
+    r"(?:jwt[_-]?secret|access[_-]?key[_-]?secret|client[_-]?secret"
+    r"|api[_-]?secret|app[_-]?secret|secret[_-]?key|secretkey"
+    r"|private[_-]?key|signing[_-]?key|secret)")
+SECRET_ASSIGN_RE = re.compile(
+    r"(?i)(?P<name>[\w.$\[\]'\"]*?" + _SECRET_TOKEN + r")"
+    r"['\"]?\]?\s*[:=]\s*['\"](?P<val>[^'\"]{4,})['\"]")
+SECRET_ENV_READ_RE = re.compile(
+    r"\bos\s*\.\s*environ\b|\bos\s*\.\s*getenv\b|System\s*\.\s*getenv\b"
+    r"|System\s*\.\s*getProperty\b|@Value\s*\(\s*\"\$\{"
+    r"|\.\s*config\s*\.\s*get\s*\(", re.I)
+SECRET_PLACEHOLDER_RE = re.compile(
+    r"(?i)your|changeit|\b123456\b|password|placeholder|dummy|example|xxxxx"
+    r"|\$\{|todo|fixme|insert_|default|已脱敏|\btest\b")
+SECRET_JWT_CTX_RE = re.compile(
+    r"jwt\s*\.\s*(?:encode|decode)|Jwts\s*\.|create_?token"
+    r"|config\s*\[[^\]\n]*SECRET_KEY", re.I)
+
+
+def hardcoded_secret_verdict(source: str) -> bool | None:
+    body = re.sub(r"//[^\n]*", "", source)
+    body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+    if not re.search(r"(?i)secret|private_?key|signing_?key", body):
+        return None                          # 不归本类目管
+    assigns = list(SECRET_ASSIGN_RE.finditer(body))
+    has_literal = False
+    for m in assigns:
+        val = m.group("val")
+        if SECRET_PLACEHOLDER_RE.search(val):
+            continue                          # 占位符不算泄露
+        # 赋值行右侧是 env/config 读取 → 单元只消费不定义
+        line_start = body.rfind("\n", 0, m.start()) + 1
+        line_end = body.find("\n", m.start())
+        line = body[line_start:line_end if line_end > 0 else len(body)]
+        if re.search(r"(?i)[:=]\s*(?:os\.environ|os\.getenv"
+                     r"|System\.getenv|System\.getProperty)", line):
+            continue
+        has_literal = True
+        break
+    if has_literal:
+        # JWT/会话签名上下文无长度门槛；通用密钥 ≥ 16
+        if SECRET_JWT_CTX_RE.search(body):
+            return True
+        if any(len(m.group("val")) >= 16
+               and not SECRET_PLACEHOLDER_RE.search(m.group("val"))
+               for m in assigns):
+            return True
+        return None                           # 只有短通用密钥 → 交模型
+    # 无字面量赋值：单元从 env/config 读取密钥 → 确定性 safe
+    if SECRET_ENV_READ_RE.search(body):
+        return False
+    return None
+
+
 def build_rule_diagnostic(category: str, code: str,
                           *, line_offset: int = 0) -> str:
     """为退回 None 的 (类目, 切片) 生成一行"静态前筛已核实事实"注释头。
@@ -7934,6 +8006,9 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category == "ssrf":
         return ssrf_verdict(source)
+
+    if category == "hardcoded_secret":
+        return hardcoded_secret_verdict(source)
 
     if category == "cmdi":
         if _looks_python(source):

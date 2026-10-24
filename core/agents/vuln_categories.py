@@ -232,6 +232,20 @@ CATEGORIES: dict[str, VulnCategory] = {
                   "注意：固定为 \"*\" 是公开可读的常规用法，"
                   "只有同时设置了 Access-Control-Allow-Credentials: true 才构成缺陷。"),
     ),
+    "hardcoded_secret": VulnCategory(
+        key="hardcoded_secret", display="硬编码密钥/凭证", cwe="CWE-798",
+        owasp=False, needs_taint=False,
+        # 配置型缺陷：问题出在密钥的存放方式（代码 vs 环境/配置中心），
+        # 与污点可达无关。
+        sink_question=("函数或配置里是否把密钥/凭证直接写死为字符串字面量"
+                       "（JWT 签名密钥、API Secret、私钥、accessKeySecret、"
+                       "SECRET_KEY 等）？"),
+        property=("密钥是否来自环境/配置读取（os.environ / System.getenv / "
+                  "@Value(\"${...}\") / 配置中心）而非代码字面量？"
+                  "注意：① 'random'、'test' 这类弱 JWT 签名密钥本身就是缺陷"
+                  "（可猜测性是危害）；② 占位符（your-secret/xxx/123456）"
+                  "不算；③ 单元只从 config/env 读取、不定义字面量的不算。"),
+    ),
     "authz": VulnCategory(
         key="authz", display="越权与未授权访问", cwe="CWE-285",
         owasp=False,
