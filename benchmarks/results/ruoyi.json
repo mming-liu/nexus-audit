@@ -12,11 +12,5 @@
   "fp": 0,
   "reverse_fn": 0,
   "fallback": 5,
-  "unannotated_true": [
-    "SysJobController.java:SysJobController.queryCronExpression",
-    "SysDictTypeController.java:SysDictTypeController.selectDictTree",
-    "SysMenuController.java:SysMenuController.selectMenuTree",
-    "SysNoticeController.java:SysNoticeController.view",
-    "SysRoleController.java:SysRoleController.authDataScope"
-  ]
+  "unannotated_true": []
 }

@@ -828,6 +828,8 @@ class JavaSlicer:
             units.extend(self._slice_file(java, text))
         self._attach_chains(units)
         self._mark_global_authz(root, units)
+        self._mark_param_validated(root, units)
+        self._mark_explicit_auth_module(root, units)
         return units
 
     # 仓库级全局鉴权的机器标记（Module 38，mall 形态）。铁律 4 的反面：
@@ -867,26 +869,167 @@ class JavaSlicer:
                         if src and self._GLOBAL_AUTHZ_MARK not in src:
                             u.source_code = self._GLOBAL_AUTHZ_MARK + "\n" + src
                     return
-            # ② Spring MVC 拦截器前缀：addPathPatterns("/xxx/**")
+            # ② 前缀级统一保护（M63 MvcConfigurer + M64 Shiro 过滤链）：
+            #    · addPathPatterns("/admin/**")（Spring MVC 拦截器）
+            #    · filterChainDefinitionMap.put("/admin/**", "authc")
+            #      （Shiro 过滤链 —— 非 anon 的过滤器 = 认证/授权强制）
+            #    路由路径落在保护前缀下的入口打标记；`/**` 全覆盖。
             prefixes: list[str] = []
             for java in root.rglob("*.java"):
                 try:
                     text = java.read_text(encoding="utf-8", errors="replace")
                 except OSError:
                     continue
-                if "addInterceptors" not in text:
-                    continue
-                prefixes += re.findall(
-                    r'addPathPatterns\(\s*"(/\w+)/\*\*\s*"\s*\)', text)
+                if "addInterceptors" in text:
+                    prefixes += re.findall(
+                        r'addPathPatterns\(\s*"(/\w+)/\*\*\s*"\s*\)', text)
+                for fm in re.finditer(
+                        r'filterChainDefinitionMap\.put\(\s*"([^"]+)"\s*,'
+                        r'\s*"([^"]*)"\s*\)', text):
+                    fpath, filters = fm.group(1), fm.group(2)
+                    if "anon" in filters:
+                        continue          # anon = 放行，不构成保护
+                    if not any(k in filters for k in ("authc", "user")):
+                        continue          # 无认证语义的过滤器（csrf 等）不算
+                    if fpath == "/**":
+                        prefixes.append("/**")
+                    elif fpath.endswith("/**"):
+                        m2 = re.match(r"^(/\w+)/\*\*$", fpath)
+                        if m2:
+                            prefixes.append(m2.group(1))
             if not prefixes:
                 return
+            full = "/**" in prefixes
             for u in units:
                 rp = u.route_path or ""
-                if not any(rp == p or rp.startswith(p + "/") for p in prefixes):
+                if not full and not any(
+                        rp == p or rp.startswith(p + "/") for p in prefixes):
                     continue
                 src = u.source_code or ""
                 if src and self._GLOBAL_AUTHZ_MARK not in src:
                     u.source_code = self._GLOBAL_AUTHZ_MARK + "\n" + src
+        except Exception:
+            pass
+
+    # 框架自带的非校验注解 —— 出现在形参上不构成"白名单校验"证据
+    _NON_VALIDATING_ANNOT = {
+        "RequestParam", "PathVariable", "RequestBody", "RequestHeader",
+        "ModelAttribute", "LoginUser", "Valid", "Validated", "NotNull",
+        "NotEmpty", "NotBlank", "Size", "Min", "Max", "Email", "Deprecated",
+    }
+
+    def _mark_param_validated(self, root: Path, units: List[CodeUnit]) -> None:
+        """Bean Validation 白名单注解标记（M64，litemall 淬火）。
+
+        仓库里定义了 `@Constraint(validatedBy = ...)` 且带 `accepts()` 白
+        名单字面量（或 @Pattern(regexp="...")）的自定义注解（litemall 的
+        `@Sort(accepts = {"add_time","id"})` / `@Order({"desc","asc"})`），
+        绑定在入口形参上 + 类级 @Validated —— 框架在参数解析阶段就强制
+        白名单，非法值 400，根本进不了方法体。这是**机制级防护事实**。
+
+        给入口切片头打 `// [param-validated] sort, order` 标记，规则层
+        （sqli C2b MBG Example 出口）据此豁免这些形参的注入面。
+        """
+        try:
+            whitelist_annot: set[str] = set()
+            for java in root.rglob("*.java"):
+                try:
+                    text = java.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                for m in re.finditer(r"@interface\s+([A-Za-z_]\w*)", text):
+                    name = m.group(1)
+                    # @Constraint 元注解出现在 @interface 声明**之前**
+                    seg = text[max(0, m.start() - 400):m.start() + 1200]
+                    if "@Constraint" not in seg:
+                        continue
+                    if re.search(r"accepts\s*\(\s*\)\s*default\s*\{[^}]*\"",
+                                 seg) or re.search(r"@Pattern\([^)]*regexp",
+                                                   seg):
+                        whitelist_annot.add(name)
+            if not whitelist_annot:
+                return
+            for u in units:
+                body = u.own_body or ""
+                # 入口签名：own_body 开头到方法体的第一个 `{` 前的括号段
+                pm = re.search(r"\bpublic\s+[^({]*\(", body)
+                if not pm:
+                    continue
+                depth = 1
+                j = pm.end()
+                while j < len(body) and depth:
+                    if body[j] == "(":
+                        depth += 1
+                    elif body[j] == ")":
+                        depth -= 1
+                    j += 1
+                sig = body[pm.end():j - 1]
+                # 括号感知切分实参段（注解实参里可能有逗号）
+                parts: list[str] = []
+                buf = []
+                d = 0
+                for ch in sig:
+                    if ch in "({[":
+                        d += 1
+                    elif ch in ")}]":
+                        d -= 1
+                    if ch == "," and d == 0:
+                        parts.append("".join(buf))
+                        buf = []
+                    else:
+                        buf.append(ch)
+                parts.append("".join(buf))
+                validated: list[str] = []
+                for part in parts:
+                    annots = re.findall(r"@([A-Za-z_]\w*)", part)
+                    if not any(a in whitelist_annot for a in annots):
+                        continue
+                    vm = re.search(
+                        r"(?:String|Integer|Long|int)\s+([A-Za-z_]\w*)\s*$",
+                        part.strip())
+                    if vm:
+                        validated.append(vm.group(1))
+                if not validated:
+                    continue
+                src = u.source_code or ""
+                if src:
+                    u.source_code = (f"// [param-validated] "
+                                     f"{', '.join(validated)}\n" + src)
+        except Exception:
+            pass
+
+    def _mark_explicit_auth_module(self, root: Path,
+                                   units: List[CodeUnit]) -> None:
+        """显式 token 鉴权模块标记（M64 litemall 淬火）。
+
+        模块（同目录）里 ≥3 个入口带「形参主体注解」段（@LoginUser 一类
+        自定义 resolver 把 token 解析为主体形参）且目录内没有任何
+        @RequiresPermissions —— 该模块采用**显式声明主体**的鉴权模型：
+        声明了主体的路由由主体比对保护，未声明的就是匿名面（设计意图，
+        如 C 端商品/品牌/专题浏览）。形参直查在这种模块上不构成"缺鉴权"
+        的结论 —— authz 判定看到标记后退 None（匿名面 ≠ 越权面）。
+        """
+        try:
+            by_dir: dict = {}
+            for u in units:
+                if "形参主体注解" not in (u.source_code or ""):
+                    continue
+                by_dir.setdefault(str(Path(u.file_path).parent), []).append(u)
+            if not by_dir:
+                return
+            annotated_dirs = {d for d, us in by_dir.items() if len(us) >= 3}
+            if not annotated_dirs:
+                return
+            for u in units:
+                d = str(Path(u.file_path).parent)
+                if d not in annotated_dirs:
+                    continue
+                src = u.source_code or ""
+                if not src or "[explicit-auth-module]" in src:
+                    continue
+                if "@RequiresPermissions" in src:
+                    continue          # 该入口自己声明了权限 → 非匿名面
+                u.source_code = "[explicit-auth-module]\n" + src
         except Exception:
             pass
 

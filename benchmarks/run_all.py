@@ -121,6 +121,12 @@ JOBS = [
     # 公开内容路由豁免（authz）、SSRF 接收者语义三分（强/谓词/弱+旁证）。
     ("My-Blog (野战实弹)", ["benchmarks/benchmark_myblog.py", "--strict"],
      "reference_repos/My-Blog-master", "target", True),
+    # 第 24 靶场（Module 64）：litemall。20k Star 多模块小程序商城。
+    # 逼出四项淬火：Bean Validation 白名单标记（@Sort/@Order + C2b 豁免）、
+    # Shiro 过滤链前缀覆盖、显式 token 鉴权模块（@LoginUser 模型）、
+    # path sink 与形参相关性（含 request.getInputStream 排除）。
+    ("litemall (野战实弹)", ["benchmarks/benchmark_litemall.py", "--strict"],
+     "reference_repos/litemall-master", "target", True),
 ]
 
 

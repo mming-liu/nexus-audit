@@ -12,8 +12,8 @@
   "subject_cmp_missing": [],
   "authz": {
     "truth_n": 29,
-    "decided": 24,
-    "correct": 24,
+    "decided": 23,
+    "correct": 23,
     "fp": [],
     "fn": [],
     "fallback": [
@@ -21,6 +21,7 @@
       "NewBeeMallGoodsAPI.goodsDetail",
       "NewBeeMallIndexAPI.indexInfo",
       "NewBeeMallGoodsAPI.search",
+      "NewBeeMallOrderAPI.paySuccess",
       "NewBeeMallPersonalAPI.getUserDetail"
     ],
     "orphan": []
@@ -29,9 +30,9 @@
   "sqli_safe_decided": 15,
   "distribution": {
     "authz": {
-      "true": 1,
+      "true": 0,
       "false": 23,
-      "none": 38
+      "none": 39
     },
     "sqli": {
       "true": 0,

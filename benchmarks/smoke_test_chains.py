@@ -3908,8 +3908,8 @@ _r74 = _sp74.run([sys.executable, str(Path(__file__).resolve().parent
                                      / "benchmark_ruoyi.py"), "--strict", "--offline"],
                  capture_output=True, text=True, encoding="utf-8")
 check("M28：RuoYi benchmark --strict --offline 退出码 0", _r74.returncode, 0)
-check("M28：RuoYi 无注解 True 面 16 → 5（11 条 check*Unique 被 2h 消解）",
-      "无注解且判 True 的入口 5 条" in (_r74.stdout or ""), True)
+check("M28：RuoYi 无注解 True 面 16 → 5 → 0（M64：Shiro /** user 全局认证核实后归零）",
+      ("无注解且判 True 的入口" not in (_r74.stdout or "")), True)
 
 
 # ---- [75] Module 29：MyBatis-Plus Wrapper 判据 + @el.check/@AnonymousAccess ----
@@ -4352,9 +4352,9 @@ check("M40：Python 字节级还原",
 # ---- [85] Module 41：覆盖地板门禁 ----
 import json                                                        # noqa: E402
 import triage_fallbacks as _tri41                                 # noqa: E402
-check("M41：地板表覆盖 11 个真值靶场且下限为正（M63 加 myblog）",
+check("M41：地板表覆盖 12 个真值靶场且下限为正（M63 myblog + M64 litemall）",
       (len(_tri41.FLOORS), all(v > 0 for v in _tri41.FLOORS.values())),
-      (11, True))
+      (12, True))
 check("M41：--check-floor 全绿态通过（exit 0）",
       _sp81.run([sys.executable, str(Path(__file__).resolve().parent
                  / "triage_fallbacks.py"), "--check-floor"],
@@ -4732,9 +4732,9 @@ check("M93：doctor 补丁器清单 14 类全绿（M55 后）",
 check("M93：doctor 校验 PoC 合成器三语言自检",
       ("-- PoC 合成器 --" in _out93
        and _out93.count("自检通过") >= 3), True)
-check("M93：doctor 校验覆盖地板（11 项）与 SCOREBOARD 同步",
+check("M93：doctor 校验覆盖地板（12 项）与 SCOREBOARD 同步",
       ("-- 覆盖地板（--check-floor）--" in _out93
-       and "共 11 项地板配置" in _out93
+       and "共 12 项地板配置" in _out93
        and "-- SCOREBOARD.md 同步 --" in _out93
        and "与当前 results/*.json 现算结果一致" in _out93), True)
 check("M93：doctor 报告正则卫生（零死正则/零遮蔽）",
@@ -5324,6 +5324,35 @@ check("M102：淬火③ StringUtils.hasText(linkUrl) 不再命中 SSRF",
                 ) is None), True)
 check("M102：盲测 P0 收敛为 3 条全真阳（11 → 3）",
       ("P0 实锤 3" in _r102.stdout or True), True)   # 盲测数由 doctor/E2E 覆盖
+
+# ---- [103] Module 64：litemall 野战实弹（第 24 靶场 + @LoginUser 主体链） ----
+_r103 = subprocess.run(
+    [sys.executable, str(ROOT / "benchmarks" / "benchmark_litemall.py"),
+     "--strict", "--offline"], capture_output=True, text=True)
+check("M103：litemall benchmark --strict 退出码 0", _r103.returncode, 0)
+check("M103：盲测 288 P0 收敛（sqli 40→0 / authz 21→0 / pathtraver 5→0），"
+      "真阳 3 条 + CORS 配置继承 219 全命中",
+      ("误报                  ：0" in _r103.stdout
+       and "漏报                  ：0" in _r103.stdout
+       and "人工真值命中          ：3/3" in _r103.stdout), True)
+from core.slicer.java_servlet import JavaSlicer as _JS103   # noqa: E402
+_u103 = _JS103(ROOT / "reference_repos" / "litemall-master").extract_entry_units()
+_ad103 = next(x for x in _u103
+              if x.unit_name.split("#")[0] == "AdminAdController.list")
+_wx103 = next(x for x in _u103
+              if x.unit_name.split("#")[0] == "WxBrandController.list")
+_addr103 = next(x for x in _u103
+                if x.unit_name.split("#")[0] == "WxAddressController.list")
+check("M103：淬火④ @Sort/@Order 形参打 [param-validated] 标记（C2b 豁免）",
+      ("[param-validated]" in _ad103.source_code
+       and "sort" in _ad103.source_code[:200]), True)
+check("M103：淬火⑥ admin 路由 Shiro /** authc 覆盖 → [global-authz]",
+      ("[global-authz]" in _ad103.source_code), True)
+check("M103：淬火⑦ wx 模块显式 token 鉴权 → [explicit-auth-module]",
+      ("[explicit-auth-module]" in _wx103.source_code), True)
+check("M103：@LoginUser Integer userId 主体被识别（地址列表无 authz P0）",
+      ("形参主体注解" in _addr103.source_code
+       and _verdict("authz", _addr103.source_code) is not True), True)
 
 print()
 if FAILS:

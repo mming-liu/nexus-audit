@@ -1115,12 +1115,25 @@ def sqli_verdict(source: str) -> bool | None:
     #     只看切片里真有 selectByExample 调用 + Example 构造 —— 接口
     #     声明段不算数（ MallExample 只是个 POJO 名字，查询载体事实在
     #     impl 段）。放 C3 之后：显式拼接出口优先级最高。
-    if re.search(r"selectByExample\s*\(", source) and re.search(
+    #
+    #     M64 litemall 淬火：入口形参带 **Bean Validation 白名单注解**
+    #     （`@Sort(accepts={"add_time","id"})` + 类级 @Validated —— 框架
+    #     在参数解析阶段强制白名单，非法值 400）时，`setOrderByClause
+    #     (sort + " " + order)` 的实参变量全部在白名单里 → 不是注入面，
+    #     不判 True。切片头 `[param-validated]` 标记由切片器打。
+    _param_validated: set[str] = set()
+    _pvm = re.search(r"//\s*\[param-validated\]\s*(.+)", source)
+    if _pvm:
+        _param_validated = {s.strip() for s in _pvm.group(1).split(",")
+                            if s.strip()}
+    _ob_safety = _ob_exit_safety(source, _param_validated)
+    if re.search(r"selectByExample\w*\s*\(", source) and re.search(
             r"Example\s*\(\s*\)", source):
-        for m in re.finditer(r"setOrderByClause\s*\(([^;]*)\)", source):
-            if not re.fullmatch(r'\s*"[^"]*"\s*', m.group(1)):
-                return True
-        if not SQLI_JDBC_SINK_RE.search(source):
+        if _ob_safety == "unsafe":
+            return True
+        if _ob_safety == "safe" and not SQLI_JDBC_SINK_RE.search(source):
+            return False
+        if _ob_safety == "none" and not SQLI_JDBC_SINK_RE.search(source):
             return False
 
     # B) MyBatis：只有能确认用的是 ${} 还是 #{} 才判
@@ -1131,6 +1144,20 @@ def sqli_verdict(source: str) -> bool | None:
         # Hello-Java-Sec 的 queryById（/safe/id/{id}）正是这种，作者注明
         # 「使用${}，但写死Int类型，无法注入」。这是可核对的事实，不是语义推断。
         if _dollar_params_all_numeric(body, mb):
+            return False
+        # M64 litemall 淬火⑤：`${orderByClause}` 是 MBG Example 的**结构
+        # 性必然出口** —— 每个 Example 查询的 Mapper XML 里都有它，但它
+        # 只能经 `setOrderByClause(...)` 到达。本单元可见调用链（入口体 +
+        # Hop 实现体）没有任何 orderByClause 写入、Example 又是切片里
+        # 现场构造的（`new XxxExample()`），XML 里的这个 ${} 就不构成
+        # 本单元的注入面（delete → deleteByPrimaryKey 这种纯主键流）。
+        hits = MYBATIS_DOLLAR_RE.findall(mb)
+        if all(h.strip() == "${orderByClause}" for h in hits) \
+                and _ob_exit_safety(source, _param_validated) == "safe":
+            return False
+        if all(h.strip() == "${orderByClause}" for h in hits) \
+                and _ob_exit_safety(source, _param_validated) == "none" \
+                and re.search(r"new\s+\w+Example\s*\(", source):
             return False
         return True
     if MYBATIS_HASH_RE.search(mb) and not SQLI_JDBC_SINK_RE.search(body):
@@ -3336,6 +3363,39 @@ def build_solidity_diagnostic(category: str, code: str,
             "（注释行不可作为证据引用，请独立判断）")
 
 
+def _ob_exit_safety(source: str, validated: set[str]) -> str:
+    """评估切片里全部 setOrderByClause 实参的"出口安全性"（M64）。
+
+    返回：
+      "unsafe"   —— 存在非字面量/非枚举列链/非白名单覆盖的实参（有注入面）
+      "safe"     —— 全部实参是字面量 / 枚举列描述链
+                    （`Xxx.Column.addTime.desc()`，固定列描述无用户数据）/
+                    白名单校验覆盖（`[param-validated]` 标记）/ MBG 管道
+                    定义（调用点全字面量）
+      "none"     —— 切片里没有任何 setOrderByClause 写入（无可评估事实）
+    """
+    args = re.findall(r"setOrderByClause\s*\(([^;]*)\)", source)
+    if not args:
+        return "none"
+    for arg in args:
+        if re.fullmatch(r'\s*"[^"]*"\s*', arg):
+            continue
+        if re.fullmatch(r"\s*\w+(?:\.\w+)+\s*\(\s*\)\s*", arg):
+            continue          # 枚举列描述链：固定列，无用户数据
+        if re.fullmatch(r"\s*orderByClause\s*", arg) and re.search(
+                r"public\s+\w+Example\s+orderBy\s*\(\s*String"
+                r"\s+orderByClause\s*\)", source):
+            ob_calls = re.findall(r"\.orderBy\s*\(([^)]*)\)", source)
+            if ob_calls and all(re.fullmatch(r'\s*"[^"]*"\s*', c)
+                                for c in ob_calls):
+                continue      # MBG 管道定义：全部调用点为字面量
+        idents = set(re.findall(r"\b([A-Za-z_]\w*)\b", arg))
+        if idents and idents <= validated:
+            continue          # 全部白名单校验过（Bean Validation 强制）
+        return "unsafe"
+    return "safe"
+
+
 def build_rule_diagnostic(category: str, code: str,
                           *, line_offset: int = 0) -> str:
     """为退回 None 的 (类目, 切片) 生成一行"静态前筛已核实事实"注释头。
@@ -4427,7 +4487,11 @@ PATH_SINK_RE = re.compile(
     r"newOutputStream|copy|write|delete|move)\s*\(|"
     r"Paths\s*\.\s*get\s*\(|"
     r"FileUtils\s*\.\s*(?:read|copy|writeFile|open)\w*\s*\(|"
-    r"IOUtils\s*\.\s*(?:toByteArray|copy|toString)\s*\(|"
+    # M64 淬火⑨：IOUtils 读 `request.getInputStream()` 是读 **HTTP 请求体**
+    # （litemall payNotify 微信回调解析），不是文件路径面 —— 排除。
+    r"IOUtils\s*\.\s*(?:toByteArray|copy|toString)\s*\("
+    r"(?!\s*request\s*\.\s*getInputStream)"
+    r"|"
     r"\.\s*listFiles\s*\(|getResourceAsStream\s*\(|ZipFile\s*\(", re.I)
 # 真正的路径约束：规范化后再比较，或直接剥掉目录
 PATH_SAFE_RE = re.compile(
@@ -4562,6 +4626,37 @@ def _path_suffix_cut_masks_taint(body: str, helpers: str = "") -> bool:
     return checked
 
 
+def _path_sink_param_linked(body: str, source: str,
+                            params: set[str]) -> bool:
+    """路径 sink 与外部输入的相关性（M64 淬火⑧，litemall 实测）。
+
+    sink 行（或 sink 变量的赋值链）里出现**入口形参名**才构成路径遍历面。
+    litemall 的 `new FileInputStream(file)` 里 file 来自微信二维码生成的
+    内部临时路径（`createWxaCodeUnlimit("goods," + goodId, ...)`），与
+    username/id 等形参毫无交集 —— 形态上命中弱 sink，机制上无遍历面。
+    不相关 → 交模型（不硬判 safe）。
+    """
+    if not params:
+        return True                # 无形参可判 → 不设门
+    for seg in (body, _sibling_methods(source)):
+        for line in seg.splitlines():
+            if not PATH_SINK_RE.search(line):
+                continue
+            ids = set(re.findall(r"\b([A-Za-z_]\w*)\b", line))
+            if ids & params:
+                return True
+            # sink 行里的每个标识符都上溯一层赋值链（`String filePath =
+            # ... + filename;` —— 参数不直接出现在 sink 行，但出现在
+            # 它的赋值右值里）
+            for v in ids:
+                for am in re.finditer(
+                        rf"\b{re.escape(v)}\s*=(?!=)[^;]*;", seg):
+                    if set(re.findall(r"\b([A-Za-z_]\w*)\b",
+                                      am.group(0))) & params:
+                        return True
+    return False
+
+
 def pathtraver_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not body:
@@ -4598,6 +4693,8 @@ def pathtraver_verdict(source: str) -> bool | None:
                 return None      # 出现了文件相关名字但没命中 sink 形态，交给模型
             return False
 
+    # M64 淬火⑧：路径 sink 必须与外部输入相关（sink 行/赋值链含形参）。
+    # 弱形态（new FileInputStream(file) 等）在切片证据段里到处可能命中，
     # 1) 规范化 + 前缀校验 / 只取文件名 → 目录逃逸被物理阻断
     if PATH_SAFE_RE.search(body):
         return False
@@ -4625,6 +4722,14 @@ def pathtraver_verdict(source: str) -> bool | None:
         sib = _sibling_methods(source)
         if _helper_guard_nature(body, sib) is False:
             return False       # 值级白名单（前缀校验/枚举）
+        return None
+    # M64 淬火⑧：路径 sink 必须与外部输入相关（sink 行/赋值链含形参）。
+    # 放在全部确定性 safe 判定之后：常量上溯/规范化已证明 safe 的不受
+    # 影响（My-Blog 上传的 new File(常量+Random文件名) 保持 False）；
+    # 弱形态（new FileInputStream(file) 等）与形参无交集时不是本单元的
+    # 遍历面 → 退 None 交模型。
+    if not _path_sink_param_linked(body, source,
+                                   set(_bare_params(_entry_signature(source)))):
         return None
     return True
 
@@ -5123,6 +5228,11 @@ def authz_verdict(source: str) -> bool | None:
         # （mall-admin 全部 controller 都无方法级注解，但未登录请求在
         # 过滤器层就被 401；不豁免会把整个安全的生产级项目判成漏洞。）
         if "[global-authz]" in source:
+            return None
+        # M64 litemall 淬火⑦：显式 token 鉴权模块 —— 模块鉴权模型是
+        # "逐路由显式声明主体"（@LoginUser resolver），未声明主体的路由
+        # 就是匿名面（C 端浏览），形参直查不构成"缺鉴权"结论。
+        if "[explicit-auth-module]" in source:
             return None
 
         # M63 My-Blog 淬火：**公开内容路由豁免**。类目 sink 定义是"访问
