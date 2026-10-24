@@ -291,8 +291,38 @@ CATEGORIES: dict[str, VulnCategory] = {
                   "\"需要管理员\"，都不算服务端校验；② 把资源标识入参原样透传给"
                   "Mapper/DAO 而没有任何主体比对，本属性即为 No。"),
     ),
-    # ---------------- Solidity / Web3（Module 17）----------------
-    # 这两类的判据形状与 Web 类目不同：都不需要"外部输入可达"——
+    # ---------------- M89：第 24 类 —— 服务端模板注入（SSTI） ----------------
+    # OWASP Benchmark 没有此类样本，故 owasp=False —— 真值来自 Hello-Java-Sec
+    # （Velocity evaluate / merge、FreeMarker putTemplate）与 Python 的
+    # render_template_string / jinja2 动态模板样本。
+    #
+    # 判据的**关键区分**：问的是"模板**源**（模板文本本身）是否由外部输入决定"，
+    # 而不是"模板里有没有渲染外部数据"—— 后者是所有模板的正常用法，
+    # 把它算进来会让整类判成一堆误报（FreeMarker 的 Model 传参、Flask 的
+    # `render_template("a.html", k=v)` 都属正常）。
+    "ssti": VulnCategory(
+        key="ssti", display="服务端模板注入", cwe="CWE-1336",
+        owasp=False,
+        sink_question=(
+            "函数是否把外部可控字符串当作**模板源本身**交给模板引擎求值/编译？"
+            "包括：① Velocity 的 `Velocity.evaluate(ctx, out, tag, templateString)`"
+            "且 templateString 含用户输入；② FreeMarker 的 "
+            "`new Template(name, new StringReader(content))` 或 "
+            "`StringTemplateLoader.putTemplate(name, content)` 且 content 可控；"
+            "③ Python 的 `jinja2.Template(user_str).render()` / "
+            "`Environment.from_string(user_str)` / "
+            "`flask.render_template_string(user_str)`。"),
+        property=(
+            "模板源是否来自**固定文件或服务端常量**，用户输入只作为模板**数据**"
+            "（`VelocityContext.put(...)`、`model.addAttribute(...)`、"
+            "`render_template(\"a.html\", k=v)`）传入？"
+            "注意：① 把用户输入拼进模板文本（哪怕只是 `.replace(...)` 填占位符）"
+            "本属性即为 No —— 用户输入进入了模板**语法**层；"
+            "② 固定模板文件 + 用户数据入 model 属正常用法，本属性为 Yes；"
+            "③ 只靠黑名单过滤模板语法关键字（`$`、`#`、`{`）不构成防护。"),
+    ),
+
+    # ---------------- Solidity / Web3（Module 17）----------------    # 这两类的判据形状与 Web 类目不同：都不需要"外部输入可达"——
     # 重入是**执行顺序**问题（外部调用与状态写入的先后），
     # 访问控制是**身份校验**问题（特权操作前有没有主体比对）。
     # 若沿用 needs_taint=True 的提问，模型会因为"链上函数本来就被任何人调用"

@@ -1,7 +1,7 @@
 {
   "bench": "flaskcrud",
   "units": 4,
-  "decided": 15,
+  "decided": 17,
   "truth_n": 2,
   "fp": 0,
   "fn": 0,

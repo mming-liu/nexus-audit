@@ -5426,8 +5426,8 @@ finally:
 
 # ---- [106] Module 67：hardcoded_secret 第 22 类规则 ----
 from core.agents.vuln_categories import CATEGORIES as _VC106   # noqa: E402
-check("M106：hardcoded_secret 已注册（第 23 类，M81 加 jwt_weakness 后单一事实源）",
-      ("hardcoded_secret" in _VC106 and len(_VC106) == 23), True)
+check("M106：hardcoded_secret 已注册（类目总数单一事实源，M89 加 ssti 后 24）",
+      ("hardcoded_secret" in _VC106 and len(_VC106) == 24), True)
 # VAmPI 形态：Flask SECRET_KEY 短弱密钥（JWT 签名上下文，无长度门槛）
 _vampi106 = ("import jwt\n"
              "vuln_app.app.config['SECRET_KEY'] = 'random'\n"
@@ -6240,10 +6240,10 @@ if _dg124.exists():
          "--strict"], capture_output=True, text=True, encoding="utf-8")
     _j124 = json.loads((ROOT / "benchmarks" / "results" / "djangoat.json")
                        .read_text(encoding="utf-8"))
-    check("M124：DjanGoat --strict 通过（真值 11/11 / 零误报）",
+    check("M124：DjanGoat --strict 通过（真值 12/12 / 零误报）",
           (_r124.returncode, _j124["fp"], _j124["reverse_fn"],
            _j124["truth_n"], _j124["django_routed"] >= 20),
-          (0, 0, 0, 11, True))
+          (0, 0, 0, 12, True))
 else:
     print("  -- DjanGoat 不在 reference_repos，跳过 E2E（M88 安装步骤）")
 
@@ -6261,6 +6261,461 @@ for _expr124, _want124 in [
         ("int(x)", False)]:
     check(f"M124：{_expr124} 的值域 = {_want124!r}",
           _pv124(_expr124, "def f(request):\n    pass\n"), _want124)
+
+# ---- [125] Module 89：第 24 类确定性规则 `ssti` ----
+# 判据内核：**模板源本身**是否由外部输入决定。分清两侧是这一类的全部难度：
+#   数据进模板（safe）：ctx.put("username", username) + 固定模板串
+#   模板源被污染（vul）：「"Hello, " + username」拼进模板文本
+print("\n[125] 第 24 类 ssti（Velocity / FreeMarker / Jinja2）（M89）")
+
+from core.agents.rule_detectors import (            # noqa: E402
+    _ssti_template_sources as _sstsrc125, ssti_verdict as _ssti125,
+)
+from core.agents.vuln_categories import CATEGORIES as _CATS125  # noqa: E402
+
+
+def _java125(body: str, cls: str = "public class C {\n") -> str:
+    return cls + body + "\n}\n"
+
+
+check("M125：ssti 已注册为第 24 类（doctor 自动升到 24）",
+      (len(_CATS125), "ssti" in _CATS125), (24, True))
+check("M125：ssti 是 CWE-1336 且不属 OWASP 11 类",
+      (_CATS125["ssti"].cwe, _CATS125["ssti"].owasp), ("CWE-1336", False))
+
+# ① Java Velocity evaluate：模板串被用户输入污染 → True
+_VUL_VELOCITY = _java125(
+    "  @GetMapping(\"/velocity/evaluate/vul\")\n"
+    "  public String v(@RequestParam(defaultValue = \"x\") String username) {\n"
+    "    String templateString = \"Hello, \" + username + \" | phone: $phone\";\n"
+    "    VelocityContext ctx = new VelocityContext();\n"
+    "    ctx.put(\"phone\", \"012345678\");\n"
+    "    Velocity.evaluate(ctx, new StringWriter(), \"test\", templateString);\n"
+    "    return \"ok\";\n"
+    "  }\n")
+check("M125：Velocity.evaluate + 模板串拼入形参 → True",
+      _ssti125(_VUL_VELOCITY), True)
+# ② 同一 API，用户输入只进 ctx（数据位）→ False（正常用法，不许判 vul）
+_SAFE_VELOCITY = _java125(
+    "  @GetMapping(\"/velocity/evaluate/safe\")\n"
+    "  public String v(@RequestParam(defaultValue = \"x\") String username) {\n"
+    "    String templateString = \"Hello, $username | phone: $phone\";\n"
+    "    VelocityContext ctx = new VelocityContext();\n"
+    "    ctx.put(\"username\", username);\n"
+    "    Velocity.evaluate(ctx, new StringWriter(), \"test\", templateString);\n"
+    "    return \"ok\";\n"
+    "  }\n")
+check("M125：Velocity.evaluate + 输入只进 ctx（数据位）→ False",
+      _ssti125(_SAFE_VELOCITY), False)
+# ③ FreeMarker putTemplate：模板内容可控 → True
+check("M125：FreeMarker putTemplate(name, content) 内容可控 → True",
+      _ssti125(_java125(
+          "  @GetMapping(\"/freemarker/vul\")\n"
+          "  public String v(@RequestParam String file, @RequestParam String"
+          " content) {\n"
+          "    stringTemplateLoader.putTemplate(file, content);\n"
+          "    return file;\n"
+          "  }\n")), True)
+# ④ FreeMarker 固定模板 + Model 传数据 → False
+check("M125：固定模板文件 + Model 只传数据 → False",
+      _ssti125(_java125(
+          "  @GetMapping(\"/safe\")\n"
+          "  public String v(@RequestParam String name, Model model) {\n"
+          "    model.addAttribute(\"name\", name);\n"
+          "    return \"hello\";\n"
+          "  }\n")), None)
+# ⑤ Velocity merge 场景：模板文件读出来再 .replace 用户输入 → True
+check("M125：模板文件内容 .replace(占位符, 形参) → True",
+      _ssti125(_java125(
+          "  @GetMapping(\"/merge\")\n"
+          "  public String v(@RequestParam String username) throws Exception {\n"
+          "    String templateString = new String(new byte[0]);\n"
+          "    templateString = templateString.replace(\"<USERNAME>\", username);\n"
+          "    StringReader reader = new StringReader(templateString);\n"
+          "    runtimeServices.parse(reader, \"t\");\n"
+          "    return \"ok\";\n"
+          "  }\n")), True)
+# ⑥ 模板源提取：三种机制都要看得出实参
+_srcs125 = _sstsrc125(
+    "Velocity.evaluate(ctx, out, \"t\", tmpl);\n"
+    "stringTemplateLoader.putTemplate(name, body);\n"
+    "new Template(n, new StringReader(src));\n")
+check("M125：三种模板源实参全部提取",
+      _srcs125, ["tmpl", "body", "new StringReader(src)"])
+
+# ⑦ Python：动态模板 True / 固定模板文件 False
+check("M125：flask render_template_string(request.args[...]) → True",
+      _ssti125("from flask import render_template_string\n"
+               "def f():\n"
+               "    return render_template_string(request.args.get('t'))\n"), True)
+check("M125：jinja2.Template(user_str).render() → True",
+      _ssti125("import jinja2\n"
+               "def f(request):\n"
+               "    tpl = jinja2.Template(request.form['t'])\n"
+               "    return tpl.render()\n"), True)
+check("M125：Environment.from_string(用户串) → True",
+      _ssti125("import jinja2\n"
+               "def f(request):\n"
+               "    env = jinja2.Environment()\n"
+               "    return env.from_string(request.args['x']).render()\n"), True)
+check("M125：固定模板文件 render_template(\"a.html\", k=v) → False",
+      _ssti125("from flask import render_template\n"
+               "def f(request):\n"
+               "    return render_template('a.html', name=request.args['n'])\n"),
+      False)
+
+# ⑧ 真实仓库对照（HJS 3 条 + java-sec-code 1 条，全部真值）
+_hjs125 = ROOT / "reference_repos" / "Hello-Java-Sec-master"
+_jsc125 = ROOT / "reference_repos" / "java-sec-code"
+if _hjs125.exists() and _jsc125.exists():
+    from core.slicer.java_servlet import JavaSlicer as _JS125   # noqa: E402
+
+    def _ssti_rows125(repo: Path) -> dict[str, bool | None]:
+        return {u.unit_name: _ssti125(u.source_code)
+                for u in _JS125(repo).extract_entry_units()
+                if "SSTI" in Path(u.file_path).name}
+
+    _h125 = _ssti_rows125(_hjs125)
+    _j125 = _ssti_rows125(_jsc125)
+    check("M125：HJS 三条真阳全命中（evaluate / merge / freemarker）",
+          (_h125.get("SSTI.velocityEvaluateVul"),
+           _h125.get("SSTI.velocityMergeVul"),
+           _h125.get("SSTI.freemarkerVul")), (True, True, True))
+    check("M125：HJS 的 safe 样本不判 vul（evaluate/safe 判 False）",
+          _h125.get("SSTI.velocityEvaluateSafe"), False)
+    check("M125：java-sec-code SSTI.velocity 命中",
+          _j125.get("SSTI.velocity"), True)
+    check("M125：两库 SSTI 全量零误报（True 恰好 3+1）",
+          (sum(1 for v in _h125.values() if v is True),
+           sum(1 for v in _j125.values() if v is True)), (3, 1))
+else:
+    print("  -- HJS / java-sec-code 不在 reference_repos，跳过真实仓库对照")
+
+# ---- [126] Module 90：Python/Django 开放重定向 + 第 18 类补丁器 ----
+# redir 类目此前只有 Java 支（sendRedirect / setHeader(Location) / redirect: 前缀）。
+# Python 侧的跳转 API 名字完全不同（redirect / HttpResponseRedirect），
+# 而"目标可控"的形态也不同 —— 单独一支，不能硬套 Java 正则。
+print("\n[126] Python/Django 开放重定向与第 18 类补丁器（M90）")
+
+from core.agents.rule_detectors import redir_verdict as _redir126  # noqa: E402
+
+# ① 正例：整条目标由 request.POST / 形参决定
+check("M126：HttpResponseRedirect(request.POST['path']) → True",
+      _redir126("from django.shortcuts import redirect\n"
+                "def f(request):\n"
+                "    path = request.POST['path']\n"
+                "    return redirect(path)\n"), True)
+check("M126：redirect(视图形参) → True",
+      _redir126("from django.shortcuts import redirect\n"
+                "def f(request, next_url='/home'):\n"
+                "    return redirect(next_url)\n"), True)
+check("M126：HttpResponseRedirect(request.GET.get('next')) → True",
+      _redir126("def f(request):\n"
+                "    return HttpResponseRedirect(request.GET.get('next'))\n"),
+      True)
+# ② 反例：站内固定前缀 / 字面量 / 框架产 URL —— 都不许判 True
+check("M126：站内固定前缀 \"/users/\" + str(uid) → False",
+      _redir126("from django.shortcuts import redirect\n"
+                "def f(request, user_id):\n"
+                "    return redirect(\"/users/\" + str(user_id) + \"/messages\")\n"),
+      False)
+check("M126：`\"/users/%s/x\" % uid` 固定前缀 → False",
+      _redir126("from django.shortcuts import redirect\n"
+                "def f(request, user_id):\n"
+                "    return redirect(\"/users/%s/account_settings\" % user_id)\n"),
+      False)
+check("M126：常量目标 redirect('/login') → False",
+      _redir126("from django.shortcuts import redirect\n"
+                "def f(request):\n"
+                "    return redirect('/login')\n"), False)
+check("M126：url_for('index') 框架产 URL → False",
+      _redir126("from flask import redirect, url_for\n"
+                "def f():\n"
+                "    return redirect(url_for('index'))\n"), False)
+check("M126：Django reverse('app:login') 框架产 URL → False",
+      _redir126("from django.http import HttpResponseRedirect\n"
+                "def f(request):\n"
+                "    return HttpResponseRedirect(reverse('app:login'))\n"),
+      False)
+# ③ 有同源校验 → False（Django 官方推荐的两个 API 都要认）
+for _g126 in ("url_has_allowed_host_and_scheme(u, allowed_hosts={request.get_host()})",
+              "is_safe_url(u, allowed_hosts=None)",
+              "urlparse(u).netloc == ''"):
+    check(f"M126：有同源校验（{_g126[:28]}…）→ False",
+          _redir126("from django.shortcuts import redirect\n"
+                    "def f(request):\n"
+                    "    u = request.POST['p']\n"
+                    f"    assert {_g126}\n"
+                    "    return redirect(u)\n"), False)
+# ④ 没有跳转 API → 不归本类目管
+check("M126：无跳转 API → None（不硬判）",
+      _redir126("def f(request):\n    return 'ok'\n"), None)
+
+# ⑤ 第 18 类补丁器：E2E（扫描 → --fix → 自检翻 False）
+_d126 = Path(_tmod.mkdtemp(prefix="nexus_t126_"))
+try:
+    (_d126 / "urls.py").write_text(
+        "from django.conf.urls import url\n"
+        "from . import views\n"
+        "urlpatterns = [\n"
+        "    url(r'^go/$', views.go, name='go'),\n"
+        "]\n", encoding="utf-8")
+    (_d126 / "views.py").write_text(
+        "from django.http import HttpResponseRedirect\n"
+        "\n"
+        "def go(request):\n"
+        "    path = request.POST['path']\n"
+        "    return HttpResponseRedirect(path)\n", encoding="utf-8")
+    _r126 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d126),
+         "--auto", "--offline", "--fix",
+         "--summary-json", str(_d126 / "s.json"),
+         "--output", str(_d126 / "r.md")],
+        capture_output=True, text=True, encoding="utf-8")
+    _fix126 = (_d126 / "fix_report_auto.md")
+    _fix_t = _fix126.read_text(encoding="utf-8") if _fix126.exists() else ""
+    _s126 = json.loads((_d126 / "s.json").read_text(encoding="utf-8"))
+    check("M126：开放重定向被 --auto 判成 P0（redir 类目命中）",
+          _s126["p0_route_by_cat"].get("redir"), 1)
+    check("M126：第 18 类补丁器产出 [py-redir] 补丁并自检通过",
+          ("[py-redir]" in _fix_t
+           and "url_has_allowed_host_and_scheme" in _fix_t
+           and "自检通过" in _fix_t), True)
+    check("M126：patches_verified 记账 ≥1",
+          _s126["patches_verified"] >= 1, True)
+    # 补丁文本必须自洽：import 在文件首行（本夹具无 __future__），
+    # 守卫缩进与跳转语句对齐（views.body 是 4 空格）
+    _patch126 = _fix_t.split("```diff", 1)[1].split("```", 1)[0]
+    check("M126：补丁 diff 自带 import 且守卫缩进与跳转语句对齐",
+          ("+from django.utils.http import url_has_allowed_host_and_scheme"
+           in _patch126
+           and "+    if not url_has_allowed_host_and_scheme(" in _patch126),
+          True)
+finally:
+    shutil.rmtree(_d126, ignore_errors=True)
+
+# ⑥ doctor：补丁器升到 18 类
+_r126d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
+                        capture_output=True, text=True, encoding="utf-8")
+check("M126：doctor 补丁器升到 18 类（含 _fix_python_redirect）",
+      ("（18 类）" in (_r126d.stdout or "")
+       and "_fix_python_redirect" in (_r126d.stdout or "")), True)
+
+# ---- [127] Module 91：`cli.py hunt` 多仓批量野战 + Portfolio 大屏 ----
+# 把"手工逐仓跑 scan --auto"变成一条命令。价值不在省几次回车，而在
+# **两条路径必须是同一条**：hunt 内部就是再调一次 cli.py scan（子进程），
+# 所以大屏上的数字与手工跑出来的逐个对得上。单仓崩溃只记在该仓名下。
+print("\n[127] cli.py hunt 多仓批量野战（M91）")
+
+_h127 = Path(_tmod.mkdtemp(prefix="nexus_t127_"))
+try:
+    # ① Java 仓（sqli 真阳）
+    _jdir = _h127 / "java-repo" / "src"
+    _jdir.mkdir(parents=True)
+    (_jdir / "OrderController.java").write_text(
+        "@RestController\n"
+        "public class OrderController {\n"
+        "  @GetMapping(\"/order\")\n"
+        "  public String order(@RequestParam String id, HttpServletRequest"
+        " request) throws Exception {\n"
+        "    Statement st = conn.createStatement();\n"
+        "    st.executeQuery(\"select * from o where id='\" + id + \"'\");\n"
+        "    return \"ok\";\n"
+        "  }\n"
+        "}\n", encoding="utf-8")
+    # ② Python 仓（Django urls.py 路由 + pickle 反序列化真阳）
+    _pdir = _h127 / "py-repo"
+    _pdir.mkdir(parents=True)
+    (_pdir / "urls.py").write_text(
+        "from django.conf.urls import url\nfrom . import views\n"
+        "urlpatterns = [url(r'^load/$', views.load, name='load')]\n",
+        encoding="utf-8")
+    (_pdir / "views.py").write_text(
+        "import pickle, base64\n"
+        "def load(request):\n"
+        "    return pickle.loads(base64.b64decode(request.POST['d']))\n",
+        encoding="utf-8")
+    # ③ Solidity 仓（重入真阳：状态写在外部调用之后）
+    _sdir = _h127 / "sol-repo"
+    _sdir.mkdir(parents=True)
+    (_sdir / "Bank.sol").write_text(
+        "pragma solidity 0.4.24;\n"
+        "contract Bank {\n"
+        "  mapping(address => uint256) public balances;\n"
+        "  function withdraw() public {\n"
+        "    uint256 amount = balances[msg.sender];\n"
+        "    msg.sender.call.value(amount)();\n"
+        "    balances[msg.sender] = 0;\n"
+        "  }\n"
+        "}\n", encoding="utf-8")
+
+    _out127 = _h127 / "hunt"
+    _r127 = subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "hunt",
+         str(_h127 / "java-repo"), str(_h127 / "py-repo"),
+         str(_h127 / "sol-repo"),
+         "--outdir", str(_out127),
+         "--html", str(_out127 / "portfolio.html"),
+         "--summary-json", str(_out127 / "hunt.json"),
+         "--advisory-dir", str(_out127 / "advisories")],
+        capture_output=True, text=True, encoding="utf-8")
+    _hj127 = json.loads((_out127 / "hunt.json").read_text(encoding="utf-8"))
+    _html127 = (_out127 / "portfolio.html").read_text(encoding="utf-8")
+    check("M127：三语言多仓一键 hunt 退出码 0",
+          _r127.returncode, 0)
+    check("M127：汇总 JSON 三仓 / 零失败 / 入口 ≥3",
+          (_hj127["totals"]["repos"], _hj127["totals"]["failed_repos"],
+           _hj127["totals"]["units"] >= 3), (3, 0, True))
+    check("M127：三仓各自都检出了独立根因（跨语言）",
+          (sorted(r["name"] for r in _hj127["repos"]),
+           all(int(r["p0_unique"]) >= 1 for r in _hj127["repos"])),
+          (["java-repo", "py-repo", "sol-repo"], True))
+    check("M127：Portfolio 大屏含三仓名 + 总计行",
+          (all(n in _html127 for n in ("java-repo", "py-repo", "sol-repo")),
+           "独立根因" in _html127, "table class=\"portfolio\"" in _html127),
+          (True, True, True))
+    check("M127：每仓产物齐全（report.md / summary.json / report.sarif）",
+          all((_out127 / n / f).exists()
+              for n in ("java-repo", "py-repo", "sol-repo")
+              for f in ("report.md", "summary.json", "report.sarif")), True)
+    _adv127 = _out127 / "advisories"
+    check("M127：披露草稿按仓分目录（≤ 独立根因数，去重生效）",
+          (sorted(p.name for p in _adv127.iterdir()),
+           sum(1 for _ in _adv127.rglob("GHSA-*.md"))
+           <= _hj127["totals"]["p0_unique_root_causes"]),
+          (["java-repo", "py-repo", "sol-repo"], True))
+finally:
+    shutil.rmtree(_h127, ignore_errors=True)
+
+# ---- [128] Module 92：SARIF 2.1.0 严格合规校验器 ----
+# 上传 GitHub Code Scanning 时格式错一个字段整批被拒，而本地"看着对"。
+# 校验器本身也要被校验：坏文档必须被**逐条**拦住（只拦住一条等于没写）。
+print("\n[128] SARIF 2.1.0 合规校验器（M92）")
+
+from core.context.sarif_validator import (          # noqa: E402
+    SARIF_VERSION as _SV128, validate_sarif as _vs128,
+    validate_sarif_file as _vsf128,
+)
+
+
+def _mk128(**over) -> dict:
+    """一份最小合规 SARIF，用 over 覆盖任意层（测试用）。"""
+    doc = {
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {"driver": {"name": "nexus-audit", "rules": [
+                {"id": "sqli", "properties": {"security-severity": "9.8"}}]}},
+            "results": [{
+                "ruleId": "sqli",
+                "message": {"text": "SQL 注入"},
+                "level": "error",
+                "locations": [{"physicalLocation": {
+                    "artifactLocation": {"uri": "src/A.java"},
+                    "region": {"startLine": 3, "endLine": 5}}}],
+                "properties": {"security-severity": "9.8"},
+            }],
+        }],
+    }
+    doc.update(over)
+    return doc
+
+
+check("M128：常量与 SARIF 规范一致", _SV128, "2.1.0")
+check("M128：最小合规文档零错误", _vs128(_mk128()), [])
+
+# ① 版本必须精确是 2.1.0（"2.1" 不行）
+check("M128：拦 version='2.1'", len(_vs128(_mk128(version="2.1"))), 1)
+# ② 规则 ID 重复
+_d128 = _mk128()
+_d128["runs"][0]["tool"]["driver"]["rules"].append({"id": "sqli"})
+check("M128：拦规则 ID 重复", any("重复" in e for e in _vs128(_d128)), True)
+# ③ 悬空 ruleId
+_d128 = _mk128()
+_d128["runs"][0]["results"][0]["ruleId"] = "nope"
+check("M128：拦悬空 ruleId", any("不在 rules 里" in e for e in _vs128(_d128)), True)
+# ④ 空 message.text
+_d128 = _mk128()
+_d128["runs"][0]["results"][0]["message"]["text"] = ""
+check("M128：拦空 message.text",
+      any("message.text" in e for e in _vs128(_d128)), True)
+# ⑤ 非法 level
+_d128 = _mk128()
+_d128["runs"][0]["results"][0]["level"] = "fatal"
+check("M128：拦非法 level", any(".level" in e for e in _vs128(_d128)), True)
+# ⑥ uri 必须是相对 POSIX（盘符 / 反斜杠 / 绝对 / file: 全部拦）
+for _u128 in ("C:\\repo\\A.java", "src\\A.java", "/abs/A.java", "file:///a"):
+    _d128 = _mk128()
+    _d128["runs"][0]["results"][0]["locations"][0][
+        "physicalLocation"]["artifactLocation"]["uri"] = _u128
+    check(f"M128：拦非法 uri {_u128!r}",
+          any("artifactLocation.uri" in e for e in _vs128(_d128)), True)
+# ⑦ startLine ≥1 且 endLine ≥ startLine
+_d128 = _mk128()
+_d128["runs"][0]["results"][0]["locations"][0][
+    "physicalLocation"]["region"] = {"startLine": 0}
+check("M128：拦 startLine=0",
+      any("startLine" in e for e in _vs128(_d128)), True)
+_d128 = _mk128()
+_d128["runs"][0]["results"][0]["locations"][0][
+    "physicalLocation"]["region"] = {"startLine": 5, "endLine": 2}
+check("M128：拦 endLine < startLine",
+      any("endLine" in e for e in _vs128(_d128)), True)
+# ⑧ security-severity 必须是**字符串**浮点且 0–10
+_d128 = _mk128()
+_d128["runs"][0]["results"][0]["properties"]["security-severity"] = 9.8
+check("M128：拦数字型 security-severity（GitHub 会静默忽略）",
+      any("必须是**字符串**" in e for e in _vs128(_d128)), True)
+_d128 = _mk128()
+_d128["runs"][0]["tool"]["driver"]["rules"][0][
+    "properties"]["security-severity"] = "11.5"
+check("M128：拦越界 security-severity",
+      any("超出 0–10" in e for e in _vs128(_d128)), True)
+# ⑨ 结构性错误
+for _bad128, _hint128 in (({}, "version"), ([], "对象"),
+                          ({"version": "2.1.0", "runs": []}, "非空")):
+    check(f"M128：拦结构性错误（{_hint128}）",
+          any(_hint128 in e for e in _vs128(_bad128)), True)
+
+# ⑩ E2E：cli.py scan 真产出的 SARIF 必须合规（负例：坏文件要报错）
+_d128e = Path(_tmod.mkdtemp(prefix="nexus_t128_"))
+try:
+    (_d128e / "A.java").write_text(
+        "@RestController\npublic class A {\n"
+        "  @GetMapping(\"/a\")\n"
+        "  public String a(@RequestParam String id) throws Exception {\n"
+        "    Statement st = conn.createStatement();\n"
+        "    st.executeQuery(\"select * from t where id='\" + id + \"'\");\n"
+        "    return \"ok\";\n  }\n}\n", encoding="utf-8")
+    subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d128e),
+         "--auto", "--offline", "--sarif", str(_d128e / "r.sarif"),
+         "--output", str(_d128e / "r.md")],
+        capture_output=True, text=True, encoding="utf-8")
+    check("M128：scan 真产出的 SARIF 零错误",
+          _vsf128(_d128e / "r.sarif"), [])
+    (_d128e / "bad.sarif").write_text(
+        json.dumps({"version": "2.1", "runs": [{
+            "tool": {"driver": {"name": ""}},
+            "results": [{"message": {"text": "x"}, "locations": [
+                {"physicalLocation": {
+                    "artifactLocation": {"uri": "C:\\a.java"},
+                    "region": {"startLine": 0}}}]}],
+        }]}), encoding="utf-8")
+    _berrs128 = _vsf128(_d128e / "bad.sarif")
+    check("M128：坏 SARIF 文件被逐条报错（≥3 条）",
+          len(_berrs128) >= 3, True)
+    check("M128：文件不存在也归入错误列表（不抛异常）",
+          len(_vsf128(_d128e / "nope.sarif")), 1)
+finally:
+    shutil.rmtree(_d128e, ignore_errors=True)
+
+# ⑪ doctor 第五段常驻自检（自产合规 + 坏文档逐条拦住）
+_r128d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
+                        capture_output=True, text=True, encoding="utf-8")
+check("M128：doctor 内置 SARIF 合规自检（自产合规 + 坏文档被拦）",
+      (_r128d.returncode,
+       "自产 SARIF 合规" in (_r128d.stdout or ""),
+       "坏 SARIF 逐条拦住" in (_r128d.stdout or "")), (0, True, True))
 
 print()
 if FAILS:

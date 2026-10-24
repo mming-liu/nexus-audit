@@ -9,7 +9,7 @@
   "reverse_fn": 0,
   "fallback": [],
   "stray_true": [],
-  "false_judgements": 320,
+  "false_judgements": 222,
   "disputed": [
     {
       "lab": "xss_lab",

@@ -232,6 +232,8 @@ def build_scoreboard() -> str:
         ("compound-protocol (Solidity 生产协议)", "compound.json", "total_units"),
         ("uniswap-v3-core (Solidity DEX)", "uniswapv3.json", "total_units"),
         ("FastAPI (Python 异步真实模板)", "fastapi_wild.json", "total_units"),
+        ("compound-finance/comet (Solidity 0.8.x)", "comet.json", "total_units"),
+        ("DjanGoat (Django urls.py 路由表)", "djangoat.json", "total_units"),
     ]
     total_fp = total_rev = 0
     for label, fname, unit_key in WHITELIST:

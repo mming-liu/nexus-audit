@@ -152,6 +152,117 @@ def _card(e: dict) -> str:
     return "\n".join(parts)
 
 
+def build_portfolio_html(records: list[dict], title: str = "nexus-audit 多仓狩猎总览",
+                         meta: str = "") -> str:
+    """多仓 Portfolio 单文件大屏（Module 91）。
+
+    records 每条：
+      {name, path, units, p0_route, p0_unique, by_cat, scan_rc, duration_s,
+       benchmark?: {rc, tail}}
+
+    与单仓报告的取舍不同：大屏要回答的是"**跨仓横比**"——哪个仓没干完、
+    哪个类目集中在哪个仓、总量是否自洽。所以每条仓一行表格 + 可展开的
+    类目明细，明细里只放数字与链接，不塞代码块（塞了就没法一眼横比）。
+    """
+    n_repos = len(records)
+    total_units = sum(int(r.get("units") or 0) for r in records)
+    total_route = sum(int(r.get("p0_route") or 0) for r in records)
+    total_unique = sum(int(r.get("p0_unique") or 0) for r in records)
+    n_failed = sum(1 for r in records if int(r.get("scan_rc") or 0) != 0)
+    agg_cat: Counter = Counter()
+    for r in records:
+        for c, n in (r.get("by_cat") or {}).items():
+            agg_cat[str(c)] += int(n or 0)
+
+    stats = [
+        f'<div class="stat"><div class="num">{n_repos}</div>'
+        '<div class="lbl">仓库</div></div>',
+        f'<div class="stat"><div class="num">{total_units}</div>'
+        '<div class="lbl">入口总数</div></div>',
+        f'<div class="stat"><div class="num">{total_unique}</div>'
+        '<div class="lbl">独立根因</div></div>',
+        f'<div class="stat"><div class="num">{total_route}</div>'
+        '<div class="lbl">路由级命中</div></div>',
+        f'<div class="stat"><div class="num">{n_failed}</div>'
+        '<div class="lbl">扫描失败仓</div></div>',
+    ]
+
+    rows = []
+    for r in sorted(records, key=lambda x: -(int(x.get("p0_unique") or 0))):
+        name = html.escape(str(r.get("name") or "?"))
+        path = html.escape(str(r.get("path") or ""))
+        cats = ", ".join(f"{html.escape(str(c))}×{n}"
+                         for c, n in Counter(r.get("by_cat") or {}).most_common())
+        rc = int(r.get("scan_rc") or 0)
+        rc_html = ('<span class="badge p0">FAIL</span>' if rc else
+                   '<span class="badge" style="background:#2e7d4f">OK</span>')
+        rows.append(
+            "<tr>"
+            f"<td>{rc_html}</td>"
+            f"<td><b>{name}</b><div class=\"fileinfo\">{path}</div></td>"
+            f"<td>{int(r.get('units') or 0)}</td>"
+            f"<td>{int(r.get('p0_route') or 0)}</td>"
+            f"<td>{int(r.get('p0_unique') or 0)}</td>"
+            f"<td class=\"fileinfo\">{cats or '—'}</td>"
+            f"<td class=\"fileinfo\">{float(r.get('duration_s') or 0):.1f}s</td>"
+            "</tr>")
+
+    max_cat = max(agg_cat.values()) if agg_cat else 0
+    bars = "".join(
+        f'<div style="display:flex;align-items:center;gap:8px;margin:3px 0;">'
+        f'<div style="width:120px;color:#9fb0c9;font-size:12px;text-align:right;">'
+        f'{html.escape(c)}</div>'
+        f'<div style="flex:1;background:#22334f;border-radius:4px;">'
+        f'<div style="width:{(n / max_cat * 100) if max_cat else 0:.0f}%;'
+        f'background:#e0524b;height:10px;border-radius:4px;"></div></div>'
+        f'<div style="color:#c9d4e4;font-size:12px;">{n}</div></div>'
+        for c, n in agg_cat.most_common())
+
+    table_css = """
+table.portfolio { width: 100%; border-collapse: collapse; background: #fff;
+                  border: 1px solid #dfe3ea; border-radius: 10px;
+                  overflow: hidden; }
+table.portfolio th { text-align: left; font-size: 12px; color: #5a6675;
+                     background: #f0f4fa; padding: 8px 10px; font-weight: 600; }
+table.portfolio td { padding: 9px 10px; border-top: 1px solid #eef1f5;
+                     font-size: 13px; vertical-align: top; }
+"""
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{html.escape(title)}</title>
+<style>{_CSS}{table_css}</style>
+</head>
+<body>
+<header>
+  <h1>{html.escape(title)}</h1>
+  <div class="meta">{html.escape(meta) or
+                     '多仓批量狩猎 · 规则层离线可复现 · 数字由 cli.py hunt 实跑产出'}</div>
+  <div class="stats">{''.join(stats)}</div>
+  <div style="margin-top:12px;background:#16233a;border-radius:8px;
+              padding:10px 14px;">{bars or '<i style="color:#556;">无检出</i>'}
+  </div>
+</header>
+<main>
+<h2 class="sec">跨仓横比（按独立根因数降序）</h2>
+<table class="portfolio">
+<thead><tr><th>状态</th><th>仓库</th><th>入口</th><th>路由级命中</th>
+<th>独立根因</th><th>类目分布</th><th>耗时</th></tr></thead>
+<tbody>
+{''.join(rows) or '<tr><td colspan="7">无仓库</td></tr>'}
+</tbody>
+</table>
+<p class="fileinfo" style="margin-top:14px;">
+总计 {total_units} 个入口 / {total_unique} 个独立根因 / {total_route} 条路由级命中。
+</p>
+</main>
+</body>
+</html>
+"""
+
+
 def build_html_report(entries: list[dict], repo: str = ".",
                       title: str = "nexus-audit 审计报告",
                       funnel: dict | None = None) -> str:

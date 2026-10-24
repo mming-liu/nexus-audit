@@ -1280,6 +1280,147 @@ def cmd_pr_scan(args):
     cmd_scan_java(ns, repo)
 
 
+def _hunt_repo_name(repo: Path) -> str:
+    """仓库显示名：取最后一段目录名；`contracts` 这类泛名再往上取一层。"""
+    name = repo.name
+    if name in ("contracts", "src", "app", "") and repo.parent.name:
+        name = f"{repo.parent.name}-{name}"
+    return name
+
+
+def _hunt_one(repo: Path, outdir: Path, advisory_root: str | None,
+              extra: list[str], timeout: int = 1800) -> dict:
+    """对单个仓库跑一次 `scan --auto`（子进程：与野战命令同一条路径）。
+
+    刻意不复用仓库内函数而是**再调一次 cli.py**：hunt 的价值是"把你手工
+    会跑的那条命令批量跑一遍"，两条路径必须是同一条。子进程还顺带隔离了
+    单仓崩溃（rc≠0 只记在该仓名下，不中断整批）。
+    """
+    name = _hunt_repo_name(repo)
+    outdir.mkdir(parents=True, exist_ok=True)
+    summary = outdir / "summary.json"
+    cmd = [sys.executable, str(Path(__file__).resolve()),
+           "scan", str(repo), "--auto", "--offline",
+           "--summary-json", str(summary),
+           "--output", str(outdir / "report.md"),
+           "--html", str(outdir / "report.html"),
+           "--sarif", str(outdir / "report.sarif"), *extra]
+    if advisory_root:
+        cmd += ["--advisory-dir", str(Path(advisory_root) / name)]
+    t0 = time.monotonic()
+    try:
+        p = subprocess.run(cmd, cwd=Path(__file__).resolve().parent,
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=timeout)
+        rc = p.returncode
+        tail = "\n".join([x for x in ((p.stdout or "") + (p.stderr or ""))
+                          .strip().splitlines() if x.strip()][-3:])
+    except subprocess.TimeoutExpired:
+        rc, tail = 124, f"超时（{timeout}s）"
+    dt = time.monotonic() - t0
+    data: dict = {}
+    if summary.exists():
+        try:
+            data = json.loads(summary.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            data = {}
+    return {
+        "name": name, "path": str(repo), "scan_rc": rc,
+        "duration_s": round(dt, 2),
+        "units": data.get("total_units", 0),
+        "p0_route": data.get("p0_route_level_hits", data.get("p0_confirmed", 0)),
+        "p0_unique": data.get("p0_unique_root_causes", 0),
+        "by_cat": data.get("p0_unique_by_cat") or data.get("p0_route_by_cat") or {},
+        "funnel_filtered": data.get("funnel_filtered_out", 0),
+        "patches_verified": data.get("patches_verified", 0),
+        "tail": tail,
+    }
+
+
+def cmd_hunt(args) -> int:
+    """M91：多仓批量野战 + Portfolio 总览大屏。
+
+        python cli.py hunt repoA repoB repoC --html portfolio.html \\
+               --advisory-dir advisories/ --summary-json hunt.json
+
+    逐仓（或 --jobs N 并发）跑 `scan --auto`，产出：
+      · 每个仓自己的 report.md / report.html / report.sarif / summary.json
+        （落在 <outdir>/<仓名>/ 下）；
+      · 跨仓汇总 JSON（--summary-json）；
+      · 单文件 Portfolio 大屏（--html）；
+      · 去重后的 GHSA 披露草稿目录（--advisory-dir，每仓一个子目录，
+        仓内按"独立根因"去重 —— 与单仓 --advisory-dir 同一口径）。
+    """
+    repos = [Path(p) for p in args.repos]
+    missing = [str(p) for p in repos if not p.exists()]
+    if missing:
+        print(f"! 目录不存在：{', '.join(missing)}")
+        return 2
+    outdir = Path(args.outdir or "hunt_results")
+    outdir.mkdir(parents=True, exist_ok=True)
+    extra: list[str] = []
+    if getattr(args, "fix", False):
+        extra.append("--fix")
+    if getattr(args, "emit_poc", None):
+        extra += ["--emit-poc", str(args.emit_poc)]
+
+    print(f"[hunt] {len(repos)} 个仓库 → {outdir}"
+          + (f"（并发 {args.jobs}）" if args.jobs > 1 else "（顺序）"))
+    records: list[dict] = []
+    jobs = max(1, int(args.jobs or 1))
+    if jobs > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=jobs) as ex:
+            futs = {ex.submit(_hunt_one, r, outdir / _hunt_repo_name(r),
+                              args.advisory_dir, extra): r for r in repos}
+            for fut, r in futs.items():          # 保序收集
+                rec = fut.result()
+                records.append(rec)
+                print(f"  [{rec['name']}] rc={rec['scan_rc']} "
+                      f"units={rec['units']} 根因={rec['p0_unique']} "
+                      f"{rec['duration_s']}s")
+    else:
+        for r in repos:
+            rec = _hunt_one(r, outdir / _hunt_repo_name(r),
+                            args.advisory_dir, extra)
+            records.append(rec)
+            print(f"  [{rec['name']}] rc={rec['scan_rc']} units={rec['units']} "
+                  f"根因={rec['p0_unique']} {rec['duration_s']}s")
+
+    agg = {
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "repos": records,
+        "totals": {
+            "repos": len(records),
+            "units": sum(int(r["units"]) for r in records),
+            "p0_route_level_hits": sum(int(r["p0_route"]) for r in records),
+            "p0_unique_root_causes": sum(int(r["p0_unique"]) for r in records),
+            "failed_repos": sum(1 for r in records if r["scan_rc"] != 0),
+        },
+    }
+    if args.summary_json:
+        Path(args.summary_json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.summary_json).write_text(
+            json.dumps(agg, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"      汇总 JSON → {args.summary_json}")
+    if args.html:
+        from core.context.report_html import build_portfolio_html
+        Path(args.html).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.html).write_text(
+            build_portfolio_html(records), encoding="utf-8")
+        print(f"      Portfolio 大屏 → {args.html}")
+    if args.advisory_dir:
+        adv = Path(args.advisory_dir)
+        n = sum(1 for _ in adv.rglob("*.md")) if adv.exists() else 0
+        print(f"      披露草稿 → {adv}（{n} 份）")
+
+    t = agg["totals"]
+    print(f"\n[hunt] {t['repos']} 仓 / {t['units']} 入口 / "
+          f"{t['p0_unique_root_causes']} 独立根因 / "
+          f"{t['p0_route_level_hits']} 条路由级命中 / 失败 {t['failed_repos']}")
+    return 0 if t["failed_repos"] == 0 else 1
+
+
 def _reslice_for_fix(repo: Path, unit_name: str):
     """补丁写入后重新切片并取回同一入口（剥 `#N` 后缀比对）。
 
@@ -1568,6 +1709,7 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_python_deserial(repo, py, report)
         n += _fix_python_shell(repo, py, report)
         n += _fix_python_yaml(repo, py, report)
+        n += _fix_python_redirect(repo, py, report)
         n += _fix_hardcoded_secret(repo, py, report)
     if sol:
         n += _fix_solidity_txorigin(repo, sol, report)
@@ -2193,6 +2335,146 @@ def _fix_python_yaml(repo: Path, targets: list, lines: list) -> int:
             lines += [f"## [py-yaml] {u.unit_name}（`{f.name}`）",
                       f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
     return fixed
+
+
+def _fix_python_redirect(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 18 类（Module 90）：Python/Django 开放重定向补同源校验。
+
+    修法只有一个（Django 官方推荐的那一个）：在跳转前用
+    `url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()})`
+    做同源判定，不通过就退回站内固定路径。
+
+    **不采用**"自己写 startswith('/') 校验"：`//evil.com` 是协议相对 URL，
+    单看首字符 `/` 挡不住它 —— 那会产出一个"看起来修了、实际还能跳出去"的
+    坏补丁。也不采用域名黑名单：黑名单天然可绕。
+
+    插入点是跳转语句**之前**的一行，缩进与之对齐；形参目标不就地赋值
+    （`request.POST['x'] = "/"` 非法），统一用 `return redirect("/")` 早退。
+    自检同前：重切片 + 重跑 redir 规则 → False。
+    """
+    from core.agents.rule_detectors import (verdict as rule_verdict,
+                                            _PY_REDIR_SINK_RE)
+    fixed = 0
+    imp = "from django.utils.http import url_has_allowed_host_and_scheme"
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("redir", src) is not True:
+            continue
+        m = _PY_REDIR_SINK_RE.search(src)
+        if not m:
+            continue
+        # 取整条调用原文（跨行也要完整），到文件里按原文定位
+        call_txt = _py_call_text(src, m.end() - 1)
+        if not call_txt:
+            continue
+        args = _py_first_arg(call_txt)
+        if not args:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        idx = original.find(call_txt)
+        if idx < 0:
+            continue
+        line_start = original.rfind("\n", 0, idx) + 1
+        indent = original[line_start:idx]
+        if indent.strip():
+            continue                     # 不是行首（同行有别名赋值）→ 交人工
+        guard = (f"{indent}if not url_has_allowed_host_and_scheme({args}, "
+                 f"allowed_hosts={{request.get_host()}}):\n"
+                 f"{indent}    return redirect(\"/\")\n")
+        patched = original[:line_start] + guard + original[line_start:]
+        if imp not in patched:
+            # `from __future__` 必须是文件的第一条语句 —— import 插在它之前
+            # 会直接把文件写成 SyntaxError（实测过）。有它就跟在它后面。
+            fut = re.search(r"(?m)^from\s+__future__\s+import[^\n]*\n", patched)
+            if fut:
+                at = fut.end()
+                patched = patched[:at] + imp + "\n" + patched[at:]
+            else:
+                patched = imp + "\n" + patched
+        v2 = None
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.slicer.web_treesitter import WebTreeSitterSlicer
+            u2 = next((x for x in WebTreeSitterSlicer(repo).extract_entry_units()
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = rule_verdict("redir", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [py-redir] {u.unit_name}（`{f.name}`）", "```diff",
+                      *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 redir 规则 → False。",
+                      "> 跳转前用 url_has_allowed_host_and_scheme 做同源判定，",
+                      "> 不通过则退回站内固定路径（不用 startswith('/')，",
+                      "> 因为 `//evil.com` 是协议相对 URL，首字符校验挡不住）。", ""]
+        else:
+            lines += [f"## [py-redir] {u.unit_name}（`{f.name}`）",
+                      f"- 补丁后规则仍报 `{v2}`，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
+def _py_call_text(src: str, open_idx: int) -> str:
+    """取 `src[open_idx]` 处 `(` 开始的完整调用原文（引号感知配平）。"""
+    depth = 0
+    quote = ""
+    i = open_idx
+    while i < len(src):
+        c = src[i]
+        if quote:
+            if c == "\\":
+                i += 2
+                continue
+            if c == quote:
+                quote = ""
+        elif c in "'\"":
+            quote = c
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                start = src.rfind("\n", 0, open_idx) + 1
+                return src[start:i + 1].strip()
+        i += 1
+    return ""
+
+
+def _py_first_arg(call_txt: str) -> str:
+    """调用原文的第一个实参（顶层逗号切分）。"""
+    oi = call_txt.find("(")
+    if oi < 0:
+        return ""
+    depth = 0
+    quote = ""
+    for i in range(oi + 1, len(call_txt)):
+        c = call_txt[i]
+        if quote:
+            if c == "\\":
+                continue
+            if c == quote:
+                quote = ""
+        elif c in "'\"":
+            quote = c
+        elif c in "([{":
+            depth += 1
+        elif c in ")]}":
+            if depth == 0:
+                return call_txt[oi + 1:i].strip()
+            depth -= 1
+        elif c == "," and depth == 0:
+            return call_txt[oi + 1:i].strip()
+    return ""
 
 
 def _fix_solidity_txorigin(repo: Path, targets: list, lines: list) -> int:
@@ -3114,6 +3396,7 @@ DOCTOR_PATCHERS = [
     "_fix_solidity_onlyowner", "_fix_solidity_txorigin", "_fix_mp_concat",
     "_fix_solidity_arith_guard", "_fix_solidity_unchecked_wrap",
     "_fix_hardcoded_secret", "_fix_cors_config", "_fix_jwt_weakness",
+    "_fix_python_redirect",
 ]
 
 
@@ -3312,6 +3595,53 @@ def _doctor_extended_checks(ok: bool) -> bool:
         print(f"  [FAIL] 正则卫生检查异常: {type(e).__name__}: {e}")
         ok = False
 
+    # ---- 5.5 SARIF 2.1.0 合规（M92）----
+    # 上传 GitHub Code Scanning 时格式错一个字段整批被拒，而本地"看着对"。
+    # 这里做两件事：① 自产 SARIF 必须零错误；② 故意写坏的文档必须被逐条拦住
+    # （不拦 = 校验器写了跟没写一样）。
+    print("  -- SARIF 2.1.0 合规校验 --")
+    try:
+        from core.context.sarif_validator import validate_sarif
+        _good = build_sarif([{
+            "file": "src/A.java", "line": 12, "category": "sqli",
+            "unit": "A.run", "level": "warning", "priority": "P0",
+            "message": "SQL 注入", "code": "class A {}", "code_from": 1,
+        }], ".")
+        _gerrs = validate_sarif(_good)
+        if _gerrs:
+            print(f"  [FAIL] 自产 SARIF 不合规：{_gerrs[:3]}")
+            ok = False
+        else:
+            print("  [OK] 自产 SARIF 合规（rubric: version / uri / startLine /"
+                  " security-severity）")
+        _bad = {
+            "version": "2.1",
+            "runs": [{
+                "tool": {"driver": {"name": "x", "rules": [
+                    {"id": "a"}, {"id": "a"}]}},
+                "results": [{
+                    "ruleId": "nope",
+                    "message": {"text": ""},
+                    "level": "fatal",
+                    "locations": [{"physicalLocation": {
+                        "artifactLocation": {"uri": "C:\\x\\A.java"},
+                        "region": {"startLine": 0, "endLine": 0}}}],
+                    "properties": {"security-severity": 6},
+                }],
+            }],
+        }
+        _berrs = validate_sarif(_bad)
+        if len(_berrs) < 6:
+            print(f"  [FAIL] 坏 SARIF 只拦住 {len(_berrs)} 条（应 ≥6）：{_berrs}")
+            ok = False
+        else:
+            print(f"  [OK] 坏 SARIF 逐条拦住 {len(_berrs)} 类问题"
+                  "（版本/重复 ID/悬空 ruleId/空消息/非法 level/盘符路径/"
+                  "startLine/severity 类型）")
+    except Exception as e:  # noqa: BLE001
+        print(f"  [FAIL] SARIF 校验器异常: {type(e).__name__}: {e}")
+        ok = False
+
     return ok
 
 
@@ -3438,11 +3768,31 @@ def main():
     p_pr.add_argument("--output", default=None, help="报告输出路径")
     p_pr.add_argument("--graph", action="store_true",
                       help="M49：报告中内嵌 Mermaid 污点传播路径图")
+    p_hunt = sub.add_parser(
+        "hunt", help="M91：多仓批量野战 + Portfolio 总览大屏 + 披露草稿")
+    p_hunt.add_argument("repos", nargs="+", metavar="REPO",
+                        help="一个或多个仓库/子目录路径")
+    p_hunt.add_argument("--outdir", default="hunt_results",
+                        help="每仓产物的落盘根目录（默认 hunt_results/）")
+    p_hunt.add_argument("--html", default=None, metavar="OUT.html",
+                        help="跨仓 Portfolio 单文件大屏")
+    p_hunt.add_argument("--summary-json", default=None, metavar="OUT.json",
+                        help="跨仓汇总 JSON")
+    p_hunt.add_argument("--advisory-dir", default=None, metavar="DIR",
+                        help="GHSA 披露草稿目录（每仓一个子目录）")
+    p_hunt.add_argument("--emit-poc", default=None, metavar="DIR",
+                        help="为每仓 P0 合成 PoC 脚本目录")
+    p_hunt.add_argument("--fix", action="store_true",
+                        help="对每仓 P0 跑确定性补丁自检（--fix）")
+    p_hunt.add_argument("--jobs", type=int, default=1,
+                        help="并发仓数（≥2 启用并发，默认顺序）")
     args = parser.parse_args()
     if args.command == "scan":
         cmd_scan(args)
     elif args.command == "doctor":
         sys.exit(cmd_doctor(args))
+    elif args.command == "hunt":
+        sys.exit(cmd_hunt(args))
     else:
         cmd_pr_scan(args)
 

@@ -73,6 +73,9 @@ TRUTH = {
     ("app/views/admin/views.py", "admin_analytics"): "sqli",
     ("app/views/users/pay/views.py", "user_pay"): "authz",
     ("app/views/users/views.py", "user_view"): "authz",
+    # M90 的 Python redir 支上线后才判得出的真阳：`path = request.POST['path']`
+    # → `HttpResponseRedirect(path)`，登录后跳转目标整条由外部决定。
+    ("app/views/sessions/views.py", "sessions_index"): "redir",
 }
 SECRET_FILE = "pygoat/settings.py"
 SECRET_CAT = "hardcoded_secret"
@@ -161,7 +164,7 @@ def main() -> int:
     print("=" * 72)
     print(f"  切片单元              ：{len(units)}")
     print(f"  路由证据（django:）   ：{len(routed)}")
-    print(f"  规则确定性判定        ：{n_decided}")
+    print(f"  规则判定次数（unit×类目）：{n_decided}")
     print(f"  真值命中              ：{truth_n - fn}/{truth_n}")
     print(f"  误报                  ：{fp}")
     print(f"  漏报                  ：{fn}")
@@ -180,13 +183,17 @@ def main() -> int:
     if fn:
         bad.append(f"漏报 {fn} 条")
     ok = not bad
-    print(f"\n{'STRICT PASS ✔（Django 路由通道在线 / 零误报 / 真值 11/11）' if ok else 'STRICT FAIL ✘ ' + '；'.join(bad)}")
+    print(f"\n{'STRICT PASS ✔（Django 路由通道在线 / 零误报 / 真值 12/12）' if ok else 'STRICT FAIL ✘ ' + '；'.join(bad)}")
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({
         "bench": "djangoat", "units": len(units), "total_units": len(units),
-        "django_routed": len(routed), "decided": n_decided,
+        "django_routed": len(routed),
+        # SCOREBOARD 口径：decided = 本门禁**登记真值**的条数（真值表 + 文件级密钥），
+        # 不是 rule 求值次数 —— 后者是 120（36 单元 × 全类目），塞进 decided
+        # 会让覆盖率算成 333%（分母分子不同量纲）。
+        "decided": truth_n, "rule_evaluations": n_decided,
         "correct": truth_n - fn, "fp": fp, "reverse_fn": fn,
         "truth_n": truth_n, "secret_ok": secret_ok, "rows": rows,
     }, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -3,11 +3,12 @@
   "units": 36,
   "total_units": 36,
   "django_routed": 23,
-  "decided": 132,
-  "correct": 11,
+  "decided": 12,
+  "rule_evaluations": 120,
+  "correct": 12,
   "fp": 0,
   "reverse_fn": 0,
-  "truth_n": 11,
+  "truth_n": 12,
   "secret_ok": true,
   "rows": []
 }

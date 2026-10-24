@@ -3975,7 +3975,94 @@ REDIR_CONST_TARGET_RE = re.compile(
     r"(?:setHeader|addHeader)\s*\(\s*\"[Ll]ocation\"\s*,\s*\"[^\"]*\"\s*\)", re.I)
 
 
+# ---- M90：Python / Django 开放重定向支 ----
+#
+# 与 Java 支同样的两支判据：① 有没有下发 Location 的 API；② 目标是否被限制
+# 为站内。但 Python 侧的"目标可控"形态和 Java 不同，必须单独写：
+#
+#   跳转 API：`redirect(target)` / `HttpResponseRedirect(target)` /
+#            `HttpResponsePermanentRedirect(target)`（Django / Flask 同形）
+#   可控来源：`request.POST['path']`、`request.GET.get('next')`、视图形参
+#   安全来源：字面量、`url_for(...)` / `reverse(...)`、**以单斜杠开头的固定前缀**
+#
+# 判据的关键细节：`"/users/" + str(uid) + "/messages"` 与
+# `"/users/%s/x" % uid` **不是**开放重定向 —— 结果必然以 `/users/` 起头，
+# 换不掉 origin。所以这里认"字面量前缀"：`/` 开头、且第二个字符不是 `/`
+# （`//evil.com` 是协议相对 URL，仍可换 origin）→ 直接判同源安全。
+# DjanGoat 的 `sessions_index` 反例正好验证：`path = request.POST['path']`
+# 整条目标都由外部决定，是真漏洞。
+_PY_REDIR_SINK_RE = re.compile(
+    r"(?<![\w.])(?:redirect|HttpResponseRedirect|"
+    r"HttpResponsePermanentRedirect)\s*\(")
+# 框架自己产 URL 的入口 —— 目标由路由名决定，不是外部字符串
+_PY_REDIR_GENERATED_RE = re.compile(
+    r"^\s*(?:url_for|reverse|resolve_url|get_absolute_url)\s*\(")
+# 同源校验 / 白名单（Django 官方推荐的两个 API + netloc 判据）
+_PY_REDIR_GUARD_RE = re.compile(
+    r"url_has_allowed_host_and_scheme\s*\(|"
+    r"\bis_safe_url\s*\(|"
+    r"\bis_safe_redirect\s*\(|"
+    r"\.\s*netloc\s*(?:==|!=)|"
+    r"\ballowed_hosts\s*=|"
+    r"\bALLOWED_(?:REDIRECT|HOSTS)\w*")
+# 以**单个** `/` 开头的字面量前缀 → 结果必然同源
+_PY_REDIR_SAME_ORIGIN_RE = re.compile(r"^\s*[rbuf]?\s*[\"']/(?!/)[^\"']*[\"']")
+_PY_REDIR_LITERAL_RE = re.compile(r"^\s*[rbuf]?\s*[\"'][^\"']*[\"']\s*$")
+_PY_REQUEST_READ_RE = re.compile(
+    r"\brequest\s*\.\s*(?:GET|POST|FILES|cookies|headers|form|args|values|"
+    r"body|data|json|query_params|META)\b")
+
+
+def _py_redir_external(expr: str, body: str, params: set[str],
+                       depth: int = 0) -> bool | None:
+    """跳转目标是否由外部决定：True 可控 / False 固定 / None 断链。"""
+    if depth > 3:
+        return None
+    e = expr.strip().rstrip(",").strip()
+    if not e:
+        return None
+    if _PY_REDIR_GENERATED_RE.match(e):
+        return False                     # url_for / reverse：路由名产 URL
+    if _PY_REDIR_SAME_ORIGIN_RE.match(e):
+        return False                     # 固定站内前缀，origin 换不掉
+    if _PY_REDIR_LITERAL_RE.match(e):
+        return False                     # 常量目标
+    if _PY_REQUEST_READ_RE.search(e):
+        return True                      # request.POST['path'] 等
+    if params & set(re.findall(r"\b([A-Za-z_]\w*)\b", e)):
+        return True                      # 视图形参（可被 URL 控制）
+    if re.fullmatch(r"[A-Za-z_]\w*", e):
+        rhs = _last_assign_rhs(body, e)
+        if rhs is None:
+            return None
+        return _py_redir_external(rhs, body, params, depth + 1)
+    return None
+
+
+def _py_redir_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    if not body:
+        return None
+    if not _PY_REDIR_SINK_RE.search(body):
+        return None                      # 没有跳转 API → 不归本类目管
+    if _PY_REDIR_GUARD_RE.search(body):
+        return False                     # 已有同源/白名单校验
+    params = _py_func_params(source)
+    verdicts: list[bool | None] = []
+    for m in _PY_REDIR_SINK_RE.finditer(body):
+        args = _ssti_call_args(body, m.end() - 1)
+        if args:
+            verdicts.append(_py_redir_external(args[0], body, params))
+    if any(v is True for v in verdicts):
+        return True
+    if verdicts and all(v is False for v in verdicts):
+        return False
+    return None
+
+
 def redir_verdict(source: str) -> bool | None:
+    if _looks_python(source):
+        return _py_redir_verdict(source)
     body = entry_body(source)
     if not body:
         return None
@@ -8177,6 +8264,280 @@ def solidity_unchecked_call_verdict(source: str) -> bool | None:
 
 
 
+# ---------------- M89：服务端模板注入（SSTI，第 24 类） ----------------
+#
+# 判据内核（挂机制不挂名字）：**模板源本身**是否由外部输入决定。
+#
+# 这一类最容易做歪的地方是把"模板里渲染了外部数据"当成漏洞 —— 那是所有
+# 模板的正常用法。FREE 的两侧在这里分叉：
+#
+#   数据进模板（safe）：`ctx.put("username", username)` +
+#                       `Velocity.evaluate(ctx, out, "t", "Hello, $username")`
+#                       `render_template("a.html", name=name)`
+#   → 用户输入落在**求值后的字符串值**里，模板语法层没有它。
+#
+#   模板源被污染（vul）：`"Hello, " + username`（拼进模板文本）
+#                       `templateString.replace("<USERNAME>", username)`
+#                       `render_template_string(request.args["t"])`
+#   → 用户输入落在**模板语法**里，`#set($e=...)` / `${...}` 会被引擎执行。
+#
+# 只做确定性两档：认出模板源固定 → False；认出模板源含外部输入 → True；
+# 其余（模板源来自文件/拼接链里有一条断链）→ None 退回模型。
+_SSTI_SKIP_PARAM_TYPES = frozenset({
+    "HttpServletRequest", "HttpServletResponse", "ServletRequest",
+    "ServletResponse", "Model", "ModelMap", "HttpSession", "MultipartFile",
+    "Principal", "BindingResult", "Locale", "UriComponentsBuilder",
+})
+# 请求读取（Java）—— 与 has_external_input 同口径
+_SSTI_JAVA_REQ_RE = re.compile(
+    r"request\s*\.\s*(?:getParameter|getHeader|getQueryString|getInputStream|"
+    r"getReader|getCookies|getRequestURI)", re.I)
+# Velocity：evaluate(ctx, out, tag, templateSource)
+_SSTI_VELOCITY_RE = re.compile(r"\bVelocity\s*\.\s*evaluate\s*\(")
+# FreeMarker：StringTemplateLoader.putTemplate(name, templateSource)
+_SSTI_PUTTPL_RE = re.compile(r"\bputTemplate\s*\(")
+# FreeMarker：new Template(name, new StringReader(templateSource), ...)
+_SSTI_NEWTPL_RE = re.compile(r"\bnew\s+(?:[A-Za-z_]\w*\s*\.\s*)*Template\s*\(")
+# Velocity merge：RuntimeServices.parse(reader, name) —— reader 里装着模板源
+_SSTI_RT_PARSE_RE = re.compile(
+    r"\b(?:[A-Za-z_]\w*[Rr]untimeServices|[Rr]untimeServices)\s*\.\s*parse\s*\(")
+# Python：模板源入口（`render_template` 是固定文件，**不在此列**）
+_SSTI_PY_RES: tuple[tuple[re.Pattern[str], bool], ...] = (
+    (re.compile(r"\brender_template_string\s*\("), False),
+    (re.compile(r"\b(?:jinja2\s*\.\s*)?Template\s*\("), True),
+    (re.compile(r"\.\s*from_string\s*\("), True),
+)
+
+
+def _ssti_split_args(s: str) -> list[str]:
+    """引号与括号感知的顶层逗号切分（注解里也可能带逗号）。"""
+    out: list[str] = []
+    buf: list[str] = []
+    depth = 0
+    quote = ""
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if quote:
+            buf.append(c)
+            if c == "\\" and i + 1 < len(s):
+                buf.append(s[i + 1])
+                i += 2
+                continue
+            if c == quote:
+                quote = ""
+        elif c in "'\"":
+            quote = c
+            buf.append(c)
+        elif c in "([{":
+            depth += 1
+            buf.append(c)
+        elif c in ")]}":
+            depth -= 1
+            buf.append(c)
+        elif c == "," and depth == 0:
+            out.append("".join(buf))
+            buf = []
+        else:
+            buf.append(c)
+        i += 1
+    if "".join(buf).strip():
+        out.append("".join(buf))
+    return [x.strip() for x in out]
+
+
+def _ssti_call_args(text: str, open_idx: int) -> list[str]:
+    """取 `text[open_idx]` 处 `(` 开始的实参列表（引号感知配平）。"""
+    depth = 0
+    quote = ""
+    i = open_idx
+    while i < len(text):
+        c = text[i]
+        if quote:
+            if c == "\\":
+                i += 2
+                continue
+            if c == quote:
+                quote = ""
+        elif c in "'\"":
+            quote = c
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return _ssti_split_args(text[open_idx + 1:i])
+        i += 1
+    return []
+
+
+def _ssti_java_params(source: str) -> set[str]:
+    """Java 签名里的**字符串形参**（框架注入类型已排除）。
+
+    入参必须是**完整切片源码**：`_entry_signature` 内部先截入口体再找签名，
+    重复套用一次就会把签名当成"没有括号"而返回空集（实测症状：模板源
+    认出来了但形参集为空，于是 `"Hello, " + username` 追不到外部输入，
+    整批退成 None —— 静默漏报，不报错）。
+    """
+    sig = _entry_signature(source)
+    if not sig:
+        return set()
+    out: set[str] = set()
+    for a in _ssti_split_args(sig):
+        a = re.sub(r"@\w+\s*(?:\((?:[^()]|\([^()]*\))*\))?", " ", a)
+        toks = re.findall(r"[A-Za-z_]\w*", a)
+        if len(toks) < 2:
+            continue
+        typ, name = toks[-2], toks[-1]
+        if typ in _SSTI_SKIP_PARAM_TYPES or name in _SSTI_SKIP_PARAM_TYPES:
+            continue
+        out.add(name)
+    return out
+
+
+_SSTI_LITERAL_RE = re.compile(
+    r"(?:\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'|[A-Z][A-Z0-9_]*|-?\d+)"
+    r"(?:\s*\+\s*(?:\"(?:[^\"\\]|\\.)*\"|'(?:[^'\\]|\\.)*'|"
+    r"[A-Z][A-Z0-9_]*|-?\d+))*\s*")
+
+
+def _ssti_origin(expr: str, body: str, params: set[str],
+                 depth: int = 0) -> bool | None:
+    """模板源表达式的外部可控性：True 可控 / False 固定 / None 断链。"""
+    if depth > 3:
+        return None
+    e = expr.strip().rstrip(";").strip()
+    if not e:
+        return None
+    # 纯字面量/常量拼接 → 模板源固定
+    if _SSTI_LITERAL_RE.fullmatch(e):
+        return False
+    if _SSTI_JAVA_REQ_RE.search(e):
+        return True
+    if params & set(re.findall(r"\b([A-Za-z_]\w*)\b", e)):
+        return True
+    var: str | None = None
+    if re.fullmatch(r"[A-Za-z_]\w*", e):
+        var = e
+    else:
+        # `x.toString()` / `x.replace(a,b)` / `String.valueOf(x)` /
+        # `new StringReader(x)` —— 取被包/被调的那个载体变量
+        mm = re.fullmatch(
+            r"(?:String\s*\.\s*valueOf|new\s+StringReader|new\s+String|"
+            r"StringBuilder)\s*\(\s*([A-Za-z_]\w*)\s*\)", e)
+        if mm:
+            var = mm.group(1)
+        else:
+            mm2 = re.match(r"([A-Za-z_]\w*)\s*\.\s*\w+\s*\(", e)
+            if mm2:
+                var = mm2.group(1)
+    if var is None:
+        return None
+    rhs = _last_assign_rhs(body, var)
+    if rhs is None:
+        return None
+    return _ssti_origin(rhs, body, params, depth + 1)
+
+
+def _ssti_template_sources(body: str) -> list[str]:
+    """全量提取"交给引擎当模板源"的实参表达式（Java 三种机制）。"""
+    out: list[str] = []
+    for m in _SSTI_VELOCITY_RE.finditer(body):
+        args = _ssti_call_args(body, m.end() - 1)
+        if len(args) >= 4:
+            out.append(args[3])
+    for m in _SSTI_PUTTPL_RE.finditer(body):
+        args = _ssti_call_args(body, m.end() - 1)
+        if len(args) >= 2:
+            out.append(args[1])
+    for m in _SSTI_NEWTPL_RE.finditer(body):
+        for a in _ssti_call_args(body, m.end() - 1):
+            if re.search(r"new\s+StringReader\s*\(", a):
+                out.append(a)
+    for m in _SSTI_RT_PARSE_RE.finditer(body):
+        args = _ssti_call_args(body, m.end() - 1)
+        if len(args) >= 1:
+            out.append(args[0])
+    return out
+
+
+def _java_ssti_verdict(source: str) -> bool | None:
+    body = entry_body(source)
+    if not body:
+        return None
+    params = _ssti_java_params(source)
+    srcs = _ssti_template_sources(body)
+    if not srcs:
+        return None
+    verdicts = [_ssti_origin(x, body, params) for x in srcs]
+    if any(v is True for v in verdicts):
+        return True
+    if verdicts and all(v is False for v in verdicts):
+        return False
+    return None
+
+
+# ---- 为什么**不**判 Thymeleaf「视图名注入」变体（M89 实测后的取舍）----
+#
+# `return "vul/ssti/" + para;`（Spring MVC 把返回值当视图名解析，`::` 片段
+# 选择器还能注入表达式）在 HJS / JavaSecLab 里都标了 vul，但它**判不了确定性**：
+#
+#   ① 唯一的判别证据是类级注解 `@Controller` vs `@RestController`。而本工具是
+#      **方法级切片** —— 实测两个仓库共 17 个 SSTI 单元的切片里，类级注解
+#      一次都没出现（`@Controller` 命中 0/17）。证据不在切片内就判不了。
+#   ② 退一步只按"方法上没有 @ResponseBody"判，会把所有 `@RestController`
+#      返回 `"固定文案" + 参数` 的方法全判成注入 —— HJS 自己就摆着这一对：
+#      `fragmentVul` 与 `fragmentSafe` **只差**一个 `@ResponseBody`，
+#      返回值字符串一模一样。缺了类级注解就分不开，这是必然的误报面。
+#
+# 所以本类目只判**真·模板引擎 API**（Velocity evaluate / FreeMarker
+# putTemplate / new Template(StringReader) / RuntimeServices.parse），
+# 这三条机制在 HJS 与 java-sec-code 上一共 4 条真值全部命中、0 误报。
+# 视图名注入变体如实登记为已知缺口（召回缺口，不是判反）。
+
+
+
+def _py_ssti_verdict(source: str) -> bool | None:
+    """Python：模板源是否来自外部输入。
+
+    只认三种"把字符串当模板编译"的入口；`render_template("a.html", k=v)`
+    是**固定文件 + 数据**，根本不在 sink 列表里（那是正常用法，不是注入）。
+    `Template(` 的裸写形态只在源码里出现 `jinja2` 时才收 —— 否则
+    `django.template.Template(`、`string.Template(` 之类会被误吞。
+    """
+    has_jinja = "jinja2" in source
+    srcs: list[str] = []
+    for rx, needs_jinja in _SSTI_PY_RES:
+        if needs_jinja and not has_jinja:
+            continue
+        for m in rx.finditer(source):
+            args = _ssti_call_args(source, m.end() - 1)
+            if args:
+                srcs.append(args[0])
+    if not srcs:
+        # 用了模板但**只走固定文件渲染**（`render_template("a.html", k=v)`）：
+        # 模板源是磁盘上的文件，用户输入只落在 data 位 → 确定性 safe。
+        # 与"根本不用模板"（None）区分开：后者不归本类目管。
+        # 复用 xss 支已有的 `_PY_TPL_SAFE_RE`，不再内联同一 pattern
+        # （内联会在正则卫生审计里被记成"遮蔽冲突"）。
+        return False if _PY_TPL_SAFE_RE.search(source) else None
+    verdicts = [_py_value_text_capable(x, source) for x in srcs]
+    if any(v is True for v in verdicts):
+        return True
+    if verdicts and all(v is False for v in verdicts):
+        return False
+    return None
+
+
+def ssti_verdict(source: str) -> bool | None:
+    """服务端模板注入（M89，第 24 类）。True 有漏洞 / False 安全 / None 断链。"""
+    if _looks_python(source):
+        return _py_ssti_verdict(source)
+    if _looks_solidity(source):
+        return None
+    return _java_ssti_verdict(source)
+
+
 def verdict(category: str, source: str) -> bool | None:
     """对配置型类目给出确定性结论：True(有漏洞) / False(安全) / None(证据不足)。"""
     cfg = parse_config_block(source)
@@ -8222,6 +8583,9 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category == "spel":
         return spel_verdict(source)
+
+    if category == "ssti":
+        return ssti_verdict(source)
 
     if category == "xxe":
         return xxe_verdict(source)
