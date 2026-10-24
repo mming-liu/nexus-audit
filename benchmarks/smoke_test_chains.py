@@ -2911,8 +2911,10 @@ public void vul(HttpServletRequest request) throws IOException {
 _hdr = build_rule_diagnostic("sqli", _DIAG_SRC, line_offset=1)
 # 行号契约：头部占 1 行，body 从注解行起算 —— bar 在原码第 3 行 → 模型看到 L4；
 # executeQuery 在原码第 6 行 → L7。探针打印过真实头部，别凭记忆写预期。
-check("诊断头：候选输入行与 sink 行都抓到",
-      ("候选输入行: L4" in _hdr and "候选敏感操作行: L6, L7" in _hdr), True)
+check("诊断头：候选输入行与 sink 行都抓到（M65：空实参 createStatement"
+      " 行被相关性闸门剔除）",
+      ("候选输入行: L4" in _hdr and "候选敏感操作行: L7" in _hdr
+       and "L6" not in _hdr), True)
 
 # 带头代码上的引证核验：真实代码行通过、注释头被拒绝
 _code_h = _hdr + "\n" + _DIAG_SRC
@@ -5353,6 +5355,33 @@ check("M103：淬火⑦ wx 模块显式 token 鉴权 → [explicit-auth-module]"
 check("M103：@LoginUser Integer userId 主体被识别（地址列表无 authz P0）",
       ("形参主体注解" in _addr103.source_code
        and _verdict("authz", _addr103.source_code) is not True), True)
+
+# ---- [104] Module 65：二级 Sink 漏斗相关性校验（假候选消解） ----
+from core.agents.rule_detectors import build_rule_diagnostic as _brd65  # noqa: E402
+# 施工单夹具：纯常量实参的 sink（new File("/var/log/app.log")）不是候选
+_check65a = _brd65("pathtraver", '''
+public void run() {
+    java.io.File f = new File("/var/log/app.log");
+    System.out.println(f.exists());
+}''')
+check("M104：纯常量实参的 sink 行不计入候选（施工单夹具）",
+      _check65a, "")
+# 四项目假候选形态：sink 实参与输入行无交集
+_check65b = _brd65("xss", '''
+public Object list() {
+    byte[] img = captchaService.genImage();
+    response.getOutputStream().write(img);
+    return null;
+}''')
+check("M104：验证码图片流（与输入行无交集）不派发", _check65b, "")
+# 真阳退回形态不受影响：实参与输入行有交集（含赋值链）
+_check65c = _brd65("sqli", '''
+public void vul(HttpServletRequest request) {
+    String name = request.getParameter("q");
+    stmt.executeQuery("SELECT * FROM u WHERE n='" + name + "'");
+}''')
+check("M104：真阳退回样本 0 漏网（实参经赋值链与输入行有交集）",
+      ("候选输入行" in _check65c and "候选敏感操作行" in _check65c), True)
 
 print()
 if FAILS:

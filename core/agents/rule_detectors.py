@@ -3416,15 +3416,45 @@ def build_rule_diagnostic(category: str, code: str,
     src_lines: list[str] = []
     sink_lines: list[str] = []
     bare = set(_bare_params(_entry_signature(code)))
+    # M65：sink 行相关性 —— 候选输入行的标识符集合（含形参），用于过滤
+    # "有 sink 但无外部可控输入流向 sink" 的假候选
+    input_ids: set[str] = set(bare)
     for i, ln in enumerate(body.splitlines(), 1):
         tag = f"L{i + line_offset}"
         if XSS_PARAM_RE.search(ln) or _XSS_FOREIGN_SOURCE_RE.search(ln):
             src_lines.append(tag)
+            input_ids |= set(re.findall(r"\b([A-Za-z_]\w*)\b", ln))
             continue
         if any(re.search(rf"\b{re.escape(p)}\b", ln) for p in bare):
             src_lines.append(tag)
+            input_ids |= set(re.findall(r"\b([A-Za-z_]\w*)\b", ln))
         if sink_re and sink_re.search(ln):
-            sink_lines.append(tag)
+            # M65 相关性双闸门：
+            # ① 括号内至少一个**非字面量**标识符 —— 纯常量实参的 sink
+            #    （`new File("/var/log/app.log")`）不是候选；
+            # ② 实参标识符与候选输入行标识符有**交集** —— 验证码图片流、
+            #    内部生成的 URL、支付 SDK 表单这类输出与输入行毫无交集
+            #    （RuoYi/My-Blog/litemall/mall 四项目实测 6 条假候选全部
+            #    落在 ②上）。
+            inner = ln[ln.find("("):ln.rfind(")") + 1] if "(" in ln else ln
+            arg_ids = set(re.findall(r"\b([A-Za-z_]\w*)\b", inner))
+            arg_ids -= {"new", "null", "true", "false", "this"}
+            if not arg_ids:
+                continue                      # ① 纯字面量/常量实参
+            # 取实参里的标识符及其赋值链（一层）
+            linked = bool(arg_ids & input_ids)
+            if not linked:
+                for v in arg_ids:
+                    for am in re.finditer(
+                            rf"\b{re.escape(v)}\s*=(?!=)[^;]*;", body):
+                        if set(re.findall(r"\b([A-Za-z_]\w*)\b",
+                                          am.group(0))) & input_ids:
+                            linked = True
+                            break
+                    if linked:
+                        break
+            if linked:
+                sink_lines.append(tag)
     if not src_lines or not sink_lines:
         return ""
     return (f"// [静态前筛已核实事实] 候选输入行: {', '.join(src_lines[:6])}"
