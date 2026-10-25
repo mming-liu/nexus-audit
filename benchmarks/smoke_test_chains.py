@@ -7814,6 +7814,78 @@ if _ea159.exists():
 else:
     print("  -- eladmin 不在 reference_repos，跳过 [159]")
 
+# ---- [163] Module 126：跨仓库同源缺陷聚类（计数守恒）----
+print("\n[163] 跨仓库同源缺陷聚类（M126）")
+
+from benchmarks.cross_repo_clusters import (                        # noqa: E402
+    cluster as _cl163,
+    render_markdown as _md163,
+)
+
+_agg163 = ROOT / "benchmarks" / "results" / "wild_hunt.json"
+if _agg163.exists():
+    _r163 = _cl163(_agg163)
+    check("M163：聚类计数守恒（每个根因只归一个簇）",
+          _r163["conservation_ok"], True)
+    check("M163：簇内根因数之和 == 根因总数",
+          sum(c["root_count"] for c in _r163["clusters"]),
+          _r163["total_root_causes"])
+    check("M163：跨仓簇的每个仓库名都非空且去重",
+          all(c["repo_count"] == len(set(c["repos"]))
+              and all(r for r in c["repos"])
+              for c in _r163["clusters"] if c["repo_count"] > 1), True)
+    check("M163：markdown 只渲染 ≥2 仓的簇（单仓簇不进表）",
+          _md163(_r163).count("| 2 |") + _md163(_r163).count("| 3 |")
+          >= _r163["cross_repo_clusters"], True)
+    check("M163：全局配置簇按配置体签名归并（不是按代表入口文件名）",
+          all(c["component"].startswith("cors:")
+              for c in _r163["clusters"]
+              if c["root_kind"] == "global-config"
+              and c["category"] == "cors"), True)
+else:
+    print("  -- wild_hunt.json 不在，跳过 [163]")
+
+# ---- [164] Module 127：GitLab SAST v15 导出 ----
+print("\n[164] GitLab SAST v15 报告导出（M127）")
+
+from core.context.gitlab_exporter import (                          # noqa: E402
+    build_sast_report as _bsr164,
+    validate_sast_report as _vsr164,
+)
+
+_doc164 = _bsr164([
+    {"file": str(ROOT / "core" / "agents" / "rule_detectors.py"),
+     "line": 100, "category": "sqli", "severity": "CRITICAL",
+     "cwe": "CWE-89"},
+    {"file": str(ROOT / "a" / "b.py"), "line": 7, "category": "authz",
+     "severity": "HIGH", "cwe": "CWE-639"},
+    {"file": "/abs/path.py", "line": 3, "category": "xss",
+     "severity": "MEDIUM", "cwe": "CWE-79"},
+], ROOT)
+check("M164：version 15.0.0 且 scan 六字段齐全",
+      (_doc164["version"], _vsr164(_doc164)), ("15.0.0", []))
+check("M164：绝对路径的命中被丢弃（GitLab 无法定位）",
+      len(_doc164["vulnerabilities"]), 2)
+check("M164：severity 落进 GitLab 六个枚举值内",
+      all(v["severity"] in {"Critical", "High", "Medium", "Low", "Info",
+                            "Unknown"}
+          for v in _doc164["vulnerabilities"]), True)
+check("M164：id 是确定性 uuid（同一处每次一样，GitLab 去重靠它）",
+      (_doc164["vulnerabilities"][0]["id"]
+       == _bsr164([{"file": str(ROOT / "core" / "agents" /
+                                "rule_detectors.py"),
+                    "line": 100, "category": "sqli",
+                    "severity": "CRITICAL", "cwe": "CWE-89"}],
+                  ROOT)["vulnerabilities"][0]["id"]), True)
+check("M164：identifiers 同时带 CWE 与类目，CWE 有 url",
+      all(any(i["type"] == "cwe" and "cwe.mitre.org" in i.get("url", "")
+              for i in v["identifiers"])
+          for v in _doc164["vulnerabilities"]), True)
+check("M164：cli 暴露 --gitlab-sast 开关",
+      "--gitlab-sast" in subprocess.run(
+          [sys.executable, str(ROOT / "cli.py"), "scan", "--help"],
+          capture_output=True, text=True, encoding="utf-8").stdout, True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")

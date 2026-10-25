@@ -1,0 +1,520 @@
+{
+  "total_root_causes": 84,
+  "cluster_count": 51,
+  "cross_repo_clusters": 2,
+  "conservation_ok": true,
+  "clusters": [
+    {
+      "category": "hash",
+      "root_kind": "endpoint",
+      "component": "AdminController.java",
+      "repo_count": 2,
+      "root_count": 2,
+      "repos": [
+        "My-Blog",
+        "newbee-mall"
+      ]
+    },
+    {
+      "category": "weakrand",
+      "root_kind": "endpoint",
+      "component": "UploadController.java",
+      "repo_count": 2,
+      "root_count": 3,
+      "repos": [
+        "My-Blog",
+        "newbee-mall"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "AliPayController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "eladmin-mp"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "DeliveryController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "mall4j"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "FileController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "mall4j"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "GenConfigController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "eladmin-mp"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "GeneratorController.java",
+      "repo_count": 1,
+      "root_count": 3,
+      "repos": [
+        "eladmin-mp"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "OrderController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "newbee-mall"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "VerifyController.java",
+      "repo_count": 1,
+      "root_count": 3,
+      "repos": [
+        "eladmin-mp"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "app.py",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "Employee-Management-System"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "views.py",
+      "repo_count": 1,
+      "root_count": 5,
+      "repos": [
+        "DjanGoat"
+      ]
+    },
+    {
+      "category": "cmdi",
+      "root_kind": "endpoint",
+      "component": "JobGroupController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "cmdi",
+      "root_kind": "endpoint",
+      "component": "JobLogController.java",
+      "repo_count": 1,
+      "root_count": 3,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "cmdi",
+      "root_kind": "endpoint",
+      "component": "views.py",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "DjanGoat"
+      ]
+    },
+    {
+      "category": "cors",
+      "root_kind": "global-config",
+      "component": "cors:6f184c61a2b1",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "litemall"
+      ]
+    },
+    {
+      "category": "cors",
+      "root_kind": "global-config",
+      "component": "cors:7d8d7d1f928a",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "eladmin-mp"
+      ]
+    },
+    {
+      "category": "cors",
+      "root_kind": "global-config",
+      "component": "cors:7f730c79b046",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "cors",
+      "root_kind": "global-config",
+      "component": "cors:88610365312c",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "mall"
+      ]
+    },
+    {
+      "category": "cors",
+      "root_kind": "global-config",
+      "component": "cors:ae0c07e2f965",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "newbee-mall-api"
+      ]
+    },
+    {
+      "category": "cors",
+      "root_kind": "global-config",
+      "component": "cors:e7929f19ee81",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "waynboot-mall"
+      ]
+    },
+    {
+      "category": "cors",
+      "root_kind": "global-config",
+      "component": "cors:fbc338566e41",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "mall4j"
+      ]
+    },
+    {
+      "category": "crypto",
+      "root_kind": "endpoint",
+      "component": "VerifyController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "eladmin-mp"
+      ]
+    },
+    {
+      "category": "deserial",
+      "root_kind": "endpoint",
+      "component": "JobGroupController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "deserial",
+      "root_kind": "endpoint",
+      "component": "JobLogController.java",
+      "repo_count": 1,
+      "root_count": 3,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "deserial",
+      "root_kind": "endpoint",
+      "component": "WxMsgController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "litemall"
+      ]
+    },
+    {
+      "category": "deserial",
+      "root_kind": "endpoint",
+      "component": "views.py",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "DjanGoat"
+      ]
+    },
+    {
+      "category": "hardcoded_secret",
+      "root_kind": "file-level",
+      "component": "DjangoSettings",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "DjanGoat"
+      ]
+    },
+    {
+      "category": "hardcoded_secret",
+      "root_kind": "file-level",
+      "component": "JeecgBaseConfig.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "hardcoded_secret",
+      "root_kind": "file-level",
+      "component": "JwtHelper.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "litemall"
+      ]
+    },
+    {
+      "category": "hardcoded_secret",
+      "root_kind": "file-level",
+      "component": "app.py",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "Employee-Management-System"
+      ]
+    },
+    {
+      "category": "hash",
+      "root_kind": "endpoint",
+      "component": "LoginController.java",
+      "repo_count": 1,
+      "root_count": 3,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "hash",
+      "root_kind": "endpoint",
+      "component": "NewBeeMallPersonalAPI.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "newbee-mall-api"
+      ]
+    },
+    {
+      "category": "hash",
+      "root_kind": "endpoint",
+      "component": "PersonalController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "newbee-mall"
+      ]
+    },
+    {
+      "category": "hash",
+      "root_kind": "endpoint",
+      "component": "SystemApiController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "redir",
+      "root_kind": "endpoint",
+      "component": "OrderController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "newbee-mall"
+      ]
+    },
+    {
+      "category": "redir",
+      "root_kind": "endpoint",
+      "component": "ThirdLoginController.java",
+      "repo_count": 1,
+      "root_count": 3,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "redir",
+      "root_kind": "endpoint",
+      "component": "views.py",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "DjanGoat"
+      ]
+    },
+    {
+      "category": "spel",
+      "root_kind": "endpoint",
+      "component": "views.py",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "DjanGoat"
+      ]
+    },
+    {
+      "category": "sqli",
+      "root_kind": "endpoint",
+      "component": "GenController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "RuoYi"
+      ]
+    },
+    {
+      "category": "sqli",
+      "root_kind": "endpoint",
+      "component": "SysAnnouncementSendController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "sqli",
+      "root_kind": "endpoint",
+      "component": "SysDepartController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "sqli",
+      "root_kind": "endpoint",
+      "component": "SysUserController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "sqli",
+      "root_kind": "endpoint",
+      "component": "views.py",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "DjanGoat"
+      ]
+    },
+    {
+      "category": "ssrf",
+      "root_kind": "endpoint",
+      "component": "RestTemplateDemoController.java",
+      "repo_count": 1,
+      "root_count": 7,
+      "repos": [
+        "mall"
+      ]
+    },
+    {
+      "category": "unchecked_low_level_calls",
+      "root_kind": "endpoint",
+      "component": "CrossChain.sol",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "Synthetix V3"
+      ]
+    },
+    {
+      "category": "weakrand",
+      "root_kind": "endpoint",
+      "component": "BlogController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "My-Blog"
+      ]
+    },
+    {
+      "category": "weakrand",
+      "root_kind": "endpoint",
+      "component": "NewBeeAdminUploadAPI.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "newbee-mall-api"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "AdminGoodsController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "litemall"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "JobInfoController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "SysAnnouncementController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "UserCollectionController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "mall4j"
+      ]
+    }
+  ]
+}

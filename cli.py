@@ -646,6 +646,29 @@ def cmd_scan_auto(args, repo: Path):
                     for u, cat in model_candidates]
         write_sarif(args.sarif, entries, repo)
         print(f"      SARIF 已写入 {args.sarif}（{len(entries)} 条 results）")
+    # M127：GitLab SAST（gl-sast-report.json v15）—— 与 SARIF 同一份根因集合
+    if getattr(args, "gitlab_sast", None):
+        from core.context.gitlab_exporter import (
+            build_sast_report, validate_sast_report, write_sast_report)
+        _gl_findings = [{
+            "file": rc["file"], "line": rc["line"],
+            "category": rc["category"],
+            "severity": _gl_severity(rc["category"]),
+            "cwe": CATEGORIES[rc["category"]].cwe
+            if rc["category"] in CATEGORIES else "",
+            "name": f"{rc['category']} in {rc['unit_name']}",
+            "message": (f"[{rc['category']}] 规则层确定性实锤（P0）"),
+            "description": (f"根因签名 {rc['signature']}；"
+                            f"影响 {rc['affected_routes']} 条路由。"),
+        } for rc in root_causes]
+        _gl = build_sast_report(_gl_findings, repo)
+        _gl_errs = validate_sast_report(_gl)
+        write_sast_report(args.gitlab_sast, _gl)
+        print(f"      GitLab SAST 已写入 {args.gitlab_sast}"
+              f"（{len(_gl['vulnerabilities'])} 条 vulnerabilities）")
+        if _gl_errs:
+            print(f"      [!] schema 自检发现 {len(_gl_errs)} 处问题："
+                  f"{_gl_errs[:3]}")
     if getattr(args, "html", None):
         html_entries = [{"file": rc["file"], "line": rc["line"],
                          "category": rc["category"],
@@ -4053,6 +4076,31 @@ def _fix_java_header_injection(repo: Path, targets: list,
     return fixed
 
 
+def _gl_severity(category: str) -> str:
+    """类目 → GitLab 严重级（M127）。
+
+    取值只有五档，判据挂"这个类目的**直接后果**"，不是拍脑袋：
+      · 能直接拿服务器执行权/读全库 → CRITICAL（cmdi / deserial / sqli）
+      · 能越权读写他人数据 / 读任意文件 / 打内网 → HIGH
+      · 客户端脚本执行 / 跳转钓鱼 / 弱凭证 → MEDIUM
+      · 配置类（CORS 通配、弱算法、信任边界）→ LOW
+    """
+    crit = {"cmdi", "deserial", "sqli", "unchecked_low_level_calls",
+            "reentrancy", "access_control", "arithmetic"}
+    high = {"authz", "pathtraver", "ssrf", "xxe", "spel", "ssti",
+            "ldapi", "xpathi", "header_injection"}
+    med = {"xss", "redir", "hardcoded_secret", "jwt_weakness", "crypto",
+           "hash", "weakrand", "mass_assignment", "bad_randomness"}
+    cat = (category or "").lower()
+    if cat in crit:
+        return "CRITICAL"
+    if cat in high:
+        return "HIGH"
+    if cat in med:
+        return "MEDIUM"
+    return "LOW"
+
+
 def _strip_scoreboard_timestamp(text: str) -> str:
     """去掉 SCOREBOARD 里的"生成时间"行。
 
@@ -4433,6 +4481,10 @@ def main():
                              "并落盘到 DIR")
     p_scan.add_argument("--sarif", default=None, metavar="OUT.sarif",
                         help="将命中结果导出为 SARIF v2.1.0（GitHub Code Scanning 格式）")
+    p_scan.add_argument("--gitlab-sast", dest="gitlab_sast", default=None,
+                        metavar="gl-sast-report.json",
+                        help="M127：导出 GitLab SAST v15 报告"
+                             "（GitLab Ultimate / 极狐安全面板格式）")
     p_scan.add_argument("--html", default=None, metavar="OUT.html",
                         help="M57：产出零外部依赖的单文件交互式 HTML 报告")
     p_scan.add_argument("--summary-json", default=None, metavar="OUT.json",
