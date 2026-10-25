@@ -9384,6 +9384,158 @@ def header_injection_verdict(source: str) -> bool | None:
     return False if seen else None
 
 
+# ---------------- M123：批量赋值（CWE-915，第 26 类） ----------------
+#
+# 机制：把**整个**请求体一次性灌进模型，攻击者顺手带上 `is_admin` / `role`
+# 就把自己提权了。
+#
+# 判据三件事实缺一不可：
+#   ① 有"整包灌入"的 sink（`Model(**request.json)` / `copyProperties(map, x)`）；
+#   ② 灌入的**源**是请求数据（不是服务端常量）；
+#   ③ 目标侧**有**权限字段且**没有**白名单/ignoreProperties 挡着。
+#
+# ③ 的"目标侧"只能从切片里能看到的线索判断：模型类定义（`is_admin = ...`）、
+# 变量名（`user` / `admin` / `account`）、或显式出现在实参里的字典键。
+# 看不见就退 None —— 不能因为"没看到 is_admin"就判安全。
+_MASS_PY_SINK_RE = re.compile(
+    r"\b(?:[A-Z]\w*|self\s*\.\s*\w+)\s*\(\s*\*\*\s*"
+    r"(?:request\s*\.\s*(?:json|form|data|values|get_json\s*\(\s*\))"
+    r"|request\.json|data|payload|params|kwargs)\b")
+_MASS_PY_UPDATE_RE = re.compile(
+    r"\.\s*__dict__\s*\.\s*update\s*\(\s*"
+    r"(?:request\s*\.\s*(?:json|form|data|values)|data|payload|params)\b"
+    r"|\.\s*update\s*\(\s*request\s*\.\s*(?:json|form|data|values)")
+_MASS_JAVA_SINK_RE = re.compile(
+    r"\bBeanUtils\s*\.\s*copyProperties\s*\(\s*([^,]+),\s*([^)]+)\)")
+_MASS_PRIV_FIELDS = (
+    "is_admin", "isadmin", "is_superuser", "issuperuser", "is_staff",
+    "isstaff", "role", "roles", "permission", "permissions", "balance",
+    "wallet", "owner_id", "ownerid", "user_id", "userid", "tenant",
+)
+_MASS_WHITELIST_RE = re.compile(
+    r"ignoreProperties\s*\(|ignore_properties|allow_?list|ALLOWED_?\w*"
+    r"|whitelist|\bexclude\s*=|\bonly\s*=\s*\(|fields\s*=\s*\[")
+_MASS_TARGET_HINT_RE = re.compile(
+    r"\b(?:user|account|admin|member|profile|staff|role)\b", re.I)
+# 类型名是驼峰（`UserEntity` / `AdminUser` / `AccountDTO`），末尾没有词边界 ——
+# 用不带 `\b` 的形态单独判。
+_MASS_TYPE_HINT_RE = re.compile(
+    r"(?:user|account|admin|member|profile|staff|role)", re.I)
+
+
+def _mass_target_has_priv_fields(text: str) -> bool:
+    """目标模型/实参里是否出现权限字段。"""
+    low = text.lower()
+    return any(f in low for f in _MASS_PRIV_FIELDS)
+
+
+def mass_assignment_verdict(source: str) -> bool | None:
+    """批量赋值（M123，第 26 类）。"""
+    if _looks_solidity(source):
+        return None
+    body = entry_body(source)
+    if not body:
+        return None
+    if _looks_python(source):
+        m = _MASS_PY_SINK_RE.search(body) or _MASS_PY_UPDATE_RE.search(body)
+        if not m:
+            # 有"从请求数据构造模型"但被字段白名单过滤掉 →
+            # `User(**{k: v for k, v in request.json.items() if k in ALLOWED})`
+            # 这是**安全写法**，判 False 而不是"不归本类目"。
+            if _MASS_WHITELIST_RE.search(body) and re.search(
+                    r"\b[A-Z]\w*\s*\(\s*\*\*\s*\{|request\s*\.\s*"
+                    r"(?:json|form|data|values)", body):
+                return False
+            return None
+        if _MASS_WHITELIST_RE.search(body):
+            return False                   # 显式白名单/字段过滤
+        # ③ 目标侧证据：模型类定义（在切片后段的 model/class 里）或变量名
+        region = source if len(source) > len(body) else body
+        if _mass_target_has_priv_fields(region) \
+                or _MASS_TARGET_HINT_RE.search(m.group(0)):
+            return True
+        return None                        # 看不到目标字段 → 缺证据
+    # Java：BeanUtils.copyProperties(src, dst)
+    for m in _MASS_JAVA_SINK_RE.finditer(body):
+        src_arg, dst_arg = m.group(1), m.group(2)
+        if _MASS_WHITELIST_RE.search(body):
+            return False
+        # 三参以上的重载本身就是**排除列表**：
+        #   `BeanUtils.copyProperties(src, dst, "isAdmin", "role")`
+        # 第三个实参起是要忽略的字段名 —— 这是 Spring 的确定性 API 语义。
+        # 注意 `[^)]+` 会把 `u, "isAdmin", "role"` 整段吃进 dst_arg，
+        # 所以按"捕获里有没有逗号"判断，而不是看闭括号之后。
+        if "," in dst_arg or re.match(r'\s*,\s*"', body[m.end():]):
+            return False
+        # 目标类型往往只以**声明**出现（`UserEntity u = new UserEntity();`），
+        # 实体类体不在切片里 —— 从声明里取类型名判"是不是用户/权限实体"。
+        dst_name = dst_arg.strip()
+        tm = re.search(rf"\b([A-Z]\w*)\s+{re.escape(dst_name)}\b", body)
+        dst_type = tm.group(1) if tm else ""
+        if _mass_target_has_priv_fields(body) \
+                or _MASS_TYPE_HINT_RE.search(dst_type) \
+                or _MASS_TARGET_HINT_RE.search(src_arg):
+            return True
+    if _MASS_JAVA_SINK_RE.search(body):
+        return None
+    return None
+
+
+# ---------------- M124：链上伪随机（SWC-120，第 27 类） ----------------
+#
+# 机制：`block.timestamp` / `blockhash` / `block.difficulty` 全是矿工可见、
+# 部分可操纵的公开值，拿它决定"谁中奖 / 谁拿到稀有 NFT"就是可预测随机。
+#
+# 判据两头卡死：
+#   ① 随机源必须是**区块变量**且结果参与**取模/比较/哈希**；
+#   ② 结果必须流向**价值转移**（transfer/send/call{value:}/mint）或决定赢家；
+#   ③ 时间戳**只做冷却期/截止期比较**（`require(block.timestamp >= x)`
+#      而没参与结果计算）→ False；
+#   ④ 有 VRF / commit-reveal → False。
+_BAD_RAND_BLOCKVAR_RE = re.compile(
+    r"\bblock\s*\.\s*(?:timestamp|difficulty|prevrandao|number|coinbase"
+    r"|blockhash|gaslimit)\b|\bblockhash\s*\(|\bnow\b(?!\w)")
+_BAD_RAND_COMBINE_RE = re.compile(
+    r"keccak256\s*\(|sha256\s*\(|abi\s*\.\s*encodePacked\s*\(|%\s*\d+"
+    r"|\bmod\s*\d+|\buint\s*\(\s*keccak256")
+_BAD_RAND_VALUE_RE = re.compile(
+    r"\.\s*transfer\s*\(|\.\s*send\s*\(|call\s*\{\s*value\s*:"
+    r"|\b_mint\s*\(|\bsafeMint\s*\(|\bwinner\b|\blucky\b|\breward\b", re.I)
+_BAD_RAND_OK_RE = re.compile(
+    r"\bfulfillRandomWords\b|\brequestRandomWords\b|\bVRFConsumerBase"
+    r"|\bcommit\s*[-_]?\s*reveal\b|\breveal\s*\(", re.I)
+_BAD_RAND_COOLDOWN_RE = re.compile(
+    r"\brequire\s*\(\s*block\s*\.\s*timestamp\s*[><]=?[^)]*\)"
+    r"|\bif\s*\(\s*block\s*\.\s*timestamp\s*[><]=?[^)]*\)")
+
+
+def bad_randomness_verdict(source: str) -> bool | None:
+    """链上伪随机（M124，第 27 类，SWC-120）。"""
+    if not _looks_solidity(source):
+        return None
+    body = entry_body(source)
+    if not body:
+        return None
+    if _BAD_RAND_OK_RE.search(body):
+        return False                       # VRF / commit-reveal
+    if not _BAD_RAND_BLOCKVAR_RE.search(body):
+        return None                        # 没用到区块变量
+    combine = _BAD_RAND_COMBINE_RE.search(body)
+    result_assign = re.search(
+        r"\b(?:winner|win|prize|lucky|reward)\w*\s*=", body, re.I)
+    cooldown = _BAD_RAND_COOLDOWN_RE.search(body)
+    # 没有"组合成随机数"也没有"结果赋值"，只是拿时间戳做窗口比较 → 冷却期，安全。
+    # 这一条必须在价值转移判断**之前**：`require(block.timestamp >= t)` 后面
+    # 往往紧跟 `transfer`，先看 transfer 会把冷却期误判成伪随机。
+    if not combine and not result_assign:
+        if cooldown:
+            return False
+        return None
+    if not _BAD_RAND_VALUE_RE.search(body):
+        return None                        # 随机数没流向价值转移/赢家
+    return True
+
+
 def verdict(category: str, source: str) -> bool | None:
     """对配置型类目给出确定性结论：True(有漏洞) / False(安全) / None(证据不足)。"""
     cfg = parse_config_block(source)
@@ -9453,6 +9605,12 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category in ("header_injection", "crlf"):
         return header_injection_verdict(source)
+
+    if category == "mass_assignment":
+        return mass_assignment_verdict(source)
+
+    if category == "bad_randomness":
+        return bad_randomness_verdict(source)
 
     if category == "xxe":
         return xxe_verdict(source)

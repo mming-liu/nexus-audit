@@ -1,6 +1,6 @@
 # 披露草稿总目录（nexus-audit `--advisory-dir`）
 
-共 **12** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
+共 **10** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
 带 [Auto-Fix Verified] 的草稿内嵌通过自检的补丁 diff。
 
 | CVSS | 严重级 | CWE | 类目 | 草稿 |
@@ -14,6 +14,4 @@
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-BEB7-E3E9-1E06-authz-generatorcontroller-generatorcode.md](GHSA-BEB7-E3E9-1E06-authz-generatorcontroller-generatorcode.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-BF26-0A97-06D8-authz-alipaycontroller-topayasweb.md](GHSA-BF26-0A97-06D8-authz-alipaycontroller-topayasweb.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-EC28-62F4-FAA2-authz-verifycontroller-validated.md](GHSA-EC28-62F4-FAA2-authz-verifycontroller-validated.md) |
-| 7.5 | HIGH | CWE-327 | crypto | [GHSA-250F-2AE8-249E-crypto-verifycontroller-resetemail.md](GHSA-250F-2AE8-249E-crypto-verifycontroller-resetemail.md) |
-| 7.5 | HIGH | CWE-327 | crypto | [GHSA-E637-C435-DBF1-crypto-verifycontroller-resetpass.md](GHSA-E637-C435-DBF1-crypto-verifycontroller-resetpass.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-A12F-C348-60F5-cors-alipaycontroller-topayaspc.md](GHSA-A12F-C348-60F5-cors-alipaycontroller-topayaspc.md) |

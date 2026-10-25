@@ -2238,6 +2238,8 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         # M106：第 19、20 类 —— 两个 Java 侧确定性补丁
         n += _fix_java_ssti_viewname(repo, rest, report)
         n += _fix_java_header_injection(repo, rest, report)
+        n += _fix_java_mass_assignment(repo, rest, report)
+        n += _fix_java_weakrand(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
     if n:
         out = Path(out_path)
@@ -3915,6 +3917,8 @@ DOCTOR_PATCHERS = [
     "_fix_python_redirect",
     # M106：第 19、20 类 —— Java 视图名注入白名单 / 响应头 CRLF 清洗
     "_fix_java_ssti_viewname", "_fix_java_header_injection",
+    # M125：第 21、22 类 —— 批量赋值忽略列表 / 弱随机源
+    "_fix_java_mass_assignment", "_fix_java_weakrand",
 ]
 
 
@@ -4101,6 +4105,127 @@ def _gl_severity(category: str) -> str:
     return "LOW"
 
 
+def _fix_java_mass_assignment(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 21 类（Module 125）：Java 批量赋值补**忽略列表**。
+
+    `BeanUtils.copyProperties(src, dst)` 把整个请求体灌进实体；Spring 的三参
+    重载就是官方的排除列表机制：
+
+        BeanUtils.copyProperties(src, dst, "id", "role", "isAdmin", "password");
+
+    为什么不全字段白名单化：那需要改实体/DTO 结构，属于业务重构，不是确定性
+    补丁。忽略列表是同一个 API 的既有语义，改完行为可预测、可自检。
+    """
+    from core.agents.rule_detectors import (verdict as rule_verdict,
+                                            _MASS_JAVA_SINK_RE)
+    fixed = 0
+    ignore = ', "id", "role", "isAdmin", "is_superuser", "password"'
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("mass_assignment", src) is not True:
+            continue
+        m = _MASS_JAVA_SINK_RE.search(src)
+        if not m:
+            continue
+        call = m.group(0)
+        if call.count(",") > 1:
+            continue                       # 已经有排除列表
+        new_call = call[:-1] + ignore + ")"
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        idx = original.find(call)
+        if idx < 0:
+            continue
+        patched = original[:idx] + new_call + original[idx + len(call):]
+        v2 = None
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.context.java_impl_resolver import _FILE_CACHE as _FC
+            _FC.clear()
+            from core.slicer.java_servlet import JavaSlicer
+            u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = rule_verdict("mass_assignment",
+                              u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE as _FC2
+            _FC2.clear()
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(),
+                                        patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [java-mass-assign] {u.unit_name}（`{f.name}`）",
+                      "```diff", *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 mass_assignment → False。",
+                      "> 用 Spring 三参重载的排除列表挡住权限字段；",
+                      "> 不做全字段白名单（那是业务重构，不是确定性补丁）。", ""]
+    return fixed
+
+
+def _fix_java_weakrand(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 22 类（Module 125）：Java 弱随机源 → `SecureRandom`。
+
+    `new Random()` / `Math.random()` 是线性同余发生器，种子可预测；安全敏感
+    场景（令牌、验证码、盐、临时密码）必须换 `java.security.SecureRandom`。
+
+    只改**构造点**，不引入新变量名 —— `new Random()` → `new SecureRandom()`
+    是同一接口（`java.util.Random` 的 API 是 `SecureRandom` 的超集），
+    调用方 `nextInt()` 等一行不用动。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("weakrand", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        patched = re.sub(r"\bnew\s+(?:java\.util\.)?Random\s*\(\s*\)",
+                         "new java.security.SecureRandom()", original, count=1)
+        if patched == original:
+            continue
+        v2 = None
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.context.java_impl_resolver import _FILE_CACHE as _FC
+            _FC.clear()
+            from core.slicer.java_servlet import JavaSlicer
+            u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = rule_verdict("weakrand", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE as _FC2
+            _FC2.clear()
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(),
+                                        patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [java-weakrand] {u.unit_name}（`{f.name}`）",
+                      "```diff", *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 weakrand → False。",
+                      "> `new Random()` → `new SecureRandom()`：同一接口，",
+                      "> 调用方不用改；线性同余种子可预测的问题根除。", ""]
+    return fixed
+
+
 def _strip_scoreboard_timestamp(text: str) -> str:
     """去掉 SCOREBOARD 里的"生成时间"行。
 
@@ -4115,7 +4240,7 @@ def cmd_doctor(args) -> int:
     """只读自检：依赖 / 规则注册表 / 缓存指纹 / 补丁器就位。exit 0 = 全部就绪。"""
     ok = True
 
-    print("== [1/7] 依赖就位 ==")
+    print("== [1/8] 依赖就位 ==")
     print(f"  [OK] python {sys.version.split()[0]}")
     for name in ["httpx", "tree_sitter(可选·缺省正则降级)", "pyyaml(可选)", "slither(可选)"]:
         try:
@@ -4127,7 +4252,7 @@ def cmd_doctor(args) -> int:
             if "(可选" not in name:
                 ok = False
 
-    print("== [2/7] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
+    print("== [2/8] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
     from core.agents import rule_detectors
     for cat in DOCTOR_RULE_CATEGORIES:
         try:
@@ -4141,7 +4266,7 @@ def cmd_doctor(args) -> int:
             print(f"  [FAIL] {cat}: 路由异常 {type(e).__name__}: {e}")
             ok = False
     print(f"  共 {len(DOCTOR_RULE_CATEGORIES)} 类，全部走 verdict() 路由")
-    print("== [3/7] 缓存指纹自检 ==")
+    print("== [3/8] 缓存指纹自检 ==")
     try:
         from benchmarks.diag_owasp_sqli_fp import _slicer_fingerprint
         fp1, fp2 = _slicer_fingerprint(), _slicer_fingerprint()
@@ -4154,7 +4279,7 @@ def cmd_doctor(args) -> int:
         print(f"  [FAIL] 指纹不可用: {type(e).__name__}: {e}")
         ok = False
 
-    print(f"== [4/7] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
+    print(f"== [4/8] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
     for fn_name in DOCTOR_PATCHERS:
         fn = globals().get(fn_name)
         if callable(fn):
@@ -4171,9 +4296,70 @@ def cmd_doctor(args) -> int:
     ok = _doctor_extended_checks(ok)
     ok = _doctor_wild_hunt_check(ok)
     ok = _doctor_disclosure_index_check(ok)
+    ok = _doctor_exporters_check(ok)
 
     print("doctor:", "PASS（全部就绪）" if ok else "FAIL（存在缺失项）")
     return 0 if ok else 1
+
+
+def _doctor_exporters_check(ok: bool) -> bool:
+    """doctor 第八段（M132）：双 SAST 导出器 + 跨仓聚类产物。
+
+    --sarif（GitHub）与 --gitlab-sast（GitLab）是两条独立交付路径，
+    任一条的 schema 校验器被改坏，用户那边是"报告上传失败"而不是"门禁变红"
+    —— CI 里看不出来。这里把两个校验器都跑一遍自产文档 + 一份坏文档。
+    """
+    print("== [8/8] 双 SAST 导出器与跨仓聚类（SARIF / GitLab / clusters）==")
+    root = Path(__file__).resolve().parent
+    try:
+        from core.context.sarif_validator import validate_sarif
+        _bad = validate_sarif({"version": "2.0.0", "runs": []})
+        if _bad:
+            print(f"  [OK] sarif_validator 就位（坏版本被拦 {len(_bad)} 条）")
+        else:
+            print("  [FAIL] sarif_validator 没拦住坏版本")
+            ok = False
+    except Exception as e:                                   # noqa: BLE001
+        print(f"  [FAIL] sarif_validator：{type(e).__name__}: {e}")
+        ok = False
+    try:
+        from core.context.gitlab_exporter import (
+            SAST_VERSION, build_sast_report, validate_sast_report)
+        _doc = build_sast_report([{"file": str(root / "cli.py"), "line": 1,
+                                   "category": "sqli", "severity": "CRITICAL",
+                                   "cwe": "CWE-89"}], root)
+        _errs = validate_sast_report(_doc)
+        _bad2 = validate_sast_report({"version": "14.0.0", "scan": {},
+                                      "vulnerabilities": []})
+        if not _errs and _bad2:
+            print(f"  [OK] gitlab_exporter 就位（{SAST_VERSION}；"
+                  f"自产零错误 / 坏文档被拦 {len(_bad2)} 条）")
+        else:
+            print(f"  [FAIL] gitlab_exporter：自产 {len(_errs)} 错 / "
+                  f"坏文档拦下 {len(_bad2)} 条")
+            ok = False
+    except Exception as e:                                   # noqa: BLE001
+        print(f"  [FAIL] gitlab_exporter：{type(e).__name__}: {e}")
+        ok = False
+    _cl = root / "benchmarks" / "results" / "cross_repo_clusters.json"
+    if _cl.exists():
+        try:
+            _d = json.loads(_cl.read_text(encoding="utf-8"))
+            _cons = (_d.get("conservation_ok")
+                     and sum(c["root_count"] for c in _d["clusters"])
+                     == _d.get("total_root_causes"))
+            print(f"  [{'OK' if _cons else 'FAIL'}] 跨仓聚类："
+                  f"{_d.get('total_root_causes')} 根因 → "
+                  f"{_d.get('cluster_count')} 簇（计数守恒）")
+            ok = ok and bool(_cons)
+        except Exception as e:                               # noqa: BLE001
+            print(f"  [FAIL] 跨仓聚类读取失败：{type(e).__name__}: {e}")
+            ok = False
+    else:
+        print("  [提示] 未生成 cross_repo_clusters.json（不判 FAIL）")
+    from core.agents.vuln_categories import CATEGORIES as _C
+    print(f"  [OK] 规则 {len(_C)} 类 / 补丁器 {len(DOCTOR_PATCHERS)} 类")
+    return ok
 
 
 def _doctor_disclosure_index_check(ok: bool) -> bool:
@@ -4183,7 +4369,7 @@ def _doctor_disclosure_index_check(ok: bool) -> bool:
     留下 21 份互不相干的草稿目录。"草稿总数 == 根因总数"是唯一能自动核对的
     不变量 —— 少一份说明有仓没跑到，多一份说明根因折叠漏了。
     """
-    print("== [7/7] 披露包完整性（advisories/INDEX.md ↔ wild_hunt.json）==")
+    print("== [7/8] 披露包完整性（advisories/INDEX.md ↔ wild_hunt.json）==")
     root = Path(__file__).resolve().parent
     adv_root = root / "benchmarks" / "results" / "advisories"
     agg = root / "benchmarks" / "results" / "wild_hunt.json"
@@ -4241,7 +4427,7 @@ def _doctor_extended_checks(ok: bool) -> bool:
     root = Path(__file__).resolve().parent
 
     # ---- 5.1 PoC 合成器：可导入 + 三语言模板自检通过 ----
-    print("== [5/7] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
+    print("== [5/8] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
     print("  -- PoC 合成器 --")
     try:
         from core.sandbox.poc_synthesizer import PocSynthesizer, PocArtifact
@@ -4410,7 +4596,7 @@ def _doctor_wild_hunt_check(ok: bool) -> bool:
     报告是给人和上游看的，json 是机器事实源；两者漂了 doctor 当场 FAIL。
     """
     root = Path(__file__).resolve().parent
-    print("== [6/7] 野战白皮书对账（wild_hunt.json ↔ WILD_HUNT_REPORT.md）==")
+    print("== [6/8] 野战白皮书对账（wild_hunt.json ↔ WILD_HUNT_REPORT.md）==")
     agg = root / "benchmarks" / "results" / "wild_hunt.json"
     report = root / "WILD_HUNT_REPORT.md"
     if not agg.exists() or not report.exists():

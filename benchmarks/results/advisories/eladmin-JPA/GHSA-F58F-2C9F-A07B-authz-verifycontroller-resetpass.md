@@ -1,20 +1,20 @@
-# CWE-327 · crypto in VerifyController.java 
+# CWE-285 · authz in VerifyController.java 
 
-**GHSA-250F-2AE8-249E** ｜ 规则层 P0 ｜ endpoint
-**CVSS v3.1：7.5 HIGH** ｜ `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N`
+**GHSA-F58F-2C9F-A07B** ｜ 规则层 P0 ｜ endpoint
+**CVSS v3.1：8.1 HIGH** ｜ `CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N`
 
 ## Affected Component
 
-- Repository: `C:\myFloders\git\nexus-audit\reference_repos\eladmin-mp-master`
-- File: `eladmin/eladmin-system/src/main/java/me/zhengjie/modules/system/rest/VerifyController.java:44`
-- Representative entry: `VerifyController.resetEmail`
+- Repository: `C:\myFloders\git\nexus-audit\reference_repos\eladmin`
+- File: `eladmin-system/src/main/java/me/zhengjie/modules/system/rest/VerifyController.java:52`
+- Representative entry: `VerifyController.resetPass`
 - Affected routes: **1**（同一独立根因）
 
-- `VerifyController.resetEmail`
+- `VerifyController.resetPass`
 
 ## Vulnerability Mechanism
 
-类目 `crypto`（CWE-327）。根因签名：`crypto:C:\myFloders\git\nexus-audit\reference_repos\eladmin-mp-master\eladmin\eladmin-system\src\main\java\me\zhengjie\modules\system\rest\VerifyController.java:44:VerifyController.resetEmail`。
+类目 `authz`（CWE-285）。根因签名：`authz:C:\myFloders\git\nexus-audit\reference_repos\eladmin\eladmin-system\src\main\java\me\zhengjie\modules\system\rest\VerifyController.java:52:VerifyController.resetPass`。
 
 - `global-config`：结论来自 `框架装配证据` 中的同一份全局配置，所有
   受影响路由共享该根因；修一处配置即消解整组告警。
@@ -25,17 +25,17 @@
 
 ```mermaid
 flowchart LR
-  N0["VerifyController.resetEmail /api/code/resetEmail"]
-  N1["EmailServiceImpl.java:65 (EmailServiceImpl.java)"]
+  N0["VerifyController.resetPass /api/code/email/resetPass"]
+  N1["EmailServiceImpl.java:66 (EmailServiceImpl.java)"]
   N2["EncryptUtils.java:58 (EncryptUtils.java)"]
   N3["ScpClientUtil.java:42 (ScpClientUtil.java)"]
-  N4["TokenProvider.java:147 (TokenProvider.java)"]
-  N5["LocalStorageServiceImpl.java:63 (LocalStorageServiceImpl.java)"]
-  N6["S3StorageServiceImpl.java:105 (S3StorageServiceImpl.java)"]
-  N7["FileUtil.java:108 (FileUtil.java)"]
-  N8["FileUtil.java:134 (FileUtil.java)"]
-  N9["FileUtil.java:108 (FileUtil.java)"]
-  N10["FileUtil.java:121 (FileUtil.java)"]
+  N4["TokenProvider.java:151 (TokenProvider.java)"]
+  N5["LocalStorageServiceImpl.java:74 (LocalStorageServiceImpl.java)"]
+  N6["OnlineUserService.java:53 (OnlineUserService.java)"]
+  N7["EncryptUtils.java:46 (EncryptUtils.java)"]
+  N8["TokenProvider.java:141 (TokenProvider.java)"]
+  N9["ApiError.java:35 (ApiError.java)"]
+  N10["StringUtils.java:175 (StringUtils.java)"]
   N11["跨文件证据：被调方法的接口声明（方法无方法体，实现由框架/子类提供） (VerifyController.java)"]
   N12["sendEmail() 的接口实现类方法体 (VerifyServiceImpl.java)"]
   N13["send() 的接口实现类方法体 (EmailServiceImpl.java)"]
@@ -52,14 +52,16 @@ flowchart LR
   N10 --> N11
   N11 --> N12
   N12 --> N13
+  SINK["Sink: EmailVo emailVo = verificationCodeService.sendEmail(email, C<br/>VerifyController.java:55"]
+  N0 --> SINK
 ```
 
 ## PoC Harness
 
 ```java
 // 自动生成的 PoC 骨架（M45 PoC 合成器）
-// 规则层判定：crypto = True
-// 目标位置：VerifyController.java:44
+// 规则层判定：authz = True
+// 目标位置：VerifyController.java:52
 package poc;
 
 import org.junit.jupiter.api.Test;
@@ -74,14 +76,14 @@ import static org.hamcrest.Matchers.not;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-public class Verifycontroller_resetemailPocTest {
+public class Verifycontroller_resetpassPocTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
     void otherAccountResourceDenied() throws Exception {
-        mockMvc.perform(get("/api/code/resetEmail").param("id", "9999")
+        mockMvc.perform(get("/api/code/email/resetPass").param("id", "9999")
                 .header("Authorization", "Bearer attacker-token"))
             .andExpect(status().is4xxClientError());
     }
@@ -98,17 +100,17 @@ public class Verifycontroller_resetemailPocTest {
 ## Quick Reproduction Command
 
 ```bash
-# 1) 离线复核本仓（本根因在输出里按 eladmin/eladmin-system/src/main/java/me/zhengjie/modules/system/rest/VerifyController.java:44 定位）
-python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\eladmin-mp-master --auto --offline
+# 1) 离线复核本仓（本根因在输出里按 eladmin-system/src/main/java/me/zhengjie/modules/system/rest/VerifyController.java:52 定位）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\eladmin --auto --offline
 
 # 2) 生成 PoC + 自检补丁 + 披露包
-python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\eladmin-mp-master --auto --offline --emit-poc poc/ --fix --advisory-dir adv/
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\eladmin --auto --offline --emit-poc poc/ --fix --advisory-dir adv/
 
-# 3) 只看本类目（24 类中的 crypto）
-python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\eladmin-mp-master --categories crypto --offline
+# 3) 只看本类目（24 类中的 authz）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\eladmin --categories authz --offline
 ```
 
 ## References
 
-- CWE: https://cwe.mitre.org/data/definitions/327.html
+- CWE: https://cwe.mitre.org/data/definitions/285.html
 - Generated by nexus-audit `scan --auto --advisory-dir`

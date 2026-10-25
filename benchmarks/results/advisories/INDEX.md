@@ -1,6 +1,6 @@
 # 披露草稿总目录（nexus-audit `--advisory-dir`）
 
-共 **84** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
+共 **96** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
 带 [Auto-Fix Verified] 的草稿内嵌通过自检的补丁 diff。
 
 | CVSS | 严重级 | CWE | 类目 | 草稿 |
@@ -23,6 +23,7 @@
 | 9.8 | CRITICAL | CWE-502 | deserial | [GHSA-B9DF-A8EC-384A-deserial-joblogcontroller-logdetailcat.md](GHSA-B9DF-A8EC-384A-deserial-joblogcontroller-logdetailcat.md) |
 | 9.8 | CRITICAL | CWE-798 | hardcoded_secret | [GHSA-BA26-8F7B-6331-hardcoded-secret-secret-file-jeecgbaseconfig-java.md](GHSA-BA26-8F7B-6331-hardcoded-secret-secret-file-jeecgbaseconfig-java.md) |
 | 9.8 | CRITICAL | CWE-89 | sqli | [GHSA-C13B-DD4D-336C-sqli-sysannouncementsendcontroller-readall.md](GHSA-C13B-DD4D-336C-sqli-sysannouncementsendcontroller-readall.md) |
+| 9.8 | CRITICAL | CWE-798 | hardcoded_secret | [GHSA-C280-5407-9D34-hardcoded-secret-secret-file-settings-py.md](GHSA-C280-5407-9D34-hardcoded-secret-secret-file-settings-py.md) |
 | 9.8 | CRITICAL | CWE-502 | deserial | [GHSA-C553-610A-41E8-deserial-reset-password.md](GHSA-C553-610A-41E8-deserial-reset-password.md) |
 | 9.8 | CRITICAL | CWE-78 | cmdi | [GHSA-CD24-7BAA-9F23-cmdi-joblogcontroller-logdetailcat.md](GHSA-CD24-7BAA-9F23-cmdi-joblogcontroller-logdetailcat.md) |
 | 9.8 | CRITICAL | CWE-78 | cmdi | [GHSA-DE52-4B9B-FDCC-cmdi-jobgroupcontroller-loadbyid.md](GHSA-DE52-4B9B-FDCC-cmdi-jobgroupcontroller-loadbyid.md) |
@@ -35,13 +36,20 @@
 | 8.6 | HIGH | CWE-918 | ssrf | [GHSA-8836-8873-DAEE-ssrf-resttemplatedemocontroller-getforobject.md](GHSA-8836-8873-DAEE-ssrf-resttemplatedemocontroller-getforobject.md) |
 | 8.6 | HIGH | CWE-918 | ssrf | [GHSA-BC5C-DA80-D8DB-ssrf-resttemplatedemocontroller-postforobject.md](GHSA-BC5C-DA80-D8DB-ssrf-resttemplatedemocontroller-postforobject.md) |
 | 8.6 | HIGH | CWE-918 | ssrf | [GHSA-DD83-8942-FFA6-ssrf-resttemplatedemocontroller-postforentity3.md](GHSA-DD83-8942-FFA6-ssrf-resttemplatedemocontroller-postforentity3.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-0C24-2D7A-B1F6-authz-genconfigcontroller-querygenconfig.md](GHSA-0C24-2D7A-B1F6-authz-genconfigcontroller-querygenconfig.md) |
 | 8.1 | HIGH | CWE-000 | unchecked_low_level_calls | [GHSA-0F31-56EF-6B33-unchecked-low-level-calls-processccipreceive.md](GHSA-0F31-56EF-6B33-unchecked-low-level-calls-processccipreceive.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-106C-F62B-0082-authz-delete.md](GHSA-106C-F62B-0082-authz-delete.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-14B7-5562-46E6-authz-alipaycontroller-topayaspc.md](GHSA-14B7-5562-46E6-authz-alipaycontroller-topayaspc.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-1B98-8B4B-5D04-authz-articleviewset-update.md](GHSA-1B98-8B4B-5D04-authz-articleviewset-update.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-1FE8-02A6-2289-authz-generatorcontroller-querytables.md](GHSA-1FE8-02A6-2289-authz-generatorcontroller-querytables.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-23DE-F1D9-724A-authz-generatorcontroller-querycolumns.md](GHSA-23DE-F1D9-724A-authz-generatorcontroller-querycolumns.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-2641-F620-C3D7-authz-user-pay.md](GHSA-2641-F620-C3D7-authz-user-pay.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-30B0-949A-0F04-authz-ordercontroller-paysuccess.md](GHSA-30B0-949A-0F04-authz-ordercontroller-paysuccess.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-3144-9418-F1B8-authz-generatorcontroller-querycolumns.md](GHSA-3144-9418-F1B8-authz-generatorcontroller-querycolumns.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-46A7-C6D9-4EA1-authz-user-view.md](GHSA-46A7-C6D9-4EA1-authz-user-view.md) |
+| 8.1 | HIGH | CWE-915 | mass_assignment | [GHSA-4BE6-AF7C-6427-mass-assignment-sysuseronlinecontroller-list.md](GHSA-4BE6-AF7C-6427-mass-assignment-sysuseronlinecontroller-list.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-50DD-1AF9-BA39-authz-verifycontroller-resetpass.md](GHSA-50DD-1AF9-BA39-authz-verifycontroller-resetpass.md) |
+| 8.1 | HIGH | CWE-915 | mass_assignment | [GHSA-540F-E470-0C97-mass-assignment-logincontroller-login.md](GHSA-540F-E470-0C97-mass-assignment-logincontroller-login.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-56DC-2FFD-B5EB-authz-filecontroller-uploadtinymceeditorimages.md](GHSA-56DC-2FFD-B5EB-authz-filecontroller-uploadtinymceeditorimages.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-58AE-1B4E-8B65-authz-generatorcontroller-querytables.md](GHSA-58AE-1B4E-8B65-authz-generatorcontroller-querytables.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-5E16-6BFD-9C29-authz-verifycontroller-resetemail.md](GHSA-5E16-6BFD-9C29-authz-verifycontroller-resetemail.md) |
@@ -50,13 +58,17 @@
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-8E9B-6AC8-BEFC-authz-alipaycontroller-topayaspc.md](GHSA-8E9B-6AC8-BEFC-authz-alipaycontroller-topayaspc.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-9E0F-D289-C9A7-authz-admin-update-user.md](GHSA-9E0F-D289-C9A7-authz-admin-update-user.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-9FFE-6E89-7A89-authz-genconfigcontroller-querygenconfig.md](GHSA-9FFE-6E89-7A89-authz-genconfigcontroller-querygenconfig.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-BB2C-25AA-5603-authz-alipaycontroller-topayasweb.md](GHSA-BB2C-25AA-5603-authz-alipaycontroller-topayasweb.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-BEB7-E3E9-1E06-authz-generatorcontroller-generatorcode.md](GHSA-BEB7-E3E9-1E06-authz-generatorcontroller-generatorcode.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-BF26-0A97-06D8-authz-alipaycontroller-topayasweb.md](GHSA-BF26-0A97-06D8-authz-alipaycontroller-topayasweb.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-C01B-8029-B6DB-authz-verifycontroller-resetemail.md](GHSA-C01B-8029-B6DB-authz-verifycontroller-resetemail.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-CC22-7E50-D331-authz-generatorcontroller-generatorcode.md](GHSA-CC22-7E50-D331-authz-generatorcontroller-generatorcode.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-CE47-59B1-DACE-authz-deliverycontroller-checkdelivery.md](GHSA-CE47-59B1-DACE-authz-deliverycontroller-checkdelivery.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-DE65-89DA-6BB1-authz-admin-get-user.md](GHSA-DE65-89DA-6BB1-authz-admin-get-user.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-E6E8-A481-852F-authz-verifycontroller-validated.md](GHSA-E6E8-A481-852F-authz-verifycontroller-validated.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-EC28-62F4-FAA2-authz-verifycontroller-validated.md](GHSA-EC28-62F4-FAA2-authz-verifycontroller-validated.md) |
-| 7.5 | HIGH | CWE-327 | crypto | [GHSA-250F-2AE8-249E-crypto-verifycontroller-resetemail.md](GHSA-250F-2AE8-249E-crypto-verifycontroller-resetemail.md) |
-| 7.5 | HIGH | CWE-327 | crypto | [GHSA-E637-C435-DBF1-crypto-verifycontroller-resetpass.md](GHSA-E637-C435-DBF1-crypto-verifycontroller-resetpass.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-F58F-2C9F-A07B-authz-verifycontroller-resetpass.md](GHSA-F58F-2C9F-A07B-authz-verifycontroller-resetpass.md) |
+| 6.5 | MEDIUM | CWE-942 | cors | [GHSA-0C17-B7D9-3D49-cors-alipaycontroller-topayaspc.md](GHSA-0C17-B7D9-3D49-cors-alipaycontroller-topayaspc.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-5843-F579-35BD-cors-wxaddresscontroller-list.md](GHSA-5843-F579-35BD-cors-wxaddresscontroller-list.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-58FC-7768-A775-cors-sysconfigcontroller-page.md](GHSA-58FC-7768-A775-cors-sysconfigcontroller-page.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-A12D-66C6-19B8-cors-seckillordercallbackcontroller-submit.md](GHSA-A12D-66C6-19B8-cors-seckillordercallbackcontroller-submit.md) |

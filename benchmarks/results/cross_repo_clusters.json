@@ -1,9 +1,75 @@
 {
-  "total_root_causes": 84,
-  "cluster_count": 51,
-  "cross_repo_clusters": 2,
+  "total_root_causes": 96,
+  "cluster_count": 53,
+  "cross_repo_clusters": 8,
   "conservation_ok": true,
   "clusters": [
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "AliPayController.java",
+      "repo_count": 2,
+      "root_count": 4,
+      "repos": [
+        "eladmin-JPA",
+        "eladmin-mp"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "GenConfigController.java",
+      "repo_count": 2,
+      "root_count": 2,
+      "repos": [
+        "eladmin-JPA",
+        "eladmin-mp"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "GeneratorController.java",
+      "repo_count": 2,
+      "root_count": 6,
+      "repos": [
+        "eladmin-JPA",
+        "eladmin-mp"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "VerifyController.java",
+      "repo_count": 2,
+      "root_count": 6,
+      "repos": [
+        "eladmin-JPA",
+        "eladmin-mp"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "views.py",
+      "repo_count": 2,
+      "root_count": 6,
+      "repos": [
+        "DjanGoat",
+        "django-realworld"
+      ]
+    },
+    {
+      "category": "hardcoded_secret",
+      "root_kind": "file-level",
+      "component": "DjangoSettings",
+      "repo_count": 2,
+      "root_count": 2,
+      "repos": [
+        "DjanGoat",
+        "django-realworld"
+      ]
+    },
     {
       "category": "hash",
       "root_kind": "endpoint",
@@ -29,16 +95,6 @@
     {
       "category": "authz",
       "root_kind": "endpoint",
-      "component": "AliPayController.java",
-      "repo_count": 1,
-      "root_count": 2,
-      "repos": [
-        "eladmin-mp"
-      ]
-    },
-    {
-      "category": "authz",
-      "root_kind": "endpoint",
       "component": "DeliveryController.java",
       "repo_count": 1,
       "root_count": 1,
@@ -59,26 +115,6 @@
     {
       "category": "authz",
       "root_kind": "endpoint",
-      "component": "GenConfigController.java",
-      "repo_count": 1,
-      "root_count": 1,
-      "repos": [
-        "eladmin-mp"
-      ]
-    },
-    {
-      "category": "authz",
-      "root_kind": "endpoint",
-      "component": "GeneratorController.java",
-      "repo_count": 1,
-      "root_count": 3,
-      "repos": [
-        "eladmin-mp"
-      ]
-    },
-    {
-      "category": "authz",
-      "root_kind": "endpoint",
       "component": "OrderController.java",
       "repo_count": 1,
       "root_count": 1,
@@ -89,31 +125,11 @@
     {
       "category": "authz",
       "root_kind": "endpoint",
-      "component": "VerifyController.java",
-      "repo_count": 1,
-      "root_count": 3,
-      "repos": [
-        "eladmin-mp"
-      ]
-    },
-    {
-      "category": "authz",
-      "root_kind": "endpoint",
       "component": "app.py",
       "repo_count": 1,
       "root_count": 1,
       "repos": [
         "Employee-Management-System"
-      ]
-    },
-    {
-      "category": "authz",
-      "root_kind": "endpoint",
-      "component": "views.py",
-      "repo_count": 1,
-      "root_count": 5,
-      "repos": [
-        "DjanGoat"
       ]
     },
     {
@@ -199,6 +215,16 @@
     {
       "category": "cors",
       "root_kind": "global-config",
+      "component": "cors:e04fde35992e",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "eladmin-JPA"
+      ]
+    },
+    {
+      "category": "cors",
+      "root_kind": "global-config",
       "component": "cors:e7929f19ee81",
       "repo_count": 1,
       "root_count": 1,
@@ -214,16 +240,6 @@
       "root_count": 1,
       "repos": [
         "mall4j"
-      ]
-    },
-    {
-      "category": "crypto",
-      "root_kind": "endpoint",
-      "component": "VerifyController.java",
-      "repo_count": 1,
-      "root_count": 2,
-      "repos": [
-        "eladmin-mp"
       ]
     },
     {
@@ -260,16 +276,6 @@
       "category": "deserial",
       "root_kind": "endpoint",
       "component": "views.py",
-      "repo_count": 1,
-      "root_count": 1,
-      "repos": [
-        "DjanGoat"
-      ]
-    },
-    {
-      "category": "hardcoded_secret",
-      "root_kind": "file-level",
-      "component": "DjangoSettings",
       "repo_count": 1,
       "root_count": 1,
       "repos": [
@@ -340,6 +346,26 @@
       "category": "hash",
       "root_kind": "endpoint",
       "component": "SystemApiController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "mass_assignment",
+      "root_kind": "endpoint",
+      "component": "LoginController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "mass_assignment",
+      "root_kind": "endpoint",
+      "component": "SysUserOnlineController.java",
       "repo_count": 1,
       "root_count": 1,
       "repos": [

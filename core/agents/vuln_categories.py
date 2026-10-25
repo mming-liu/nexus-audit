@@ -322,7 +322,45 @@ CATEGORIES: dict[str, VulnCategory] = {
             "③ 只靠黑名单过滤模板语法关键字（`$`、`#`、`{`）不构成防护。"),
     ),
 
-    # ---------------- M105：第 25 类 —— HTTP 响应头注入（CRLF） ----------------
+    # ---------------- M123：第 26 类 —— 批量赋值（CWE-915） ----------------
+    "mass_assignment": VulnCategory(
+        key="mass_assignment", display="批量赋值 / 权限字段越权绑定",
+        cwe="CWE-915", owasp=False,
+        sink_question=(
+            "函数是否把**整个**请求体（dict / JSON / Map）一次性灌进模型或实体？"
+            "包括：① Python `User(**request.json)` / `Model(**request.form)` /"
+            " `obj.__dict__.update(request.json)` / `setattr` 循环；"
+            "② Java `BeanUtils.copyProperties(reqMap, entity)` /"
+            " `BeanUtils.copyProperties(dto, entity)`。"
+            "只算「整包灌入」的形态；逐字段 `name=form['name']` 不算。"),
+        property=(
+            "灌入的目标模型是否含**权限字段**（`is_admin` / `is_superuser` /"
+            " `role` / `permissions` / `is_staff` / `balance` / `owner_id`），"
+            "且这次调用是否**没有**字段白名单或 `ignoreProperties` 排除？"
+            "注意：① 没有权限字段的模型（如纯 Article）本属性为 Yes；"
+            "② `Model(**{k: v for k, v in data.items() if k in ALLOWED})`"
+            " 这类显式白名单为 Yes；③ 只更新普通业务字段的 DTO 也为 Yes。"),
+    ),
+
+    # ---------------- M124：第 27 类 —— 链上伪随机（SWC-120） ----------------
+    "bad_randomness": VulnCategory(
+        key="bad_randomness", display="链上伪随机数（可预测/可操纵）",
+        cwe="CWE-330", owasp=False,
+        sink_question=(
+            "函数是否用**链上可观测/可操纵**的值决定资金归属或稀缺资源分配？"
+            "包括：① `keccak256(abi.encodePacked(block.timestamp, …))`；"
+            "② `block.blockhash(…)` / `blockhash(…)`；③ `block.difficulty` /"
+            " `block.prevrandao` / `block.number` / `now` 参与取模 `%` 或比较后"
+            "决定赢家；④ 上述结果直接驱动 `transfer` / `send` /"
+            " `call{value:}` 或 NFT 铸造。"),
+        property=(
+            "随机源是否换成了**链下不可预测**的方案（Chainlink VRF 的"
+            " `fulfillRandomWords` / `requestRandomWords`，或提交-揭示"
+            " commit-reveal），或该 `block.timestamp` 只用于**冷却期/截止时间**"
+            "比较（`require(block.timestamp >= unlockTime)`）而没有参与结果判定？"
+            "注意：只做时间窗口校验、抽奖结果另用 VRF 的，本属性为 Yes。"),
+    ),
+
     # OWASP Benchmark 无此类样本 → owasp=False。真值来自 Hello-Java-Sec 的
     # CSVInjection.exportVul / Traversal.download / SSRF 的图片下载（都把
     # 形参直接拼进 Content-Disposition）。

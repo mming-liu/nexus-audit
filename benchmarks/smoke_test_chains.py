@@ -4377,7 +4377,7 @@ check("M42：doctor exit 0（依赖/规则表/指纹/补丁器全就绪）",
       _sp86.returncode, 0)
 check("M42：doctor 输出含七段自检 + PASS 尾标（M85 升段 / M117 扩到七段）",
       all(s in _sp86.stdout for s in
-          ("[1/7]", "[2/7]", "[3/7]", "[4/7]", "[5/7]", "[6/7]", "[7/7]", "PASS")), True)
+          ("[1/8]", "[2/8]", "[3/8]", "[4/8]", "[5/8]", "[6/8]", "[7/8]", "[8/8]", "PASS")), True)
 check(f"M42：doctor 规则注册表 {len(_CATS)} 类全 OK（从 CATEGORIES 派生，免手工改数）",
       _sp86.stdout.count("  [OK]") >= len(_CATS)
       and f"共 {len(_CATS)} 类" in _sp86.stdout, True)
@@ -4726,9 +4726,9 @@ _sp93 = subprocess.run(
     [sys.executable, str(ROOT / "cli.py"), "doctor"],
     capture_output=True, text=True)
 _out93 = _sp93.stdout
-check("M93：doctor 退出码 0 且七段标题齐全",
+check("M93：doctor 退出码 0 且八段标题齐全",
       (_sp93.returncode == 0
-       and all(f"[{i}/7]" in _out93 for i in range(1, 8))), True)
+       and all(f"[{i}/8]" in _out93 for i in range(1, 9))), True)
 from cli import DOCTOR_PATCHERS as _DP93                            # noqa: E402
 check("M93：doctor 补丁器清单从 DOCTOR_PATCHERS 派生且全绿",
       (_out93.count("[OK] _fix_") == len(_DP93)
@@ -5427,8 +5427,8 @@ finally:
 
 # ---- [106] Module 67：hardcoded_secret 第 22 类规则 ----
 from core.agents.vuln_categories import CATEGORIES as _VC106   # noqa: E402
-check("M106：hardcoded_secret 已注册（类目总数单一事实源，M105 加 header_injection 后 25）",
-      ("hardcoded_secret" in _VC106 and len(_VC106) == 25), True)
+check("M106：hardcoded_secret 已注册（类目总数单一事实源，M124 后 27）",
+      ("hardcoded_secret" in _VC106 and len(_VC106) == 27), True)
 # VAmPI 形态：Flask SECRET_KEY 短弱密钥（JWT 签名上下文，无长度门槛）
 _vampi106 = ("import jwt\n"
              "vuln_app.app.config['SECRET_KEY'] = 'random'\n"
@@ -6076,7 +6076,7 @@ finally:
 _r122 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                        capture_output=True, text=True, encoding="utf-8")
 check("M122：doctor 第六段存在且整体 exit 0",
-      (_r122.returncode == 0 and "[6/7]" in (_r122.stdout or "")), True)
+      (_r122.returncode == 0 and "[6/8]" in (_r122.stdout or "")), True)
 check("M122：wild_hunt.json ↔ WILD_HUNT_REPORT 四处核心数字一致",
       ("仓库数 / 入口总数 / 独立根因数 / 零误报 四处一致"
        in (_r122.stdout or "")), True)
@@ -6234,7 +6234,7 @@ if _dg124.exists():
     check("M124：DjanGoat 切片 ≥30 入口（装饰器通道只有 13）",
           len(_units124) >= 30, True)
     check("M124：urls.py 解析器解析出 ≥20 条路由（M88 通道生效）",
-          len(_djroutes124) >= 20, True)
+          len(_djroutes124) >= 25, True)
     check("M124：点号链经 __init__ 再导出落到真实模块",
           any(p.endswith("app/views/users/views.py")
               for p in (_djpaths124 | _paths124)), True)
@@ -6285,8 +6285,8 @@ def _java125(body: str, cls: str = "public class C {\n") -> str:
     return cls + body + "\n}\n"
 
 
-check("M125：ssti 已注册为第 24 类（doctor 自动升段；M105 后总数 25）",
-      (len(_CATS125), "ssti" in _CATS125), (25, True))
+check("M125：ssti 已注册为第 24 类（doctor 自动升段；M124 后总数 27）",
+      (len(_CATS125), "ssti" in _CATS125), (27, True))
 check("M125：ssti 是 CWE-1336 且不属 OWASP 11 类",
       (_CATS125["ssti"].cwe, _CATS125["ssti"].owasp), ("CWE-1336", False))
 
@@ -6504,8 +6504,8 @@ finally:
 # ⑥ doctor：补丁器升段（M90 到 18 类，M106 到 20 类）
 _r126d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                         capture_output=True, text=True, encoding="utf-8")
-check("M126：doctor 补丁器升到 20 类（含 _fix_python_redirect 与 M106 两个 Java 补丁）",
-      ("（20 类）" in (_r126d.stdout or "")
+check("M126：doctor 补丁器升到 22 类（含 _fix_python_redirect 与 M106/M125 四个 Java 补丁）",
+      ("（22 类）" in (_r126d.stdout or "")
        and "_fix_python_redirect" in (_r126d.stdout or "")
        and "_fix_java_ssti_viewname" in (_r126d.stdout or "")
        and "_fix_java_header_injection" in (_r126d.stdout or "")), True)
@@ -6825,8 +6825,8 @@ check("M130：新增模块落在指纹目录内（M88 slicer / M92 context）",
 from core.agents.vuln_categories import CATEGORIES as _C130        # noqa: E402
 import cli as _cli130                                             # noqa: E402
 from benchmarks.run_all import JOBS as _JOBS130                   # noqa: E402
-check("M130：规则 25 类 / 补丁器 20 类（doctor 单一事实源）",
-      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (25, 20))
+check("M130：规则 27 类 / 补丁器 22 类（doctor 单一事实源）",
+      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (27, 22))
 check("M130：run_all 作业表 41 项且含 comet / DjanGoat / 覆盖地板",
       (len(_JOBS130),
        any("comet" in str(j[0]) for j in _JOBS130),
@@ -6859,9 +6859,9 @@ for _cmd130 in ("hunt", "benchmark-gen"):
 _r130d = _sp130.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                     capture_output=True, text=True, encoding="utf-8")
 _out130 = _r130d.stdout or ""
-check("M130：doctor exit 0 且 25 类 / 20 类 / 七段齐全",
-      (_r130d.returncode, "共 25 类" in _out130, "（20 类）" in _out130,
-       "[7/7]" in _out130), (0, True, True, True))
+check("M130：doctor exit 0 且 27 类 / 22 类 / 八段齐全",
+      (_r130d.returncode, "共 27 类" in _out130, "（22 类）" in _out130,
+       "[8/8]" in _out130), (0, True, True, True))
 check("M130：doctor 覆盖 M87–M93 的四项新自检",
       ("SARIF 2.1.0 合规校验" in _out130
        and "PoC 合成器" in _out130
@@ -7078,17 +7078,17 @@ _r138 = subprocess.run(
     capture_output=True, text=True, encoding="utf-8")
 _m138 = json.loads((ROOT / ".tmp" / "matrix_smoke.json")
                    .read_text(encoding="utf-8"))
-check("M138：matrix 退出码 0 且 25 类 × 三语言全覆盖渲染",
+check("M138：matrix 退出码 0 且 27 类 × 三语言全覆盖渲染",
       (_r138.returncode, len(_m138["categories"]), _m138["languages"]),
-      (0, 25, ["java", "python", "solidity"]))
+      (0, 27, ["java", "python", "solidity"]))
 check("M138：输出含四维表头（--fix / --emit-poc / CVSS）",
       ("--fix" in (_r138.stdout or "")
        and "--emit-poc" in (_r138.stdout or "")
        and "CVSS" in (_r138.stdout or "")), True)
-check("M139：覆盖缺口有界且不增长（当前 36 处；M105 加 header_injection +2）",
-      _m138["gap_count"] <= 36, True)
-check("M139：补丁器映射与 doctor 单一事实源一致（20 个补丁器 / 12 类目）",
-      (_m138["patchers"], len(_m138["fix_map"])), (20, 12))
+check("M139：覆盖缺口有界且不增长（当前 41 处；M123/M124 各 +2、M105 +2）",
+      _m138["gap_count"] <= 41, True)
+check("M139：补丁器映射与 doctor 单一事实源一致（22 个补丁器 / 12 类目）",
+      (_m138["patchers"], len(_m138["fix_map"])), (22, 12))
 
 # ---- [140] Module 101：17 仓野战与 33 项门禁不变性总锚定 ----
 # 这一条是 M87–M102 的**总锚**：四组数字必须自洽 —— 门禁数、野战场数、
@@ -7104,9 +7104,9 @@ import cli as _cli140                                             # noqa: E402
 check("M140：门禁 41 项（冒烟+争议+地板+38 个靶场/校验项）",
       len(_JOBS140), 41)
 check("M140：野战场 25 个真实仓库", len(_REPOS140), 25)
-check("M140：规则 25 类 / 补丁器 20 类", (len(_C140),
+check("M140：规则 27 类 / 补丁器 22 类", (len(_C140),
                                           len(_cli140.DOCTOR_PATCHERS)),
-      (25, 20))
+      (27, 22))
 
 # 17 个野战场必须全部有对应 benchmark 脚本与 --strict 门禁
 _missing140 = [r[0] for r in _REPOS140
@@ -7238,8 +7238,8 @@ from core.agents.rule_detectors import (                            # noqa: E402
 )
 from core.agents.vuln_categories import CATEGORIES as _C143         # noqa: E402
 
-check("M143：header_injection 已注册为第 25 类（CWE-113）",
-      (len(_C143), _C143["header_injection"].cwe), (25, "CWE-113"))
+check("M143：header_injection 已注册（CWE-113；M124 后总数 27）",
+      (len(_C143), _C143["header_injection"].cwe), (27, "CWE-113"))
 check("M143：setHeader(常量, 请求读取) → True",
       _hd143('public void f(HttpServletRequest req, HttpServletResponse resp) {\n'
              '  resp.setHeader("X-Test", req.getParameter("t"));\n}\n'), True)
@@ -7283,8 +7283,8 @@ import shutil as _sh144                                              # noqa: E40
 import cli as _cli144                                                # noqa: E402
 from core.slicer.java_servlet import JavaSlicer as _JS144            # noqa: E402
 
-check("M144：补丁器登记表 20 类（doctor 单一事实源）",
-      len(_cli144.DOCTOR_PATCHERS), 20)
+check("M144：补丁器登记表 22 类（doctor 单一事实源）",
+      len(_cli144.DOCTOR_PATCHERS), 22)
 check("M144：第 19/20 类补丁器都进登记表且可调用",
       ("_fix_java_ssti_viewname" in _cli144.DOCTOR_PATCHERS
        and "_fix_java_header_injection" in _cli144.DOCTOR_PATCHERS
@@ -7437,9 +7437,9 @@ if (ROOT / "reference_repos" / "sushiswap-zapper").exists():
                   for v in _d147["ownership_verdicts"].values()), True)
         _wh147 = ROOT / "benchmarks" / "results" / "wild_hunt.json"
         if _wh147.exists():
-            check("M147：野战场达到 20 个真实仓库",
+            check("M147：野战场达到 25 个真实仓库",
                   len(json.loads(_wh147.read_text(encoding="utf-8"))
-                      .get("repos", [])) >= 20, True)
+                      .get("repos", [])) >= 25, True)
 else:
     print("  -- sushiswap-zapper 不在 reference_repos，跳过 [147]")
 
@@ -7652,11 +7652,11 @@ if _adv154.exists():
     _drafts154 = sorted(_adv154.rglob("GHSA-*.md"))
     _idx154 = _adv154 / "INDEX.md"
     _it154 = _idx154.read_text(encoding="utf-8") if _idx154.exists() else ""
-    check("M154：草稿目录数与野战场数一致（21）",
-          len([p for p in _adv154.iterdir() if p.is_dir()]), 21)
-    check("M154：总目录零断链（84 份全被索引）",
+    check("M154：草稿目录数与野战场数一致（25）",
+          len([p for p in _adv154.iterdir() if p.is_dir()]), 25)
+    check("M154：总目录零断链（96 份全被索引）",
           (len(_drafts154), all(f"]({p.name})" in _it154
-                                for p in _drafts154)), (84, True))
+                                for p in _drafts154)), (96, True))
     check("M154：每份草稿都有 CVSS 向量与受影响组件小节",
           all("CVSS:3.1/" in p.read_text(encoding="utf-8")
               and "## Affected Component" in p.read_text(encoding="utf-8")
@@ -7673,15 +7673,15 @@ print("\n[155] doctor 第七段披露包完整性（M117）")
 _r155 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                        capture_output=True, text=True, encoding="utf-8")
 _o155 = _r155.stdout or ""
-check("M155：doctor 七段齐全且 exit 0",
-      (_r155.returncode, all(f"[{i}/7]" in _o155 for i in range(1, 8))),
+check("M155：doctor 八段齐全且 exit 0",
+      (_r155.returncode, all(f"[{i}/8]" in _o155 for i in range(1, 9))),
       (0, True))
 check("M155：第七段核对草稿数 == 根因总数",
-      "[7/7] 披露包完整性" in _o155 and "草稿数 == 根因总数" in _o155, True)
+      "[7/8] 披露包完整性" in _o155 and "草稿数 == 根因总数" in _o155, True)
 check("M155：第七段核对 INDEX 零断链与 CVSS 降序",
       ("INDEX.md 覆盖全部" in _o155 and "按 CVSS 降序" in _o155), True)
-check("M155：25 类规则 / 20 类补丁器都在 doctor 输出里",
-      ("共 25 类" in _o155 and "（20 类）" in _o155), True)
+check("M155：27 类规则 / 22 类补丁器都在 doctor 输出里",
+      ("共 27 类" in _o155 and "（22 类）" in _o155), True)
 
 # ---- [156] Module 119：Uniswap V2 整数型状态互斥锁（1 → 0 → 1）----
 print("\n[156] Uniswap V2 整数互斥锁反向锚点（M119）")
@@ -7885,6 +7885,298 @@ check("M164：cli 暴露 --gitlab-sast 开关",
       "--gitlab-sast" in subprocess.run(
           [sys.executable, str(ROOT / "cli.py"), "scan", "--help"],
           capture_output=True, text=True, encoding="utf-8").stdout, True)
+
+# ---- [160] Module 123：第 26 类 mass_assignment（CWE-915）----
+print("\n[160] 第 26 类 mass_assignment 批量赋值（M123）")
+
+from core.agents.rule_detectors import (                            # noqa: E402
+    mass_assignment_verdict as _ma160,
+)
+from core.agents.vuln_categories import CATEGORIES as _C160         # noqa: E402
+
+check("M160：mass_assignment 已注册（CWE-915；M124 后总数 27）",
+      (len(_C160), _C160["mass_assignment"].cwe), (27, "CWE-915"))
+_PY160 = ("def f(request):\n"
+          "    user = User(**request.json)\n"
+          "    db.session.add(user)\n")
+check("M160：Python `User(**request.json)` → True", _ma160(_PY160), True)
+check("M160：`User(**{k:v for k,v in … if k in ALLOWED})` 白名单 → False",
+      _ma160(_PY160.replace(
+          "User(**request.json)",
+          "User(**{k: v for k, v in request.json.items() if k in ALLOWED})")),
+      False)
+check("M160：逐字段 `User(name=request.form['name'])` → 不归本类目",
+      _ma160("def f(request):\n    return User(name=request.form['name'])\n"),
+      None)
+_JAVA160 = ("@PostMapping(\"/u\")\n"
+            "public R f(@RequestBody Map<String,Object> m) {\n"
+            "  UserEntity u = new UserEntity();\n"
+            "  BeanUtils.copyProperties(m, u);\n"
+            "  return R.ok();\n}\n")
+check("M160：Java `BeanUtils.copyProperties(map, userEntity)` → True",
+      _ma160(_JAVA160), True)
+check("M160：三参重载（排除列表）→ False",
+      _ma160(_JAVA160.replace("copyProperties(m, u)",
+                              'copyProperties(m, u, "isAdmin", "role")')),
+      False)
+check("M160：目标不是权限实体（纯 DTO）→ 缺证据退 None",
+      _ma160(_JAVA160.replace("UserEntity u", "ReportDto u")
+             .replace("@RequestBody Map<String,Object> m",
+                      "@RequestBody ReportDto m")), None)
+
+# ---- [161] Module 124：第 27 类 bad_randomness（SWC-120）----
+print("\n[161] 第 27 类 bad_randomness 链上伪随机（M124）")
+
+from core.agents.rule_detectors import (                            # noqa: E402
+    bad_randomness_verdict as _br161,
+)
+
+_SOL161 = ("pragma solidity ^0.8.0;\ncontract C {\n"
+           "  function win() external {\n"
+           "    if (uint(keccak256(abi.encodePacked("
+           "block.timestamp, msg.sender))) % 10 == 0) {\n"
+           "      payable(msg.sender).transfer(address(this).balance);\n"
+           "    }\n  }\n}\n")
+check("M161：keccak256(block.timestamp…) % N 决定转账 → True",
+      _br161(_SOL161), True)
+check("M161：block.timestamp 只做冷却期比较 → False",
+      _br161("pragma solidity ^0.8.0;\ncontract C {\n"
+             "  function claim() external {\n"
+             "    require(block.timestamp >= unlockTime, \"early\");\n"
+             "    msg.sender.transfer(1);\n  }\n}\n"), False)
+check("M161：Chainlink VRF fulfillRandomWords → False",
+      _br161("pragma solidity ^0.8.0;\ncontract C {\n"
+             "  function fulfillRandomWords(uint256 id, uint256[] memory r)"
+             " internal override {\n"
+             "    winner = r[0] % players.length;\n"
+             "    payable(players[winner]).transfer(address(this).balance);\n"
+             "  }\n}\n"), False)
+check("M161：完全没用到区块变量 → None（不归本类目）",
+      _br161("pragma solidity ^0.8.0;\ncontract C {\n"
+             "  function f(uint x) external { y = x; }\n}\n"), None)
+
+# ---- [162] Module 125：第 21/22 类补丁器 E2E ----
+print("\n[162] 第 21/22 类补丁器（批量赋值忽略列表 / 弱随机源）（M125）")
+
+import tempfile as _tf162                                            # noqa: E402
+import shutil as _sh162                                              # noqa: E402
+import cli as _cli162                                                # noqa: E402
+from core.slicer.java_servlet import JavaSlicer as _JS162            # noqa: E402
+
+check("M162：补丁器登记表 22 类（doctor 单一事实源）",
+      len(_cli162.DOCTOR_PATCHERS), 22)
+check("M162：第 21/22 类补丁器都进登记表",
+      ("_fix_java_mass_assignment" in _cli162.DOCTOR_PATCHERS
+       and "_fix_java_weakrand" in _cli162.DOCTOR_PATCHERS), True)
+
+_w162 = Path(_tf162.mkdtemp(prefix="nexus_m162_"))
+try:
+    _r162 = _w162 / "repo"
+    (_r162 / "src").mkdir(parents=True)
+    (_r162 / "src" / "Mass.java").write_text(
+        "package x;\n"
+        "import org.springframework.web.bind.annotation.*;\n"
+        "import org.springframework.beans.BeanUtils;\n"
+        "import java.util.Map;\n"
+        "@RestController\n"
+        "public class Mass {\n"
+        "  @PostMapping(\"/u\")\n"
+        "  public Object f(@RequestBody Map<String,Object> m) {\n"
+        "    UserEntity u = new UserEntity();\n"
+        "    BeanUtils.copyProperties(m, u);\n"
+        "    return u;\n"
+        "  }\n"
+        "}\n", encoding="utf-8")
+    (_r162 / "src" / "Rand.java").write_text(
+        "package x;\n"
+        "import java.util.Random;\n"
+        "import org.springframework.web.bind.annotation.*;\n"
+        "@RestController\n"
+        "public class Rand {\n"
+        "  @GetMapping(\"/t\")\n"
+        "  public String token() {\n"
+        "    Random r = new Random();\n"
+        "    return String.valueOf(r.nextInt(1000000));\n"
+        "  }\n"
+        "}\n", encoding="utf-8")
+    _us162 = list(_JS162(_r162).extract_entry_units())
+    _rep162: list[str] = []
+    _n162a = _cli162._fix_java_mass_assignment(_r162, _us162, _rep162)
+    _n162b = _cli162._fix_java_weakrand(_r162, _us162, _rep162)
+    _t162 = "\n".join(_rep162)
+    check("M162：第 21 类补丁生效并自检通过（忽略列表 → False）", _n162a, 1)
+    check("M162：第 22 类补丁生效并自检通过（SecureRandom → False）",
+          _n162b, 1)
+    check("M162：diff 里能逐字看到修复动作",
+          ('"isAdmin"' in _t162 and "SecureRandom" in _t162), True)
+    check("M162：自检后源码字节级还原（不把仓库改脏）",
+          ("BeanUtils.copyProperties(m, u);" in
+           (_r162 / "src" / "Mass.java").read_text(encoding="utf-8")
+           and "new Random()" in
+           (_r162 / "src" / "Rand.java").read_text(encoding="utf-8")), True)
+finally:
+    _sh162.rmtree(_w162, ignore_errors=True)
+
+# ---- [165]-[168] Module 128-131：四组对抗边界（正反各一）----
+print("\n[165]-[168] 四组对抗边界（M128-M131）")
+
+from core.agents.rule_detectors import (                            # noqa: E402
+    _sol_mutex_modifier_names as _mm165,
+    _drf_authz_verdict as _drf166,
+    bad_randomness_verdict as _br167,
+    mass_assignment_verdict as _ma168,
+    verdict as _v165,
+)
+
+_M165 = ('modifier lock() { require(unlocked == 1, "L");\n'
+         "  unlocked = 0; _; unlocked = 1; }\n")
+check("M165：整数锁三段式齐全 → 认出；漏恢复/漏前检 → 都不算锁",
+      (_mm165(_M165), _mm165(_M165.replace("_; unlocked = 1;", "_;")),
+       _mm165(_M165.replace('require(unlocked == 1, "L");', ""))),
+      ({"lock"}, set(), set()))
+check("M165：Uniswap V2 swap 带锁判 False（整数态，不是 bool）",
+      _v165("reentrancy", ("pragma solidity ^0.8.0;\ncontract C {\n"
+                           "  uint private unlocked = 1;\n"
+                           "  modifier lock() { require(unlocked == 1, 'L');\n"
+                           "    unlocked = 0; _; unlocked = 1; }\n"
+                           "  function swap() external lock {\n"
+                           "    (bool ok,) = msg.sender.call{value: 1}(\"\");\n"
+                           "    require(ok, \"x\");\n"
+                           "    balances[msg.sender] = 0;\n  }\n}\n")),
+      False)
+_D166 = ("def update(self, request, slug):\n"
+         "    inst = self.queryset.get(slug=slug)\n"
+         "    return Response({})\n")
+check("M166：DRF 有 IsAuthenticated 但无归属校验 → True（BOLA）",
+      _drf166("// View-Action: update\n"
+              "// Permission-Classes: IsAuthenticated\n", _D166, "update"),
+      True)
+check("M166：DRF 无任何权限类声明 → None（缺证据不下结论）",
+      _drf166("// View-Action: update\n", _D166, "update"), None)
+check("M167：时间戳冷却期 → False；keccak% 抽奖 → True",
+      (_br167("pragma solidity ^0.8.0;\ncontract C { function f() external {"
+              " require(block.timestamp >= t, \"e\"); msg.sender.transfer(1);"
+              " } }\n"),
+       _br167("pragma solidity ^0.8.0;\ncontract C { function f() external {"
+              " if (uint(keccak256(abi.encodePacked(block.timestamp))) % 2"
+              " == 0) { payable(msg.sender).transfer(1); } } }\n")),
+      (False, True))
+_J168 = ("public R f(@RequestBody Map<String,Object> m) {\n"
+         "  UserEntity u = new UserEntity();\n"
+         "  BeanUtils.copyProperties(m, u);\n  return R.ok();\n}\n")
+check("M168：copyProperties 无排除 → True；带忽略列表 → False",
+      (_ma168(_J168),
+       _ma168(_J168.replace("copyProperties(m, u)",
+                            'copyProperties(m, u, "role", "isAdmin")'))),
+      (True, False))
+
+# ---- [169] Module 132：doctor 第八段（双 SAST + 跨仓聚类）----
+print("\n[169] doctor 第八段双 SAST 导出器（M132）")
+
+_r169 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
+                       capture_output=True, text=True, encoding="utf-8")
+_o169 = _r169.stdout or ""
+check("M169：doctor 八段齐全且 exit 0",
+      (_r169.returncode, all(f"[{i}/8]" in _o169 for i in range(1, 9))),
+      (0, True))
+check("M169：第八段核对两个导出器（SARIF + GitLab）",
+      ("sarif_validator 就位" in _o169
+       and "gitlab_exporter 就位" in _o169), True)
+check("M169：第八段核对跨仓聚类计数守恒",
+      "跨仓聚类" in _o169 and "计数守恒" in _o169, True)
+check("M169：第八段报出 27 类 / 22 类（单一事实源）",
+      "规则 27 类 / 补丁器 22 类" in _o169, True)
+
+# ---- [170] Module 133：八大交付格式一键大联考 ----
+print("\n[170] 八大交付格式大联考（M133）")
+
+_w170 = Path(_tf162.mkdtemp(prefix="nexus_m170_"))
+try:
+    _r170 = _w170 / "repo"
+    (_r170 / "src").mkdir(parents=True)
+    (_r170 / "src" / "CorsConfig.java").write_text(
+        "package x;\n"
+        "import org.springframework.context.annotation.Configuration;\n"
+        "import org.springframework.web.cors.*;\n"
+        "import org.springframework.web.filter.CorsFilter;\n"
+        "import org.springframework.context.annotation.Bean;\n"
+        "@Configuration\n"
+        "public class CorsConfig {\n"
+        "  @Bean\n"
+        "  public CorsFilter corsFilter() {\n"
+        "    CorsConfiguration c = new CorsConfiguration();\n"
+        "    c.addAllowedOrigin(\"*\"); c.setAllowCredentials(true);\n"
+        "    UrlBasedCorsConfigurationSource s ="
+        " new UrlBasedCorsConfigurationSource();\n"
+        "    s.registerCorsConfiguration(\"/**\", c);\n"
+        "    return new CorsFilter(s);\n"
+        "  }\n"
+        "}\n", encoding="utf-8")
+    for _i in range(2):
+        (_r170 / "src" / f"Api{_i}.java").write_text(
+            "package x;\n"
+            "import org.springframework.web.bind.annotation.*;\n"
+            "@RestController\n"
+            f"public class Api{_i} {{\n"
+            f"  @GetMapping(\"/r{_i}\")\n"
+            f"  public String r{_i}() {{ return \"ok\"; }}\n"
+            "}\n", encoding="utf-8")
+    _md170 = _w170 / "report.md"
+    subprocess.run(
+        [sys.executable, str(ROOT / "cli.py"), "scan", str(_r170),
+         "--auto", "--offline", "--graph", "--fix",
+         "--output", str(_md170),
+         "--html", str(_w170 / "report.html"),
+         "--sarif", str(_w170 / "report.sarif"),
+         "--gitlab-sast", str(_w170 / "gl-sast-report.json"),
+         "--emit-poc", str(_w170 / "poc"),
+         "--advisory-dir", str(_w170 / "adv"),
+         "--summary-json", str(_w170 / "s.json")],
+        capture_output=True, text=True, encoding="utf-8")
+    _files170 = {
+        "markdown": _md170,
+        "html": _w170 / "report.html",
+        "sarif": _w170 / "report.sarif",
+        "gitlab": _w170 / "gl-sast-report.json",
+        "fix_diff": _w170 / "fix_report_auto.md",
+    }
+    check("M170：前五种格式全部落盘且非空",
+          [_k for _k, _p in _files170.items()
+           if not (_p.exists() and _p.stat().st_size > 0)], [])
+    _sar170 = json.loads((_w170 / "report.sarif").read_text(encoding="utf-8"))
+    check("M170：SARIF 合规（version 2.1.0 + 至少 1 条 result）",
+          (_sar170.get("version"),
+           sum(len(r.get("results", [])) for r in _sar170.get("runs", []))),
+          ("2.1.0", 1))
+    _gl170 = json.loads((_w170 / "gl-sast-report.json")
+                        .read_text(encoding="utf-8"))
+    check("M170：GitLab SAST 合规（15.0.0 + 至少 1 条 vulnerability）",
+          (_gl170.get("version"), len(_gl170.get("vulnerabilities", []))),
+          ("15.0.0", 1))
+    check("M170：Markdown 含 Mermaid 污点图（--graph）",
+          "```mermaid" in _md170.read_text(encoding="utf-8"), True)
+    _poc170 = list((_w170 / "poc").glob("*")) if (_w170 / "poc").exists() \
+        else []
+    _adv170 = list((_w170 / "adv").glob("GHSA-*.md")) \
+        if (_w170 / "adv").exists() else []
+    check("M170：PoC 与 GHSA 披露草稿都产出（每根因一份）",
+          (len(_poc170) >= 1, len(_adv170)), (True, 1))
+    from core.context.pr_commenter import (
+        build_review_payload as _brp170,
+    )
+    _pr170 = _brp170([{"file": str(_r170 / "src" / "CorsConfig.java"),
+                       "line": 12, "category": "cors",
+                       "severity": "HIGH", "cwe": "CWE-942"}], _r170)
+    check("M170：第 8 种格式 PR review 载荷可生成（path/line/body 齐）",
+          (bool(_pr170["comments"]),
+           _pr170["comments"][0]["path"], _pr170["comments"][0]["line"]),
+          (True, "src/CorsConfig.java", 12))
+    check("M170：演练后目标仓库工作树零污染（--fix 自检已还原）",
+          'addAllowedOrigin("*")' in
+          (_r170 / "src" / "CorsConfig.java").read_text(encoding="utf-8"),
+          True)
+finally:
+    _sh162.rmtree(_w170, ignore_errors=True)
 
 print()
 if FAILS:

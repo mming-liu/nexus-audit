@@ -8,23 +8,24 @@
 
 | 项 | 数值 |
 |---|---|
-| 真实仓库 | **21 个**（Java 13 + Python 3 + Solidity 5） |
-| 路由/合约入口 | **6,743 个** |
-| 路由级 P0 命中 | **1,427 条** |
-| 去重后的独立根因 P0 | **84 个** |
-| GHSA 披露草稿 | **84 份**（按独立根因，不按路由） |
+| 真实仓库 | **25 个**（Java 16 + Python 4 + Solidity 5） |
+| 路由/合约入口 | **6,868 个** |
+| 路由级 P0 命中 | **1,504 条** |
+| 去重后的独立根因 P0 | **96 个** |
+| GHSA 披露草稿 | **96 份**（按独立根因，不按路由） |
 | benchmark 层误报 | **0 条** |
-| `benchmark_* --strict` | **21/21 exit 0**（零误报 / 零漏报 / 零判反） |
+| `benchmark_* --strict` | **25/25 exit 0**（零误报 / 零漏报 / 零判反） |
 
-一句话：**在 6,743 个从未见过的真实入口上，规则层没有确认误报；84 个独立根因全部逐条人工核查过源码（作者自述 + 代码形态双重确认）。**
+一句话：**在 6,868 个从未见过的真实入口上，规则层没有确认误报；96 个独立根因全部逐条人工核查过源码（作者自述 + 代码形态双重确认）。**
 
 ## 二、逐仓数字
 
 | 仓库 | 入口 | 路由级 P0 | 独立根因 | benchmark |
 |---|---|---|---|---|
-| jeecg-boot | 458 | 479 | 24 | ✔ |
-| eladmin-mp | 65 | 76 | 12 | ✔ |
+| jeecg-boot | 458 | 481 | 26 | ✔ |
 | DjanGoat | 36 | 12 | 12 | ✔ |
+| eladmin-mp | 65 | 74 | 10 | ✔ |
+| eladmin-JPA | 66 | 75 | 10 | ✔ |
 | mall | 246 | 253 | 8 | ✔ |
 | newbee-mall | 73 | 6 | 6 | ✔ |
 | litemall | 219 | 223 | 5 | ✔ |
@@ -32,6 +33,7 @@
 | newbee-mall-api | 62 | 65 | 4 | ✔ |
 | My-Blog | 54 | 3 | 3 | ✔ |
 | Employee-Management-System | 4 | 2 | 2 | ✔ |
+| django-realworld | 11 | 2 | 2 | ✔ |
 | RuoYi | 305 | 1 | 1 | ✔ |
 | waynboot-mall | 163 | 163 | 1 | ✔ |
 | Synthetix V3 | 1,411 | 1 | 1 | ✔ |
@@ -41,6 +43,8 @@
 | AaveV3 | 553 | 0 | 0 | ✔ |
 | flaskr | 8 | 0 | 0 | ✔ |
 | sushiswap-zapper | 75 | 0 | 0 | ✔ |
+| Uniswap V2 | 29 | 0 | 0 | ✔ |
+| fastapi-realworld | 19 | 0 | 0 | ✔ |
 | UniswapV3 | 67 | 0 | 0 | ✔ |
 | FastAPI | 9 | 0 | 0 | ✔ |
 
@@ -63,7 +67,7 @@
 
 ## 四、逐仓独立根因（人工核查清单）
 
-### jeecg-boot（24 个根因）
+### jeecg-boot（26 个根因）
 
 - **[cors]** `IndexController.chartInfo`（全局配置，影响 456 条路由） @ `IndexController.java:45`
 - **[cmdi]** `JobGroupController.loadById`（端点，影响 1 条路由） @ `JobGroupController.java:174`
@@ -77,6 +81,7 @@
 - **[cmdi]** `JobLogController.logKill`（端点，影响 1 条路由） @ `JobLogController.java:159`
 - **[deserial]** `JobLogController.logKill`（端点，影响 1 条路由） @ `JobLogController.java:159`
 - **[hash]** `LoginController.login`（端点，影响 1 条路由） @ `LoginController.java:73`
+- **[mass_assignment]** `LoginController.login`（端点，影响 1 条路由） @ `LoginController.java:73`
 - **[hash]** `LoginController.randomImage`（端点，影响 1 条路由） @ `LoginController.java:499`
 - **[hash]** `LoginController.checkCaptcha`（端点，影响 1 条路由） @ `LoginController.java:605`
 - **[xss]** `SysAnnouncementController.showContent`（端点，影响 1 条路由） @ `SysAnnouncementController.java:488`
@@ -84,26 +89,12 @@
 - **[sqli]** `SysAnnouncementSendController.readAll`（端点，影响 1 条路由） @ `SysAnnouncementSendController.java:238`
 - **[sqli]** `SysDepartController.queryIdTree`（端点，影响 1 条路由） @ `SysDepartController.java:277`
 - **[sqli]** `SysUserController.frozenBatch`（端点，影响 1 条路由） @ `SysUserController.java:253`
+- **[mass_assignment]** `SysUserOnlineController.list`（端点，影响 1 条路由） @ `SysUserOnlineController.java:52`
 - **[redir]** `ThirdLoginController.render`（端点，影响 1 条路由） @ `ThirdLoginController.java:67`
 - **[redir]** `ThirdLoginController.oauth2LoginCallback`（端点，影响 1 条路由） @ `ThirdLoginController.java:294`
 - **[redir]** `ThirdLoginController.oauth2LoginCallback#2`（端点，影响 1 条路由） @ `ThirdLoginController.java:358`
 - **[hash]** `SystemApiController.queryUserAuths`（端点，影响 1 条路由） @ `SystemApiController.java:396`
 - **[hardcoded_secret]** `[secret-file] JeecgBaseConfig.java`（文件级，影响 1 条路由） @ `JeecgBaseConfig.java:1`
-
-### eladmin-mp（12 个根因）
-
-- **[authz]** `AliPayController.toPayAsPc`（端点，影响 1 条路由） @ `AliPayController.java:68`
-- **[cors]** `AliPayController.toPayAsPc`（全局配置，影响 65 条路由） @ `AliPayController.java:68`
-- **[authz]** `AliPayController.toPayAsWeb`（端点，影响 1 条路由） @ `AliPayController.java:78`
-- **[authz]** `VerifyController.resetEmail`（端点，影响 1 条路由） @ `VerifyController.java:44`
-- **[crypto]** `VerifyController.resetEmail`（端点，影响 1 条路由） @ `VerifyController.java:44`
-- **[authz]** `VerifyController.resetPass`（端点，影响 1 条路由） @ `VerifyController.java:52`
-- **[crypto]** `VerifyController.resetPass`（端点，影响 1 条路由） @ `VerifyController.java:52`
-- **[authz]** `VerifyController.validated`（端点，影响 1 条路由） @ `VerifyController.java:60`
-- **[authz]** `GenConfigController.queryGenConfig`（端点，影响 1 条路由） @ `GenConfigController.java:40`
-- **[authz]** `GeneratorController.queryTables`（端点，影响 1 条路由） @ `GeneratorController.java:53`
-- **[authz]** `GeneratorController.queryColumns`（端点，影响 1 条路由） @ `GeneratorController.java:59`
-- **[authz]** `GeneratorController.generatorCode`（端点，影响 1 条路由） @ `GeneratorController.java:82`
 
 ### DjanGoat（12 个根因）
 
@@ -119,6 +110,32 @@
 - **[spel]** `api_index`（端点，影响 1 条路由） @ `views.py:13`
 - **[spel]** `api_id`（端点，影响 1 条路由） @ `views.py:24`
 - **[hardcoded_secret]** `[secret-file] settings.py`（文件级，影响 1 条路由） @ `settings.py:1`
+
+### eladmin-mp（10 个根因）
+
+- **[authz]** `AliPayController.toPayAsPc`（端点，影响 1 条路由） @ `AliPayController.java:68`
+- **[cors]** `AliPayController.toPayAsPc`（全局配置，影响 65 条路由） @ `AliPayController.java:68`
+- **[authz]** `AliPayController.toPayAsWeb`（端点，影响 1 条路由） @ `AliPayController.java:78`
+- **[authz]** `VerifyController.resetEmail`（端点，影响 1 条路由） @ `VerifyController.java:44`
+- **[authz]** `VerifyController.resetPass`（端点，影响 1 条路由） @ `VerifyController.java:52`
+- **[authz]** `VerifyController.validated`（端点，影响 1 条路由） @ `VerifyController.java:60`
+- **[authz]** `GenConfigController.queryGenConfig`（端点，影响 1 条路由） @ `GenConfigController.java:40`
+- **[authz]** `GeneratorController.queryTables`（端点，影响 1 条路由） @ `GeneratorController.java:53`
+- **[authz]** `GeneratorController.queryColumns`（端点，影响 1 条路由） @ `GeneratorController.java:59`
+- **[authz]** `GeneratorController.generatorCode`（端点，影响 1 条路由） @ `GeneratorController.java:82`
+
+### eladmin-JPA（10 个根因）
+
+- **[authz]** `AliPayController.toPayAsPc`（端点，影响 1 条路由） @ `AliPayController.java:68`
+- **[cors]** `AliPayController.toPayAsPc`（全局配置，影响 66 条路由） @ `AliPayController.java:68`
+- **[authz]** `AliPayController.toPayAsWeb`（端点，影响 1 条路由） @ `AliPayController.java:78`
+- **[authz]** `VerifyController.resetEmail`（端点，影响 1 条路由） @ `VerifyController.java:44`
+- **[authz]** `VerifyController.resetPass`（端点，影响 1 条路由） @ `VerifyController.java:52`
+- **[authz]** `VerifyController.validated`（端点，影响 1 条路由） @ `VerifyController.java:60`
+- **[authz]** `GenConfigController.queryGenConfig`（端点，影响 1 条路由） @ `GenConfigController.java:40`
+- **[authz]** `GeneratorController.queryTables`（端点，影响 1 条路由） @ `GeneratorController.java:58`
+- **[authz]** `GeneratorController.queryColumns`（端点，影响 1 条路由） @ `GeneratorController.java:67`
+- **[authz]** `GeneratorController.generatorCode`（端点，影响 1 条路由） @ `GeneratorController.java:90`
 
 ### mall（8 个根因）
 
@@ -173,6 +190,11 @@
 
 - **[authz]** `delete`（端点，影响 1 条路由） @ `app.py:63`
 - **[hardcoded_secret]** `[secret-file] app.py`（文件级，影响 1 条路由） @ `app.py:1`
+
+### django-realworld（2 个根因）
+
+- **[authz]** `ArticleViewSet.update`（端点，影响 1 条路由） @ `views.py:87`
+- **[hardcoded_secret]** `[secret-file] settings.py`（文件级，影响 1 条路由） @ `settings.py:1`
 
 ### RuoYi（1 个根因）
 
