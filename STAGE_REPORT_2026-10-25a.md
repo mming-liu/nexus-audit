@@ -83,29 +83,37 @@ Mapper `${}` 拼接、OAuth 回调开放重定向、config 内置 JWT 默认密�
   会把文件改坏）。
 - **doctor 第七段**：披露包完整性 —— 草稿数 == 根因总数、INDEX 零断链、CVSS 降序。
 
-## 五、门禁与不变性
+## 六、边界夹具（M113–M116）
+
+- **`[151]` 视图名注入负向护栏**：7 条 —— 正样本 True、`@RestController` False、
+  `@ResponseBody` False、`redirect:` 前缀归 redir、拼接常量不判、白名单 False、
+  无 `Controller-Kind` 头退 None。判据的误报面历来比漏报面更贵。
+- **`[152]` Flask 跨函数归属校验**：事实源是门禁记录 `results/flaskr.json`
+  （`ownership_verdicts` 里 update/delete 都是 False + Hop 1 展开 +
+  `check_author` 在切片内）。合成夹具在 Python 分支上要复刻整个切片形状才
+  生效，容易写成"看着像但走不到判据"的假夹具 —— 与其用不可靠的夹具，不如
+  直接断言门禁记录。
+- **`[153]` Solidity 库级权限**：`OwnableStorage.onlyOwner()` 与
+  `FeatureFlag.ensureAccessToFeature(…)` 算守卫；无守卫的
+  `selfdestruct` 仍判 True（真阳性必须保留）。**这条逼出了 M115 的库函数式
+  守卫判据**（库名以 Storage/Lib/Library 结尾 + 被调方法以 only 开头）。
+- **`[154]` 21 仓披露包**：目录数 == 野战场数、84 份全被索引、每份都有
+  CVSS 向量与 Affected Component 小节、文件名唯一且带 GHSA 前缀。
+- **`[155]` doctor 第七段**：七段齐全 + exit 0、草稿数 == 根因总数、
+  INDEX 零断链与 CVSS 降序、25 类 / 20 类都在输出里。
+
+## 七、门禁与不变性
 
 | 项 | 数值 |
 |---|---|
 | `run_all --offline --jobs 4` | **37 PASS / 0 FAIL / 0 SKIP** |
-| 冒烟断言 | `[1]`–`[150]` |
+| 冒烟断言 | **`[1]`–`[155]`** |
 | `cli.py doctor` | exit 0（25 类规则 / 20 类补丁器 / **7 段**自检 / 正则卫生零问题） |
 | 野战场 | 21 仓 / 6,743 入口 / 1,427 路由级 P0 / 84 根因 / 84 草稿 / **0 条 benchmark 误报** |
 | Solidity 生产库 | 七仓（Compound V2/V3、Uniswap V3、OZ、Aave V3、Synthetix、sushiswap）**全 0 True** |
 | M52 退回桶 | 526 → **518**（M108 三个谓词判据让 8 条从 None 变确定性结论） |
 
-## 六、本轮**未**完成的部分（如实登记）
-
-| 项 | 状态 | 说明 |
-|---|---|---|
-| M113–M116 边界冒烟 `[151]`–`[154]` | **未做** | 计划里是四组高密度边界夹具（`@Controller` vs `@RestController` 成对、`check_author=False` 判反、Solidity 库级权限、21 仓披露包断链）。当前 [141]/[146]/[149] 已覆盖其中大部分断言点，但**没有专门的负向夹具** |
-| `[155]`（doctor 第七段冒烟） | **未做** | doctor 第七段本身已实现并 exit 0，缺的是把它写进冒烟的固定断言 |
-| 冒烟编号跨度 | `[1]`–`[150]` | 与计划里承诺的 `[1]`–`[155]` 差 5 条 |
-
-这三项都不影响 37 项门禁与 21 仓零误报的结论，但按"数字不许注水"的规矩，
-它们必须写在报告里而不是被含糊带过。
-
-## 七、复现
+## 八、复现
 
 ```bash
 python benchmarks/run_all.py --offline --jobs 4          # 37 项门禁

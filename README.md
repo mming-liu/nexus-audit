@@ -59,7 +59,7 @@ nexus-audit/
 | `benchmarks/run_all.py` | 一键跑全部离线门禁，输出 Markdown 计分板 |
 | `benchmarks/export_disputes.py` | 争议登记核对：每条口径分歧的证据必须逐字对上源码 |
 | `benchmarks/check_stability.py` | 判定稳定性复测：同一输入连问 N 次，测抖动率 |
-| `benchmarks/smoke_test_chains.py` | 判据链路断言 `[1]`-`[115]`（不调模型，秒级） |
+| `benchmarks/smoke_test_chains.py` | 判据链路断言 `[1]`-`[155]`（不调模型，秒级） |
 | `benchmarks/ab_votes.py` | 采样策略一致性 A/B：两种策略各跑 2 轮，比两轮之间的翻转数 |
 | `benchmarks/offline_baseline.py` | 对照组：纯 sink 关键词匹配 |
 
@@ -171,8 +171,8 @@ python benchmarks/benchmark_vulpy.py --strict
 CI 上没有靶场仓库，因此全量 strict 由本地钩子承担（见 `.githooks/pre-push`）。
 
 规则层现状：**25 类判据入口**（`rule_detectors.verdict()` 统一路由，空源码必须
-退 None）+ **17 类确定性补丁器**（命中→补丁→重切片→规则翻 False→finally 字节级
-还原的自检闭环，`--fix` 触发）。冒烟断言 `[1]`-`[122]` 共 702 项，秒级不调模型。
+退 None）+ **20 类确定性补丁器**（命中→补丁→重切片→规则翻 False→finally 字节级
+还原的自检闭环，`--fix` 触发）。冒烟断言 `[1]`-`[155]`，秒级不调模型。
 
 第四层另有 **PoC Harness 合成器**（`--emit-poc`）：把"规则层已判 True 的那条"
 翻译成离线可跑的验证骨架 —— Solidity Foundry `.t.sol` / Python pytest /

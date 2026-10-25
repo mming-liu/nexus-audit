@@ -7,7 +7,7 @@
   "correct": 1264,
   "fp": 0,
   "reverse_fn": 0,
-  "rule_evaluations": 3331,
+  "rule_evaluations": 3428,
   "production_prefixes": [
     "protocol/",
     "markets/",

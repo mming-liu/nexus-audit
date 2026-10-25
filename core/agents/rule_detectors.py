@@ -7713,6 +7713,14 @@ def solidity_access_verdict(source: str) -> bool | None:
                      or _sol_negated_identity_call(func_src))
     if not protected and _sol_identity_alias_check(func_src):
         protected = True
+    # M115：**库函数式守卫**。synthetix/DeFi 把权限检查封进库，调用点只有
+    #     `OwnableStorage.onlyOwner();` / `FeatureFlag.ensureAccessToFeature(…)`。
+    # 判据挂机制：库名以 Storage/Lib/Library 结尾 **且** 被调方法以 only 开头 ——
+    # 两个约束一起才分得开"库里的权限门"与"普通库调用"。
+    if not protected and re.search(
+            r"\b\w*(?:Storage|Lib|Library)\s*\.\s*only\w+\s*\("
+            r"|\bFeatureFlag\s*\.\s*ensureAccessToFeature\s*\(", func_src):
+        protected = True
     if not protected and re.search(
             r"require\s*\(\s*\w*[Ii]sApprovedOrOwner\b"
             r"|require\s*\(\s*_?msgSender\s*\(\s*\)", func_src):

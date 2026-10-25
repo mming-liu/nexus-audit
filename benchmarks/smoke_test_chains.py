@@ -7565,6 +7565,124 @@ check("M150：cli 暴露 --gh-comments 开关",
           [sys.executable, str(ROOT / "cli.py"), "pr-scan", "--help"],
           capture_output=True, text=True, encoding="utf-8").stdout, True)
 
+# ---- [151] Module 113：Java 视图名注入的四组负向护栏 ----
+# [141] 证的是"能认出真阳"；这一条证的是"不会把安全写法判成真阳"——
+# 判据的误报面历来比漏报面更贵。
+print("\n[151] Java 视图名注入负向护栏（M113）")
+
+_SIG151 = 'public String f(String para) { return "vul/" + para; }'
+check("M151：@Controller + 视图名拼接 → True（正样本）",
+      _thv141("// Controller-Kind: @Controller\n", _SIG151, {"para"}), True)
+check("M151：@RestController 同代码 → False（返回值是响应体）",
+      _thv141("// Controller-Kind: @RestController\n", _SIG151,
+              {"para"}), False)
+check("M151：@Controller + @ResponseBody → False（HJS fragmentSafe 形态）",
+      _thv141("// Controller-Kind: @Controller\n",
+              '@ResponseBody\n' + _SIG151, {"para"}), False)
+check("M151：@Controller + redirect: 前缀 → 不归本类目（归 redir）",
+      _thv141("// Controller-Kind: @Controller\n",
+              'public String f(String p) { return "redirect:" + p; }', {"p"}),
+      None)
+check("M151：拼接的不是形参（是常量） → 不判 True",
+      _thv141("// Controller-Kind: @Controller\n",
+              'public String f(String p) { return "vul/" + OTHER; }', {"p"}),
+      None)
+check("M151：白名单守卫挡住 → False",
+      _thv141("// Controller-Kind: @Controller\n",
+              'public String f(String p) {\n'
+              '  if (!WHITE.contains(p)) { return "error/404"; }\n'
+              '  return "vul/" + p;\n}\n', {"p"}), False)
+check("M151：没有 Controller-Kind 头 → None（M89 行为不变，缺证据不下结论）",
+      _thv141("class X {}\n", _SIG151, {"para"}), None)
+
+# ---- [152] Module 114：Flask 跨函数归属校验的正反两面 ----
+print("\n[152] Flask check_author 正反护栏（M114）")
+
+# M152 的事实源是**门禁记录** `results/flaskr.json`：那是
+# `benchmark_flaskr.py --strict` 实跑的结论（Hop 1 展开 + get_post 里的
+# `author_id != g.user['id']` 被认出来）。合成夹具在 Python 分支上要复刻
+# 整个切片形状才生效，容易写成一个"看着像但走不到判据"的假夹具 ——
+# 与其用一个不可靠的夹具，不如直接断言门禁记录（同一事实两处记录，
+# 任一处漂移都会红）。
+_j152 = ROOT / "benchmarks" / "results" / "flaskr.json"
+if _j152.exists():
+    _d152 = json.loads(_j152.read_text(encoding="utf-8"))
+    check("M152：门禁记录里 update/delete 的跨函数归属校验都是 False",
+          _d152.get("ownership_verdicts"),
+          {"update": False, "delete": False})
+    check("M152：Hop 1 展开与 check_author 机制都在切片内（门禁记录）",
+          (_d152.get("hop1_expanded"), _d152.get("check_author_in_slice")),
+          (True, True))
+else:
+    print("  -- results/flaskr.json 不在，跳过 [152]")
+
+# ---- [153] Module 115：Solidity 库级权限（Diamond Storage）----
+print("\n[153] Solidity 库级权限与 Diamond Storage（M115）")
+
+from core.agents.rule_detectors import (                            # noqa: E402
+    _sol_identity_aliases as _ia153,
+    _sol_predicate_authz_check as _pa153,
+    verdict as _v153,
+)
+
+check("M153：库函数式守卫 OwnableStorage.onlyOwner() 不被判成缺鉴权",
+      _v153("access_control",
+            "pragma solidity ^0.8.0;\ncontract C {\n"
+            "  function kill() external {\n"
+            "    OwnableStorage.onlyOwner();\n"
+            "    selfdestruct(payable(msg.sender));\n"
+            "  }\n}\n"), False)
+check("M153：Diamond Storage 取 owner 再比较（== 形式）算保护",
+      _pa153("function isOwner() internal view returns (bool) {\n"
+             "  return OwnableStorage.load().owner == _msgSender();\n}\n"
+             "function f() external { require(isOwner()); _x(); }\n"), True)
+check("M153：无任何守卫的 selfdestruct → True（真阳性必须保留）",
+      _v153("access_control",
+            "pragma solidity ^0.8.0;\ncontract C {\n"
+            "  function kill() external { selfdestruct(payable(msg.sender)); }\n"
+            "}\n"), True)
+check("M153：别名收集只认 address 类型声明",
+      _ia153("address s = _msgSender();\nstring t = _msgSender();\n"), ["s"])
+
+# ---- [154] Module 116：21 仓披露包与总目录零断链 ----
+print("\n[154] 21 仓披露包结构完整性（M116）")
+
+_adv154 = ROOT / "benchmarks" / "results" / "advisories"
+if _adv154.exists():
+    _drafts154 = sorted(_adv154.rglob("GHSA-*.md"))
+    _idx154 = _adv154 / "INDEX.md"
+    _it154 = _idx154.read_text(encoding="utf-8") if _idx154.exists() else ""
+    check("M154：草稿目录数与野战场数一致（21）",
+          len([p for p in _adv154.iterdir() if p.is_dir()]), 21)
+    check("M154：总目录零断链（84 份全被索引）",
+          (len(_drafts154), all(f"]({p.name})" in _it154
+                                for p in _drafts154)), (84, True))
+    check("M154：每份草稿都有 CVSS 向量与受影响组件小节",
+          all("CVSS:3.1/" in p.read_text(encoding="utf-8")
+              and "## Affected Component" in p.read_text(encoding="utf-8")
+              for p in _drafts154), True)
+    check("M154：草稿文件名带 GHSA 前缀且唯一",
+          len({p.name for p in _drafts154}) == len(_drafts154)
+          and all(p.name.startswith("GHSA-") for p in _drafts154), True)
+else:
+    print("  -- advisories/ 不在，跳过 [154]")
+
+# ---- [155] Module 117：doctor 第七段（披露包完整性）----
+print("\n[155] doctor 第七段披露包完整性（M117）")
+
+_r155 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
+                       capture_output=True, text=True, encoding="utf-8")
+_o155 = _r155.stdout or ""
+check("M155：doctor 七段齐全且 exit 0",
+      (_r155.returncode, all(f"[{i}/7]" in _o155 for i in range(1, 8))),
+      (0, True))
+check("M155：第七段核对草稿数 == 根因总数",
+      "[7/7] 披露包完整性" in _o155 and "草稿数 == 根因总数" in _o155, True)
+check("M155：第七段核对 INDEX 零断链与 CVSS 降序",
+      ("INDEX.md 覆盖全部" in _o155 and "按 CVSS 降序" in _o155), True)
+check("M155：25 类规则 / 20 类补丁器都在 doctor 输出里",
+      ("共 25 类" in _o155 and "（20 类）" in _o155), True)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
