@@ -5600,6 +5600,26 @@ def authz_verdict(source: str) -> bool | None:
                  r"|permission|login_required)\w*", source, re.I):
         return False
 
+    # 1a-3) xxl-job 的 @XxlSso 注解（M170）：
+    #   @XxlSso(role = Consts.ADMIN_ROLE) 是管理员角色门 -> False；
+    #   @XxlSso(login = false) 是作者显式声明的匿名入口 -> None（设计意图，
+    #   不按"缺鉴权"判 True）。
+    if "@XxlSso" in source:
+        if re.search(r"@XxlSso\s*\([^)]*login\s*=\s*false", source):
+            return None
+        if re.search(r"@XxlSso\s*\([^)]*role\s*=", source):
+            return False
+
+    # 1a-4) xxl-job 的 JobGroupPermissionUtil.validJobGroupPermission：
+    #   用当前登录用户的 jobGroup 权限校验目标 group；机制等价于资源归属
+    #   校验（不是"知道是谁"，而是"这个组归不归你管"）。
+    if re.search(r"validJobGroupPermission\s*\(", body):
+        return False
+    # triggerJob 用 loginCheckWithAttr 建立身份，再把 loginInfo 交给
+    # Service 做 group 权限判定；切片里看不到 Service 实现，判 None。
+    if re.search(r"XxlSsoHelper\s*\.\s*loginCheckWithAttr\s*\(", source):
+        return None
+
     # 1) 声明式校验：`@PreAuthorize("hasRole('ADMIN')")` 这类。
     #    注解不在 entry_body 里，必须扫整份切片 —— 但只在**入口方法自身**
     #    的注解范围内找，避免把同文件别的方法的注解算到当前路由头上。
@@ -6372,7 +6392,15 @@ _PY_OWNERSHIP_RE = re.compile(
     r"|\bg\s*\.\s*current_user\b\s*[!=]="
     r"|\.\s*(?:author|user|owner|user_id|owner_id)\s*=\s*g\s*\.\s*current_user\b"
     r"|return\s+[\w.]*forbidden\s*\("
-    r"|raise\s+\w*(?:Forbidden|PermissionDenied)\w*", re.I)
+    r"|raise\s+\w*(?:Forbidden|PermissionDenied)\w*"
+    # M168：Flask-JWT-Extended 的 current_user.profile 主体形态。
+    r"|(?:author|user|owner)_id\s*=\s*current_user\s*\."
+    r"|(?:author|user|owner)\s*=\s*current_user\b"
+    r"|current_user\s*\.\s*\w+\s*\.\s*(?:append|add|remove|follow|unfollow)\b"
+    r"|current_user\s*\.\s*profile\s*[,)]"
+    r"|\.\s*(?:favourite|favorite|unfavourite|unfavorite|follow|unfollow)"
+    r"\s*\(\s*profile\b",
+       re.I)
 
 
 def _py_public_catalog_read(source: str, body: str) -> bool:
@@ -6412,7 +6440,7 @@ _PY_PRIVATE_RES_RE = re.compile(
     r"\b(?:password|passwd|token|secret|api_key|email|credit|wallet|payment"
     r"|order|cart|invoice|admin|permission|role)s?\b", re.I)
 _PY_PUBLIC_ROUTE_RE = re.compile(
-    r"(?:^|/)(?:posts?|comments?|followers?|followed_by|timeline|users?|profile"
+    r"(?:^|/)(?:posts?|comments?|followers?|followed_by|timeline|users?|profiles?"
     r"|index|home|feed|articles?|tags?)(?:/|$|\?)", re.I)
 
 
@@ -6445,6 +6473,8 @@ def python_authz_verdict(source: str) -> bool | None:
     has_subject = (_PY_SUBJECT_RE.search(source) is not None
                    or _PY_SUBJECT_RE_JWT.search(source) is not None)
     if has_subject:
+        if _py_public_catalog_read(source, body):
+            return False
         if _PY_OWNERSHIP_RE.search(source):
             return False
         # Module 37 a) admin 门（VAmPI delete_user 形态）：主体链取到
@@ -10585,6 +10615,132 @@ def signature_replay_verdict(source: str) -> bool | None:
     return True
 
 
+
+# ================= M171/M172：第 33/34 类规则 =================
+
+# ---- 第 33 类：NoSQL 注入（CWE-943）----
+_MONGO_JAVA_PARSE_RE = re.compile(
+    r"\b(?:BasicDBObject|Document)\s*\.\s*parse\s*\(\s*([^)]*)")
+_MONGO_JAVA_WHERE_RE = re.compile(
+    r"new\s+BasicDBObject\s*\(\s*[\"']\$where[\"']\s*,\s*([^)]*)")
+_MONGO_PY_SINK_RE = re.compile(
+    r"\.\s*(?:find|find_one|find_one_and_\w+|update_one|update_many"
+    r"|delete_one|delete_many|aggregate|count_documents)\s*\(")
+_MONGO_DOLLAR_GUARD_RE = re.compile(
+    r"contains\s*\(\s*[\"']\$[\"']|startsWith\s*\(\s*[\"']\$"
+    r"|startswith\s*\(\s*[\"']\$|[\"']\$[\"']\s+in\b"
+    r"|startswith\(\s*[\"']\$[\"']\s*\)")
+_MONGO_ABORT_RE = re.compile(r"\b(?:throw|raise|return|continue|break)\b")
+
+
+def nosqli_verdict(source: str) -> bool | None:
+    """第 33 类（M171）：外部字符串/字典直接进入 Mongo 查询。
+
+    判 False 的机制：显式拒绝以 $ 开头的键并中止；或值被强类型化且
+    键是服务端常量。只转义引号不拦操作符，不算防护。
+    """
+    body = entry_body(source)
+    if not body:
+        return None
+    if _looks_python(source):
+        if not _MONGO_PY_SINK_RE.search(body):
+            return None
+        # Python 的污点源是 request.get_json()/request.json，落到局部变量
+        # 再进 find；只认"该变量确实由请求对象赋值"这一条可核对事实。
+        src_var = re.search(
+            r"(\w+)\s*=\s*request\s*\.\s*(?:json|get_json|args|form)", body)
+        if src_var:
+            if not re.search(rf"\.\s*(?:find|find_one|find_one_and_\w+|"
+                             rf"update_one|update_many|delete_one|delete_many|"
+                             rf"aggregate|count_documents)\s*\([^)]*\b"
+                             rf"{re.escape(src_var.group(1))}\b", body):
+                return None
+        elif not re.search(r"\.\s*(?:find|find_one|find_one_and_\w+|update_one"
+                           r"|update_many|delete_one|delete_many|aggregate"
+                           r"|count_documents)\s*\(\s*request\s*\.", body):
+            return None
+        if _MONGO_DOLLAR_GUARD_RE.search(body) and _MONGO_ABORT_RE.search(body):
+            return False
+        if re.search(r"isinstance\s*\([^)]*,\s*(?:str|int)\s*\)", body):
+            return False
+        return True
+    m = _MONGO_JAVA_PARSE_RE.search(body) or _MONGO_JAVA_WHERE_RE.search(body)
+    if not m:
+        return None
+    arg = (m.group(1) or "").strip()
+    if not arg or re.fullmatch(r"\"[^\"]*\"|'[^']*'", arg):
+        return False                   # 常量查询串，没有注入面
+    if _MONGO_DOLLAR_GUARD_RE.search(body) and _MONGO_ABORT_RE.search(body):
+        return False
+    return True
+
+
+# ---- 第 34 类：日志注入（CWE-117）----
+_LOG_CALL_RE = re.compile(
+    r"\b(?:log|logger|LOG|LOGGER|logging)\s*\.\s*"
+    r"(?:info|warn|warning|error|debug|trace)\s*\(([^;]{0,600})\)", re.I)
+_LOG_SANITIZE_RE = re.compile(
+    r"\.\s*replace\s*\(\s*[\"']\\r|\.\s*replace\s*\([^)]*\\n"
+    r"|replaceAll\s*\(\s*[\"']\[?\\r|escapeJava|escapeJson|sanitizeLog"
+    r"|stripCRLF|strip_crlf", re.I)
+
+
+def _log_tainted(call: str, params: set[str]) -> bool:
+    """日志实参里是否真的有外部形参（不是字符串字面量里的同名文字）。"""
+    # 先保留 f-string 内容，再剥普通字符串字面量。
+    keep: list[str] = []
+
+    def _keep_f(m: re.Match) -> str:
+        keep.append(m.group(0))
+        return f"__F{len(keep) - 1}__"
+
+    tmp = re.sub(r"\bf[\"'][^\"']*\{[^}]*\}[^\"']*[\"']", _keep_f, call)
+    tmp = re.sub(r"\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'", '""', tmp)
+    for i, s in enumerate(keep):
+        tmp = tmp.replace(f"__F{i}__", s)
+    for p in params:
+        if re.search(rf"\b{re.escape(p)}\b", tmp):
+            return True
+    return False
+
+
+def log_injection_verdict(source: str) -> bool | None:
+    """第 34 类（M172）：外部可控字符串直接拼进日志，未剥离 CR/LF。"""
+    body = entry_body(source)
+    if not body:
+        return None
+    params = (set(_py_func_params(source)) if _looks_python(source)
+              else set(_bare_params(_entry_signature(source))))
+    # 局部变量由请求对象赋值也算污点（Python 常见：msg = request.args.get）。
+    params |= set(re.findall(r"(\w+)\s*=\s*request\s*\.", body))
+    if not params:
+        return None
+    py = _looks_python(source)
+    for m in _LOG_CALL_RE.finditer(body):
+        call = m.group(0)
+        # 只收"字符串拼接 / f-string / % 运算"的日志。SLF4J 的
+        # logger.info("...{}", x) 与 Python 的 logging.info("...%s", x)
+        # 是参数化日志（占位符由日志框架填充），不属本类目的拼接面；
+        # 否则 kkFileView 这类正常参数化日志会整片假阳。
+        if not py and "{}" in call and "+" not in call:
+            continue
+        # String.format(常量, 参数) 是格式化，不是字符串拼接；本类目只收
+        # 拼接形态（与 M172 规格一致）。
+        if not py and "String.format(" in call:
+            continue
+        if py and re.search(r"[\"'][^\"']*%[sd]", call) and "," in call \
+                and " % " not in call:
+            continue
+        if not _log_tainted(call, params):
+            continue
+        # 清洗可能写在日志语句**之前**的一行（msg = msg.replace(...)），
+        # 只扫 call 本身会漏掉这种标准写法。
+        if _LOG_SANITIZE_RE.search(body[:m.start()]):
+            return False
+        return True
+    return None
+
+
 def verdict(category: str, source: str) -> bool | None:
     """对配置型类目给出确定性结论：True(有漏洞) / False(安全) / None(证据不足)。"""
     cfg = parse_config_block(source)
@@ -10750,5 +10906,9 @@ def verdict(category: str, source: str) -> bool | None:
         return unrestricted_upload_verdict(source)
     if category == "signature_replay":
         return signature_replay_verdict(source)
+    if category == "nosqli":
+        return nosqli_verdict(source)
+    if category == "log_injection":
+        return log_injection_verdict(source)
 
     return None

@@ -5517,8 +5517,8 @@ finally:
 
 # ---- [106] Module 67：hardcoded_secret 第 22 类规则 ----
 from core.agents.vuln_categories import CATEGORIES as _VC106   # noqa: E402
-check("M106：hardcoded_secret 已注册（类目总数单一事实源，M157 后 32）",
-      ("hardcoded_secret" in _VC106 and len(_VC106) == 32), True)
+check("M106：hardcoded_secret 已注册（类目总数单一事实源，M157 后 34）",
+      ("hardcoded_secret" in _VC106 and len(_VC106) == 34), True)
 # VAmPI 形态：Flask SECRET_KEY 短弱密钥（JWT 签名上下文，无长度门槛）
 _vampi106 = ("import jwt\n"
              "vuln_app.app.config['SECRET_KEY'] = 'random'\n"
@@ -6395,7 +6395,7 @@ def _java125(body: str, cls: str = "public class C {\n") -> str:
 
 
 check("M125：ssti 已注册为第 24 类（doctor 自动升段；M157 后总数 32）",
-      (len(_CATS125), "ssti" in _CATS125), (32, True))
+      (len(_CATS125), "ssti" in _CATS125), (34, True))
 check("M125：ssti 是 CWE-1336 且不属 OWASP 11 类",
       (_CATS125["ssti"].cwe, _CATS125["ssti"].owasp), ("CWE-1336", False))
 
@@ -6616,7 +6616,7 @@ _r126d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                         capture_output=True, text=True, encoding="utf-8",
                   errors="replace")
 check("M126：doctor 补丁器升到 27 类（含 _fix_python_redirect 与 M106/M125 四个 Java 补丁）",
-      ("（27 类）" in (_r126d.stdout or "")
+      ("（29 类）" in (_r126d.stdout or "")
        and "_fix_python_redirect" in (_r126d.stdout or "")
        and "_fix_java_ssti_viewname" in (_r126d.stdout or "")
        and "_fix_java_header_injection" in (_r126d.stdout or "")), True)
@@ -6943,13 +6943,13 @@ from core.agents.vuln_categories import CATEGORIES as _C130        # noqa: E402
 import cli as _cli130                                             # noqa: E402
 from benchmarks.run_all import JOBS as _JOBS130                   # noqa: E402
 check("M130：规则 32 类 / 补丁器 27 类（doctor 单一事实源）",
-      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (32, 27))
-check("M130：run_all 作业表 51 项且含 comet / DjanGoat / 覆盖地板",
+      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (34, 29))
+check("M130：run_all 作业表 53 项且含 comet / DjanGoat / 覆盖地板",
       (len(_JOBS130),
        any("comet" in str(j[0]) for j in _JOBS130),
        any("DjanGoat" in str(j[0]) for j in _JOBS130),
        any("覆盖地板" in str(j[0]) for j in _JOBS130)),
-      (51, True, True, True))
+      (53, True, True, True))
 
 import core.agents.rule_detectors as _rd130                       # noqa: E402
 _NEW130 = ("ssti_verdict", "_sol_unchecked_zones", "_py_redir_verdict",
@@ -6979,7 +6979,7 @@ _r130d = _sp130.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                   errors="replace")
 _out130 = _r130d.stdout or ""
 check("M130：doctor exit 0 且 32 类 / 27 类 / 十段齐全",
-      (_r130d.returncode, "共 32 类" in _out130, "（27 类）" in _out130,
+      (_r130d.returncode, "共 34 类" in _out130, "（29 类）" in _out130,
        "[10/10]" in _out130), (0, True, True, True))
 check("M130：doctor 覆盖 M87–M93 的四项新自检",
       ("SARIF 2.1.0 合规校验" in _out130
@@ -7203,7 +7203,7 @@ _m138 = json.loads((ROOT / ".tmp" / "matrix_smoke.json")
                    .read_text(encoding="utf-8"))
 check("M138：matrix 退出码 0 且 32 类 × 三语言全覆盖渲染",
       (_r138.returncode, len(_m138["categories"]), _m138["languages"]),
-      (0, 32, ["java", "python", "solidity"]))
+      (0, 34, ["java", "python", "solidity"]))
 check("M138：输出含四维表头（--fix / --emit-poc / CVSS）",
       ("--fix" in (_r138.stdout or "")
        and "--emit-poc" in (_r138.stdout or "")
@@ -7215,10 +7215,10 @@ check("M138：输出含四维表头（--fix / --emit-poc / CVSS）",
 # Java/Python、delegatecall=Solidity），每个都会在不适用的语言上留一个
 # (类目, 语言) 空格 —— 41 → 47 是设计使然，不是判据退步。真正该锁的不变量
 # 在 [184]：**每个新类目至少有一门语言判得出来**，不允许整类空着。
-check("M139：覆盖缺口有界（≤50；M157 两新类目各留不适用的语言空格）",
-      _m138["gap_count"] <= 50, True)
-check("M139：补丁器映射与 doctor 单一事实源一致（27 个补丁器 / 21 类目）",
-      (_m138["patchers"], len(_m138["fix_map"])), (27, 21))
+check("M139：覆盖缺口有界（≤54；M171 两新类目各留不适用的语言空格）",
+      _m138["gap_count"] <= 54, True)
+check("M139：补丁器映射与 doctor 单一事实源一致（29 个补丁器 / 23 类目）",
+      (_m138["patchers"], len(_m138["fix_map"])), (29, 23))
 
 # ---- [140] Module 101：17 仓野战与 33 项门禁不变性总锚定 ----
 # 这一条是 M87–M102 的**总锚**：四组数字必须自洽 —— 门禁数、野战场数、
@@ -7232,11 +7232,11 @@ from core.agents.vuln_categories import CATEGORIES as _C140       # noqa: E402
 import cli as _cli140                                             # noqa: E402
 
 check("M140：门禁 51 项（冒烟+争议+地板+48 个靶场/校验项）",
-      len(_JOBS140), 51)
+      len(_JOBS140), 53)
 check("M140：野战场 34 个真实仓库", len(_REPOS140), 34)
 check("M140：规则 32 类 / 补丁器 27 类", (len(_C140),
                                           len(_cli140.DOCTOR_PATCHERS)),
-      (32, 27))
+      (34, 29))
 
 # 17 个野战场必须全部有对应 benchmark 脚本与 --strict 门禁
 _missing140 = [r[0] for r in _REPOS140
@@ -7369,8 +7369,8 @@ from core.agents.rule_detectors import (                            # noqa: E402
 )
 from core.agents.vuln_categories import CATEGORIES as _C143         # noqa: E402
 
-check("M143：header_injection 已注册（CWE-113；M157 后总数 32）",
-      (len(_C143), _C143["header_injection"].cwe), (32, "CWE-113"))
+check("M143：header_injection 已注册（CWE-113；M171 后总数 34）",
+      (len(_C143), _C143["header_injection"].cwe), (34, "CWE-113"))
 check("M143：setHeader(常量, 请求读取) → True",
       _hd143('public void f(HttpServletRequest req, HttpServletResponse resp) {\n'
              '  resp.setHeader("X-Test", req.getParameter("t"));\n}\n'), True)
@@ -7415,7 +7415,7 @@ import cli as _cli144                                                # noqa: E40
 from core.slicer.java_servlet import JavaSlicer as _JS144            # noqa: E402
 
 check("M144：补丁器登记表 27 类（doctor 单一事实源）",
-      len(_cli144.DOCTOR_PATCHERS), 27)
+      len(_cli144.DOCTOR_PATCHERS), 29)
 check("M144：第 19/20 类补丁器都进登记表且可调用",
       ("_fix_java_ssti_viewname" in _cli144.DOCTOR_PATCHERS
        and "_fix_java_header_injection" in _cli144.DOCTOR_PATCHERS
@@ -7822,7 +7822,7 @@ check("M155：第七段核对草稿数 == 根因总数",
 check("M155：第七段核对 INDEX 零断链与 CVSS 降序",
       ("INDEX.md 覆盖全部" in _o155 and "按 CVSS 降序" in _o155), True)
 check("M155：32 类规则 / 27 类补丁器都在 doctor 输出里",
-      ("共 32 类" in _o155 and "（27 类）" in _o155), True)
+      ("共 34 类" in _o155 and "（29 类）" in _o155), True)
 
 # ---- [156] Module 119：Uniswap V2 整数型状态互斥锁（1 → 0 → 1）----
 print("\n[156] Uniswap V2 整数互斥锁反向锚点（M119）")
@@ -8036,8 +8036,8 @@ from core.agents.rule_detectors import (                            # noqa: E402
 )
 from core.agents.vuln_categories import CATEGORIES as _C160         # noqa: E402
 
-check("M160：mass_assignment 已注册（CWE-915；M157 后总数 32）",
-      (len(_C160), _C160["mass_assignment"].cwe), (32, "CWE-915"))
+check("M160：mass_assignment 已注册（CWE-915；M171 后总数 34）",
+      (len(_C160), _C160["mass_assignment"].cwe), (34, "CWE-915"))
 _PY160 = ("def f(request):\n"
           "    user = User(**request.json)\n"
           "    db.session.add(user)\n")
@@ -8106,7 +8106,7 @@ import cli as _cli162                                                # noqa: E40
 from core.slicer.java_servlet import JavaSlicer as _JS162            # noqa: E402
 
 check("M162：补丁器登记表 27 类（doctor 单一事实源）",
-      len(_cli162.DOCTOR_PATCHERS), 27)
+      len(_cli162.DOCTOR_PATCHERS), 29)
 check("M162：第 21/22 类补丁器都进登记表",
       ("_fix_java_mass_assignment" in _cli162.DOCTOR_PATCHERS
        and "_fix_java_weakrand" in _cli162.DOCTOR_PATCHERS), True)
@@ -8228,7 +8228,7 @@ check("M169：第八段核对两个导出器（SARIF + GitLab）",
 check("M169：第八段核对跨仓聚类计数守恒",
       "跨仓聚类" in _o169 and "计数守恒" in _o169, True)
 check("M169：第八段报出 32 类 / 27 类（单一事实源）",
-      "规则 32 类 / 补丁器 27 类" in _o169, True)
+      "规则 34 类 / 补丁器 29 类" in _o169, True)
 
 # ---- [170] Module 133：八大交付格式一键大联考 ----
 print("\n[170] 八大交付格式大联考（M133）")
@@ -8805,9 +8805,9 @@ try:
     from benchmarks.run_all import JOBS as _JOBS
     from core.agents.vuln_categories import CATEGORIES as _CATS
     import cli as _cli2
-    check("M148：run_all 门禁 51 项", len(_JOBS), 51)
-    check("M148：规则注册表 32 类", len(_CATS), 32)
-    check("M148：补丁器 27 类", len(_cli2.DOCTOR_PATCHERS), 27)
+    check("M148：run_all 门禁 53 项", len(_JOBS), 53)
+    check("M148：规则注册表 34 类", len(_CATS), 34)
+    check("M148：补丁器 29 类", len(_cli2.DOCTOR_PATCHERS), 29)
     check("M148：三新类目都在注册表里",
           all(k in _CATS for k in ("unsafe_reflection", "zip_slip",
                                    "delegatecall_untrusted")), True)
@@ -8875,8 +8875,8 @@ try:
     check("M151：27 个补丁器全部可调用",
           all(callable(getattr(_cli186, _f, None))
               for _f in _cli186.DOCTOR_PATCHERS), True)
-    check("M151：MATRIX_FIX_MAP 21 类目",
-          len(_cli186.MATRIX_FIX_MAP), 21)
+    check("M151：MATRIX_FIX_MAP 23 类目",
+          len(_cli186.MATRIX_FIX_MAP), 23)
 except Exception as _e186:                                           # noqa: BLE001
     check(f"M151：矩阵恒等可导入（{type(_e186).__name__}）", True, True)
 
@@ -8999,7 +8999,7 @@ finally:
     shutil.rmtree(_d188, ignore_errors=True) if "_d188" in dir() else None
 
 print("\n[189] M157/M158：新类目注册与矩阵映射")
-check("M157：CATEGORIES 32 类", len(_C143), 32)
+check("M157：CATEGORIES 34 类", len(_C143), 34)
 check("M157：unrestricted_upload 已在注册表",
       (_C143["unrestricted_upload"].cwe, _C143["unrestricted_upload"].owasp),
       ("CWE-434", False))
@@ -9234,6 +9234,132 @@ print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
 check("M166：源码里 [186]-[200] 标签齐全",
       all(f"[{n}]" in Path(__file__).read_text(encoding="utf-8")
           for n in range(186, 201)), True)
+
+
+
+print("\n[201] M171：nosqli 正反例 + 补丁 #28")
+from core.agents.rule_detectors import nosqli_verdict as _ns201     # noqa: E402
+_NS_JAVA_V = '''public String q(String body) {
+    Document d = Document.parse(body);
+    return d.toJson();
+}'''
+_NS_JAVA_S = '''public String q(String body) {
+    if (body.contains("$")) { throw new IllegalArgumentException("bad"); }
+    Document d = Document.parse(body);
+    return d.toJson();
+}'''
+_NS_PY_V = '''def q(request, coll):
+    body = request.get_json()
+    return coll.find(body)
+'''
+_NS_PY_S = '''def q(request, coll):
+    body = request.get_json()
+    if any(str(k).startswith("$") for k in body):
+        raise ValueError("bad")
+    return coll.find(body)
+'''
+check("M171：Java Document.parse(body) -> True", _ns201(_NS_JAVA_V), True)
+check("M171：Java 拒绝 $ 后 -> False", _ns201(_NS_JAVA_S), False)
+check("M171：Python coll.find(request_json) -> True", _ns201(_NS_PY_V), True)
+check("M171：Python 拒绝 $ 后 -> False", _ns201(_NS_PY_S), False)
+try:
+    _d201 = Path(_ws_mkdtemp("ns201_"))
+    (_d201 / "src" / "main" / "java" / "demo").mkdir(parents=True)
+    (_d201 / "src" / "main" / "java" / "demo" / "Q.java").write_text(
+        'package demo;\nimport org.bson.Document;\n'
+        'import org.springframework.web.bind.annotation.*;\n'
+        '@RestController\npublic class Q {\n  @PostMapping("/q")\n'
+        + _NS_JAVA_V + '\n}\n',
+        encoding="utf-8")
+    from core.slicer.java_servlet import JavaSlicer as _JS201       # noqa: E402
+    _u201 = next(x for x in _JS201(_d201).extract_entry_units()
+                 if x.unit_name.endswith("q"))
+    _l201: list = []
+    check("M171：补丁 #28 True->False", _cli186._fix_nosqli(
+        _d201, [_u201], _l201), 1)
+    check("M171：补丁后文件还原",
+          "contains" not in (_d201 / "src" / "main" / "java" / "demo" /
+                             "Q.java").read_text(encoding="utf-8"), True)
+finally:
+    shutil.rmtree(_d201, ignore_errors=True) if "_d201" in dir() else None
+
+print("\n[202] M172：log_injection 正反例 + 补丁 #29")
+from core.agents.rule_detectors import log_injection_verdict as _li202  # noqa: E402
+_LI_JAVA_V = '''public void f(String msg) {
+    log.info("user: " + msg);
+}'''
+_LI_JAVA_S = '''public void f(String msg) {
+    msg = String.valueOf(msg).replace("\\r", "").replace("\\n", "");
+    log.info("user: " + msg);
+}'''
+_LI_PY_V = '''def f(request):
+    msg = request.args.get("m")
+    logging.info(f"user: {msg}")
+'''
+_LI_PY_S = '''def f(request):
+    msg = request.args.get("m")
+    msg = str(msg).replace("\\r", "").replace("\\n", "")
+    logging.info(f"user: {msg}")
+'''
+check("M172：Java 拼接日志 -> True", _li202(_LI_JAVA_V), True)
+check("M172：Java 剥离 CR/LF 后 -> False", _li202(_LI_JAVA_S), False)
+check("M172：Python f-string 日志 -> True", _li202(_LI_PY_V), True)
+check("M172：Python 剥离 CR/LF 后 -> False", _li202(_LI_PY_S), False)
+check("M172：SLF4J 参数化日志不算拼接 -> None",
+      _li202('public void f(String m) { log.info("x {}", m); }'), None)
+try:
+    _d202 = Path(_ws_mkdtemp("li202_"))
+    (_d202 / "src" / "main" / "java" / "demo").mkdir(parents=True)
+    (_d202 / "src" / "main" / "java" / "demo" / "L.java").write_text(
+        'package demo;\n@RestController\npublic class L {\n'
+        '  private static final org.slf4j.Logger log = '
+        'org.slf4j.LoggerFactory.getLogger(L.class);\n'
+        '  @GetMapping("/l")\n' + _LI_JAVA_V + '\n}\n',
+        encoding="utf-8")
+    from core.slicer.java_servlet import JavaSlicer as _JS202       # noqa: E402
+    _u202 = next(x for x in _JS202(_d202).extract_entry_units()
+                 if x.unit_name.endswith("f"))
+    _l202: list = []
+    check("M172：补丁 #29 True->False", _cli186._fix_log_injection(
+        _d202, [_u202], _l202), 1)
+finally:
+    shutil.rmtree(_d202, ignore_errors=True) if "_d202" in dir() else None
+
+print("\n[203] M168：flask-realworld 26 入口 / 0 True / 8 条 authz False")
+_r203 = subprocess.run(
+    [sys.executable, str(ROOT / "benchmarks" / "benchmark_flask_rw.py"),
+     "--strict"], capture_output=True, text=True, encoding="utf-8",
+    errors="replace")
+check("M168：benchmark_flask_rw --strict exit 0", _r203.returncode, 0)
+check("M168：26 入口 / 全类目 0 True", ("26 入口 / 全类目 0 True"
+                                        in (_r203.stdout or "")), True)
+check("M168：8 条 authz False + 反向锚点生效",
+      ("8 条 authz False / 反向锚点生效" in (_r203.stdout or "")), True)
+
+print("\n[204] M169：v3-periphery 136 入口 / 0 True / multicall False")
+_r204 = subprocess.run(
+    [sys.executable, str(ROOT / "benchmarks" / "benchmark_v3_periphery.py"),
+     "--strict"], capture_output=True, text=True, encoding="utf-8",
+    errors="replace")
+check("M169：benchmark_v3_periphery --strict exit 0", _r204.returncode, 0)
+check("M169：136 生产入口 / 0 True", ("136 入口 / 0 True"
+                                      in (_r204.stdout or "")), True)
+check("M169：multicall delegatecall False / 公开 swap 不误判",
+      ("multicall delegatecall False" in (_r204.stdout or "")), True)
+
+print("\n[205] M171/M172：34 类 / 29 补丁器 / 23 矩阵类目")
+check("M171：CATEGORIES 34 类", len(_C143), 34)
+check("M171：nosqli CWE-943",
+      (_C143["nosqli"].cwe, _C143["nosqli"].owasp), ("CWE-943", False))
+check("M172：log_injection CWE-117",
+      (_C143["log_injection"].cwe, _C143["log_injection"].owasp),
+      ("CWE-117", False))
+check("M171/M172：29 个补丁器全部可调用",
+      all(callable(getattr(_cli186, _f, None))
+          for _f in _cli186.DOCTOR_PATCHERS), True)
+check("M171/M172：两新类目进 MATRIX_FIX_MAP",
+      all(k in _cli186.MATRIX_FIX_MAP for k in ("nosqli",
+                                                "log_injection")), True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

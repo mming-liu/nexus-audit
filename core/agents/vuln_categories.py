@@ -541,6 +541,34 @@ CATEGORIES: dict[str, VulnCategory] = {
             "用 OpenZeppelin ECDSA.recover（库内已做零地址校验）且消费 nonce"
             " 的写法属于安全。"),
     ),
+    # ---------------- M171：第 33 类 —— NoSQL 注入（CWE-943） ----------------
+    "nosqli": VulnCategory(
+        key="nosqli", display="NoSQL 注入",
+        cwe="CWE-943", owasp=False, needs_taint=False,
+        sink_question=(
+            "函数是否把外部可控的查询串/查询对象直接交给 MongoDB API？包括："
+            "① Java BasicDBObject.parse(x) / Document.parse(x)；"
+            "② new BasicDBObject(\"$where\", x)；"
+            "③ Python pymongo 的 find/find_one/update_* 收到 request.json /"
+            " request.get_json() / 外部字典。"),
+        property=(
+            "进入 Mongo 查询前是否拒绝以 $ 开头的操作符键（或把值强类型化成"
+            " str/int，且键是服务端固定常量）？"
+            "注意：只转义引号不拦 $ne/$gt/$where，不算防护。"),
+    ),
+
+    # ---------------- M172：第 34 类 —— 日志注入（CWE-117） ----------------
+    "log_injection": VulnCategory(
+        key="log_injection", display="日志注入 / CRLF 伪造",
+        cwe="CWE-117", owasp=False, needs_taint=False,
+        sink_question=(
+            "函数是否把外部可控字符串直接拼进日志调用（log/logger 的"
+            " info/warn/error/debug，或 Python logging）？"),
+        property=(
+            "写日志前是否剥离 CR/LF（replace(\"\\r\",\"\") / replace(\"\\n\",\"\")）"
+            "或用 escapeJava / 结构化参数化日志？"
+            "注意：只做 HTML 转义不处理换行，仍可伪造日志行。"),
+    ),
 }
 
 ALL_KEYS = list(CATEGORIES.keys())

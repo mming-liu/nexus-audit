@@ -148,7 +148,7 @@ def main() -> int:
         bad.append("守卫文本不在（normalize + startsWith）")
     ok = not bad
     print()
-    print("STRICT PASS ✔（15 入口 / 32 类 0 True / zip_slip 真实解压路径 False / "
+    print("STRICT PASS ✔（15 入口 / 34 类 0 True / zip_slip 真实解压路径 False / "
           "反向锚点 True）" if ok else "STRICT FAIL ✘ " + "；".join(bad))
 
     out = Path(args.output)

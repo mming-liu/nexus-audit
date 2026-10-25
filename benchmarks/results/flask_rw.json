@@ -1,0 +1,21 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flask-realworld",
+  "total_units": 26,
+  "decided": 83,
+  "true": 0,
+  "authz": {
+    "update_article": false,
+    "delete_article": false,
+    "favorite_an_article": false,
+    "unfavorite_an_article": false,
+    "make_comment_on_article": false,
+    "delete_comment_on_article": false,
+    "follow_user": false,
+    "get_profile": false
+  },
+  "anchor_vuln": true,
+  "anchor_safe": false,
+  "fp": 0,
+  "reverse_fn": 0,
+  "pass": true
+}

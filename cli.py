@@ -1892,6 +1892,9 @@ MATRIX_FIX_MAP: dict[str, tuple[str, ...]] = {
     # M157/M158：第 31、32 类
     "unrestricted_upload": ("_fix_unrestricted_upload",),
     "signature_replay": ("_fix_solidity_ecrecover",),
+    # M171/M172：第 33、34 类
+    "nosqli": ("_fix_nosqli",),
+    "log_injection": ("_fix_log_injection",),
 }
 
 
@@ -2283,6 +2286,9 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_zip_slip(repo, py, report)
         # M157：第 31 类 —— Python UploadFile 文件名校验
         n += _fix_unrestricted_upload(repo, py, report)
+        # M171/M172：第 33、34 类
+        n += _fix_nosqli(repo, py, report)
+        n += _fix_log_injection(repo, py, report)
     if sol:
         n += _fix_solidity_txorigin(repo, sol, report)
         n += _fix_solidity_reentrancy(repo, sol, report)
@@ -2308,6 +2314,9 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_zip_slip(repo, rest, report)
         # M157：第 31 类 —— Java MultipartFile 文件名校验
         n += _fix_unrestricted_upload(repo, rest, report)
+        # M171/M172：第 33、34 类
+        n += _fix_nosqli(repo, rest, report)
+        n += _fix_log_injection(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
     if n:
         out = Path(out_path)
@@ -4006,6 +4015,8 @@ DOCTOR_PATCHERS = [
     "_fix_solidity_delegatecall",
     # M157/M158：第 31、32 类
     "_fix_unrestricted_upload", "_fix_solidity_ecrecover",
+    # M171/M172：第 33、34 类
+    "_fix_nosqli", "_fix_log_injection",
 ]
 
 
@@ -4736,6 +4747,157 @@ def _fix_solidity_ecrecover(repo: Path, targets: list, lines: list) -> int:
         else:
             lines += [f"## [signature_replay] {u.unit_name}（{f.name}）",
                       f"- 补丁后规则仍报 {v2!r}，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
+
+def _fix_nosqli(repo: Path, targets: list, lines: list) -> int:
+    """第 33 类（M171）：Mongo 查询前拒绝 $ 操作符键。"""
+    from core.agents.rule_detectors import verdict as rule_verdict, _looks_python
+    fence = chr(96) * 3
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("nosqli", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        py = _looks_python(src)
+        if py:
+            m = re.search(r"(?m)^([ \t]*)(\w+)\s*=\s*request\s*\.\s*"
+                          r"(?:json|get_json|args|form)", original)
+            if not m:
+                continue
+            var, indent = m.group(2), m.group(1)
+            at = original[:m.end()].count("\n") + 1
+            guard = (f"{indent}if any(str(k).startswith(\"$\") for k in {var}):\n"
+                     f"{indent}    raise ValueError(\"mongo operator\")\n")
+        else:
+            m = re.search(r"(?m)^([ \t]*).*?\b(?:Document|BasicDBObject)\s*"
+                          r"\.\s*parse\s*\(\s*(\w+)", original)
+            if not m:
+                continue
+            var, indent = m.group(2), m.group(1)
+            at = original[:m.start()].count("\n")
+            guard = (f"{indent}if ({var}.contains(\"$\")) {{ "
+                     f"throw new IllegalArgumentException(\"mongo operator\"); }}\n")
+        patched_lines = original.splitlines(keepends=True)
+        patched_lines.insert(at, guard)
+        patched = "".join(patched_lines)
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+            if py:
+                from core.slicer.web_treesitter import WebTreeSitterSlicer
+                u2 = next((x for x in WebTreeSitterSlicer(repo).extract_entry_units(repo)
+                           if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+            else:
+                from core.slicer.java_servlet import JavaSlicer
+                u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                           if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+            v2 = rule_verdict("nosqli", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}", tofile=f"b/{f.name}",
+                                        lineterm="")
+            lines += [f"## [nosqli] {u.unit_name}（{f.name}）", fence + "diff",
+                      *diff, fence, "",
+                      "> 自检通过：重切片 + 重跑 nosqli -> False。",
+                      "> 拒绝 $ 操作符键；上线前请同时限制查询深度与键集合。", ""]
+        else:
+            lines += [f"## [nosqli] {u.unit_name}（{f.name}）",
+                      f"- 补丁后规则仍报 {v2!r}，**不推荐**该补丁", ""]
+    return fixed
+
+
+def _fix_log_injection(repo: Path, targets: list, lines: list) -> int:
+    """第 34 类（M172）：日志调用前剥离 CR/LF。"""
+    from core.agents.rule_detectors import verdict as rule_verdict, _looks_python
+    fence = chr(96) * 3
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("log_injection", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        py = _looks_python(src)
+        log_re = (r"(?m)^([ \t]*).*\b(?:logging|log|logger|LOG|LOGGER)\s*\.\s*"
+                  r"(?:info|warn|warning|error|debug|trace)\s*\(")
+        m = re.search(log_re, original)
+        if not m:
+            continue
+        indent = m.group(1)
+        line_end = original.find("\n", m.start())
+        line = original[m.start(): line_end if line_end >= 0 else len(original)]
+        body = original[:m.start()]
+        cands = re.findall(r"\b([a-zA-Z_]\w*)\b", line)
+        params = set()
+        if py:
+            for c in cands:
+                if re.search(rf"\b{c}\s*=\s*request\s*\.", body):
+                    params.add(c)
+        else:
+            for c in cands:
+                if re.search(rf"\bString\s+{re.escape(c)}\b", body):
+                    params.add(c)
+        if not params:
+            continue
+        var = sorted(params, key=len, reverse=True)[0]
+        if py:
+            guard = (f"{indent}{var} = str({var}).replace(\"\\r\", \"\")"
+                     f".replace(\"\\n\", \"\")\n")
+        else:
+            guard = (f"{indent}{var} = String.valueOf({var})"
+                     f".replace(\"\\r\", \"\").replace(\"\\n\", \"\");\n")
+        at = original[:m.start()].count("\n")
+        patched_lines = original.splitlines(keepends=True)
+        patched_lines.insert(at, guard)
+        patched = "".join(patched_lines)
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+            if py:
+                from core.slicer.web_treesitter import WebTreeSitterSlicer
+                u2 = next((x for x in WebTreeSitterSlicer(repo).extract_entry_units(repo)
+                           if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+            else:
+                from core.slicer.java_servlet import JavaSlicer
+                u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                           if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+            v2 = rule_verdict("log_injection", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}", tofile=f"b/{f.name}",
+                                        lineterm="")
+            lines += [f"## [log_injection] {u.unit_name}（{f.name}）", fence + "diff",
+                      *diff, fence, "",
+                      "> 自检通过：重切片 + 重跑 log_injection -> False。", ""]
+        else:
+            lines += [f"## [log_injection] {u.unit_name}（{f.name}）",
+                      f"- 补丁后规则仍报 {v2!r}，**不推荐**该补丁", ""]
     return fixed
 
 
