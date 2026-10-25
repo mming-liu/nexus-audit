@@ -289,6 +289,8 @@ class WebTreeSitterSlicer:
         # `@admin_required`）。放在**展开之后**：守卫装饰器不是被调函数，
         # BFS 不会把它的实现体带进来，必须单独贴。
         self._attach_auth_guards(repo, filtered)
+        # M154：FastAPI 的 Annotated 别名 / APIRouter 级 dependencies
+        self._attach_fastapi_dependencies(repo, filtered)
         return filtered
 
     # ---------------- M137：装饰器守卫证据头 ----------------
@@ -343,6 +345,92 @@ class WebTreeSitterSlicer:
                 if info:
                     rel, line, body = info
                     evidence += (f"\n\n// ---- 守卫装饰器实现体 [{rel}:{line}] ----\n"
+                                 f"{body}")
+            u.source_code = header + u.source_code + evidence
+
+
+    # ---------------- M154：FastAPI Annotated/APIRouter 依赖证据 ----------------
+    #
+    # FastAPI 的认证几乎不写在函数体里：
+    #   SessionDep = Annotated[Session, Depends(get_db)]
+    #   CurrentUser = Annotated[User, Depends(get_current_user)]
+    #   @router.get("/", dependencies=[Depends(get_current_active_superuser)])
+    #   router = APIRouter(prefix="/users")
+    #
+    # 判据只看 source 文本时，CurrentUser 是一个**类型别名**（名字里没有
+    # auth 语义），路由级 dependencies 又在多行装饰器里 —— 两者都会被
+    # 漏成"缺鉴权"。这里把别名展开成 Depends(...) 证据头，并把 APIRouter
+    # 的模块级 dependencies 挂到该 router 的每个入口上；同时贴依赖函数
+    # 实现体，判据据此核验它真的会拒绝（403/raise），不是只认名字。
+
+    @staticmethod
+    def _balanced_span(text: str, open_idx: int,
+                       open_ch: str = "(", close_ch: str = ")") -> str:
+        depth = 0
+        for i in range(open_idx, len(text)):
+            if text[i] == open_ch:
+                depth += 1
+            elif text[i] == close_ch:
+                depth -= 1
+                if depth == 0:
+                    return text[open_idx:i + 1]
+        return text[open_idx:]
+
+    def _attach_fastapi_dependencies(self, repo: Path,
+                                     units: List["CodeUnit"]) -> None:
+        text_cache: dict[str, str] = {}
+        aliases: dict[str, list[str]] = {}
+        routers: dict[tuple[str, str], list[str]] = {}
+        for py in sorted(repo.rglob("*.py")):
+            if any(part in IGNORE_DIRS for part in py.parts):
+                continue
+            try:
+                text = py.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            text_cache[str(py)] = text
+            for m in re.finditer(r"(?m)^[ \t]*(\w+)\s*=\s*APIRouter\s*\(", text):
+                args = self._balanced_span(text, m.end() - 1)
+                dm = re.search(r"dependencies\s*=\s*\[(.*?)\]", args, re.S)
+                if dm:
+                    deps = re.findall(r"Depends\s*\(\s*([\w.]+)", dm.group(1))
+                    if deps:
+                        routers[(str(py), m.group(1))] = deps
+            for m in re.finditer(r"(?m)^[ \t]*(\w+)\s*=\s*Annotated\s*\[", text):
+                inside = self._balanced_span(text, m.end() - 1, "[", "]")
+                deps = re.findall(r"Depends\s*\(\s*([\w.]+)", inside)
+                if deps:
+                    aliases[m.group(1)] = deps
+        if not aliases and not routers:
+            return
+        cache: dict[str, tuple[str, int, str] | None] = {}
+        for u in units:
+            fkey = str(Path(u.file_path))
+            text = text_cache.get(fkey)
+            if not text:
+                continue
+            lines = text.splitlines()
+            pre = "\n".join(lines[max(0, u.start_line - 16):u.start_line - 1])
+            deps: list[str] = []
+            for rm in re.finditer(r"@\s*(\w+)\.", pre):
+                deps += routers.get((fkey, rm.group(1)), [])
+            deps += re.findall(r"Depends\s*\(\s*([\w.]+)", pre)
+            sig = (u.source_code or "")[:700]
+            for alias, adeps in aliases.items():
+                if re.search(rf":\s*{re.escape(alias)}\b", sig):
+                    deps += adeps
+            deps = list(dict.fromkeys(deps))
+            if not deps:
+                continue
+            header = "".join(f"// Auth-Dependency: Depends({d})\n" for d in deps)
+            evidence = ""
+            for d in deps:
+                if d not in cache:
+                    cache[d] = self._find_decorator_def(repo, d)
+                info = cache[d]
+                if info:
+                    rel, line, body = info
+                    evidence += (f"\n\n// ---- 依赖实现体 [{rel}:{line}] ----\n"
                                  f"{body}")
             u.source_code = header + u.source_code + evidence
 

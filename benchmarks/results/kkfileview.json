@@ -1,0 +1,19 @@
+{
+  "bench": "kkfileview",
+  "units": 15,
+  "total_units": 15,
+  "decided": 65,
+  "correct": 15,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 65,
+  "zip_slip": {
+    "unrar": false,
+    "helper": false,
+    "unrar_alone": null,
+    "unguarded": true,
+    "unguarded_helper": true
+  },
+  "guard_text": true,
+  "true_rows": []
+}

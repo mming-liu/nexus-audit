@@ -6,23 +6,21 @@
   "correct": 487,
   "fp": 0,
   "reverse_fn": 0,
-  "rule_evaluations": 2718,
+  "rule_evaluations": 2723,
   "authz_true": 0,
   "non_authz_by_category": {
     "cors": 1,
-    "cmdi": 4,
     "deserial": 4,
-    "xss": 3,
+    "xss": 2,
     "hash": 4,
-    "sqli": 4,
+    "sqli": 3,
     "redir": 3
   },
   "frozen_non_authz": {
-    "cmdi": 4,
     "deserial": 4,
     "hash": 4,
-    "sqli": 4,
-    "xss": 3,
+    "sqli": 3,
+    "xss": 2,
     "redir": 3,
     "cors": 1
   },
@@ -81,11 +79,6 @@
       "file": "JobGroupController.java",
       "unit": "JobGroupController.remove",
       "category": "cors"
-    },
-    {
-      "file": "JobGroupController.java",
-      "unit": "JobGroupController.loadById",
-      "category": "cmdi"
     },
     {
       "file": "JobGroupController.java",
@@ -155,11 +148,6 @@
     {
       "file": "JobLogController.java",
       "unit": "JobLogController.logDetailPage",
-      "category": "cmdi"
-    },
-    {
-      "file": "JobLogController.java",
-      "unit": "JobLogController.logDetailPage",
       "category": "deserial"
     },
     {
@@ -170,22 +158,12 @@
     {
       "file": "JobLogController.java",
       "unit": "JobLogController.logDetailCat",
-      "category": "cmdi"
-    },
-    {
-      "file": "JobLogController.java",
-      "unit": "JobLogController.logDetailCat",
       "category": "deserial"
     },
     {
       "file": "JobLogController.java",
       "unit": "JobLogController.logDetailCat",
       "category": "cors"
-    },
-    {
-      "file": "JobLogController.java",
-      "unit": "JobLogController.logKill",
-      "category": "cmdi"
     },
     {
       "file": "JobLogController.java",
@@ -546,11 +524,6 @@
       "file": "SysAnnouncementController.java",
       "unit": "SysAnnouncementController.syncNotic",
       "category": "cors"
-    },
-    {
-      "file": "SysAnnouncementController.java",
-      "unit": "SysAnnouncementController.showContent",
-      "category": "xss"
     },
     {
       "file": "SysAnnouncementController.java",
@@ -921,11 +894,6 @@
       "file": "SysDepartController.java",
       "unit": "SysDepartController.deleteBatch",
       "category": "cors"
-    },
-    {
-      "file": "SysDepartController.java",
-      "unit": "SysDepartController.queryIdTree",
-      "category": "sqli"
     },
     {
       "file": "SysDepartController.java",

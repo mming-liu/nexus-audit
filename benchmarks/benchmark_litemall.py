@@ -43,9 +43,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from core.text_utils import ensure_utf8_stdio                   # noqa: E402
 from core.agents.rule_detectors import verdict as rule_verdict   # noqa: E402
 from core.slicer.java_servlet import JavaSlicer                  # noqa: E402
 from benchmarks.slice_cache import cached_units                  # noqa: E402
+
+ensure_utf8_stdio()
 
 DEFAULT_TARGET = ROOT / "reference_repos" / "litemall-master"
 

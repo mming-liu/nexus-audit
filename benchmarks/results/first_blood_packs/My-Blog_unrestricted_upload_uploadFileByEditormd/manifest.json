@@ -1,0 +1,12 @@
+{
+  "repo": "My-Blog",
+  "github": "ZHENFENG13/My-Blog",
+  "category": "unrestricted_upload",
+  "unit": "BlogController.uploadFileByEditormd",
+  "file": "BlogController.java",
+  "line": 185,
+  "affected_routes": 1,
+  "patch_verified": true,
+  "poc_ok": true,
+  "component_cve": ""
+}

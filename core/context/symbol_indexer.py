@@ -200,9 +200,27 @@ class SymbolIndexer:
         source = "\n".join(lines[sym["start"] - 1: sym["end"]])
         # 裁剪尾部误入的空行/下一个符号的装饰器（第1周收尾项）
         src_lines = source.splitlines()
-        while src_lines and (not src_lines[-1].strip() or src_lines[-1].lstrip().startswith("@")):
+        while src_lines and (not src_lines[-1].strip()
+                             or src_lines[-1].lstrip().startswith("@")):
             src_lines.pop()
-        source = "\n".join(src_lines)
+        # M154：**跨行**的下一个函数装饰器也会被算进本符号（FastAPI 的
+        # @router.post( 多行参数 )。尾部只剩 ")" / 参数行，不以 @ 开头，
+        # 旧的 while 条件停不住，装饰器连同 dependencies 一起混进入口体。
+        # 从尾部找最后一个 @ 行；它之后没有 def/class 就整段剥掉（循环处理
+        # 堆叠装饰器）。
+        while True:
+            tail = None
+            for i in range(len(src_lines) - 1, -1, -1):
+                if src_lines[i].lstrip().startswith("@"):
+                    tail = i
+                    break
+            if tail is None:
+                break
+            if any(l.lstrip().startswith(("def ", "async def ", "class "))
+                   for l in src_lines[tail:]):
+                break
+            src_lines = src_lines[:tail]
+        source = "\n".join(src_lines).rstrip()
         return {"name": sym.get("name", ""), "file_path": sym["file"],
                 "start_line": sym["start"], "end_line": sym["end"],
                 "decorators": sym["decorators"], "source": source}

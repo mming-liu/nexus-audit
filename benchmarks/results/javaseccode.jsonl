@@ -20,8 +20,8 @@
 {"unit": "SQLI.jdbc_sqli_sec", "route": "/jdbc/sec", "category": "sqli", "real_vuln": false, "truth_src": "route", "flagged": false, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "SQLI.jdbc_ps_vuln", "route": "/jdbc/ps/vuln", "category": "sqli", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "SQLI.mybatisVuln01", "route": "/mybatis/vuln01", "category": "sqli", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
-{"unit": "SQLI.mybatisVuln02", "route": "/mybatis/vuln02", "category": "sqli", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
-{"unit": "SQLI.mybatisVuln03", "route": "/mybatis/orderby/vuln03", "category": "sqli", "real_vuln": true, "truth_src": "route", "flagged": true, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
+{"unit": "SQLI.mybatisVuln02", "route": "/mybatis/vuln02", "category": "sqli", "real_vuln": true, "truth_src": "route", "flagged": null, "stage": "not_judged", "detail": "规则未覆盖（离线模式）", "elapsed_s": 0.0}
+{"unit": "SQLI.mybatisVuln03", "route": "/mybatis/orderby/vuln03", "category": "sqli", "real_vuln": true, "truth_src": "route", "flagged": null, "stage": "not_judged", "detail": "规则未覆盖（离线模式）", "elapsed_s": 0.0}
 {"unit": "SQLI.mybatisSec01", "route": "/mybatis/sec01", "category": "sqli", "real_vuln": false, "truth_src": "route", "flagged": false, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "SQLI.mybatisSec02", "route": "/mybatis/sec02", "category": "sqli", "real_vuln": false, "truth_src": "route", "flagged": false, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}
 {"unit": "SQLI.mybatisSec03", "route": "/mybatis/sec03", "category": "sqli", "real_vuln": false, "truth_src": "route", "flagged": false, "stage": "rule", "detail": "deterministic", "elapsed_s": 0.0}

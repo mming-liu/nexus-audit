@@ -855,6 +855,13 @@ class JavaSlicer:
     # 会把入口体截成空（实测 M38 首跑 body len 0）。用方括号标签。
     _GLOBAL_AUTHZ_MARK = ("// [global-authz] Spring Security 过滤器统一认证"
                           "（JwtAuthenticationTokenFilter / addFilterBefore）")
+    # M156：Apollo 形态 —— 仓库同时提供"启用认证"与"默认关闭认证"两套
+    # Spring Security 配置（@ConditionalOnMissingProfile / @Profile）。
+    # 入口有没有鉴权取决于**部署 profile**，静态切片证明不了；
+    # 按铁律退 None，不判 True（把"部署未开 auth"当代码漏洞是假阳）。
+    _PROFILE_AUTHZ_MARK = ("// [auth-profile-dependent] 认证由 Spring Security "
+                           "profile 决定（anyRequest().hasAnyRole）；"
+                           "默认部署可能匿名可达，静态不可判")
 
     def _mark_global_authz(self, root: Path, units: List[CodeUnit]) -> None:
         """仓库级统一鉴权检测（机器标记，检测失败静默跳过）。
@@ -880,6 +887,25 @@ class JavaSlicer:
                         if src and self._GLOBAL_AUTHZ_MARK not in src:
                             u.source_code = self._GLOBAL_AUTHZ_MARK + "\n" + src
                     return
+            # ①b Spring Security profile 门（M156 Apollo）：anyRequest()
+            # 的 hasAnyRole 只在 auth/ldap/oidc profile 生效，默认配置
+            # 直接放行。整库打"依赖 profile"标记，authz 判据退 None。
+            profile_auth = False
+            for java in root.rglob("*.java"):
+                try:
+                    text = java.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                if ("anyRequest().hasAnyRole(" in text
+                        and ("@ConditionalOnMissingProfile" in text
+                             or "@Profile(" in text)):
+                    profile_auth = True
+                    break
+            if profile_auth:
+                for u in units:
+                    src = u.source_code or ""
+                    if src and self._PROFILE_AUTHZ_MARK not in src:
+                        u.source_code = self._PROFILE_AUTHZ_MARK + "\n" + src
             # ② 前缀级统一保护（M63 MvcConfigurer + M64 Shiro 过滤链）：
             #    · addPathPatterns("/admin/**")（Spring MVC 拦截器）
             #    · filterChainDefinitionMap.put("/admin/**", "authc")

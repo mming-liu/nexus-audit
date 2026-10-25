@@ -1,0 +1,12 @@
+{
+  "repo": "RuoYi",
+  "github": "yangzongzhuan/RuoYi",
+  "category": "sqli",
+  "unit": "GenController.create",
+  "file": "GenController.java",
+  "line": 195,
+  "affected_routes": 1,
+  "patch_verified": true,
+  "poc_ok": true,
+  "component_cve": ""
+}

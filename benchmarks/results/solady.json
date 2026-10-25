@@ -1,0 +1,31 @@
+{
+  "bench": "solady",
+  "units": 2968,
+  "total_units": 2968,
+  "decided": 14840,
+  "correct": 2968,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 14840,
+  "checks": {
+    "Ownable.transferOwnership": false,
+    "OwnableRoles.grantRoles": false,
+    "ERC721.transferFrom": false,
+    "ERC721.safeTransferFrom": false
+  },
+  "evidence": {
+    "Ownable.transferOwnership": true,
+    "OwnableRoles.grantRoles": true,
+    "ERC721.transferFrom": true,
+    "ERC721.safeTransferFrom": true
+  },
+  "safe_transfer_units": 42,
+  "safe_transfer_true": [],
+  "mechanism_anchor": {
+    "unguarded": true,
+    "guarded": false,
+    "role_unguarded": true,
+    "role_guarded": false
+  },
+  "true_rows": []
+}

@@ -35,9 +35,9 @@
       "none": 60
     },
     "xss": {
-      "true": 0,
+      "true": 3,
       "false": 31,
-      "none": 42
+      "none": 39
     },
     "pathtraver": {
       "true": 0,

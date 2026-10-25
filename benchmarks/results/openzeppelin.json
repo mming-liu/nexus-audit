@@ -7,7 +7,7 @@
   "correct": 576,
   "fp": 0,
   "reverse_fn": 0,
-  "rule_evaluations": 1511,
+  "rule_evaluations": 1517,
   "anchors": [
     {
       "unit": "access/Ownable2Step.sol:acceptOwnership",

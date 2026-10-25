@@ -1,0 +1,11 @@
+--- a/GenTableMapper.xml
++++ b/GenTableMapper.xml
+@@ -166,7 +166,7 @@
+     </insert>
+     
+     <update id="createTable">
+-        ${sql}
++        #{sql}
+     </update>
+     
+     <update id="updateGenTable" parameterType="GenTable">

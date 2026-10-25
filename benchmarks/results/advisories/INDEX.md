@@ -1,20 +1,19 @@
 # 披露草稿总目录（nexus-audit `--advisory-dir`）
 
-共 **98** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
+共 **119** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
 带 [Auto-Fix Verified] 的草稿内嵌通过自检的补丁 diff。
 
 | CVSS | 严重级 | CWE | 类目 | 草稿 |
 |---|---|---|---|---|
-| 9.8 | CRITICAL | CWE-78 | cmdi | [GHSA-008B-9D7D-8394-cmdi-joblogcontroller-logdetailpage.md](GHSA-008B-9D7D-8394-cmdi-joblogcontroller-logdetailpage.md) |
 | 9.8 | CRITICAL | CWE-502 | deserial | [GHSA-027D-A8E1-52CE-deserial-jobgroupcontroller-loadbyid.md](GHSA-027D-A8E1-52CE-deserial-jobgroupcontroller-loadbyid.md) |
+| 9.8 | CRITICAL | CWE-502 | deserial | [GHSA-0294-EF83-9BF6-deserial-appcontroller-findmissenvs.md](GHSA-0294-EF83-9BF6-deserial-appcontroller-findmissenvs.md) |
 | 9.8 | CRITICAL | CWE-78 | cmdi | [GHSA-07E3-44FB-F343-cmdi-upload.md](GHSA-07E3-44FB-F343-cmdi-upload.md) |
-| 9.8 | CRITICAL | CWE-89 | sqli | [GHSA-0DF9-ACA7-5D88-sqli-sysdepartcontroller-queryidtree.md](GHSA-0DF9-ACA7-5D88-sqli-sysdepartcontroller-queryidtree.md) |
 | 9.8 | CRITICAL | CWE-798 | hardcoded_secret | [GHSA-103D-C9DB-C856-hardcoded-secret-secret-file-jwthelper-java.md](GHSA-103D-C9DB-C856-hardcoded-secret-secret-file-jwthelper-java.md) |
 | 9.8 | CRITICAL | CWE-89 | sqli | [GHSA-11B8-C1D3-3D97-sqli-sysannouncementsendcontroller-editbyid.md](GHSA-11B8-C1D3-3D97-sqli-sysannouncementsendcontroller-editbyid.md) |
 | 9.8 | CRITICAL | CWE-798 | hardcoded_secret | [GHSA-1C2C-C72A-57EF-hardcoded-secret-secret-file-app-py.md](GHSA-1C2C-C72A-57EF-hardcoded-secret-secret-file-app-py.md) |
-| 9.8 | CRITICAL | CWE-78 | cmdi | [GHSA-456D-6EE3-BDB5-cmdi-joblogcontroller-logkill.md](GHSA-456D-6EE3-BDB5-cmdi-joblogcontroller-logkill.md) |
 | 9.8 | CRITICAL | CWE-94 | spel | [GHSA-4F8E-30FC-987F-spel-api-id.md](GHSA-4F8E-30FC-987F-spel-api-id.md) |
 | 9.8 | CRITICAL | CWE-89 | sqli | [GHSA-5B2E-CF0B-7B6C-sqli-sysusercontroller-frozenbatch.md](GHSA-5B2E-CF0B-7B6C-sqli-sysusercontroller-frozenbatch.md) |
+| 9.8 | CRITICAL | CWE-502 | deserial | [GHSA-76C3-B648-275E-deserial-appcontroller-load.md](GHSA-76C3-B648-275E-deserial-appcontroller-load.md) |
 | 9.8 | CRITICAL | CWE-89 | sqli | [GHSA-8224-3C28-B89E-sqli-gencontroller-create.md](GHSA-8224-3C28-B89E-sqli-gencontroller-create.md) |
 | 9.8 | CRITICAL | CWE-502 | deserial | [GHSA-9146-BA63-0374-deserial-wxmsgcontroller-config-2.md](GHSA-9146-BA63-0374-deserial-wxmsgcontroller-config-2.md) |
 | 9.8 | CRITICAL | CWE-502 | deserial | [GHSA-97F3-1606-46AA-deserial-joblogcontroller-logdetailpage.md](GHSA-97F3-1606-46AA-deserial-joblogcontroller-logdetailpage.md) |
@@ -25,8 +24,7 @@
 | 9.8 | CRITICAL | CWE-89 | sqli | [GHSA-C13B-DD4D-336C-sqli-sysannouncementsendcontroller-readall.md](GHSA-C13B-DD4D-336C-sqli-sysannouncementsendcontroller-readall.md) |
 | 9.8 | CRITICAL | CWE-798 | hardcoded_secret | [GHSA-C280-5407-9D34-hardcoded-secret-secret-file-settings-py.md](GHSA-C280-5407-9D34-hardcoded-secret-secret-file-settings-py.md) |
 | 9.8 | CRITICAL | CWE-502 | deserial | [GHSA-C553-610A-41E8-deserial-reset-password.md](GHSA-C553-610A-41E8-deserial-reset-password.md) |
-| 9.8 | CRITICAL | CWE-78 | cmdi | [GHSA-CD24-7BAA-9F23-cmdi-joblogcontroller-logdetailcat.md](GHSA-CD24-7BAA-9F23-cmdi-joblogcontroller-logdetailcat.md) |
-| 9.8 | CRITICAL | CWE-78 | cmdi | [GHSA-DE52-4B9B-FDCC-cmdi-jobgroupcontroller-loadbyid.md](GHSA-DE52-4B9B-FDCC-cmdi-jobgroupcontroller-loadbyid.md) |
+| 9.8 | CRITICAL | CWE-89 | sqli | [GHSA-D393-547B-EB92-sqli-accesskeycontroller-enable.md](GHSA-D393-547B-EB92-sqli-accesskeycontroller-enable.md) |
 | 9.8 | CRITICAL | CWE-94 | spel | [GHSA-EA43-DB3A-4B26-spel-api-index.md](GHSA-EA43-DB3A-4B26-spel-api-index.md) |
 | 9.8 | CRITICAL | CWE-798 | hardcoded_secret | [GHSA-F17D-02BA-8EBC-hardcoded-secret-secret-file-settings-py.md](GHSA-F17D-02BA-8EBC-hardcoded-secret-secret-file-settings-py.md) |
 | 8.6 | HIGH | CWE-918 | ssrf | [GHSA-29EF-F544-F3F9-ssrf-resttemplatedemocontroller-getforentity.md](GHSA-29EF-F544-F3F9-ssrf-resttemplatedemocontroller-getforentity.md) |
@@ -40,20 +38,28 @@
 | 8.1 | HIGH | CWE-000 | unchecked_low_level_calls | [GHSA-0F31-56EF-6B33-unchecked-low-level-calls-processccipreceive.md](GHSA-0F31-56EF-6B33-unchecked-low-level-calls-processccipreceive.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-106C-F62B-0082-authz-delete.md](GHSA-106C-F62B-0082-authz-delete.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-14B7-5562-46E6-authz-alipaycontroller-topayaspc.md](GHSA-14B7-5562-46E6-authz-alipaycontroller-topayaspc.md) |
+| 8.1 | HIGH | CWE-434 | unrestricted_upload | [GHSA-1955-F44D-769A-unrestricted-upload-newbeeadminuploadapi-uploadv2.md](GHSA-1955-F44D-769A-unrestricted-upload-newbeeadminuploadapi-uploadv2.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-1B98-8B4B-5D04-authz-articleviewset-update.md](GHSA-1B98-8B4B-5D04-authz-articleviewset-update.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-1FE8-02A6-2289-authz-generatorcontroller-querytables.md](GHSA-1FE8-02A6-2289-authz-generatorcontroller-querytables.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-23DE-F1D9-724A-authz-generatorcontroller-querycolumns.md](GHSA-23DE-F1D9-724A-authz-generatorcontroller-querycolumns.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-2641-F620-C3D7-authz-user-pay.md](GHSA-2641-F620-C3D7-authz-user-pay.md) |
+| 8.1 | HIGH | CWE-434 | unrestricted_upload | [GHSA-2AB7-CC71-9777-unrestricted-upload-deploycontroller-uploaddeploy.md](GHSA-2AB7-CC71-9777-unrestricted-upload-deploycontroller-uploaddeploy.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-30B0-949A-0F04-authz-ordercontroller-paysuccess.md](GHSA-30B0-949A-0F04-authz-ordercontroller-paysuccess.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-3144-9418-F1B8-authz-generatorcontroller-querycolumns.md](GHSA-3144-9418-F1B8-authz-generatorcontroller-querycolumns.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-46A7-C6D9-4EA1-authz-user-view.md](GHSA-46A7-C6D9-4EA1-authz-user-view.md) |
+| 8.1 | HIGH | CWE-434 | unrestricted_upload | [GHSA-479A-EBB9-007C-unrestricted-upload-databasecontroller-uploaddatabase.md](GHSA-479A-EBB9-007C-unrestricted-upload-databasecontroller-uploaddatabase.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-50DD-1AF9-BA39-authz-verifycontroller-resetpass.md](GHSA-50DD-1AF9-BA39-authz-verifycontroller-resetpass.md) |
+| 8.1 | HIGH | CWE-434 | unrestricted_upload | [GHSA-542E-0489-AAB2-unrestricted-upload-uploadcontroller-upload.md](GHSA-542E-0489-AAB2-unrestricted-upload-uploadcontroller-upload.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-56DC-2FFD-B5EB-authz-filecontroller-uploadtinymceeditorimages.md](GHSA-56DC-2FFD-B5EB-authz-filecontroller-uploadtinymceeditorimages.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-58AE-1B4E-8B65-authz-generatorcontroller-querytables.md](GHSA-58AE-1B4E-8B65-authz-generatorcontroller-querytables.md) |
+| 8.1 | HIGH | CWE-434 | unrestricted_upload | [GHSA-5A40-AED1-679C-unrestricted-upload-databasecontroller-uploaddatabase.md](GHSA-5A40-AED1-679C-unrestricted-upload-databasecontroller-uploaddatabase.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-5E16-6BFD-9C29-authz-verifycontroller-resetemail.md](GHSA-5E16-6BFD-9C29-authz-verifycontroller-resetemail.md) |
+| 8.1 | HIGH | CWE-434 | unrestricted_upload | [GHSA-6634-047E-4DD2-unrestricted-upload-newbeeadminuploadapi-upload.md](GHSA-6634-047E-4DD2-unrestricted-upload-newbeeadminuploadapi-upload.md) |
+| 8.1 | HIGH | CWE-434 | unrestricted_upload | [GHSA-6951-94BB-FA04-unrestricted-upload-blogcontroller-uploadfilebyeditormd.md](GHSA-6951-94BB-FA04-unrestricted-upload-blogcontroller-uploadfilebyeditormd.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-6B16-B41D-457B-authz-admin-delete-user.md](GHSA-6B16-B41D-457B-authz-admin-delete-user.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-8851-9E26-6A8F-authz-filecontroller-uploadelementfile.md](GHSA-8851-9E26-6A8F-authz-filecontroller-uploadelementfile.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-8E9B-6AC8-BEFC-authz-alipaycontroller-topayaspc.md](GHSA-8E9B-6AC8-BEFC-authz-alipaycontroller-topayaspc.md) |
+| 8.1 | HIGH | CWE-434 | unrestricted_upload | [GHSA-93D8-8E54-1705-unrestricted-upload-uploadcontroller-uploadv2.md](GHSA-93D8-8E54-1705-unrestricted-upload-uploadcontroller-uploadv2.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-9E0F-D289-C9A7-authz-admin-update-user.md](GHSA-9E0F-D289-C9A7-authz-admin-update-user.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-9FFE-6E89-7A89-authz-genconfigcontroller-querygenconfig.md](GHSA-9FFE-6E89-7A89-authz-genconfigcontroller-querygenconfig.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-BB2C-25AA-5603-authz-alipaycontroller-topayasweb.md](GHSA-BB2C-25AA-5603-authz-alipaycontroller-topayasweb.md) |
@@ -63,7 +69,9 @@
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-CC22-7E50-D331-authz-generatorcontroller-generatorcode.md](GHSA-CC22-7E50-D331-authz-generatorcontroller-generatorcode.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-CE47-59B1-DACE-authz-deliverycontroller-checkdelivery.md](GHSA-CE47-59B1-DACE-authz-deliverycontroller-checkdelivery.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-DE65-89DA-6BB1-authz-admin-get-user.md](GHSA-DE65-89DA-6BB1-authz-admin-get-user.md) |
+| 8.1 | HIGH | CWE-434 | unrestricted_upload | [GHSA-E03D-0929-9CFA-unrestricted-upload-uploadcontroller-upload.md](GHSA-E03D-0929-9CFA-unrestricted-upload-uploadcontroller-upload.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-E6E8-A481-852F-authz-verifycontroller-validated.md](GHSA-E6E8-A481-852F-authz-verifycontroller-validated.md) |
+| 8.1 | HIGH | CWE-434 | unrestricted_upload | [GHSA-EA3F-E726-6E27-unrestricted-upload-deploycontroller-uploaddeploy.md](GHSA-EA3F-E726-6E27-unrestricted-upload-deploycontroller-uploaddeploy.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-EC28-62F4-FAA2-authz-verifycontroller-validated.md](GHSA-EC28-62F4-FAA2-authz-verifycontroller-validated.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-F58F-2C9F-A07B-authz-verifycontroller-resetpass.md](GHSA-F58F-2C9F-A07B-authz-verifycontroller-resetpass.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-0C17-B7D9-3D49-cors-alipaycontroller-topayaspc.md](GHSA-0C17-B7D9-3D49-cors-alipaycontroller-topayaspc.md) |
@@ -75,13 +83,26 @@
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-AB88-BFFE-BC80-cors-newbeeadmincarouselapi-list.md](GHSA-AB88-BFFE-BC80-cors-newbeeadmincarouselapi-list.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-EA41-287E-036C-cors-indexcontroller-chartinfo.md](GHSA-EA41-287E-036C-cors-indexcontroller-chartinfo.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-FE2A-3A27-1194-cors-esproductcontroller-importalllist.md](GHSA-FE2A-3A27-1194-cors-esproductcontroller-importalllist.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-0E50-DD3E-643E-xss-consumercontroller-create.md](GHSA-0E50-DD3E-643E-xss-consumercontroller-create.md) |
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-193F-BEA5-1288-xss-admingoodscontroller-update.md](GHSA-193F-BEA5-1288-xss-admingoodscontroller-update.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-1C2C-59BE-5B7A-xss-uploadcontroller-uploadv2.md](GHSA-1C2C-59BE-5B7A-xss-uploadcontroller-uploadv2.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-2F30-7C10-236B-xss-uploadcontroller-upload.md](GHSA-2F30-7C10-236B-xss-uploadcontroller-upload.md) |
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-2F43-8D59-99C9-xss-jobinfocontroller-update.md](GHSA-2F43-8D59-99C9-xss-jobinfocontroller-update.md) |
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-570B-0DD8-BEEB-xss-usercollectioncontroller-addorcancel.md](GHSA-570B-0DD8-BEEB-xss-usercollectioncontroller-addorcancel.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-57E6-1A3F-8AAA-xss-commoncontroller-uploadfile.md](GHSA-57E6-1A3F-8AAA-xss-commoncontroller-uploadfile.md) |
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-5805-0E45-068A-xss-jobinfocontroller-add.md](GHSA-5805-0E45-068A-xss-jobinfocontroller-add.md) |
-| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-B586-7443-2E6B-xss-sysannouncementcontroller-showcontent.md](GHSA-B586-7443-2E6B-xss-sysannouncementcontroller-showcontent.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-5914-A2C6-8DAE-xss-serverconfigcontroller-createorupdateconfigdbcon.md](GHSA-5914-A2C6-8DAE-xss-serverconfigcontroller-createorupdateconfigdbcon.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-5DBB-96B6-9573-xss-appnamespacecontroller-create.md](GHSA-5DBB-96B6-9573-xss-appnamespacecontroller-create.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-651B-551F-8A63-xss-personalcontroller-updateinfo.md](GHSA-651B-551F-8A63-xss-personalcontroller-updateinfo.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-6824-37CC-0B48-xss-serverconfigcontroller-createorupdateportaldbcon.md](GHSA-6824-37CC-0B48-xss-serverconfigcontroller-createorupdateportaldbcon.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-684D-452A-7A8D-xss-favoritecontroller-addfavorite.md](GHSA-684D-452A-7A8D-xss-favoritecontroller-addfavorite.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-84DD-ABB9-E1CA-xss-newbeemallpersonalapi-updateinfo.md](GHSA-84DD-ABB9-E1CA-xss-newbeemallpersonalapi-updateinfo.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-93EE-B014-EA0E-xss-newbeeadminuploadapi-upload.md](GHSA-93EE-B014-EA0E-xss-newbeeadminuploadapi-upload.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-9FF8-FECB-5FA8-xss-uploadcontroller-upload.md](GHSA-9FF8-FECB-5FA8-xss-uploadcontroller-upload.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-A134-8C0E-69EB-xss-newbeeadminuploadapi-uploadv2.md](GHSA-A134-8C0E-69EB-xss-newbeeadminuploadapi-uploadv2.md) |
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-C7BF-E3EF-EA19-xss-admingoodscontroller-create.md](GHSA-C7BF-E3EF-EA19-xss-admingoodscontroller-create.md) |
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-CEB7-E68C-C504-xss-blogcontroller-gotoblogedit.md](GHSA-CEB7-E68C-C504-xss-blogcontroller-gotoblogedit.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-E9FC-3669-DC8F-xss-commoncontroller-uploadfiles.md](GHSA-E9FC-3669-DC8F-xss-commoncontroller-uploadfiles.md) |
 | 5.9 | MEDIUM | CWE-328 | hash | [GHSA-0FB4-044C-21E2-hash-logincontroller-randomimage.md](GHSA-0FB4-044C-21E2-hash-logincontroller-randomimage.md) |
 | 5.9 | MEDIUM | CWE-330 | weakrand | [GHSA-26D2-2208-32B7-weakrand-uploadcontroller-upload.md](GHSA-26D2-2208-32B7-weakrand-uploadcontroller-upload.md) |
 | 5.9 | MEDIUM | CWE-330 | weakrand | [GHSA-2C54-D87B-FB78-weakrand-uploadcontroller-uploadv2.md](GHSA-2C54-D87B-FB78-weakrand-uploadcontroller-uploadv2.md) |

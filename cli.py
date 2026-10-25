@@ -244,10 +244,12 @@ def _is_test_path(path: str | Path) -> bool:
     return any(part.lower() in _TEST_PATH_PARTS for part in Path(path).parts)
 
 
+# M164：只扫**能定义密钥的源码/配置**。minified JS bundle 与 i18n JSON
+# 里的 "secret" 是文案/字段名，不是凭证 —— kkFileView 的 index.umd.js、
+# Apollo 的 en.json 实测各贡献 1 条假阳。JS/TS/JSON 不作为文件级密钥面。
 _SECRET_FILE_EXTS = {
-    ".py", ".java", ".sol", ".properties", ".yml", ".yaml", ".xml",
-    ".json", ".js", ".ts", ".go", ".php", ".rb", ".env", ".conf",
-    ".ini", ".toml",
+    ".py", ".java", ".sol", ".properties", ".yml", ".yaml", ".env",
+    ".conf", ".ini", ".toml",
 }
 _SECRET_FILE_SKIP = {
     ".git", "__pycache__", "node_modules", "target", "build", "dist",
@@ -1793,6 +1795,44 @@ def _matrix_probe_units() -> dict[str, list]:
             p = root / name
             if p.exists():
                 units += list(JavaSlicer(p).extract_entry_units())
+        # M153：zip_slip 在真实业务代码上的唯一入口证据。
+        # kkFileView 的解压落在 service 层（无 Controller 注解），JavaSlicer
+        # 的入口切片看不到它；矩阵问的是"判据有没有"，因此单独把
+        # unRar + helper 证据拼成一个单元纳入 Java 探针。
+        kk_reader = (root / "kkFileView" / "server" / "src" / "main" /
+                     "java" / "cn" / "keking" / "service" /
+                     "CompressFileReader.java")
+        if kk_reader.is_file():
+            from core.models import CodeUnit, Language
+            _text = kk_reader.read_text(encoding="utf-8", errors="replace")
+
+            def _span(sig: str) -> str:
+                _i = _text.index(sig)
+                _j = _text.index("{", _i)
+                _depth = 0
+                for _k in range(_j, len(_text)):
+                    if _text[_k] == "{":
+                        _depth += 1
+                    elif _text[_k] == "}":
+                        _depth -= 1
+                        if _depth == 0:
+                            return _text[_i:_k + 1]
+                return _text[_i:]
+
+            try:
+                _unrar = _span("public String unRar(")
+                _helper = _span("private Path getFilePathInsideArchive(")
+                units.append(CodeUnit(
+                    file_path=str(kk_reader), language=Language.JAVA_WEB,
+                    unit_name="CompressFileReader.unRar",
+                    start_line=_text[:_text.index("public String unRar(")].count("\n") + 1,
+                    end_line=_text[:_text.index("public String unRar(")].count("\n")
+                    + _unrar.count("\n") + 1,
+                    decorators_or_modifiers=[], called_symbols=[],
+                    source_code=_unrar + "\n\n" + _helper,
+                    own_body=_unrar))
+            except ValueError:
+                pass
         if units:
             out["java"] = units
     except Exception:                                        # noqa: BLE001
@@ -1834,13 +1874,24 @@ MATRIX_FIX_MAP: dict[str, tuple[str, ...]] = {
     "hardcoded_secret": ("_fix_hardcoded_secret",),
     "jwt_weakness": ("_fix_jwt_weakness",),
     "reentrancy": ("_fix_solidity_reentrancy",),
-    "access_control": ("_fix_solidity_onlyowner", "_fix_solidity_initiator"),
+    "access_control": ("_fix_solidity_onlyowner", "_fix_solidity_initiator",
+                       "_fix_solidity_txorigin"),
     "arithmetic": ("_fix_solidity_arith_guard",),
     "unchecked_low_level_calls": ("_fix_solidity_unchecked_wrap",),
     # M139–M141：第 28、29、30 类
     "unsafe_reflection": ("_fix_java_unsafe_reflection",),
     "zip_slip": ("_fix_zip_slip",),
     "delegatecall_untrusted": ("_fix_solidity_delegatecall",),
+    # M151：把早已就位、却漏登记的 4 个补丁器接回矩阵。
+    # 矩阵的 "--fix" 列读的是这张表，不是 doctor 的名单 —— 表漏登就会
+    # 在能力矩阵里显示 "—"（看起来"没有补丁器"），而 --fix 实际能跑。
+    "ssti": ("_fix_java_ssti_viewname",),
+    "header_injection": ("_fix_java_header_injection",),
+    "mass_assignment": ("_fix_java_mass_assignment",),
+    "weakrand": ("_fix_java_weakrand",),
+    # M157/M158：第 31、32 类
+    "unrestricted_upload": ("_fix_unrestricted_upload",),
+    "signature_replay": ("_fix_solidity_ecrecover",),
 }
 
 
@@ -2230,6 +2281,8 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_hardcoded_secret(repo, py, report)
         # M140：Python 侧 Zip Slip（`extractall(..., filter="data")`）
         n += _fix_zip_slip(repo, py, report)
+        # M157：第 31 类 —— Python UploadFile 文件名校验
+        n += _fix_unrestricted_upload(repo, py, report)
     if sol:
         n += _fix_solidity_txorigin(repo, sol, report)
         n += _fix_solidity_reentrancy(repo, sol, report)
@@ -2239,6 +2292,8 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_solidity_unchecked_wrap(repo, sol, report)
         # M141：不受信 delegatecall → 目标收窄到 address(this)
         n += _fix_solidity_delegatecall(repo, sol, report)
+        # M158：第 32 类 —— ecrecover 零地址校验 + nonce 消费
+        n += _fix_solidity_ecrecover(repo, sol, report)
     if rest:
         n += _fix_cors_config(repo, rest, report)
         n += _fix_hardcoded_secret(repo, rest, report)
@@ -2251,6 +2306,8 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         # M139/M140：第 23、24 类 —— 反射白名单 / 解压前缀校验
         n += _fix_java_unsafe_reflection(repo, rest, report)
         n += _fix_zip_slip(repo, rest, report)
+        # M157：第 31 类 —— Java MultipartFile 文件名校验
+        n += _fix_unrestricted_upload(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
     if n:
         out = Path(out_path)
@@ -2293,7 +2350,21 @@ def _py_parametrize_call(node) -> object | None:
             values.extend(vals)
             return True
         if isinstance(n, _ast.BinOp) and isinstance(n.op, _ast.Add):
-            return walk(n.left) and walk(n.right)
+            # M152 实测缺口：原实现要求左右**都是字面量**，于是
+            # `"select ... " + uid` 这种最常见的拼接根本进不了 edits，
+            # 规则判 True 却永远修不了。右操作数只要是表达式就当作绑定值；
+            # 左边继续递归（覆盖 "a" + b + c 的左结合形态）。
+            if not walk(n.left):
+                return False
+            if literal_of(n.right) is not None:
+                sql_parts.append(literal_of(n.right))
+            else:
+                # 拼接点必须补一个 ? 占位符：只把值挪进参数元组而 SQL 里
+                # 不留占位符，会得到 "where id = " 这种把整段值丢掉的
+                # 坏补丁 —— 规则层却会因为"看见参数化调用"判 False。
+                sql_parts.append("?")
+                values.append(n.right)
+            return True
         if isinstance(n, _ast.JoinedStr):
             for part in n.values:
                 if isinstance(part, _ast.Constant):
@@ -3933,6 +4004,8 @@ DOCTOR_PATCHERS = [
     # M139-M141：第 23、24、25 类 —— 反射白名单 / 解压前缀 / 委托目标
     "_fix_java_unsafe_reflection", "_fix_zip_slip",
     "_fix_solidity_delegatecall",
+    # M157/M158：第 31、32 类
+    "_fix_unrestricted_upload", "_fix_solidity_ecrecover",
 ]
 
 
@@ -4461,6 +4534,211 @@ def _fix_solidity_delegatecall(repo: Path, targets: list, lines: list) -> int:
     return fixed
 
 
+
+def _fix_unrestricted_upload(repo: Path, targets: list, lines: list) -> int:
+    """第 31 类（M157）：给"原始文件名直接落盘"补**后缀白名单**守卫。
+
+    只改"文件名先赋给变量、再落盘"的形态（有明确插入点）；文件名内联在
+    transferTo/open 里的写法不硬改 —— 在表达式里塞守卫会破坏语法，宁可不修。
+    白名单变量名刻意写得能被执行后的判据逐字复核（_upload_has_guard 的
+    if + raise/throw 结构）。
+    """
+    from core.agents.rule_detectors import (verdict as rule_verdict,
+                                            _looks_python)
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("unrestricted_upload", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        file_lines = original.splitlines(keepends=True)
+        py = _looks_python(src)
+        ins_at = None
+        indent = ""
+        name_var = "name"
+        if py:
+            m = re.search(r"(?m)^([ \t]*)(\w+)\s*=\s*\w+\s*\.\s*filename\s*$",
+                          original)
+            if m:
+                # +1：插到赋值行的**下一行**。count("\n") 得到的是该行行号
+                # （0-based），直接当插入下标会把守卫插到赋值之前，
+                # 生成 name 未定义就先用的坏补丁。
+                ins_at = original[:m.end()].count("\n") + 1
+                indent = m.group(1)
+                name_var = m.group(2)
+            block = (f"{indent}ALLOWED_EXT = {{\"jpg\", \"jpeg\", \"png\", \"gif\", \"pdf\"}}\n"
+                     f"{indent}_ext = {name_var}.rsplit(\".\", 1)[-1].lower()\n"
+                     f"{indent}if _ext not in ALLOWED_EXT:\n"
+                     f"{indent}    raise ValueError(\"unsupported file type\")\n")
+        else:
+            m = re.search(
+                r"(?m)^([ \t]*)(?:String|var)\s+(\w+)\s*=\s*\w+\s*\.\s*"
+                r"get(?:OriginalFilename|SubmittedFileName)\s*\(\s*\)\s*;",
+                original)
+            if m:
+                ins_at = original[:m.end()].count("\n") + 1
+                indent = m.group(1)
+                name_var = m.group(2)
+            block = (f"{indent}java.util.Set<String> ALLOWED_EXT = "
+                     f"java.util.Set.of(\"jpg\", \"jpeg\", \"png\", \"gif\", \"pdf\");\n"
+                     f"{indent}String _ext = {name_var}"
+                     f".substring({name_var}.lastIndexOf('.') + 1)"
+                     f".toLowerCase();\n"
+                     f"{indent}if (!ALLOWED_EXT.contains(_ext)) {{ "
+                     f"throw new IllegalArgumentException(\"unsupported file type\"); }}\n")
+        if ins_at is None:
+            lines += [f"## [unrestricted_upload] {u.unit_name}",
+                      "- 找不到文件名赋值插入点，跳过（不硬改表达式）", ""]
+            continue
+        patched_lines = list(file_lines)
+        patched_lines.insert(ins_at, block)
+        patched = "".join(patched_lines)
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            if py:
+                from core.slicer.web_treesitter import WebTreeSitterSlicer
+                u2 = next((x for x in WebTreeSitterSlicer(repo).extract_entry_units(repo)
+                           if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+            else:
+                # 缓存按路径缓存、不看 mtime：不清空的话重切片读到的还是
+                # 补丁前的旧内容，"补丁后仍 True"就是缓存造出来的假结论。
+                from core.context.java_impl_resolver import _FILE_CACHE
+                _FILE_CACHE.clear()
+                from core.slicer.java_servlet import JavaSlicer
+                u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                           if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+            v2 = rule_verdict("unrestricted_upload", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [unrestricted_upload] {u.unit_name}（{f.name}）",
+                      "\x60\x60\x60diff", *diff, "\x60\x60\x60", "",
+                      "> 自检通过：重切片 + 重跑 unrestricted_upload -> False。",
+                      "> 白名单是**示例**（jpg/png/gif/pdf）；上线前按业务改成",
+                      "> 真实允许的类型，别把业务需要的格式挡掉。", ""]
+        else:
+            lines += [f"## [unrestricted_upload] {u.unit_name}（{f.name}）",
+                      f"- 补丁后规则仍报 {v2!r}，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
+
+def _fix_solidity_ecrecover(repo: Path, targets: list, lines: list) -> int:
+    """第 32 类（M158）：原生 ecrecover 补零地址校验 + 一次性 nonce 消费。
+
+    两处插入：
+      ① 赋值行后：require(signer != address(0)) + require(!__usedSig[h]) +
+         __usedSig[h] = true；
+      ② 合约开括号后：mapping(bytes32 => bool) private __usedSig;
+    拿不到合约声明/bytes32 形参时**不修** —— 生成一个编译不过的补丁比不修更糟。
+    """
+    from core.agents.rule_detectors import (verdict as rule_verdict,
+                                            _sol_has_nonce_consumption)
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("signature_replay", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        file_lines = original.splitlines(keepends=True)
+        lo = max(0, int(getattr(u, "start_line", 1)) - 1)
+        hi = min(len(file_lines), int(getattr(u, "end_line", len(file_lines))))
+        assign = None
+        for i in range(lo, hi):
+            if re.search(r"\baddress(?:\s+payable)?\s+\w+\s*=\s*ecrecover\s*\(",
+                         file_lines[i]):
+                assign = i
+                break
+        if assign is None:
+            continue
+        am = re.search(r"\baddress(?:\s+payable)?\s+(\w+)\s*=\s*ecrecover",
+                       file_lines[assign])
+        var = am.group(1)
+        indent = re.match(r"[ \t]*", file_lines[assign]).group(0)
+        sig_m = re.search(r"bytes32\s+(\w+)", src)
+        hash_var = sig_m.group(1) if sig_m else None
+        need_zero = not re.search(
+            rf"\b{re.escape(var)}\s*!=\s*address\s*\(\s*0\s*\)", src)
+        need_nonce = not _sol_has_nonce_consumption(src)
+        inserts: list[tuple[int, str]] = []
+        guard = ""
+        if need_zero:
+            guard += f"{indent}require({var} != address(0), \"invalid signature\");\n"
+        if need_nonce:
+            if hash_var is None:
+                lines += [f"## [signature_replay] {u.unit_name}",
+                          "- 找不到 bytes32 签名哈希形参，nonce 消费无法自动插入", ""]
+                continue
+            guard += (f"{indent}require(!__usedSig[{hash_var}], \"signature used\");\n"
+                      f"{indent}__usedSig[{hash_var}] = true;\n")
+            c_at = None
+            for i in range(lo, -1, -1):
+                if re.search(r"^\s*contract\s+\w+", file_lines[i]):
+                    c_at = i
+                    break
+            if c_at is None:
+                lines += [f"## [signature_replay] {u.unit_name}",
+                          "- 切片里没有合约声明行，无法声明 nonce 映射", ""]
+                continue
+            brace = c_at
+            while brace < len(file_lines) and "{" not in file_lines[brace]:
+                brace += 1
+            if brace >= len(file_lines):
+                continue
+            inserts.append((brace + 1,
+                            "    mapping(bytes32 => bool) private __usedSig;\n"))
+        if guard:
+            inserts.append((assign + 1, guard))
+        patched_lines = list(file_lines)
+        for at, text in sorted(inserts, reverse=True):
+            patched_lines.insert(at, text)
+        patched = "".join(patched_lines)
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+            from core.slicer.web3_slither import SoliditySlicer
+            u2 = next((x for x in SoliditySlicer(repo).extract_entry_units(repo)
+                       if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+            v2 = rule_verdict("signature_replay", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [signature_replay] {u.unit_name}（{f.name}）",
+                      "\x60\x60\x60diff", *diff, "\x60\x60\x60", "",
+                      "> 自检通过：重切片 + 重跑 signature_replay -> False。",
+                      "> nonce 映射名 __usedSig 是**示例**；生产代码应并入现有",
+                      "> nonce 体系，并让签名消息本身绑定 chainId/合约地址。", ""]
+        else:
+            lines += [f"## [signature_replay] {u.unit_name}（{f.name}）",
+                      f"- 补丁后规则仍报 {v2!r}，**不推荐**该补丁（自检未过）", ""]
+    return fixed
+
+
 def _looks_python_src(src: str) -> bool:
     from core.agents.rule_detectors import _looks_python
     return _looks_python(src)
@@ -4489,11 +4767,60 @@ def _strip_scoreboard_timestamp(text: str) -> str:
                      if not l.startswith("生成时间"))
 
 
+def _doctor_matrix_registry_check(ok: bool) -> bool:
+    """doctor 第十段（M151）：能力矩阵 × 补丁注册表**双向恒等**。
+
+    为什么值得常驻：这两份清单回答的是同一个问题（"这一类有没有确定性
+    补丁器"），但服务两个入口 —— 矩阵的 --fix 列读 MATRIX_FIX_MAP，
+    doctor 的 [4/10] 与 --fix 调度读 DOCTOR_PATCHERS。只在一侧登记，
+    用户看到的是"矩阵里这一类没有补丁器"，而命令其实能跑；反过来则是
+    "--fix 列表里有、矩阵不认"，两边都很难在人工走查里发现。
+
+    断言三个方向：
+      ① DOCTOR_PATCHERS - MATRIX_FIX_MAP 展开集 == 空（登记了却没接矩阵）；
+      ② MATRIX_FIX_MAP 展开集 - DOCTOR_PATCHERS == 空（矩阵指向未注册函数）；
+      ③ 矩阵的每个 key 都是真实类目（防止拼写漂移造出幽灵类目）。
+    """
+    print("== [10/10] 能力矩阵 × 补丁注册表双向恒等（M151）==")
+    mapped = {fn for tup in MATRIX_FIX_MAP.values() for fn in tup}
+    registered = set(DOCTOR_PATCHERS)
+    only_doctor = sorted(registered - mapped)
+    only_matrix = sorted(mapped - registered)
+    missing_callable = sorted(fn for fn in mapped
+                              if not callable(globals().get(fn)))
+    # unchecked_low_level_calls 是**检测器专有键**：verdict() 有分支、也有
+    # 补丁器，但它没有 LLM 两步法的场景问句，因此不在 CATEGORIES 里。
+    # 把它当幽灵类目会误报；显式豁免并单独打印，账才说得清。
+    _detector_only = {"unchecked_low_level_calls"}
+    ghost_cats = sorted(k for k in MATRIX_FIX_MAP
+                        if k not in CATEGORIES and k not in _detector_only)
+    if only_doctor:
+        print(f"  [FAIL] 已注册但未接入矩阵（{len(only_doctor)}）：{only_doctor}")
+        ok = False
+    if only_matrix:
+        print(f"  [FAIL] 矩阵登记但未注册（{len(only_matrix)}）：{only_matrix}")
+        ok = False
+    if missing_callable:
+        print(f"  [FAIL] 矩阵指向的函数不存在（{len(missing_callable)}）："
+              f"{missing_callable}")
+        ok = False
+    if ghost_cats:
+        print(f"  [FAIL] 矩阵含未注册类目：{ghost_cats}")
+        ok = False
+    if not (only_doctor or only_matrix or missing_callable or ghost_cats):
+        print(f"  [OK] 双向恒等：矩阵 {len(mapped)} 个补丁器 "
+              f"== 注册表 {len(registered)} 个（差集为空）")
+        print(f"  [OK] 矩阵 {len(MATRIX_FIX_MAP)} 个类目全部命中规则注册表"
+              f"（另含 {len(_detector_only & set(MATRIX_FIX_MAP))} 个"
+              f"检测器专有键：{sorted(_detector_only & set(MATRIX_FIX_MAP))}）")
+    return ok
+
+
 def cmd_doctor(args) -> int:
     """只读自检：依赖 / 规则注册表 / 缓存指纹 / 补丁器就位。exit 0 = 全部就绪。"""
     ok = True
 
-    print("== [1/9] 依赖就位 ==")
+    print("== [1/10] 依赖就位 ==")
     print(f"  [OK] python {sys.version.split()[0]}")
     for name in ["httpx", "tree_sitter(可选·缺省正则降级)", "pyyaml(可选)", "slither(可选)"]:
         try:
@@ -4505,7 +4832,7 @@ def cmd_doctor(args) -> int:
             if "(可选" not in name:
                 ok = False
 
-    print("== [2/9] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
+    print("== [2/10] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
     from core.agents import rule_detectors
     for cat in DOCTOR_RULE_CATEGORIES:
         try:
@@ -4519,7 +4846,7 @@ def cmd_doctor(args) -> int:
             print(f"  [FAIL] {cat}: 路由异常 {type(e).__name__}: {e}")
             ok = False
     print(f"  共 {len(DOCTOR_RULE_CATEGORIES)} 类，全部走 verdict() 路由")
-    print("== [3/9] 缓存指纹自检 ==")
+    print("== [3/10] 缓存指纹自检 ==")
     try:
         from benchmarks.diag_owasp_sqli_fp import _slicer_fingerprint
         fp1, fp2 = _slicer_fingerprint(), _slicer_fingerprint()
@@ -4532,7 +4859,7 @@ def cmd_doctor(args) -> int:
         print(f"  [FAIL] 指纹不可用: {type(e).__name__}: {e}")
         ok = False
 
-    print(f"== [4/9] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
+    print(f"== [4/10] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
     for fn_name in DOCTOR_PATCHERS:
         fn = globals().get(fn_name)
         if callable(fn):
@@ -4551,6 +4878,7 @@ def cmd_doctor(args) -> int:
     ok = _doctor_disclosure_index_check(ok)
     ok = _doctor_exporters_check(ok)
     ok = _doctor_cross_repo_check(ok)
+    ok = _doctor_matrix_registry_check(ok)
 
     print("doctor:", "PASS（全部就绪）" if ok else "FAIL（存在缺失项）")
     return 0 if ok else 1
@@ -4568,7 +4896,7 @@ def _doctor_cross_repo_check(ok: bool) -> bool:
     产物不在（首次克隆、还没跑野战）时**不判 FAIL** —— 与第 7、8 段同一
     口径：缺产物是"还没跑"，不是"跑坏了"。
     """
-    print("== [9/9] 跨仓聚类一致性（M135）==")
+    print("== [9/10] 跨仓聚类一致性（M135）==")
     root = Path(__file__).resolve().parent
     agg = root / "benchmarks" / "results" / "wild_hunt.json"
     cl = root / "benchmarks" / "results" / "cross_repo_clusters.json"
@@ -4598,7 +4926,7 @@ def _doctor_exporters_check(ok: bool) -> bool:
     任一条的 schema 校验器被改坏，用户那边是"报告上传失败"而不是"门禁变红"
     —— CI 里看不出来。这里把两个校验器都跑一遍自产文档 + 一份坏文档。
     """
-    print("== [8/9] 双 SAST 导出器与跨仓聚类（SARIF / GitLab / clusters）==")
+    print("== [8/10] 双 SAST 导出器与跨仓聚类（SARIF / GitLab / clusters）==")
     root = Path(__file__).resolve().parent
     try:
         from core.context.sarif_validator import validate_sarif
@@ -4658,7 +4986,7 @@ def _doctor_disclosure_index_check(ok: bool) -> bool:
     留下 21 份互不相干的草稿目录。"草稿总数 == 根因总数"是唯一能自动核对的
     不变量 —— 少一份说明有仓没跑到，多一份说明根因折叠漏了。
     """
-    print("== [7/9] 披露包完整性（advisories/INDEX.md ↔ wild_hunt.json）==")
+    print("== [7/10] 披露包完整性（advisories/INDEX.md ↔ wild_hunt.json）==")
     root = Path(__file__).resolve().parent
     adv_root = root / "benchmarks" / "results" / "advisories"
     agg = root / "benchmarks" / "results" / "wild_hunt.json"
@@ -4716,7 +5044,7 @@ def _doctor_extended_checks(ok: bool) -> bool:
     root = Path(__file__).resolve().parent
 
     # ---- 5.1 PoC 合成器：可导入 + 三语言模板自检通过 ----
-    print("== [5/9] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
+    print("== [5/10] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
     print("  -- PoC 合成器 --")
     try:
         from core.sandbox.poc_synthesizer import PocSynthesizer, PocArtifact
@@ -4875,6 +5203,34 @@ def _doctor_extended_checks(ok: bool) -> bool:
         print(f"  [FAIL] SARIF 校验器异常: {type(e).__name__}: {e}")
         ok = False
 
+    # ---- 5.5 M160：Top-3 交单四件套 ----
+    print("  -- Top-3 交单包 --")
+    packs_dir = root / "benchmarks" / "results" / "first_blood_packs"
+    if not packs_dir.exists():
+        print("  [提示] first_blood_packs/ 不存在（尚未生成，不判 FAIL）")
+    else:
+        packs = [d for d in sorted(packs_dir.iterdir()) if d.is_dir()]
+        if len(packs) < 3:
+            print(f"  [FAIL] 交单包只有 {len(packs)} 个（应 ≥3）")
+            ok = False
+        for d in packs:
+            need = ["ADVISORY.md", "fix.patch", "SUBMISSION_CHECKLIST.md"]
+            miss = [f for f in need if not (d / f).is_file()]
+            adv = ((d / "ADVISORY.md").read_text(encoding="utf-8")
+                   if (d / "ADVISORY.md").is_file() else "")
+            patched = ((d / "fix.patch").stat().st_size
+                       if (d / "fix.patch").is_file() else 0)
+            good = (not miss and patched > 0
+                    and "[Auto-Fix Verified]" in adv)
+            print(f"  [{'OK' if good else 'FAIL'}] {d.name}"
+                  f"{' 缺 ' + str(miss) if miss else ''}"
+                  f"{' 无补丁' if patched == 0 else ''}"
+                  f"{' 缺标记' if '[Auto-Fix Verified]' not in adv else ''}")
+            if not good:
+                ok = False
+        if packs and not any(True for _ in packs if False):
+            print(f"  共 {len(packs)} 份立即可投递的交单包（每份四件套 + 补丁自检）")
+
     return ok
 
 
@@ -4885,7 +5241,7 @@ def _doctor_wild_hunt_check(ok: bool) -> bool:
     报告是给人和上游看的，json 是机器事实源；两者漂了 doctor 当场 FAIL。
     """
     root = Path(__file__).resolve().parent
-    print("== [6/9] 野战白皮书对账（wild_hunt.json ↔ WILD_HUNT_REPORT.md）==")
+    print("== [6/10] 野战白皮书对账（wild_hunt.json ↔ WILD_HUNT_REPORT.md）==")
     agg = root / "benchmarks" / "results" / "wild_hunt.json"
     report = root / "WILD_HUNT_REPORT.md"
     if not agg.exists() or not report.exists():
@@ -4928,7 +5284,47 @@ def _doctor_wild_hunt_check(ok: bool) -> bool:
     return ok
 
 
+
+def cmd_watch(args) -> int:
+    """M152：增量首杀监控入口。"""
+    from core.context.watchtower import WATCH_CATEGORIES, run_watch
+
+    cats = ([c.strip() for c in args.categories.split(",") if c.strip()]
+            if args.categories else None)
+    unknown = sorted(set(cats or []) - set(WATCH_CATEGORIES))
+    if unknown:
+        print(f"[!] 未注册类目：{unknown}")
+        return 2
+    payload = run_watch(
+        args.repos, since=args.since, state_file=args.state_file,
+        bundle_dir=args.bundle_dir, categories=cats,
+        check_baseline=not args.no_baseline,
+        include_existing=args.include_existing, dry_run=args.dry_run)
+    for r in payload["repos"]:
+        state = ("ERROR " + r["error"]) if r["error"] else (
+            r["skipped"] or f"命中 {r['hits']}")
+        print(f"[watch] {Path(r['repo']).name}: {state}")
+    if payload["hits"]:
+        print("\n增量命中：")
+        for h in payload["hits"]:
+            print(f"  - [{h['category']}] {h['unit']} @ {h['file']}:{h['line']}"
+                  f"（{h['origin']} / {h['baseline']}）")
+    print(f"\n产物 {payload['bundle_count']} 个 → {Path(args.bundle_dir)}")
+    if args.json:
+        Path(args.json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.json).write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                                   encoding="utf-8")
+        print(f"摘要 JSON → {args.json}")
+    errors = [r for r in payload["repos"] if r["error"]]
+    if errors:
+        print(f"[!] {len(errors)} 个仓库未能监控")
+        return 1
+    return 0
+
+
 def main():
+    from core.text_utils import ensure_utf8_stdio
+    ensure_utf8_stdio()
     load_dotenv(Path(__file__).resolve().parent / ".env")
     parser = argparse.ArgumentParser(prog="nexus-audit", description="AI 自动化漏洞挖掘审计框架")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -5040,6 +5436,28 @@ def main():
         "matrix", help="M100：24 类 × 三语言 ×（规则/--fix/PoC/CVSS）能力矩阵")
     p_matrix.add_argument("--summary-json", default=None, metavar="OUT.json",
                           help="矩阵 JSON（供冒烟断言缺口不增长）")
+    p_watch = sub.add_parser(
+        "watch", help="M152：增量首杀监控（只报本次提交新引入的规则层 P0）")
+    p_watch.add_argument("repos", nargs="+", metavar="REPO",
+                         help="一个或多个本地 Git 仓库")
+    p_watch.add_argument("--since", default=None,
+                         help="对比基线（默认读 state_file 里的 last_sha；"
+                              "首跑回看 HEAD~1）")
+    p_watch.add_argument("--state-file", default=".watch_state.json",
+                         help="监控状态文件（默认 .watch_state.json）")
+    p_watch.add_argument("--bundle-dir", default="watch_bundles",
+                         help="交单四件套输出目录（默认 watch_bundles/）")
+    p_watch.add_argument("--categories", default=None,
+                         help="只监控指定类目，逗号分隔（默认全部 31 类）")
+    p_watch.add_argument("--no-baseline", dest="no_baseline", action="store_true",
+                         help="跳过基线 worktree（更快，但无法区分存量/新增）")
+    p_watch.add_argument("--include-existing", dest="include_existing",
+                         action="store_true",
+                         help="基线已存在的命中也产包（默认只产新增）")
+    p_watch.add_argument("--dry-run", action="store_true",
+                         help="只判定不落盘（不写 bundle，也不更新状态）")
+    p_watch.add_argument("--json", default=None, metavar="OUT.json",
+                         help="机器可读摘要（供冒烟/CI 断言）")
     args = parser.parse_args()
     if args.command == "scan":
         cmd_scan(args)
@@ -5051,6 +5469,8 @@ def main():
         sys.exit(cmd_benchmark_gen(args))
     elif args.command == "matrix":
         sys.exit(cmd_matrix(args))
+    elif args.command == "watch":
+        sys.exit(cmd_watch(args))
     else:
         cmd_pr_scan(args)
 

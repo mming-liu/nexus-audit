@@ -1,9 +1,17 @@
 {
   "bench": "myblog",
   "units": 54,
-  "decided": 201,
+  "decided": 202,
   "truth_n": 3,
   "fp": 0,
   "fn": 0,
-  "rows": []
+  "rows": [
+    {
+      "unit": "UploadController.upload",
+      "file": "UploadController.java",
+      "cat": "xss",
+      "truth": "truth=weakrand",
+      "got": true
+    }
+  ]
 }

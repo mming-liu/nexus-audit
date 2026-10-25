@@ -89,8 +89,15 @@ def main() -> None:
     if args.workers > 1:
         batch = max(1, len(tasks) // (args.workers * 4) or 1)
         chunks = [tasks[i:i + batch] for i in range(0, len(tasks), batch)]
-        with ProcessPoolExecutor(max_workers=args.workers) as ex:
-            results = [row for ch in ex.map(_eval_chunk, chunks) for row in ch]
+        try:
+            ex = ProcessPoolExecutor(max_workers=args.workers)
+        except (PermissionError, OSError):
+            # 受限 Windows 沙箱禁止匿名管道 —— 并发只是加速，回退顺序。
+            results = _eval_chunk(tasks)
+        else:
+            with ex:
+                results = [row for ch in ex.map(_eval_chunk, chunks)
+                           for row in ch]
     else:
         results = _eval_chunk(tasks)
 

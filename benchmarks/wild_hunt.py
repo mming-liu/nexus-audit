@@ -81,6 +81,13 @@ REPOS = [
      "openzeppelin_upgradeable", ["--strict"]),
     ("My-Blog-layui", "reference_repos/My-Blog-layui", "my_blog_layui",
      ["--strict"]),
+    # —— M153–M156：第 31–34 号野仓（34 仓里程碑）——
+    ("kkFileView", "reference_repos/kkFileView", "kkfileview", ["--strict"]),
+    ("full-stack-fastapi-template",
+     "reference_repos/full-stack-fastapi-template/backend",
+     "fastapi_fullstack", ["--strict"]),
+    ("solady", "reference_repos/solady/src", "solady", ["--strict"]),
+    ("apollo", "reference_repos/apollo", "apollo", ["--strict"]),
 ]
 
 P0_LINE = re.compile(r"^- \*\*\[([a-z_]+)\]\*\* `")

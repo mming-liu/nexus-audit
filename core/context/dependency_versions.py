@@ -33,11 +33,24 @@ SENSITIVE_ARTIFACTS: dict[str, str] = {
     "xstream": "1.4.18 起默认白名单",
     "log4j-core": "2.15.0 之前 JNDI lookup RCE",
     "struts2-core": "OGNL 表达式注入，版本敏感",
+    # M159：国内 Java 项目高频组件。版本本身不必然等于漏洞（下面
+    # DEPENDENCY_ADVISORIES 只收有明确 fixed_in 的条目），但必须能被
+    # 采集到 —— 收不到版本，第七节永远是"—"。
+    "hutool-all": "5.8.11 之前存在反序列化/表达式相关风险（CVE-2023-24162）",
+    "druid": "连接池/监控面，版本敏感；无版本绑定的保守 advisory（不猜 CVE）",
+    "pagehelper": "5.3.1 之前 orderBy 参数存在时间盲注（CVE-2022-28111）",
+    "mybatis": "3.5.6 之前对不可信数据反序列化处理不当（CVE-2020-26945）",
+    "mysql-connector-java": "8.0.28 之前存在 CVE-2022-21363",
+    "postgresql": "42.2.25 之前 JDBC URL 可实例化任意类（CVE-2022-21724）",
 }
 
 _PROP_BLOCK_RE = re.compile(r"<properties>(.*?)</properties>", re.S)
 _TAG_RE = re.compile(r"<([A-Za-z_][\w.\-]*)>([^<]*)</\1>")
 _DEP_BLOCK_RE = re.compile(r"<dependency>(.*?)</dependency>", re.S)
+# M159：<dependencyManagement> 是**版本声明区**，不是依赖使用区。
+# 旧实现把它当普通 <dependency> 扫，等于把"父 pom 管理过的版本"全部
+# 记成"本项目用了这个组件"—— 版本对上了，组件可能根本没人引用。
+_DEPMGMT_RE = re.compile(r"<dependencyManagement>(.*?)</dependencyManagement>", re.S)
 _PLACEHOLDER_RE = re.compile(r"\$\{([^}]+)\}")
 
 # 版本比较用：取开头的数字段。`1.2.83.sec10` / `1.2.31_noneautotype` 都按 1.2.83 / 1.2.31 算。
@@ -139,9 +152,30 @@ class DependencyVersionResolver:
                 props.setdefault(k, v)
             blocks.append(text)
 
+        # M159 第一步：先建 dependencyManagement 的版本索引。
+        # 子模块 dependency 省略 version 是 Maven 继承的常态
+        # （版本在父 pom 的 dependencyManagement 里），旧实现 if not ver:
+        # continue 会把这些组件整片丢掉 —— 13 个 Java 仓的第七节全是 "—"。
+        managed: dict[str, str] = {}
+        for text in blocks:
+            for mm in _DEPMGMT_RE.finditer(text):
+                for dep in _DEP_BLOCK_RE.finditer(mm.group(1)):
+                    body = dep.group(1)
+                    aid = re.search(r"<artifactId>([^<]+)</artifactId>", body)
+                    ver = re.search(r"<version>([^<]+)</version>", body)
+                    if not aid or not ver:
+                        continue
+                    name = aid.group(1).strip().lower()
+                    if name not in SENSITIVE_ARTIFACTS:
+                        continue
+                    value = self._resolve(ver.group(1), props)
+                    if not _PLACEHOLDER_RE.search(value):
+                        managed.setdefault(name, value)
+
+        # 第二步：只扫**非 management** 的 dependency（管理区不是使用区）。
         found: dict[str, str] = {}
         for text in blocks:
-            for dep in _DEP_BLOCK_RE.finditer(text):
+            for dep in _DEP_BLOCK_RE.finditer(_DEPMGMT_RE.sub("", text)):
                 body = dep.group(1)
                 aid = re.search(r"<artifactId>([^<]+)</artifactId>", body)
                 ver = re.search(r"<version>([^<]+)</version>", body)
@@ -150,11 +184,14 @@ class DependencyVersionResolver:
                 name = aid.group(1).strip().lower()
                 if name not in SENSITIVE_ARTIFACTS:
                     continue
-                if not ver:
-                    continue                    # 版本在别处管理，等 management 那条
-                value = self._resolve(ver.group(1), props)
-                if _PLACEHOLDER_RE.search(value):
-                    continue                    # 占位符没还原 → 不记假版本
+                if ver:
+                    value = self._resolve(ver.group(1), props)
+                    if _PLACEHOLDER_RE.search(value):
+                        continue                # 占位符没还原 → 不记假版本
+                else:
+                    value = managed.get(name, "")
+                    if not value:
+                        continue                # 版本不在管理区 → 不猜
                 found.setdefault(name, value)
         self._versions = found
         return found
@@ -277,6 +314,28 @@ DEPENDENCY_ADVISORIES: dict[str, list[tuple[str, str, str]]] = {
     "pycrypto": [
         ("2.7.0", "CVE-2013-7459",
          "AES-NI 实现堆溢出（项目已停止维护，建议迁移 pycryptodome）"),
+    ],
+
+    # M159：国内 Java 项目高频组件的保守 advisory（只收有明确 fixed_in 的）
+    "hutool-all": [
+        ("5.8.11", "CVE-2023-24162",
+         "Hutool 反序列化/表达式处理风险（5.8.11 修复）"),
+    ],
+    "pagehelper": [
+        ("5.3.1", "CVE-2022-28111",
+         "orderBy 参数时间盲注 SQL 注入（5.3.1 修复）"),
+    ],
+    "mybatis": [
+        ("3.5.6", "CVE-2020-26945",
+         "不可信数据反序列化处理不当（3.5.6 修复）"),
+    ],
+    "mysql-connector-java": [
+        ("8.0.28", "CVE-2022-21363",
+         "MySQL Connector/J 输入校验缺陷（8.0.28 修复）"),
+    ],
+    "postgresql": [
+        ("42.2.25", "CVE-2022-21724",
+         "JDBC URL 可实例化任意类（42.2.25 修复）"),
     ],
 }
 

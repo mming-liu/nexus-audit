@@ -506,6 +506,41 @@ CATEGORIES: dict[str, VulnCategory] = {
             "注意：① 名字叫 onlyOwner 但实现体没有身份比对不算防护；"
             "② 只在注释里声明「仅管理员」不算。"),
     ),
+    # ---------------- M157：第 31 类 —— 不受限文件上传（CWE-434） ----------------
+    "unrestricted_upload": VulnCategory(
+        key="unrestricted_upload", display="不受限文件上传",
+        cwe="CWE-434", owasp=False, needs_taint=False,
+        sink_question=(
+            "函数是否把**客户端提供的原始文件名**直接用于落盘路径？包括："
+            "① Java MultipartFile：getOriginalFilename() / getSubmittedFileName()"
+            " 的结果进入 new File(...) / Paths.get(...) / transferTo(...) /"
+            " Files.copy(...)；"
+            "② Python UploadFile / request.files：file.filename 进入 open(...) /"
+            " .save(...) / shutil.copyfileobj(...)。"),
+        property=(
+            "落盘前是否把文件名约束在**白名单或服务端生成的名字**上？有效防护包括："
+            "① 后缀白名单（ALLOWED_EXTENSIONS / endsWith 后不通过就中止）；"
+            "② 服务端重命名为 UUID + **固定后缀**（不是沿用原始后缀）；"
+            "③ 交给对象存储的流式上传接口（key 由服务端生成）。"
+            "注意：① 只检查 Content-Type/MIME 不算防护（客户端可伪造）；"
+            "② 只用 UUID 但保留原始后缀仍可上传 .jsp/.php，不算防护。"),
+    ),
+
+    # ---------------- M158：第 32 类 —— 签名重放（SWC-121/CWE-347） ----------------
+    "signature_replay": VulnCategory(
+        key="signature_replay", display="签名重放 / 缺失 nonce 消费",
+        cwe="CWE-347", owasp=False, needs_taint=False,
+        sink_question=(
+            "函数是否在**状态变更路径**上调用原生 ecrecover 恢复签名者，"
+            "却没有同时做到「恢复地址非零校验」与「一次性 nonce/哈希消费」？"
+            "只读（view/pure）或 internal/private 的验签辅助函数不算。"),
+        property=(
+            "是否同时具备：① 对 ecrecover 返回值做 != address(0) 校验；"
+            "② 在状态变更前消费 nonce/签名哈希（require(!used[h]) 后"
+            " used[h] = true，或 nonces[signer]++）。"
+            "用 OpenZeppelin ECDSA.recover（库内已做零地址校验）且消费 nonce"
+            " 的写法属于安全。"),
+    ),
 }
 
 ALL_KEYS = list(CATEGORIES.keys())

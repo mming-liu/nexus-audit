@@ -134,10 +134,17 @@ def load_units(refresh: bool = False, workers: int = 1) -> dict[str, str]:
         files = list(slicer._iter_java_files())
         batch = max(1, len(files) // (workers * 4) or 1)
         shards = [files[i:i + batch] for i in range(0, len(files), batch)]
-        with ProcessPoolExecutor(max_workers=workers) as ex:
-            unit_list = [u for part in ex.map(_slice_shard,
-                                              [REPO] * len(shards), shards)
-                         for u in part]
+        try:
+            ex = ProcessPoolExecutor(max_workers=workers)
+        except (PermissionError, OSError):
+            # 受限 Windows 沙箱禁止匿名管道；并发只是冷缓存加速，
+            # 回退逐文件切片（顺序与分片合并口径一致）。
+            unit_list = slicer.extract_entry_units()
+        else:
+            with ex:
+                unit_list = [u for part in ex.map(_slice_shard,
+                                                  [REPO] * len(shards), shards)
+                             for u in part]
         slicer._attach_chains(unit_list)
     else:
         unit_list = slicer.extract_entry_units()

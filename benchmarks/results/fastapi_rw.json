@@ -6,7 +6,7 @@
   "correct": 19,
   "fp": 0,
   "reverse_fn": 0,
-  "rule_evaluations": 38,
+  "rule_evaluations": 39,
   "param_sql_verdict": false,
   "known_gap_force_fetch": "None",
   "unit_names": [

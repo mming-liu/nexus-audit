@@ -40,9 +40,9 @@
       "none": 47
     },
     "xss": {
-      "true": 0,
+      "true": 3,
       "false": 5,
-      "none": 57
+      "none": 54
     },
     "pathtraver": {
       "true": 0,

@@ -1,0 +1,60 @@
+{
+  "bench": "apollo",
+  "units": 200,
+  "total_units": 200,
+  "correct": 200,
+  "fp": 0,
+  "reverse_fn": 0,
+  "preauthorize_units": 59,
+  "preauthorize_false": 59,
+  "custom_el": {
+    "isSuperAdmin": 45,
+    "isAppAdmin": 17,
+    "hasQueryPermission": 5
+  },
+  "profile_marked": 200,
+  "anchor": true,
+  "authz_true": [],
+  "residual": [
+    {
+      "file": "AppController.java",
+      "unit": "AppController.load",
+      "category": "deserial"
+    },
+    {
+      "file": "AppController.java",
+      "unit": "AppController.findMissEnvs",
+      "category": "deserial"
+    },
+    {
+      "file": "ConsumerController.java",
+      "unit": "ConsumerController.create",
+      "category": "xss"
+    },
+    {
+      "file": "FavoriteController.java",
+      "unit": "FavoriteController.addFavorite",
+      "category": "xss"
+    },
+    {
+      "file": "ServerConfigController.java",
+      "unit": "ServerConfigController.createOrUpdateConfigDBConfig",
+      "category": "xss"
+    },
+    {
+      "file": "AccessKeyController.java",
+      "unit": "AccessKeyController.enable",
+      "category": "sqli"
+    },
+    {
+      "file": "AppNamespaceController.java",
+      "unit": "AppNamespaceController.create",
+      "category": "xss"
+    },
+    {
+      "file": "ServerConfigController.java",
+      "unit": "ServerConfigController.createOrUpdatePortalDBConfig",
+      "category": "xss"
+    }
+  ]
+}

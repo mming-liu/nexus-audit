@@ -1163,6 +1163,14 @@ def sqli_verdict(source: str) -> bool | None:
                 and _ob_exit_safety(source, _param_validated) == "none" \
                 and re.search(r"new\s+\w+Example\s*\(", source):
             return False
+        # M156：${} 必须能被入口**形参**触达才算本单元的注入面。
+        # Apollo 实测：importConfigByZip 的切片里带着别的 Mapper 语句
+        # ${appId}/${namespaceName}，而这两个名字根本不在本入口签名里 ——
+        # 证据段混入即判 True 是"看得见不等于够得着"的典型假阳。
+        _params = set(_bare_params(_entry_signature(source)))
+        _vars = {re.split(r"[.\[]", h.strip("${} "))[0] for h in hits}
+        if not (_vars & _params):
+            return None
         return True
     if MYBATIS_HASH_RE.search(mb) and not SQLI_JDBC_SINK_RE.search(body):
         return False
@@ -3766,8 +3774,25 @@ def xss_verdict(source: str) -> bool | None:
     # 而不是"有串接证据" —— db 证据块由下面的 (2b) 专门处理。
     reader = _chain_reader_body(source)
 
+    # M156：@RestController 的 `return dto;` 是 JSON 序列化，不是 HTML 回显。
+    # Apollo 的 ItemController.create/update 因此被判存储型 XSS —— 实际
+    # 响应体是 application/json，浏览器不会把它当页面解析。只有真的写
+    # response.getWriter()/getOutputStream() 或声明 text/html 才算回显面。
+    # 只看**返回类型**：String/void/byte[] 仍可能是 HTML 回显；
+    # DTO / ResponseEntity 才是 JSON 序列化。只用注解名一刀切会把
+    # "返回拼接字符串"的反射型 XSS 一起洗掉（烟雾 [6]/[10] 实测）。
+    _ret_m = re.search(
+        r"\b(?:public|protected|private)\s+([\w<>\[\],.?]+)\s+\w+\s*\(", body)
+    _ret = _ret_m.group(1) if _ret_m else ""
+    _json_type = bool(_ret and _ret not in (
+        "String", "CharSequence", "byte[]", "void", "Object"))
+    _rest_json = bool(
+        ("Controller-Kind: @RestController" in source or "@ResponseBody" in source)
+        and _json_type
+        and not re.search(r"getWriter\s*\(|getOutputStream\s*\(|"
+                          r"produces\s*=\s*\"text/html\"", body))
     # 1) 反射型：有外部入参 + 有回显 + 无编码
-    if has_param and _echo_sink_hit(body):
+    if has_param and not _rest_json and _echo_sink_hit(body):
         if XSS_ENCODE_RE.search(body):
             # `printf`/`format` 的格式串位置如果是变量，说明用户能控制
             # Formatter 的转换说明符 —— 那是另一套注入面，ENCODE 未必覆盖。
@@ -4379,7 +4404,10 @@ CMDI_SINK_RE = re.compile(
     r"Runtime\s*\.\s*getRuntime\s*\(\s*\)\s*\.\s*exec\s*\(|"
     r"\bnew\s+(?:ProcessBuilder|Invoker)\s*\(|"
     r"\.\s*command\s*\(|"
-    r"\.\s*load(?:Library)?\s*\(|"
+    # M156：只认 Runtime/System 的本地库加载。裸 .load( 会把
+    # appService.load(appId) 当成 Runtime.load —— Apollo 实测 2 条假阳。
+    r"\b(?:Runtime\s*\.\s*getRuntime\s*\(\s*\)|System|Runtime"
+    r"|rt|runtime)\s*\.\s*load(?:Library)?\s*\(|"
     r"ProcessImpl\s*\.\s*start\s*\(|"
     r"\bmethod\s*\.\s*invoke\s*\(|"
     r"ProcessUtils|CommandLine\s*\.\s*parse", re.I)
@@ -5303,7 +5331,11 @@ _AUTHZ_DENY_RE = re.compile(
     # 判据要求方法名是 fail/deny/forbidden 这类**语义明确**的终止动作，
     # 不认 `xxxException.warn(...)` 之类的软处理。
     r"\w*(?:Exception|Error)\s*\.\s*(?:fail|deny|forbidden|throw\w*)\s*\(|"
-    r"\.\s*sendError\s*\(\s*40[13]", re.I)
+    # M153：Servlet 常量写法（kkFileView）—— sendError(SC_UNAUTHORIZED)
+    # 与字面量 401 同义；只认数字会让共享密钥门的拒绝分支看不见。
+    r"\.\s*sendError\s*\(\s*(?:40[13]"
+    r"|(?:javax\.servlet\.http\.)?HttpServletResponse\s*\.\s*"
+    r"SC_(?:UNAUTHORIZED|FORBIDDEN))", re.I)
 
 # 资源访问：Mapper / Repository / DAO 上的方法调用。
 _AUTHZ_RESOURCE_RE = re.compile(
@@ -5562,8 +5594,10 @@ def authz_verdict(source: str) -> bool | None:
     # 1a) FastAPI `Depends(require_superuser)` / `Depends(get_current_user)`
     #     是框架级认证/权限依赖（M80 实测）。依赖名必须是认证语义；
     #     只认 `Depends(get_db)` 这类资源依赖时不得误判安全。
+    # M154：必须扫 source —— 路由级 dependencies 与 Annotated 别名都展开在
+    # 切片头部的 Auth-Dependency 证据里，不在 entry_body 内。
     if re.search(r"Depends\s*\(\s*(?:require|get_current|current_user|auth"
-                 r"|permission|login_required)\w*", body, re.I):
+                 r"|permission|login_required)\w*", source, re.I):
         return False
 
     # 1) 声明式校验：`@PreAuthorize("hasRole('ADMIN')")` 这类。
@@ -5571,6 +5605,28 @@ def authz_verdict(source: str) -> bool | None:
     #    的注解范围内找，避免把同文件别的方法的注解算到当前路由头上。
     if _AUTHZ_ROLE_RE.search(source):
         return False
+
+    # 1a-2) 认证由**部署 profile** 决定的仓库（M156 Apollo）：
+    # anyRequest().hasAnyRole(...) 只在 auth/ldap/oidc profile 下生效，
+    # 默认配置直接放行。没有方法级 @PreAuthorize 的入口，静态切片无法
+    # 证明"线上缺鉴权"——退 None，不判 True。
+    if "[auth-profile-dependent]" in source:
+        return None
+
+    # 1b) 共享密钥门（M153 kkFileView 实测）：
+    #         if (WebUtils.validateKey(key)) { response.sendError(401); return; }
+    #     谓词实现是 `return !"false".equals(configKey) && !configKey.equals(key)`
+    #     —— 服务端配置值参与比较，客户端伪造不了，机制与主体鉴权同类。
+    #     判据必须看**实现体**（切片证据段里有 configKey.equals），只认
+    #     validateKey 这个名字等于"认名字不认机制"。
+    if _AUTHZ_DENY_RE.search(body):
+        for pm in re.finditer(
+                r"if\s*\(\s*!?\s*([\w.]+)\s*\(\s*(\w+)\s*\)\s*\)", body):
+            var = pm.group(2)
+            if re.search(
+                    rf"(?:config|expected|stored|server|secret)\w*\s*\.\s*"
+                    rf"equals\s*\(\s*{re.escape(var)}\b", source, re.I):
+                return False
 
     # 2) 主体获取 + 拒绝分支。两个条件缺一不可：
     #    只取主体不比对（`log.info(currentUser)`）不构成校验；
@@ -6379,8 +6435,12 @@ def python_authz_verdict(source: str) -> bool | None:
     _guards = re.findall(r"//\s*Auth-Guard:\s*(\w+)", source)
     if "admin_required" in _guards:
         return False
+    # M154：M80 只认了 body 里的 Depends(...) —— FastAPI 模板把权限声明写在
+    # 路由装饰器上（dependencies=[Depends(get_current_active_superuser)]），
+    # body 里一个字符都没有。改为扫 source，并补上 superuser 这一族。
     if re.search(r"Depends\s*\(\s*(?:require|permission|login_required"
-                 r"|auth_required|authorize)\w*", body, re.I):
+                 r"|auth_required|authorize|superuser"
+                 r"|get_current_(?:active_)?superuser)\w*", source, re.I):
         return False
     has_subject = (_PY_SUBJECT_RE.search(source) is not None
                    or _PY_SUBJECT_RE_JWT.search(source) is not None)
@@ -6407,6 +6467,13 @@ def python_authz_verdict(source: str) -> bool | None:
                     r"\.\s*(?:password|email|admin|balance)\s*=[^=]"
                     r"|\bdelete\w*\s*\(\s*[^)]*\b" + p + r"\b", source):
                 return True
+        # M154：只服务"当前主体"的自助路由（read_user_me / delete_user_me /
+        # create_item）。判 False 需要的两个可核对事实：
+        #   ① 没有 URL 资源形参（user_id / id / name ...）；
+        #   ② 主体只以 current_user 出现，操作对象就是它（或新建记录归属它）。
+        # 没有"他人资源键"就没有水平越权面；这与"有主体但不比对"不同。
+        if not res_params and re.search(r"\bcurrent_user\b", body):
+            return False
         # 有主体但方法体看不出比对：主体可能下沉到 Service —— 不表态
         if re.search(r"(?:service|repo|dao|crud|manager|store)\s*\.\s*\w+\s*\(",
                      source, re.I):
@@ -7854,6 +7921,80 @@ def _sol_bare_transfer_ownership(func_src: str) -> bool:
     return False
 
 
+
+
+# ---- M155：库式鉴权（solady / 内联汇编）----
+#
+# solady 把权限检查封进 internal helper，用 Yul 直接读存储槽：
+#     function _checkOwner() internal view virtual {
+#         assembly { if iszero(eq(caller(), sload(_OWNER_SLOT))) { revert(...) } }
+#     }
+#     function _checkRoles(uint256 roles) ... {
+#         assembly { if iszero(and(sload(keccak256(...)), roles)) { revert(...) } }
+#     }
+# 入口只写 onlyOwner / onlyRoles(roles)，函数体里既没有 msg.sender
+# 也没有 require —— 只看入口体的判据会整片退 None/True。
+#
+# 判据挂机制不挂名字：沿"入口/修饰符调用的 helper"找到实现体，核验里面
+# 真的有 caller() 与存储槽比较 + revert，或 role 位与掩码相交 + revert。
+_SOL_YUL_CALLER_GUARD_RE = re.compile(
+    r"eq\s*\(\s*caller\s*\(\s*\)\s*,\s*sload\s*\(")
+_SOL_YUL_ROLE_GUARD_RE = re.compile(
+    r"and\s*\(\s*sload\s*\(\s*keccak256|sload\s*\(\s*keccak256[\s\S]{0,120}?"
+    r",\s*roles\s*\)")
+_SOL_DELEGATED_AUTHZ_RE = re.compile(
+    r"_isAuthorized\s*\(|_checkAuthorized\s*\(|isApprovedOrOwner\s*\("
+    r"|getApproved\s*\([^)]*\)\s*==\s*(?:msg\s*\.\s*sender|caller\s*\(\s*\))"
+    r"|isApprovedForAll\s*\(")
+# 注意别叫 _SOL_ABORT_RE：文件后段（委托调用判据）已有同名常量，
+# 重复赋值会被 doctor 的正则卫生检查判为遮蔽冲突。
+_SOL_YUL_ABORT_RE = re.compile(r"\b(?:revert|throw)\b|\brequire\s*\(")
+
+
+def _sol_helper_body(source: str, name: str) -> str:
+    """按名字找同一切片里的函数实现体（证据段已把 helper 拼进来）。"""
+    m = re.search(rf"\bfunction\s+{re.escape(name)}\s*\([^)]*\)[^{{;]*\{{",
+                  source)
+    if not m:
+        return ""
+    brace = source.index("{", m.start())
+    return _sol_block_body(source, brace) or ""
+
+
+def _sol_yul_guard(body: str) -> bool:
+    if not _SOL_YUL_ABORT_RE.search(body):
+        return False
+    # solady ERC721 的形态是 eq(caller(), from) / eq(caller(), approved)
+    # 再套 iszero(or(...)) —— 比较的右侧是局部变量而不是 sload(...)。
+    # 只要 caller() 参与相等比较且本函数会 revert，就是身份门。
+    return bool(_SOL_YUL_CALLER_GUARD_RE.search(body)
+                or _SOL_YUL_ROLE_GUARD_RE.search(body)
+                or re.search(r"eq\s*\(\s*caller\s*\(\s*\)\s*,", body))
+
+
+def _sol_delegated_authz(body: str) -> bool:
+    return bool(_SOL_DELEGATED_AUTHZ_RE.search(body)
+                and _SOL_YUL_ABORT_RE.search(body))
+
+
+def _sol_protected_by_helpers(source: str, func_src: str, mod_block: str) -> bool:
+    """入口体或修饰符里调用的 helper 是否真的做了身份/角色校验。"""
+    for block in (func_src, mod_block):
+        if not block:
+            continue
+        for m in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", block):
+            name = m.group(1)
+            if name in {"require", "if", "for", "while", "return", "emit",
+                        "revert", "assert", "keccak256", "ecrecover", "add",
+                        "sub", "mul", "div", "and", "or", "eq", "iszero",
+                        "sload", "sstore", "mload", "mstore", "caller"}:
+                continue
+            hb = _sol_helper_body(source, name)
+            if hb and (_sol_yul_guard(hb) or _sol_delegated_authz(hb)):
+                return True
+    return False
+
+
 def solidity_access_verdict(source: str) -> bool | None:
     """Solidity 访问控制（Module 13 按 smartbugs 真实合约重写）。
 
@@ -7972,6 +8113,10 @@ def solidity_access_verdict(source: str) -> bool | None:
     # smartbugs access_control 真阳 19 条里含签名恢复的 **0 条**
     # ⇒ 本早退不会把真阳判反。
     if not protected and _sol_signature_authorized(func_src, _inh_func_block):
+        protected = True
+    # M155：库式/Yul 鉴权 —— 入口或 modifier 调用的 helper 实现体里
+    # 有 caller()+sload 比较 + revert，或 role 掩码相交 + revert。
+    if not protected and _sol_protected_by_helpers(source, func_src, mod_block):
         protected = True
     if protected:
         return False
@@ -9941,6 +10086,11 @@ def unsafe_reflection_verdict(source: str) -> bool | None:
 _ZIP_ENTRY_TYPE_RE = re.compile(
     r"\b(?:ZipEntry|JarEntry|TarArchiveEntry|ArchiveEntry)\b")
 _ZIP_NAME_GET_RE = re.compile(r"\.\s*getName\s*\(\s*\)")
+# M153：kkFileView 用 sevenzipjbinding，没有 ZipEntry.getName()，
+# 条目名走 ISimpleInArchiveItem.getPath()。不认这两个类型/取值，
+# 真实解压落盘代码会整片退 None（矩阵里 zip_slip 永远没有 Java 证据）。
+_ZIP_SEVENZIP_TYPE_RE = re.compile(r"\b(?:ISimpleInArchiveItem|IInArchive|SevenZip)\b")
+_ZIP_SEVENZIP_NAME_RE = re.compile(r"\.\s*getPath\s*\(\s*\)")
 _JAVA_PATH_SINK_RE = re.compile(
     r"new\s+(?:java\.io\.)?File\s*\([^;]*\)"
     r"|Paths?\s*\.\s*(?:get|of)\s*\([^;]*\)"
@@ -9988,8 +10138,39 @@ def zip_slip_verdict(source: str) -> bool | None:
         if _PY_PATH_PREFIX_GUARD_RE.search(source):
             return False
         return True
-    has_entry = bool(_ZIP_ENTRY_TYPE_RE.search(source))
-    if not has_entry or not _ZIP_NAME_GET_RE.search(body):
+    seven = _ZIP_SEVENZIP_TYPE_RE.search(source)
+    has_entry = bool(_ZIP_ENTRY_TYPE_RE.search(source) or seven)
+    name_in_body = bool(_ZIP_NAME_GET_RE.search(body)
+                        or (seven and _ZIP_SEVENZIP_NAME_RE.search(body)))
+    if not has_entry:
+        return None
+    # M153：two-step 形态 —— 条目名在 helper 里取，入口只拿 helper 返回的
+    # Path 落盘（kkFileView 的 unRar -> getFilePathInsideArchive）。
+    # 判据要同时看入口与**切片里的 helper 实现体**，否则只能看到
+    # "Path p = helper(item, dir)"，名字流与守卫都不在入口体内。
+    if seven and not name_in_body:
+        if not _ZIP_SEVENZIP_NAME_RE.search(source):
+            return None
+        helper_call = re.search(
+            r"\b(?:Path|String|File)\s+\w+\s*=\s*\w+\s*\(\s*\w+\s*,", body)
+        if not helper_call:
+            return None
+        if _ZIP_CANONICAL_GUARD_RE.search(source):
+            return False
+        if _JAVA_PATH_SINK_RE.search(body) or re.search(
+                r"Files\s*\.\s*createDirectories", source):
+            return True
+        return None
+    # helper 本身（名字 + resolve + 守卫）也是一个可判单元：它没有写出
+    # 动作，但它的**返回值**就是落盘路径，缺守卫时调用方必然穿越。
+    if seven and _ZIP_SEVENZIP_NAME_RE.search(body) \
+            and re.search(r"\.\s*resolve\s*\(", body):
+        if _ZIP_CANONICAL_GUARD_RE.search(source):
+            return False
+        if re.search(r"Files\s*\.\s*createDirectories|FileOutputStream", source):
+            return True
+        return None
+    if not name_in_body:
         return None
     # 条目名 → 文件路径/输出流：直接内联，或经一个局部变量中转。
     names = set(re.findall(r"\b([A-Za-z_]\w*)\s*=\s*[^;]*?\.\s*getName\s*\(\s*\)",
@@ -10262,6 +10443,148 @@ def solidity_delegatecall_verdict(source: str) -> bool | None:
     return None
 
 
+
+# ================= M157/M158：第 31、32 类规则 =================
+#
+# 两类都遵守同一条铁律：判据锚在"数据流到汇聚点"的可核对事实上，
+# 而不是"文件里出现了某个词"。名字/注释都不算证据。
+
+# ---- 第 31 类：不受限文件上传（CWE-434）----
+_UPLOAD_JAVA_NAME_RE = re.compile(
+    r"\bget(?:OriginalFilename|SubmittedFileName)\s*\(\s*\)")
+_UPLOAD_JAVA_SINK_RE = re.compile(
+    r"\.\s*transferTo\s*\(|new\s+File\s*\(|Paths\s*\.\s*get\s*\("
+    r"|new\s+FileOutputStream\s*\(|Files\s*\.\s*(?:copy|write)\s*\(")
+_UPLOAD_JAVA_PARAM_RE = re.compile(r"\bMultipartFile\b|\bPart\b")
+_UPLOAD_PY_NAME_RE = re.compile(r"\.\s*filename\b")
+_UPLOAD_PY_PARAM_RE = re.compile(
+    r"\bUploadFile\b|\brequest\s*\.\s*files\b|\bFileStorage\b")
+_UPLOAD_PY_SINK_RE = re.compile(
+    r"\bopen\s*\(|\bshutil\s*\.\s*copyfileobj\s*\(|\.\s*save\s*\(")
+
+# 白名单/固定后缀的"证据面"：必须同时出现**判定**与**中止**，
+# 只写一个 ALLOWED 常量但从不拿它 if，不算防护。
+_UPLOAD_WHITELIST_HINT_RE = re.compile(
+    r"(?i)(?:allowed|permitted|valid)_?(?:ext|exts|extensions?|suffix|suffixes|filetypes?|types?)"
+    r"|\bwhitelist\b|\.\s*endsWith\s*\(|\.\s*endswith\s*\("
+    r"|\b(?:in|not\s+in)\s+\w*(?:ALLOWED|SAFE|PERMITTED|VALID)\w*"
+    r"|\.\s*contains\s*\(\s*(?:ext|suffix|fileType)\s*\)")
+_UPLOAD_JAVA_GUARD_RE = re.compile(
+    # 条件里可能有两层括号（if (...) { ... } 与 contains(...)），
+    # 只吃一个右括号会把 ")) {" 判成不匹配 —— 白名单明明写了却判 True。
+    r"(?is)if\s*\([^)]{0,400}(?:allowed|safe|permitted|endsWith|contains|"
+    r"ALLOWED|valid)[^)]{0,400}\)\s*\)?\s*\{[^}]{0,600}(?:return|throw|continue)")
+_UPLOAD_PY_GUARD_RE = re.compile(
+    r"(?is)if\s+[^:\n]{0,400}(?:not\s+in|endswith|allowed|safe|permitted)"
+    r"[^:\n]{0,400}:\s*\n\s*(?:raise|return|continue|abort)")
+# 服务端重命名 + **固定后缀**：UUID 后跟字面量 .png/.jpg 才算；
+# UUID + 原始后缀（fileName.substring(...)）仍然可传 .jsp，不算。
+_UPLOAD_GENERATED_RE = re.compile(
+    r"(?i)\b(?:uuid|uuid4|randomUUID|nanoTime|snowflake)\b[^;\n]{0,160}"
+    r"[\"']\.(?:png|jpe?g|gif|pdf|zip|txt|docx?|xlsx?)[\"']")
+
+
+def _upload_has_guard(body: str, python: bool) -> bool:
+    if not _UPLOAD_WHITELIST_HINT_RE.search(body):
+        return False
+    return bool((_UPLOAD_PY_GUARD_RE if python else _UPLOAD_JAVA_GUARD_RE)
+                .search(body))
+
+
+def unrestricted_upload_verdict(source: str) -> bool | None:
+    """第 31 类（M157）：原始文件名直接落盘，且无后缀白名单/固定重命名。
+
+    判 False 的两条机制（都可核对）：
+      ① 白名单判定 + 中止分支（if/raise/return/throw）；
+      ② 服务端生成 UUID + **固定后缀**（不是沿用原始后缀）。
+    只有 MIME/Content-Type 校验不算 —— 客户端可控。
+    """
+    if _looks_solidity(source):
+        return None
+    body = entry_body(_entry_region(source))
+    if not body:
+        return None
+    if _looks_python(source):
+        if not (_UPLOAD_PY_PARAM_RE.search(source)
+                or _UPLOAD_PY_PARAM_RE.search(body)):
+            return None
+        if not _UPLOAD_PY_NAME_RE.search(body):
+            return None
+        if not _UPLOAD_PY_SINK_RE.search(body):
+            return None
+        if _upload_has_guard(body, python=True):
+            return False
+        if _UPLOAD_GENERATED_RE.search(body):
+            return False
+        return True
+    # Java / Kotlin
+    if not (_UPLOAD_JAVA_PARAM_RE.search(source)
+            or _UPLOAD_JAVA_PARAM_RE.search(body)):
+        return None
+    if not _UPLOAD_JAVA_NAME_RE.search(body):
+        return None
+    if not _UPLOAD_JAVA_SINK_RE.search(body):
+        return None
+    if _upload_has_guard(body, python=False):
+        return False
+    if _UPLOAD_GENERATED_RE.search(body):
+        return False
+    return True
+
+
+# ---- 第 32 类：签名重放 / 缺失 nonce 消费（SWC-121 / CWE-347）----
+_SOL_ECRECOVER_RE = re.compile(r"\becrecover\s*\(")
+_SOL_ECRECOVER_ASSIGN_RE = re.compile(
+    r"\baddress(?:\s+payable)?\s+(\w+)\s*=\s*ecrecover\s*\(")
+_SOL_STATE_CHANGE_RE = re.compile(
+    r"\b(?:transfer|transferFrom|safeTransfer|safeTransferFrom|_mint|_burn"
+    r"|selfdestruct|delegatecall|call\s*\{)\b"
+    r"|\b\w+\s*\[[^\]]*\]\s*[+\-]?=(?!=)|\bdelete\s+\w+|\+\+|--")
+
+
+def _sol_has_nonce_consumption(body: str) -> bool:
+    """一次性 nonce / 签名哈希是否**先判后写**。"""
+    guard = re.search(
+        r"(?is)(?:require|if)\s*\([^)]{0,300}!\s*\w+\s*\[", body)
+    write = re.search(
+        r"(?is)\w+\s*\[[^\]]+\]\s*=\s*(?:true|block\.timestamp|block\.number"
+        r"|\w+\s*\+\s*1)", body)
+    bump = re.search(r"\w+\s*\[[^\]]+\]\s*\+\+", body)
+    return bool((guard and write) or bump)
+
+
+def signature_replay_verdict(source: str) -> bool | None:
+    """第 32 类（M158）：状态变更路径上的原生 ecrecover 缺零地址校验/nonce。
+
+    编译器强制的事实优先：view/pure 不写状态、internal/private 外部不可达，
+    两者都判 False（验签辅助函数不构成本类漏洞）。
+    安全判据要**同时**满足：恢复地址 != address(0)，且 nonce/哈希被消费。
+    """
+    if not _looks_solidity(source):
+        return None
+    func_src, _mod_block, _inh = _split_sol_sections(source)
+    sig = _sol_signature(func_src)
+    if _sol_is_readonly(sig) or _sol_is_internal_only(sig):
+        return False
+    if not _SOL_ECRECOVER_RE.search(func_src):
+        return None
+    # 验签结果没进入任何状态变更/价值转移 → 不是"签名重放"能造成损失的路径。
+    # 但 "used[hash] = true" 本身就是状态变更，所以这条只在**没有**任何
+    # 赋值/转移时才退 None（纯验签工具函数）。
+    if not _SOL_STATE_CHANGE_RE.search(func_src):
+        return None
+    m = _SOL_ECRECOVER_ASSIGN_RE.search(func_src)
+    zero_ok = False
+    if m:
+        var = re.escape(m.group(1))
+        zero_ok = bool(re.search(
+            rf"\b{var}\s*!=\s*address\s*\(\s*0\s*\)", func_src))
+    nonce_ok = _sol_has_nonce_consumption(func_src)
+    if zero_ok and nonce_ok:
+        return False
+    return True
+
+
 def verdict(category: str, source: str) -> bool | None:
     """对配置型类目给出确定性结论：True(有漏洞) / False(安全) / None(证据不足)。"""
     cfg = parse_config_block(source)
@@ -10283,8 +10606,14 @@ def verdict(category: str, source: str) -> bool | None:
         # 仍在）。所以必须先对**原始 source** 按标记切段，再看入口那一段。
         _region = _entry_region(source)
         _body = entry_body(_region)
+        # M153 实测：原来写裸 encrypt|decrypt 会把**形参名** encryption
+        # 当成加解密调用（kkFileView onlinePreview 的 encryption 是查询参数），
+        # 证据归属守卫被一个变量名绕过，AES/ECB 从 Hop 2 的 AESUtil 算到入口
+        # 头上 —— 4 条 crypto 假阳。要求真的出现**调用**（后面跟括号）。
         if not re.search(r"Cipher\s*\.\s*getInstance|\.\s*(?:doFinal|update)\s*\("
-                         r"|new\s+\w*Cipher|encrypt|decrypt", _body, re.I):
+                         r"|new\s+\w*Cipher"
+                         r"|\b(?:encrypt|decrypt)(?:Data|String|Bytes|File|Url)?\s*\(",
+                         _body, re.I):
             return None
         return cipher_is_weak(alg) if alg else None
 
@@ -10415,5 +10744,11 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category == "delegatecall_untrusted":
         return solidity_delegatecall_verdict(source)
+
+    # M157/M158：第 31、32 类
+    if category == "unrestricted_upload":
+        return unrestricted_upload_verdict(source)
+    if category == "signature_replay":
+        return signature_replay_verdict(source)
 
     return None

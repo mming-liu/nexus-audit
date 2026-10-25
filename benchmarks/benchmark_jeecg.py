@@ -47,8 +47,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from core.text_utils import ensure_utf8_stdio                   # noqa: E402
 from core.agents import rule_detectors as R                     # noqa: E402
 from core.slicer.java_servlet import JavaSlicer                 # noqa: E402
+
+ensure_utf8_stdio()
 
 DEFAULT_TARGET = ROOT / "reference_repos" / "jeecg-boot"
 CATS = ("sqli", "cmdi", "xss", "pathtraver", "weakrand", "hash", "ssrf",
@@ -61,8 +64,11 @@ MIN_UNITS = 450
 # 注意 `hardcoded_secret` 不在表里：jeecg 那条是 **文件级伪单元**
 # （`jeecg-boot-base-core/.../JeecgBaseConfig.java` 里内置的 JWT 默认密钥），
 # 由 `--auto` 的文件级普查产出，不属于入口切片 —— 单独用文件读断言它。
+# M156 修正：原表 cmdi=4 / sqli=4 / xss=3 里混进了 4 条 cmdi 假阳
+# （裸 .load( 把 appService.load(appId) 当成 Runtime.load）。判据收窄后
+# 逐条复核：cmdi 归零，sqli 3，xss 2。冻结表按**真实证据**重记。
 FROZEN_NON_AUTHZ = {
-    "cmdi": 4, "deserial": 4, "hash": 4, "sqli": 4, "xss": 3,
+    "deserial": 4, "hash": 4, "sqli": 3, "xss": 2,
     "redir": 3, "cors": 1,
 }
 # 文件级密钥：路径片段 + 必须出现的字面量证据
@@ -148,7 +154,7 @@ def main() -> int:
     if not secret_hit:
         bad.append("文件级密钥文件未被判出（JeecgBaseConfig 默认密钥）")
     ok = not bad
-    print(f"\n{'STRICT PASS ✔（458 入口 / authz 零 True / 24 个已知根因冻结）' if ok else 'STRICT FAIL ✘ ' + '；'.join(bad)}")
+    print(f"\n{'STRICT PASS ✔（487 入口 / authz 零 True / 17 个已知根因冻结 + 1 文件级密钥）' if ok else 'STRICT FAIL ✘ ' + '；'.join(bad)}")
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)

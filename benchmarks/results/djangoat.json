@@ -5,7 +5,7 @@
   "django_routed": 50,
   "django_marked_units": 0,
   "decided": 12,
-  "rule_evaluations": 120,
+  "rule_evaluations": 122,
   "correct": 12,
   "fp": 0,
   "reverse_fn": 0,

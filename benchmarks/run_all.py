@@ -45,7 +45,7 @@ SCOREBOARD = ROOT / "benchmarks" / "results" / "SCOREBOARD.md"
 # (名称, 命令, 前置目录检查, 类别, 可并发)
 #   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
 JOBS = [
-    ("冒烟测试 [1]-[185]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
+    ("冒烟测试 [1]-[200]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke", False),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target", True),
@@ -259,6 +259,22 @@ JOBS = [
     ("FastAPI (Python 异步真实模板)",
      ["benchmarks/benchmark_fastapi_wild.py", "--strict"],
      "reference_repos/fastapi-sql-template", "target", True),
+    # ---- M151–M160：第 31–34 野仓 ----
+    # kkFileView：zip_slip 在真实业务代码上的唯一入口证据（sevenzipjbinding
+    # 的 getPath() + normalize/startsWith 守卫），0 True + 反向锚点。
+    ("kkFileView (zip_slip 真实解压)",
+     ["benchmarks/benchmark_kkfileview.py", "--strict"],
+     "reference_repos/kkFileView", "target", True),
+    # FastAPI 官方模板：Annotated 别名 + APIRouter 级 dependencies。
+    ("full-stack-fastapi-template (Annotated 依赖)",
+     ["benchmarks/benchmark_fastapi_fullstack.py", "--strict"],
+     "reference_repos/full-stack-fastapi-template", "target", True),
+    # solady：Yul caller()/sload 权限门 + SafeTransferLib。
+    ("solady (Yul 权限门)", ["benchmarks/benchmark_solady.py", "--strict"],
+     "reference_repos/solady/src", "target", True),
+    # Apollo：自定义 Spring EL @PreAuthorize + profile 化认证。
+    ("apollo (自定义 Spring EL)", ["benchmarks/benchmark_apollo.py", "--strict"],
+     "reference_repos/apollo", "target", True),
     # 第 47 项（M135）：跨仓聚类一致性。它不跑靶场，只对账：
     #   · 各簇根因数之和 == wild_hunt.json 的独立根因总数（计数守恒）；
     #   · 多仓共现簇 >= 8（低于就退化成一仓一簇，"跨仓同源"不成立）。
@@ -290,7 +306,17 @@ def run_job(name: str, cmd: list[str]) -> tuple[str, float, str]:
 def _run_parallel(jobs: list[tuple[str, list[str]]], jobs_n: int) -> dict[str, tuple[str, float, str]]:
     """并发跑作业。快速失败：首个 FAIL 后不再启动新作业。"""
     results: dict[str, tuple[str, float, str]] = {}
-    with ProcessPoolExecutor(max_workers=jobs_n) as ex:
+    try:
+        ex = ProcessPoolExecutor(max_workers=jobs_n)
+    except (PermissionError, OSError) as e:
+        # DSH/受限 Windows 沙箱禁止匿名管道：ProcessPoolExecutor 建池即
+        # WinError 5。并发是加速手段，不是门禁语义 —— 明确告警后顺序跑，
+        # 绝不把"跑不了并发"伪装成"全绿"。
+        print(f"  [!] 并发不可用（{type(e).__name__}: {e}）；回退顺序执行")
+        for name, cmd in jobs:
+            results[name] = run_job(name, cmd)
+        return results
+    with ex:
         futures = [(name, ex.submit(run_job, name, cmd)) for name, cmd in jobs]
         running = list(futures)
         failed = False

@@ -1,0 +1,28 @@
+{
+  "bench": "fastapi_fullstack",
+  "units": 23,
+  "total_units": 23,
+  "decided": 90,
+  "correct": 23,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 90,
+  "checks": {
+    "superuser:read_users": false,
+    "superuser:create_user": false,
+    "superuser:update_user": false,
+    "superuser:delete_user": false,
+    "currentuser:read_items": false,
+    "currentuser:read_item": false,
+    "currentuser:create_item": false,
+    "currentuser:update_item": false,
+    "currentuser:delete_item": false,
+    "currentuser:read_user_me": false,
+    "currentuser:delete_user_me": false,
+    "dev-only:private.create_user": null
+  },
+  "alias_header": true,
+  "router_dep": true,
+  "anchor": true,
+  "true_rows": []
+}

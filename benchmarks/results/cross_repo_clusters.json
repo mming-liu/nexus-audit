@@ -1,7 +1,7 @@
 {
-  "total_root_causes": 98,
-  "cluster_count": 53,
-  "cross_repo_clusters": 8,
+  "total_root_causes": 119,
+  "cluster_count": 65,
+  "cross_repo_clusters": 12,
   "conservation_ok": true,
   "clusters": [
     {
@@ -83,7 +83,51 @@
       ]
     },
     {
+      "category": "unrestricted_upload",
+      "root_kind": "endpoint",
+      "component": "DatabaseController.java",
+      "repo_count": 2,
+      "root_count": 2,
+      "repos": [
+        "eladmin-JPA",
+        "eladmin-mp"
+      ]
+    },
+    {
+      "category": "unrestricted_upload",
+      "root_kind": "endpoint",
+      "component": "DeployController.java",
+      "repo_count": 2,
+      "root_count": 2,
+      "repos": [
+        "eladmin-JPA",
+        "eladmin-mp"
+      ]
+    },
+    {
+      "category": "unrestricted_upload",
+      "root_kind": "endpoint",
+      "component": "UploadController.java",
+      "repo_count": 2,
+      "root_count": 3,
+      "repos": [
+        "My-Blog",
+        "newbee-mall"
+      ]
+    },
+    {
       "category": "weakrand",
+      "root_kind": "endpoint",
+      "component": "UploadController.java",
+      "repo_count": 2,
+      "root_count": 3,
+      "repos": [
+        "My-Blog",
+        "newbee-mall"
+      ]
+    },
+    {
+      "category": "xss",
       "root_kind": "endpoint",
       "component": "UploadController.java",
       "repo_count": 2,
@@ -131,26 +175,6 @@
       "root_count": 1,
       "repos": [
         "Employee-Management-System"
-      ]
-    },
-    {
-      "category": "cmdi",
-      "root_kind": "endpoint",
-      "component": "JobGroupController.java",
-      "repo_count": 1,
-      "root_count": 1,
-      "repos": [
-        "jeecg-boot"
-      ]
-    },
-    {
-      "category": "cmdi",
-      "root_kind": "endpoint",
-      "component": "JobLogController.java",
-      "repo_count": 1,
-      "root_count": 3,
-      "repos": [
-        "jeecg-boot"
       ]
     },
     {
@@ -251,6 +275,16 @@
       "root_count": 1,
       "repos": [
         "mall4j"
+      ]
+    },
+    {
+      "category": "deserial",
+      "root_kind": "endpoint",
+      "component": "AppController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "apollo"
       ]
     },
     {
@@ -406,6 +440,16 @@
     {
       "category": "sqli",
       "root_kind": "endpoint",
+      "component": "AccessKeyController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "apollo"
+      ]
+    },
+    {
+      "category": "sqli",
+      "root_kind": "endpoint",
       "component": "GenController.java",
       "repo_count": 1,
       "root_count": 1,
@@ -419,16 +463,6 @@
       "component": "SysAnnouncementSendController.java",
       "repo_count": 1,
       "root_count": 2,
-      "repos": [
-        "jeecg-boot"
-      ]
-    },
-    {
-      "category": "sqli",
-      "root_kind": "endpoint",
-      "component": "SysDepartController.java",
-      "repo_count": 1,
-      "root_count": 1,
       "repos": [
         "jeecg-boot"
       ]
@@ -474,6 +508,26 @@
       ]
     },
     {
+      "category": "unrestricted_upload",
+      "root_kind": "endpoint",
+      "component": "BlogController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "My-Blog"
+      ]
+    },
+    {
+      "category": "unrestricted_upload",
+      "root_kind": "endpoint",
+      "component": "NewBeeAdminUploadAPI.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "newbee-mall-api"
+      ]
+    },
+    {
       "category": "weakrand",
       "root_kind": "endpoint",
       "component": "BlogController.java",
@@ -506,11 +560,51 @@
     {
       "category": "xss",
       "root_kind": "endpoint",
+      "component": "AppNamespaceController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "apollo"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
       "component": "BlogController.java",
       "repo_count": 1,
       "root_count": 1,
       "repos": [
         "My-Blog-layui"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "CommonController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "RuoYi"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "ConsumerController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "apollo"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "FavoriteController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "apollo"
       ]
     },
     {
@@ -526,11 +620,41 @@
     {
       "category": "xss",
       "root_kind": "endpoint",
-      "component": "SysAnnouncementController.java",
+      "component": "NewBeeAdminUploadAPI.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "newbee-mall-api"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "NewBeeMallPersonalAPI.java",
       "repo_count": 1,
       "root_count": 1,
       "repos": [
-        "jeecg-boot"
+        "newbee-mall-api"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "PersonalController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "newbee-mall"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "ServerConfigController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "apollo"
       ]
     },
     {

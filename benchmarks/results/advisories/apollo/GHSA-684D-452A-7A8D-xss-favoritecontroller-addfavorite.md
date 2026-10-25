@@ -1,20 +1,20 @@
-# CWE-79 · xss in SysAnnouncementController.java 
+# CWE-79 · xss in FavoriteController.java 
 
-**GHSA-B586-7443-2E6B** ｜ 规则层 P0 ｜ endpoint
+**GHSA-684D-452A-7A8D** ｜ 规则层 P0 ｜ endpoint
 **CVSS v3.1：6.1 MEDIUM** ｜ `CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N`
 
 ## Affected Component
 
-- Repository: `C:\myFloders\git\nexus-audit\reference_repos\jeecg-boot`
-- File: `jeecg-module-system/jeecg-system-biz/src/main/java/org/jeecg/modules/system/controller/SysAnnouncementController.java:488`
-- Representative entry: `SysAnnouncementController.showContent`
+- Repository: `C:\myFloders\git\nexus-audit\reference_repos\apollo`
+- File: `apollo-portal/src/main/java/com/ctrip/framework/apollo/portal/controller/FavoriteController.java:52`
+- Representative entry: `FavoriteController.addFavorite`
 - Affected routes: **1**（同一独立根因）
 
-- `SysAnnouncementController.showContent`
+- `FavoriteController.addFavorite`
 
 ## Vulnerability Mechanism
 
-类目 `xss`（CWE-79）。根因签名：`xss:C:\myFloders\git\nexus-audit\reference_repos\jeecg-boot\jeecg-module-system\jeecg-system-biz\src\main\java\org\jeecg\modules\system\controller\SysAnnouncementController.java:488:SysAnnouncementController.showContent`。
+类目 `xss`（CWE-79）。根因签名：`xss:C:\myFloders\git\nexus-audit\reference_repos\apollo\apollo-portal\src\main\java\com\ctrip\framework\apollo\portal\controller\FavoriteController.java:52:FavoriteController.addFavorite`。
 
 - `global-config`：结论来自 `框架装配证据` 中的同一份全局配置，所有
   受影响路由共享该根因；修一处配置即消解整组告警。
@@ -25,15 +25,13 @@
 
 ```mermaid
 flowchart LR
-  N0["SysAnnouncementController.showContent /sys/annountCement/show/&lbrace;id&rbrace;"]
-  N1["JimuReportTokenService.java:46 (JimuReportTokenService.java)"]
-  N2["verifyToken() 的接口实现类方法体 (TokenUtils.java)"]
-  N3["equals() 的接口实现类方法体 (SysDepart.java)"]
-  N4["setStatus() 的接口实现类方法体 (MyRouteDefinition.java)"]
+  N0["FavoriteController.addFavorite /favorites"]
+  N1["DefaultUserInfoHolder.java:33 (DefaultUserInfoHolder.java)"]
+  N2["addFavorite() 的接口实现类方法体 (FavoriteService.java)"]
+  N4["跨路由串接证据 (FavoriteController.java)"]
   N0 --> N1
   N1 --> N2
-  N2 --> N3
-  N3 --> N4
+  N2 --> N4
 ```
 
 ## PoC Harness
@@ -41,7 +39,7 @@ flowchart LR
 ```java
 // 自动生成的 PoC 骨架（M45 PoC 合成器）
 // 规则层判定：xss = True
-// 目标位置：SysAnnouncementController.java:488
+// 目标位置：FavoriteController.java:52
 package poc;
 
 import org.junit.jupiter.api.Test;
@@ -56,14 +54,14 @@ import static org.hamcrest.Matchers.not;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-public class Sysannouncementcontroller_showcontentPocTest {
+public class Favoritecontroller_addfavoritePocTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
     void otherAccountResourceDenied() throws Exception {
-        mockMvc.perform(get("/sys/annountCement/show/{id}").param("id", "9999")
+        mockMvc.perform(get("/favorites").param("id", "9999")
                 .header("Authorization", "Bearer attacker-token"))
             .andExpect(status().is4xxClientError());
     }
@@ -80,14 +78,14 @@ public class Sysannouncementcontroller_showcontentPocTest {
 ## Quick Reproduction Command
 
 ```bash
-# 1) 离线复核本仓（本根因在输出里按 jeecg-module-system/jeecg-system-biz/src/main/java/org/jeecg/modules/system/controller/SysAnnouncementController.java:488 定位）
-python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\jeecg-boot --auto --offline
+# 1) 离线复核本仓（本根因在输出里按 apollo-portal/src/main/java/com/ctrip/framework/apollo/portal/controller/FavoriteController.java:52 定位）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\apollo --auto --offline
 
 # 2) 生成 PoC + 自检补丁 + 披露包
-python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\jeecg-boot --auto --offline --emit-poc poc/ --fix --advisory-dir adv/
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\apollo --auto --offline --emit-poc poc/ --fix --advisory-dir adv/
 
 # 3) 只看本类目（24 类中的 xss）
-python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\jeecg-boot --categories xss --offline
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\apollo --categories xss --offline
 ```
 
 ## References

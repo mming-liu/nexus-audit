@@ -2,10 +2,10 @@
   "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\JavaSecLab-main",
   "total_units": 227,
   "with_truth": 63,
-  "rule_covered": 41,
-  "rule_coverage": 0.6508,
+  "rule_covered": 42,
+  "rule_coverage": 0.6667,
   "rule_correct": 40,
-  "rule_accuracy": 1.0,
+  "rule_accuracy": 0.9756,
   "per_category": {
     "xxe": {
       "n": 5,
@@ -16,7 +16,7 @@
     "xss": {
       "n": 7,
       "safe_n": 1,
-      "decided": 3,
+      "decided": 4,
       "correct": 3
     },
     "spel": {
@@ -86,12 +86,6 @@
       "category": "xss",
       "real_vuln": true,
       "route": "/vul1Upload"
-    },
-    {
-      "unit": "ReflectController.vul1",
-      "category": "xss",
-      "real_vuln": true,
-      "route": "/vul1"
     },
     {
       "unit": "StoreController.vul",
