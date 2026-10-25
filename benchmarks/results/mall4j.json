@@ -6,43 +6,18 @@
   "correct": 139,
   "fp": 0,
   "reverse_fn": 0,
-  "rule_evaluations": 796,
+  "rule_evaluations": 941,
   "cors_route_hits": 139,
   "cors_root_causes": 1,
   "cors_config_file": "AuthConfig.java",
   "subject_chain_units": 25,
   "subject_chain_authz_true": 0,
-  "review_needed": 9,
-  "review_frozen": 9,
+  "review_needed": 4,
+  "review_frozen": 4,
   "review_rows": [
-    {
-      "file": "CaptchaController.java",
-      "unit": "CaptchaController.get",
-      "category": "authz"
-    },
-    {
-      "file": "CaptchaController.java",
-      "unit": "CaptchaController.check",
-      "category": "authz"
-    },
     {
       "file": "DeliveryController.java",
       "unit": "DeliveryController.checkDelivery",
-      "category": "authz"
-    },
-    {
-      "file": "NoticeController.java",
-      "unit": "NoticeController.getNoticeById",
-      "category": "authz"
-    },
-    {
-      "file": "ProdController.java",
-      "unit": "ProdController.prodInfo",
-      "category": "authz"
-    },
-    {
-      "file": "ProdController.java",
-      "unit": "ProdController.moreBuyProdList",
       "category": "authz"
     },
     {

@@ -31,11 +31,10 @@ mall4j 是 5.3k Star 的企业级多模块商城：`yami-shop-api`（C 端）+ `
   `UserCollectionController` / `PayController` 五个 C 端"我的资源"控制器里
   `authz` **零 True**（这是 M98 要证的核心命题）；
 - 全局 CORS 缺陷必须判出并折叠成 1 个根因；
-- 人工复核面（`REVIEW_NEEDED`）冻结成清单：这些是**公开资源查询**
-  （商品/公告/配送费/验证码）与后台文件上传，按 authz 类目的定义
-  （"访问**归属于某个主体的资源**"）它们不是本类目的判定对象，
-  但规则层无法仅凭代码区分"公开目录"与"他人资源"。如实登记、计数冻结，
-  涨一条就红 —— 不假装零误报。
+- 人工复核面（`REVIEW_NEEDED`）冻结成清单：M104 的"公共目录只读查询"
+  豁免把 6 条公开查询（商品/公告/验证码/销量榜）转正为确定性 False；
+  剩下的 3 条是**真风险**（按单号查物流的真 IDOR + 后台未鉴权上传 + 收藏 XSS）。
+  计数冻结，涨一条就红 —— 不假装零误报。
 """
 from __future__ import annotations
 
@@ -64,9 +63,12 @@ SUBJECT_CHAIN_CONTROLLERS = {
     "UserCollectionController.java": "我的收藏",
     "PayController.java": "支付单",
 }
-# 人工复核面：公开资源查询 + 后台文件上传。按 authz 类目定义不是判定对象，
-# 但规则层区分不了"公开目录"与"他人资源" —— 计数冻结，涨一条就红。
-REVIEW_NEEDED = 9
+# 人工复核面：公开资源查询已被 M104 的"公共目录只读查询"豁免转正为 False
+# （商品/公告/验证码/销量榜 = 全站共享目录，不存在"归属某个主体"的定义）。
+# 剩下的三条是**真风险**：按 orderNumber 查物流单（猜单号即可读别人的订单
+# 物流 → 真 IDOR）+ 后台两个未鉴权上传 + 一条收藏 XSS —— 都不是可以
+# 机械判 False 的形态，冻结计数，涨一条就红。
+REVIEW_NEEDED = 4
 CORS_CONFIG_FILE = "AuthConfig.java"
 
 

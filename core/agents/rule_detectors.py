@@ -2194,7 +2194,12 @@ def _db_readers(source: str) -> list[str]:
 # 除形参与注解之外，request 对象本身还有一批读取入口。
 # XSS_PARAM_RE 只覆盖了最常用的两个，这里补齐其余通道。
 _REQUEST_READ_RE = re.compile(
-    r"request\s*\.\s*(?:getParameter|getParameterValues|getParameterMap|"
+    # M105：接收者不再写死 `request` —— `req` / `httpServletRequest` / `servletRequest`
+    # 都是同一机制的常见命名（`req.getParameter("t")` 与
+    # `request.getParameter("t")` 没有任何语义差别）。判据挂的是**方法名语义**
+    # （getParameter/getHeader/…），不是变量名。
+    r"\b(?:req|request|httpServletRequest|servletRequest)\s*\.\s*"
+    r"(?:getParameter|getParameterValues|getParameterMap|"
     r"getHeader|getHeaders|getHeaderNames|getCookies|getInputStream|getReader|"
     r"getQueryString|getPathInfo|getRequestURI|getRemoteUser)\s*\(",
     re.I)
@@ -5383,6 +5388,67 @@ def _container_flows_to_service(body: str, holder: str) -> bool:
                      rf"[^;]{{0,240}}?\b(?:{alt})\b", body) is not None
 
 
+_AUTHZ_PUBLIC_WRITE_RE = re.compile(
+    r"\b(?:insert|update|delete|remove|save|upload|create|edit|modify)\w*\s*\(",
+    re.I)
+_AUTHZ_ADMIN_PREFIXES = ("/admin", "/sys", "/system", "/manage", "/monitor")
+# 用户私有资源：这些 Service/Mapper 背后是"归属于某个主体"的表。命中即不是
+# 公共目录 —— 只读也一样（`orderService.getOrderByOrderNumber` 就是真实 IDOR 面）。
+_AUTHZ_PRIVATE_RES_RE = re.compile(
+    r"\b(?:order|cart|address|addr|user|account|wallet|pay|member)\w*"
+    r"\s*(?:Service|Mapper|Dao|DAO)\b|\buser_?id\b|\bmember_?id\b"
+    r"|\bbuyer_?id\b", re.I)
+# M104：**正面**目录白名单。这一条是"公共目录"的**必要证据**，不是可选加分。
+#
+# 教训（M104 第一版）：曾用"不含私有资源词"作判据 —— 那是**否定式**，任何
+# 认不出的查询都会落进来，于是冒烟里三条本该 True/None 的样本（裸形参直查、
+# 非 Unique 命名、垂直越权视图路由）全被翻成 False。否定式证据在安全判定里
+# 永远不够用：看不见 ≠ 不存在。
+#
+# 现在要求**先认出它是目录**：路由前缀或 Service/Mapper 名里出现商品/公告/
+# 验证码/分类/品牌/轮播/搜索这类**全站共享**的实体名。认不出就照原样走
+# True/None，绝不因为"没提 user_id"就判安全。
+_AUTHZ_CATALOG_RES_RE = re.compile(
+    r"\b(?:prod|product|goods|goodsInfo|sku|spu|notice|noticeInfo|captcha"
+    r"|category|cate|brand|banner|advert|advertisement|seckill|flashsale"
+    r"|comment|review|search|dict|config)\w*\s*(?:Service|Mapper|Dao|DAO)\b",
+    re.I)
+_AUTHZ_CATALOG_ROUTE_RE = re.compile(
+    r"(?i)^/(?:prod|product|goods|sku|spu|notice|captcha|category|cate|brand"
+    r"|banner|advert|seckill|flashsale|comment|search|dict|config|home|index)"
+    r"(?:/|$)")
+
+
+def _is_public_catalog_read(source: str, body: str) -> bool:
+    """公共目录只读查询判定（M104）。
+
+    四件事实缺一不可：
+      ① 无写动作；
+      ② 非管理端路由；
+      ③ 不碰用户私有资源（order/cart/address/user/... 或 user_id 条件列）；
+      ④ **正面认出它是目录**（路由前缀或 Service/Mapper 名命中文档实体）。
+
+    第 ④ 条是必要条件、且是**正面证据**：认不出就不豁免。否定式判据
+    （"没提 user_id 就算公共"）会把所有认不出的查询判成安全，M104 第一版
+    正是这么把三条冒烟护栏翻红的。
+    """
+    if _AUTHZ_PUBLIC_WRITE_RE.search(body):
+        return False
+    rm = re.search(r"//\s*Full-Route:\s*(\S+)", source)
+    route = (rm.group(1) if rm else "")
+    if any(route.lower().startswith(p) for p in _AUTHZ_ADMIN_PREFIXES):
+        return False
+    if _AUTHZ_PRIVATE_RES_RE.search(body):
+        return False
+    return bool(_AUTHZ_CATALOG_RES_RE.search(body)
+                or (_route_check_catalog(route)))
+
+
+def _route_check_catalog(route: str) -> bool:
+    """路由前缀是否指向全站共享目录（M104 的正面证据之一）。"""
+    return bool(route) and bool(_AUTHZ_CATALOG_ROUTE_RE.match(route))
+
+
 def authz_verdict(source: str) -> bool | None:
     """越权/未授权的确定性判定：False(有校验) / True(入参直查且无主体) / None。"""
     body = entry_body(source)
@@ -5607,6 +5673,30 @@ def authz_verdict(source: str) -> bool | None:
         if "[explicit-auth-module]" in source:
             return None
 
+        # 4-豁免）**公共目录只读查询**（M104，mall4j 实测形态）。
+        #
+        # 判据挂"被查的到底是什么资源"，不挂路由名。三件可核对的事实缺一不可：
+        #   ① 纯读：方法体里没有任何写动作（insert/update/delete/save/remove/
+        #      upload/create/edit/modify 一个都没有）；
+        #   ② 非管理端：`// Full-Route:` 不以 /admin /sys /system /manage
+        #      /monitor 开头；
+        #   ③ 资源不属任何主体：方法体里既不取当前主体（本分支已由
+        #      `not has_any_subject` 保证），也不碰用户私有资源
+        #      （order/cart/address/user/account/wallet/pay/member 的
+        #      Service/Mapper），更不含 user_id/member_id/buyer_id 条件列。
+        #
+        # 为什么判 False 而不是 None：authz 类目问的是"访问**归属于某个主体**
+        # 的资源有没有核对归属"。商品详情、公告、验证码、销量榜是全站共享的
+        # 公共目录 —— **不存在"A 用户越权读 B 用户商品"这个定义**，越权面为零。
+        #
+        # 反例保护（必须留在 True / None）：
+        #   · `DeliveryController.checkDelivery` —— 按 orderNumber 查**订单**
+        #     （order 命中私有资源词），猜单号就能查别人的物流 → 真 IDOR；
+        #   · 后台 `FileController.upload*` —— 有 upload 写动作 → ①不过；
+        #   · 任何带主体的接口 —— 根本进不到本分支。
+        if _is_public_catalog_read(source, body):
+            return False
+
         # M63 My-Blog 淬火：**公开内容路由豁免**。类目 sink 定义是"访问
         # 归属于某个主体的资源"—— 博客文章/标签/分类/搜索页按内容主键
         # 查公开内容（/blog/{id}、/tag/{name}、/search），匿名访问本来就是
@@ -5672,6 +5762,12 @@ def authz_verdict(source: str) -> bool | None:
                     break
             if not suspicious:
                 return False
+
+    # 2i) **公共目录只读查询**豁免（M104）。判据实现在 `_is_public_catalog_read`，
+    # 由 4) 入参直查分支调用 —— 这里再兜一次 `has_any_subject` 为假但走不到 4)
+    # 的形态（无 Mapper 调用、或无裸形参），保持口径一致。
+    if not has_any_subject and _is_public_catalog_read(source, body):
+        return False
 
     # 垂直越权 / 未授权 / 校验在全局配置里 —— 方法体看不到，交模型。
     return None
@@ -8767,33 +8863,89 @@ def _java_ssti_verdict(source: str) -> bool | None:
         return None
     params = _ssti_java_params(source)
     srcs = _ssti_template_sources(body)
-    if not srcs:
+    if srcs:
+        verdicts = [_ssti_origin(x, body, params) for x in srcs]
+        if any(v is True for v in verdicts):
+            return True
+        if all(v is False for v in verdicts):
+            return False
         return None
-    verdicts = [_ssti_origin(x, body, params) for x in srcs]
-    if any(v is True for v in verdicts):
-        return True
-    if verdicts and all(v is False for v in verdicts):
+    # 没有显式模板引擎 API 时，才看「视图名注入」变体
+    return _thymeleaf_viewname_verdict(source, body, params)
+
+
+# ---- M103：Thymeleaf「视图名注入」变体（Spring MVC 专属机制） ----
+#
+#   @Controller                                  ← **不是** @RestController
+#   public String vul1(@RequestParam String para) {
+#       return "vul/ssti/" + para;                // 返回值被当成**视图名**解析
+#   }
+#
+# M89 时期这条判不了：唯一的判别证据是类级注解，而**方法级切片里没有类级注解**
+# （实测 HJS + JavaSecLab 共 17 个 SSTI 单元，`@Controller` 命中 0/17）。缺了它
+# 就分不开 @Controller 与 @RestController —— HJS 自己摆着只差一个 `@ResponseBody`
+# 的成对样本（fragmentVul / fragmentSafe），按"方法无 @ResponseBody"判会把所有
+# REST 控制器的字符串拼接判成注入。
+#
+# M103 把这条证据补上了：切片器在头部写 `// Controller-Kind: @Controller`。
+# 现在判据是三件可核对的事实缺一不可：
+#   ① 头部写着 `@Controller`（不是 @RestController）；
+#   ② 方法自身没有 `@ResponseBody`（有则返回值进响应体，不走视图解析）；
+#   ③ `return "<字面量>" + <形参>`，且字面量不是 redirect:/forward:（那归 redir）。
+# 误报闸：`if (white_list.contains(para))` 这类包含性白名单必须判 False。
+_SSTI_CTRL_KIND_RE = re.compile(r"//\s*Controller-Kind:\s*@(\w+)")
+_SSTI_THYMELEAF_RET_RE = re.compile(
+    r"\breturn\s+(?:\"([^\"\n]*)\"|([A-Z][A-Z0-9_]*))\s*\+\s*"
+    r"([A-Za-z_]\w*)\s*;")
+_SSTI_VIEW_LITERAL_SKIP = ("redirect:", "forward:")
+
+
+def _thymeleaf_viewname_verdict(source: str, body: str,
+                                params: set[str]) -> bool | None:
+    m = _SSTI_CTRL_KIND_RE.search(source)
+    if not m:
+        return None                      # 切片没有类级证据 → 不判（M89 的行为）
+    if m.group(1) != "Controller":
+        return False                     # @RestController：返回值是响应体，不是视图名
+    if re.search(r"@ResponseBody\b", body):
+        # 方法级 @ResponseBody 同样让返回值直接进响应体（HJS 的 fragmentSafe
+        # 与 fragmentVul 只差这一个注解）→ 视图解析不发生 → 确定性 safe。
         return False
-    return None
+    if not re.search(r"\b(?:public|protected)\s+(?:static\s+)?String\s+\w+\s*\(",
+                     body):
+        return None                      # 返回类型不是 String → 不是视图名
+    hits: list[str] = []
+    for rm in _SSTI_THYMELEAF_RET_RE.finditer(body):
+        lit = rm.group(1)
+        var = rm.group(3)
+        if lit is not None and lit.strip().lower().startswith(
+                _SSTI_VIEW_LITERAL_SKIP):
+            continue                     # redirect:/forward: 归 redir 类目
+        if var not in params:
+            continue
+        hits.append(var)
+    if not hits:
+        # 返回值全是**纯字面量**（`return "vul/ssti/vul";`）→ 视图名固定，
+        # 模板源是磁盘上的文件 → 确定性 safe。注意只认"return 里就是字面量"：
+        # `String v = "x" + p; return v;` 的 return 是裸变量，这里**不判**
+        # （间接可控的视图名看不见，宁可退 None 也不下 False）。
+        _rets = re.findall(r"\breturn\s+([^;]+);", body)
+        if _rets and all(re.fullmatch(r'\s*"[^"\n]*"\s*', r) for r in _rets):
+            return False
+        return None
+    for var in hits:
+        if not re.search(
+                rf"if\s*\([^)]*\.\s*contains\s*\(\s*{re.escape(var)}\s*\)", body):
+            return True                  # 有视图名拼接且无白名单 → 注入
+    return False                         # 全部命中都被白名单挡住
 
 
-# ---- 为什么**不**判 Thymeleaf「视图名注入」变体（M89 实测后的取舍）----
+# ---- M103 之后的取舍说明 ----
 #
-# `return "vul/ssti/" + para;`（Spring MVC 把返回值当视图名解析，`::` 片段
-# 选择器还能注入表达式）在 HJS / JavaSecLab 里都标了 vul，但它**判不了确定性**：
-#
-#   ① 唯一的判别证据是类级注解 `@Controller` vs `@RestController`。而本工具是
-#      **方法级切片** —— 实测两个仓库共 17 个 SSTI 单元的切片里，类级注解
-#      一次都没出现（`@Controller` 命中 0/17）。证据不在切片内就判不了。
-#   ② 退一步只按"方法上没有 @ResponseBody"判，会把所有 `@RestController`
-#      返回 `"固定文案" + 参数` 的方法全判成注入 —— HJS 自己就摆着这一对：
-#      `fragmentVul` 与 `fragmentSafe` **只差**一个 `@ResponseBody`，
-#      返回值字符串一模一样。缺了类级注解就分不开，这是必然的误报面。
-#
-# 所以本类目只判**真·模板引擎 API**（Velocity evaluate / FreeMarker
-# putTemplate / new Template(StringReader) / RuntimeServices.parse），
-# 这三条机制在 HJS 与 java-sec-code 上一共 4 条真值全部命中、0 误报。
-# 视图名注入变体如实登记为已知缺口（召回缺口，不是判反）。
+# M89 时这里写着"不判视图名注入"，理由是方法级切片里没有类级 @Controller 证据。
+# M103 把这个证据补上了（切片器写 `// Controller-Kind:`），缺口已闭合 ——
+# 但**没有证据时仍然不判**：合成夹具/旧切片没有这行头时 `_thymeleaf_viewname_verdict`
+# 返回 None，行为与 M89 一致。这条"缺证据不下结论"的口径不能因为补了证据就丢。
 
 
 
@@ -8836,6 +8988,102 @@ def ssti_verdict(source: str) -> bool | None:
     if _looks_solidity(source):
         return None
     return _java_ssti_verdict(source)
+
+
+# ---------------- M105：HTTP 响应头注入（CWE-113，第 25 类） ----------------
+#
+# 机制：把外部可控字符串直接放进响应头 value，CR/LF 会被 HTTP 层解释成
+# 新的响应头 / 响应体开头（响应拆分）。
+#
+# 判据只认两件**可逐字核对**的事实：
+#   ① 有响应头下发（`response.setHeader` / `addHeader`）；
+#   ② 该调用的 value 实参里**直接**出现请求读取或本函数裸形参。
+#
+# 剥掉"方法调用链"是这一步的关键：`file.getName()`、`data.length`、
+# `realFilePath.getFileName().toString()` 这类**服务端对象取值**不含外部输入，
+# 但把 `file`/`data` 当标识符会误判成形参。所以先删掉 `x.y(...)` 形态再取标识符。
+_HDR_SINK_RE = re.compile(r"\.\s*(?:setHeader|addHeader)\s*\(", re.I)
+# 清洗证据：CR/LF 过滤或编码包装。命中即算防护。
+_HDR_SANITIZE_RE = re.compile(
+    r"URLEncoder\s*\.\s*encode|safeHttpHeader|StringEscapeUtils"
+    r"|ESAPI\s*\.\s*encoder|encodeForHeader"
+    r"|replaceAll\s*\([^)]*\\[rn]|replace\s*\(\s*['\"]\\[rn]" r"|_\w*encode\w*\s*\(",
+    re.I)
+_HDR_MEMBER_CALL_RE = re.compile(r"\b[A-Za-z_]\w*\s*\.\s*\w+\s*\([^()]*\)")
+
+
+def _hdr_value_idents(expr: str) -> set[str]:
+    """value 表达式里的**裸标识符**（先把 `x.y(...)` 方法调用整段删掉）。"""
+    stripped = expr
+    for _ in range(3):                     # 链式 `a.b().c()` 删三轮足够
+        new = _HDR_MEMBER_CALL_RE.sub(" ", stripped)
+        if new == stripped:
+            break
+        stripped = new
+    return set(re.findall(r"\b([A-Za-z_]\w*)\b", stripped))
+
+
+def _hdr_guarded(body: str, var: str) -> bool:
+    """该变量在 sink 之前是否被**会中止的校验调用**挡过（M105）。
+
+    waynboot 实测形态：
+        if (!FileUtils.checkAllowDownload(fileName)) {
+            throw new BusinessException("文件名称(...)非法，不允许下载。");
+        }
+        …
+        response.setHeader("Content-Disposition", "attachment;fileName=" + …)
+
+    判据（挂机制）：`if (<否定式校验调用>)` 且条件为真时中止（throw/return/
+    revert 或花括号块）。只认"条件里有对**同一变量**的校验调用"，不认可空 if。
+    """
+    for m in _IF_RE.finditer(body):
+        close = _sol_match_paren(body, m.end() - 1)
+        if close < 0:
+            continue
+        cond = body[m.end():close]
+        if not re.search(rf"\b{re.escape(var)}\b", cond):
+            continue
+        if not re.search(r"!\s*[\w.]+\s*\(|\bcheck\w*\s*\(", cond, re.I):
+            continue
+        tail = body[close + 1:]
+        stripped = tail.lstrip()
+        if stripped[:1] == "{":
+            blk = _sol_block_body(stripped, 0)
+            if blk and _sol_block_aborts(blk):
+                return True
+        elif re.match(r"\s*(?:throw|return|revert)\b", tail):
+            return True
+    return False
+
+
+def header_injection_verdict(source: str) -> bool | None:
+    """HTTP 响应头注入（M105，第 25 类）。"""
+    if _looks_python(source):
+        return None                        # Python 侧暂无确定性判据（不硬判）
+    if _looks_solidity(source):
+        return None
+    body = entry_body(source)
+    if not body:
+        return None
+    params = set(_bare_params(_entry_signature(source)))
+    seen = False
+    for m in _HDR_SINK_RE.finditer(body):
+        args = _ssti_call_args(body, m.end() - 1)
+        if len(args) < 2:
+            continue
+        seen = True
+        value = args[1]
+        idents = _hdr_value_idents(value)
+        tainted = bool(_REQUEST_READ_RE.search(value)) or bool(params & idents)
+        if not tainted:
+            continue
+        if _HDR_SANITIZE_RE.search(value):
+            continue                       # 已编码/已剥 CR LF → 该处安全
+        # 前置守卫：同变量被"会中止的校验调用"挡过 → 该处安全
+        if any(_hdr_guarded(body, p) for p in (params & idents)):
+            continue
+        return True
+    return False if seen else None
 
 
 def verdict(category: str, source: str) -> bool | None:
@@ -8886,6 +9134,9 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category == "ssti":
         return ssti_verdict(source)
+
+    if category in ("header_injection", "crlf"):
+        return header_injection_verdict(source)
 
     if category == "xxe":
         return xxe_verdict(source)

@@ -322,6 +322,29 @@ CATEGORIES: dict[str, VulnCategory] = {
             "③ 只靠黑名单过滤模板语法关键字（`$`、`#`、`{`）不构成防护。"),
     ),
 
+    # ---------------- M105：第 25 类 —— HTTP 响应头注入（CRLF） ----------------
+    # OWASP Benchmark 无此类样本 → owasp=False。真值来自 Hello-Java-Sec 的
+    # CSVInjection.exportVul / Traversal.download / SSRF 的图片下载（都把
+    # 形参直接拼进 Content-Disposition）。
+    "header_injection": VulnCategory(
+        key="header_injection", display="HTTP 响应头注入（CRLF）", cwe="CWE-113",
+        owasp=False,
+        sink_question=(
+            "函数是否把外部可控字符串直接拼进**响应头**下发？包括："
+            "① `response.setHeader(name, value)`；② `response.addHeader(name, value)`；"
+            "③ `response.setHeader(\"Location\", …)` 之外的其它自定义头。"
+            "只算 value 里**直接出现**请求读取（`request.getParameter(...)`）或"
+            "本函数裸形参的形态。"),
+        property=(
+            "写入响应头之前是否清除了 CR/LF（`replaceAll(\"[\\\\r\\\\n]\", \"\")`、"
+            "`replace(\"\\r\", \"\")`），或做了 URL 编码/安全包装"
+            "（`URLEncoder.encode`、`safeHttpHeader`、`StringEscapeUtils`、"
+            "`ESAPI.encoder()`）？"
+            "注意：① 值若是纯常量、数字长度、或服务端对象取值"
+            "（`file.getName()`、`realFilePath.getFileName()`）本属性为 Yes；"
+            "② 只做业务字符过滤（去掉中文/符号）不算清 CR/LF。"),
+    ),
+
     # ---------------- Solidity / Web3（Module 17）----------------    # 这两类的判据形状与 Web 类目不同：都不需要"外部输入可达"——
     # 重入是**执行顺序**问题（外部调用与状态写入的先后），
     # 访问控制是**身份校验**问题（特权操作前有没有主体比对）。

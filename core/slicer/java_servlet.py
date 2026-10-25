@@ -35,6 +35,17 @@ INTERFACE_HEAD_RE = re.compile(
 
 # 类声明：class Foo extends HttpServlet
 CLASS_RE = re.compile(r"\b(?:public\s+)?(?:final\s+|abstract\s+)?class\s+([A-Za-z_]\w*)")
+# M103：类级控制器的**种类**事实 —— `@RestController` 与 `@Controller` 的语义
+# 差异决定了"方法返回值是**响应体**还是**视图名**"。
+#
+# 这是**编译期/框架期事实**，不是推测：Spring 把 @RestController 类里所有方法
+# 都当成 @ResponseBody（返回值直接写响应体，不经视图解析）；@Controller 类里
+# 的方法则会被当成视图名去解析 —— Thymeleaf 视图名注入（`return "vul/" + para`）
+# 只存在于后者。
+#
+# 方法级切片里看不到类级注解（实测 HJS + JavaSecLab 共 17 个 SSTI 单元，
+# `@Controller` 命中 0/17），所以必须由切片器把它写进头部证据表。
+CTRL_KIND_RE = re.compile(r"@(RestController|Controller)\b")
 # @WebServlet(value = "/path") 或 @WebServlet("/path")
 WEBSERVLET_RE = re.compile(r"@WebServlet\s*\(\s*(?:value\s*=\s*)?\"([^\"]*)\"")
 # Spring / JAX-RS 方法级路由注解
@@ -1122,6 +1133,14 @@ class JavaSlicer:
             class_prefix = JAXRS_PATH_RE.search(head).group(1)
             class_prefixes = [class_prefix]
 
+        # M103：类级控制器种类。取 head 里**最后一个**匹配 —— 一个 .java 里
+        # 可能有多个类，靠后的那个才是当前类的注解（前一个类的注解必然在它
+        # 自己的类体之前，位置更靠前）。
+        ctrl_kind = ""
+        _kinds = list(CTRL_KIND_RE.finditer(head))
+        if _kinds:
+            ctrl_kind = "@" + _kinds[-1].group(1)
+
         # 收集本文件所有方法：[(name, start, end, source, annotations)]
         #
         # 这里**不能**用 `dict[name]`：RESTful 控制器里同名重载是常态，
@@ -1294,6 +1313,12 @@ class JavaSlicer:
                     source += "// Alias-Route: " + ", ".join(route_aliases) + "\n"
             else:
                 source = ""
+            # M103：把类级控制器种类写进头部证据表（`// Full-Route:` 之下、
+            # 方法体之上）。它同样是**注释行** —— `entry_body()` 会剥掉，
+            # 既有判据一字不受影响；只有显式读头部证据的判据（ssti 视图名支）
+            # 才消费它。
+            if ctrl_kind:
+                source += f"// Controller-Kind: {ctrl_kind}\n"
 
             # 入口方法 + 同文件私有辅助方法（污点清洗常发生在辅助方法里）
             source += src if not helper_src else f"{src}\n\n// ---- 同文件辅助方法 ----\n{helper_src}"

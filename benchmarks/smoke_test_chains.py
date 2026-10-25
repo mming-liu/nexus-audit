@@ -5427,8 +5427,8 @@ finally:
 
 # ---- [106] Module 67：hardcoded_secret 第 22 类规则 ----
 from core.agents.vuln_categories import CATEGORIES as _VC106   # noqa: E402
-check("M106：hardcoded_secret 已注册（类目总数单一事实源，M89 加 ssti 后 24）",
-      ("hardcoded_secret" in _VC106 and len(_VC106) == 24), True)
+check("M106：hardcoded_secret 已注册（类目总数单一事实源，M105 加 header_injection 后 25）",
+      ("hardcoded_secret" in _VC106 and len(_VC106) == 25), True)
 # VAmPI 形态：Flask SECRET_KEY 短弱密钥（JWT 签名上下文，无长度门槛）
 _vampi106 = ("import jwt\n"
              "vuln_app.app.config['SECRET_KEY'] = 'random'\n"
@@ -6279,8 +6279,8 @@ def _java125(body: str, cls: str = "public class C {\n") -> str:
     return cls + body + "\n}\n"
 
 
-check("M125：ssti 已注册为第 24 类（doctor 自动升到 24）",
-      (len(_CATS125), "ssti" in _CATS125), (24, True))
+check("M125：ssti 已注册为第 24 类（doctor 自动升段；M105 后总数 25）",
+      (len(_CATS125), "ssti" in _CATS125), (25, True))
 check("M125：ssti 是 CWE-1336 且不属 OWASP 11 类",
       (_CATS125["ssti"].cwe, _CATS125["ssti"].owasp), ("CWE-1336", False))
 
@@ -6386,9 +6386,9 @@ if _hjs125.exists() and _jsc125.exists():
           _h125.get("SSTI.velocityEvaluateSafe"), False)
     check("M125：java-sec-code SSTI.velocity 命中",
           _j125.get("SSTI.velocity"), True)
-    check("M125：两库 SSTI 全量零误报（True 恰好 3+1）",
+    check("M125：两库 SSTI 全量零误报（True 恰好 5+1；M103 补视图名支后 +2）",
           (sum(1 for v in _h125.values() if v is True),
-           sum(1 for v in _j125.values() if v is True)), (3, 1))
+           sum(1 for v in _j125.values() if v is True)), (5, 1))
 else:
     print("  -- HJS / java-sec-code 不在 reference_repos，跳过真实仓库对照")
 
@@ -6817,8 +6817,8 @@ check("M130：新增模块落在指纹目录内（M88 slicer / M92 context）",
 from core.agents.vuln_categories import CATEGORIES as _C130        # noqa: E402
 import cli as _cli130                                             # noqa: E402
 from benchmarks.run_all import JOBS as _JOBS130                   # noqa: E402
-check("M130：规则 24 类 / 补丁器 18 类（doctor 单一事实源）",
-      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (24, 18))
+check("M130：规则 25 类 / 补丁器 18 类（doctor 单一事实源）",
+      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (25, 18))
 check("M130：run_all 作业表 33 项且含 comet / DjanGoat / 覆盖地板",
       (len(_JOBS130),
        any("comet" in str(j[0]) for j in _JOBS130),
@@ -6851,8 +6851,8 @@ for _cmd130 in ("hunt", "benchmark-gen"):
 _r130d = _sp130.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                     capture_output=True, text=True, encoding="utf-8")
 _out130 = _r130d.stdout or ""
-check("M130：doctor exit 0 且 24 类 / 18 类 / 六段齐全",
-      (_r130d.returncode, "共 24 类" in _out130, "（18 类）" in _out130,
+check("M130：doctor exit 0 且 25 类 / 18 类 / 六段齐全",
+      (_r130d.returncode, "共 25 类" in _out130, "（18 类）" in _out130,
        "[6/6]" in _out130), (0, True, True, True))
 check("M130：doctor 覆盖 M87–M93 的四项新自检",
       ("SARIF 2.1.0 合规校验" in _out130
@@ -7070,15 +7070,15 @@ _r138 = subprocess.run(
     capture_output=True, text=True, encoding="utf-8")
 _m138 = json.loads((ROOT / ".tmp" / "matrix_smoke.json")
                    .read_text(encoding="utf-8"))
-check("M138：matrix 退出码 0 且 24 类 × 三语言全覆盖渲染",
+check("M138：matrix 退出码 0 且 25 类 × 三语言全覆盖渲染",
       (_r138.returncode, len(_m138["categories"]), _m138["languages"]),
-      (0, 24, ["java", "python", "solidity"]))
+      (0, 25, ["java", "python", "solidity"]))
 check("M138：输出含四维表头（--fix / --emit-poc / CVSS）",
       ("--fix" in (_r138.stdout or "")
        and "--emit-poc" in (_r138.stdout or "")
        and "CVSS" in (_r138.stdout or "")), True)
-check("M139：覆盖缺口有界且不增长（当前 34 处）",
-      _m138["gap_count"] <= 34, True)
+check("M139：覆盖缺口有界且不增长（当前 36 处；M105 加 header_injection +2）",
+      _m138["gap_count"] <= 36, True)
 check("M139：补丁器映射与 doctor 单一事实源一致（18 个补丁器 / 12 类目）",
       (_m138["patchers"], len(_m138["fix_map"])), (18, 12))
 
@@ -7096,9 +7096,9 @@ import cli as _cli140                                             # noqa: E402
 check("M140：门禁 33 项（冒烟+争议+地板+30 个靶场/校验项）",
       len(_JOBS140), 33)
 check("M140：野战场 17 个真实仓库", len(_REPOS140), 17)
-check("M140：规则 24 类 / 补丁器 18 类", (len(_C140),
+check("M140：规则 25 类 / 补丁器 18 类", (len(_C140),
                                           len(_cli140.DOCTOR_PATCHERS)),
-      (24, 18))
+      (25, 18))
 
 # 17 个野战场必须全部有对应 benchmark 脚本与 --strict 门禁
 _missing140 = [r[0] for r in _REPOS140
@@ -7128,6 +7128,144 @@ _r140d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
 check("M140：doctor exit 0 且白皮书对账仍一致",
       (_r140d.returncode,
        "四处一致" in (_r140d.stdout or "")), (0, True))
+
+# ---- [141] Module 103：类级 `// Controller-Kind:` 与 Thymeleaf 视图名注入 ----
+# M89 时这条判不了：唯一判别证据是类级注解，而方法级切片里没有它
+# （实测 HJS + JavaSecLab 共 17 个 SSTI 单元，`@Controller` 命中 0/17）。
+# M103 让切片器把它写成头部证据表，判据才敢下结论。
+print("\n[141] Controller-Kind 切片头与视图名注入（M103）")
+
+from core.slicer.java_servlet import JavaSlicer as _JS141          # noqa: E402
+from core.agents.rule_detectors import (                           # noqa: E402
+    _thymeleaf_viewname_verdict as _thv141,
+    ssti_verdict as _sv141,
+)
+
+_hjs141 = ROOT / "reference_repos" / "Hello-Java-Sec-master"
+_jscl141 = ROOT / "reference_repos" / "JavaSecLab-main"
+if _hjs141.exists():
+    _u141 = [u for u in _JS141(_hjs141).extract_entry_units()
+             if "SSTI." in u.unit_name]
+    check("M141：切片头带 Controller-Kind（来自 HJS SSTI.java 类级注解）",
+          all("// Controller-Kind: @Controller" in u.source_code
+              for u in _u141), True)
+    _v141 = {u.unit_name: _sv141(u.source_code) for u in _u141}
+    check("M141：@Controller 视图名拼接成对样本精准区分（vul=True / safe=False）",
+          (_v141.get("SSTI.thymeleafVul"), _v141.get("SSTI.thymeleafSafe"),
+           _v141.get("SSTI.fragmentVul")), (True, False, True))
+    check("M141：方法级 @ResponseBody 的 fragmentSafe 判 False（返回值进响应体）",
+          _v141.get("SSTI.fragmentSafe"), False)
+    check("M141：11 个 SSTI 单元零误报（True 恰好 5 条，全是作者标注的 vul）",
+          sum(1 for v in _v141.values() if v is True), 5)
+else:
+    print("  -- Hello-Java-Sec 不在 reference_repos，跳过 [141] 真实仓部分")
+
+# 合成夹具：没有 Controller-Kind 头时仍必须退 None（缺证据不下结论）
+check("M141：无 Controller-Kind 头 → 视图名支退 None（M89 行为不变）",
+      _thv141("// contract: X\nclass X {}\n",
+              'public String f(String p) { return "vul/" + p; }', {"p"}),
+      None)
+check("M141：@RestController 头 → 直接 False（返回值是响应体不是视图名）",
+      _thv141("// Controller-Kind: @RestController\n",
+              'public String f(String p) { return "vul/" + p; }', {"p"}),
+      False)
+
+if _jscl141.exists():
+    _j141 = [u for u in _JS141(_jscl141).extract_entry_units()
+             if "SSTIController." in u.unit_name]
+    _jsv141 = {u.unit_name: _sv141(u.source_code) for u in _j141}
+    check("M141：JavaSecLab @Controller 视图名两真阳命中（vul1/vul2）",
+          (_jsv141.get("SSTIController.vul1"),
+           _jsv141.get("SSTIController.vul2")), (True, True))
+    check("M141：JavaSecLab safe1（白名单）判 False",
+          _jsv141.get("SSTIController.safe1"), False)
+
+# ---- [142] Module 104：公共目录只读查询豁免 ----
+print("\n[142] 公共目录只读查询豁免（M104）")
+
+from core.agents.rule_detectors import authz_verdict as _az142      # noqa: E402
+
+
+def _u142(route: str, body: str) -> str:
+    return f"// Full-Route: {route}\n// Controller-Kind: @RestController\n" + body
+
+
+check("M142：商品详情只读（prodService）→ False（全站共享目录，无归属定义）",
+      _az142(_u142("/prod/prodInfo",
+                   "public R f(@RequestParam Long prodId) {\n"
+                   "  return R.ok(prodService.getProductByProdId(prodId));\n}\n")),
+      False)
+check("M142：公告详情只读（noticeService）→ False",
+      _az142(_u142("/notice/info/{id}",
+                   "public R f(@PathVariable Long id) {\n"
+                   "  return R.ok(noticeService.getNoticeById(id));\n}\n")),
+      False)
+check("M142：按单号查**订单**物流 → 仍判 True（order 是私有资源，真 IDOR）",
+      _az142(_u142("/delivery/check",
+                   "public R f(@RequestParam String orderNumber) {\n"
+                   "  Order o = orderService.getOrderByOrderNumber(orderNumber);\n"
+                   "  return R.ok(deliveryService.getById(o.getDvyId()));\n}\n")),
+      True)
+check("M142：后台写操作（upload）→ 不豁免（①无写动作不成立）",
+      _az142(_u142("/admin/file/upload",
+                   "public R f(@RequestParam MultipartFile file) {\n"
+                   "  return R.ok(attachFileService.uploadFile(file));\n}\n")),
+      True)
+check("M142：认不出的只读查询 → 不豁免（正面证据缺失，维持原判）",
+      _az142(_u142("/list",
+                   "public R f(@RequestParam String name) {\n"
+                   "  return R.ok(mapper.selectByName(name));\n}\n")),
+      True)
+check("M142：管理端路由（/system/**）→ 不豁免",
+      _az142(_u142("/system/dict/data",
+                   "public R f(@RequestParam Long dictCode) {\n"
+                   "  return R.ok(dictService.getByCode(dictCode));\n}\n")),
+      True)
+
+# ---- [143] Module 105：第 25 类 header_injection（CWE-113）----
+print("\n[143] 第 25 类 header_injection（HTTP 响应头 CRLF）（M105）")
+
+from core.agents.rule_detectors import (                            # noqa: E402
+    header_injection_verdict as _hd143,
+)
+from core.agents.vuln_categories import CATEGORIES as _C143         # noqa: E402
+
+check("M143：header_injection 已注册为第 25 类（CWE-113）",
+      (len(_C143), _C143["header_injection"].cwe), (25, "CWE-113"))
+check("M143：setHeader(常量, 请求读取) → True",
+      _hd143('public void f(HttpServletRequest req, HttpServletResponse resp) {\n'
+             '  resp.setHeader("X-Test", req.getParameter("t"));\n}\n'), True)
+check("M143：addHeader(常量, 裸形参) → True",
+      _hd143('public void f(String name, HttpServletResponse resp) {\n'
+             '  resp.addHeader("Content-Disposition", "attachment; filename=" +'
+             ' name);\n}\n'), True)
+check("M143：值已 URLEncoder.encode → False",
+      _hd143('public void f(String name, HttpServletResponse resp) throws'
+             ' Exception {\n'
+             '  resp.setHeader("Content-Disposition", "attachment;filename=" +'
+             ' URLEncoder.encode(name, "UTF-8"));\n}\n'), False)
+check("M143：值来自服务端对象取值 file.getName() → False（不是外部输入）",
+      _hd143('public void f(File file, HttpServletResponse resp) {\n'
+             '  resp.setHeader("Content-Disposition", "attachment; filename=" +'
+             ' file.getName());\n}\n'), False)
+check("M143：纯常量头值 → False",
+      _hd143('public void f(HttpServletResponse resp) {\n'
+             '  resp.setHeader("X-Frame-Options", "DENY");\n}\n'), False)
+check("M143：同变量被会中止的校验调用挡过 → False（前置守卫）",
+      _hd143('public void f(String fileName, HttpServletResponse resp) {\n'
+             '  if (!FileUtils.checkAllowDownload(fileName)) {\n'
+             '    throw new BusinessException("非法");\n'
+             '  }\n'
+             '  resp.setHeader("Content-Disposition", "attachment;fileName=" +'
+             ' fileName);\n}\n'), False)
+check("M143：无响应头下发 → None（不归本类目管）",
+      _hd143('public void f(String a) { log.info(a); }\n'), None)
+_jsc143 = ROOT / "reference_repos" / "java-sec-code"
+if _jsc143.exists():
+    _crlf143 = [u for u in _JS141(_jsc143).extract_entry_units()
+                if "CRLFInjection" in Path(u.file_path).name]
+    check("M143：java-sec-code CRLFInjection 专用真阳命中",
+          [_hd143(u.source_code) for u in _crlf143], [True])
 
 print()
 if FAILS:
