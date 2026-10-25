@@ -1,4 +1,4 @@
-# CWE-942 · cors in AliPayController.java
+# CWE-942 · cors in AliPayController.java 
 
 **GHSA-A12F-C348-60F5** ｜ 规则层 P0 ｜ global-config
 **CVSS v3.1：6.5 MEDIUM** ｜ `CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:N/A:N`
@@ -82,6 +82,19 @@ public class Alipaycontroller_topayaspcPocTest {
 ## Verified Patch
 
 （本次未跑 `--fix` 或该类目没有确定性补丁器；架构/配置类缺陷按建议手工修复。）
+
+## Quick Reproduction Command
+
+```bash
+# 1) 离线复核本仓（本根因在输出里按 eladmin/eladmin-tools/src/main/java/me/zhengjie/rest/AliPayController.java:68 定位）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\eladmin-mp-master --auto --offline
+
+# 2) 生成 PoC + 自检补丁 + 披露包
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\eladmin-mp-master --auto --offline --emit-poc poc/ --fix --advisory-dir adv/
+
+# 3) 只看本类目（24 类中的 cors）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\eladmin-mp-master --categories cors --offline
+```
 
 ## References
 

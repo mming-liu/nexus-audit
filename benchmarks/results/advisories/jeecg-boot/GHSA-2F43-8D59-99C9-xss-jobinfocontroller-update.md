@@ -1,20 +1,20 @@
-# CWE-79 · xss in NewBeeMallUserAddressAPI.java
+# CWE-79 · xss in JobInfoController.java 
 
-**GHSA-31B6-7A6B-B6B5** ｜ 规则层 P0 ｜ endpoint
+**GHSA-2F43-8D59-99C9** ｜ 规则层 P0 ｜ endpoint
 **CVSS v3.1：6.1 MEDIUM** ｜ `CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N`
 
 ## Affected Component
 
-- Repository: `C:\myFloders\git\nexus-audit\reference_repos\newbee-mall-api-master`
-- File: `src/main/java/ltd/newbee/mall/api/mall/NewBeeMallUserAddressAPI.java:59`
-- Representative entry: `NewBeeMallUserAddressAPI.updateMallUserAddress`
+- Repository: `C:\myFloders\git\nexus-audit\reference_repos\jeecg-boot`
+- File: `jeecg-server-cloud/jeecg-visual/jeecg-cloud-xxljob/src/main/java/com/xxl/job/admin/controller/JobInfoController.java:108`
+- Representative entry: `JobInfoController.update`
 - Affected routes: **1**（同一独立根因）
 
-- `NewBeeMallUserAddressAPI.updateMallUserAddress`
+- `JobInfoController.update`
 
 ## Vulnerability Mechanism
 
-类目 `xss`（CWE-79）。根因签名：`xss:C:\myFloders\git\nexus-audit\reference_repos\newbee-mall-api-master\src\main\java\ltd\newbee\mall\api\mall\NewBeeMallUserAddressAPI.java:59:NewBeeMallUserAddressAPI.updateMallUserAddress`。
+类目 `xss`（CWE-79）。根因签名：`xss:C:\myFloders\git\nexus-audit\reference_repos\jeecg-boot\jeecg-server-cloud\jeecg-visual\jeecg-cloud-xxljob\src\main\java\com\xxl\job\admin\controller\JobInfoController.java:108:JobInfoController.update`。
 
 - `global-config`：结论来自 `框架装配证据` 中的同一份全局配置，所有
   受影响路由共享该根因；修一处配置即消解整组告警。
@@ -25,27 +25,13 @@
 
 ```mermaid
 flowchart LR
-  N0["NewBeeMallUserAddressAPI.updateMallUserAddress /api/v1/address"]
-  N1["NewBeeMallUserAddressServiceImpl.java:81 (NewBeeMallUserAddressServiceImpl.java)"]
-  N2["MallUserAddressMapper.xml (MallUserAddressMapper.xml)"]
-  N3["NewBeeMallException.java:25 (NewBeeMallException.java)"]
-  N4["BeanUtil.java:14 (BeanUtil.java)"]
-  N5["ResultGenerator.java:41 (ResultGenerator.java)"]
-  N6["ResultGenerator.java:19 (ResultGenerator.java)"]
-  N7["getMallUserAddressById() 的接口实现类方法体 (NewBeeMallUserAddressServiceImpl.java)"]
-  N8["genFailResult() 的接口实现类方法体 (ResultGenerator.java)"]
-  N9["copyProperties() 的接口实现类方法体 (BeanUtil.java)"]
-  N11["跨路由串接证据 (NewBeeMallUserAddressAPI.java)"]
+  N0["JobInfoController.update /jobinfo/update"]
+  N1["同文件辅助方法 (JobInfoController.java)"]
+  N2["update() 的接口实现类方法体 (XxlJobServiceImpl.java)"]
+  N4["跨路由串接证据 (JobInfoController.java)"]
   N0 --> N1
   N1 --> N2
-  N2 --> N3
-  N3 --> N4
-  N4 --> N5
-  N5 --> N6
-  N6 --> N7
-  N7 --> N8
-  N8 --> N9
-  N9 --> N11
+  N2 --> N4
 ```
 
 ## PoC Harness
@@ -53,7 +39,7 @@ flowchart LR
 ```java
 // 自动生成的 PoC 骨架（M45 PoC 合成器）
 // 规则层判定：xss = True
-// 目标位置：NewBeeMallUserAddressAPI.java:59
+// 目标位置：JobInfoController.java:108
 package poc;
 
 import org.junit.jupiter.api.Test;
@@ -68,14 +54,14 @@ import static org.hamcrest.Matchers.not;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-public class Newbeemalluseraddressapi_updatemalluseraddressPocTest {
+public class Jobinfocontroller_updatePocTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
     void otherAccountResourceDenied() throws Exception {
-        mockMvc.perform(get("/api/v1/address").param("id", "9999")
+        mockMvc.perform(get("/jobinfo/update").param("id", "9999")
                 .header("Authorization", "Bearer attacker-token"))
             .andExpect(status().is4xxClientError());
     }
@@ -88,6 +74,19 @@ public class Newbeemalluseraddressapi_updatemalluseraddressPocTest {
 ## Verified Patch
 
 （本次未跑 `--fix` 或该类目没有确定性补丁器；架构/配置类缺陷按建议手工修复。）
+
+## Quick Reproduction Command
+
+```bash
+# 1) 离线复核本仓（本根因在输出里按 jeecg-server-cloud/jeecg-visual/jeecg-cloud-xxljob/src/main/java/com/xxl/job/admin/controller/JobInfoController.java:108 定位）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\jeecg-boot --auto --offline
+
+# 2) 生成 PoC + 自检补丁 + 披露包
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\jeecg-boot --auto --offline --emit-poc poc/ --fix --advisory-dir adv/
+
+# 3) 只看本类目（24 类中的 xss）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\jeecg-boot --categories xss --offline
+```
 
 ## References
 

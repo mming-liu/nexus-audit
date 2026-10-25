@@ -1,4 +1,4 @@
-# CWE-942 · cors in WxAddressController.java
+# CWE-942 · cors in WxAddressController.java 
 
 **GHSA-5843-F579-35BD** ｜ 规则层 P0 ｜ global-config
 **CVSS v3.1：6.5 MEDIUM** ｜ `CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:N/A:N`
@@ -88,6 +88,19 @@ public class Wxaddresscontroller_listPocTest {
 ## Verified Patch
 
 （本次未跑 `--fix` 或该类目没有确定性补丁器；架构/配置类缺陷按建议手工修复。）
+
+## Quick Reproduction Command
+
+```bash
+# 1) 离线复核本仓（本根因在输出里按 litemall-wx-api/src/main/java/org/linlinjava/litemall/wx/web/WxAddressController.java:42 定位）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\litemall-master --auto --offline
+
+# 2) 生成 PoC + 自检补丁 + 披露包
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\litemall-master --auto --offline --emit-poc poc/ --fix --advisory-dir adv/
+
+# 3) 只看本类目（24 类中的 cors）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\litemall-master --categories cors --offline
+```
 
 ## References
 

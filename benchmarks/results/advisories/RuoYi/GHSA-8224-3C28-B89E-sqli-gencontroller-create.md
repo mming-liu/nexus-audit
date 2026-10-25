@@ -1,4 +1,4 @@
-# CWE-89 · sqli in GenController.java
+# CWE-89 · sqli in GenController.java 
 
 **GHSA-8224-3C28-B89E** ｜ 规则层 P0 ｜ endpoint
 **CVSS v3.1：9.8 CRITICAL** ｜ `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H`
@@ -93,6 +93,19 @@ public class Gencontroller_createPocTest {
 ## Verified Patch
 
 （本次未跑 `--fix` 或该类目没有确定性补丁器；架构/配置类缺陷按建议手工修复。）
+
+## Quick Reproduction Command
+
+```bash
+# 1) 离线复核本仓（本根因在输出里按 ruoyi-generator/src/main/java/com/ruoyi/generator/controller/GenController.java:195 定位）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\RuoYi-master --auto --offline
+
+# 2) 生成 PoC + 自检补丁 + 披露包
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\RuoYi-master --auto --offline --emit-poc poc/ --fix --advisory-dir adv/
+
+# 3) 只看本类目（24 类中的 sqli）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\RuoYi-master --categories sqli --offline
+```
 
 ## References
 

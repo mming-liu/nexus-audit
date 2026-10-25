@@ -8,35 +8,39 @@
 
 | 项 | 数值 |
 |---|---|
-| 真实仓库 | **17 个**（Java 9 + Python 3 + Solidity 5） |
-| 路由/合约入口 | **4,791 个** |
-| 路由级 P0 命中 | **953 条** |
-| 去重后的独立根因 P0 | **65 个** |
-| GHSA 披露草稿 | **65 份**（按独立根因，不按路由） |
+| 真实仓库 | **21 个**（Java 13 + Python 3 + Solidity 5） |
+| 路由/合约入口 | **6,743 个** |
+| 路由级 P0 命中 | **1,427 条** |
+| 去重后的独立根因 P0 | **84 个** |
+| GHSA 披露草稿 | **84 份**（按独立根因，不按路由） |
 | benchmark 层误报 | **0 条** |
-| `benchmark_* --strict` | **17/17 exit 0**（零误报 / 零漏报 / 零判反） |
+| `benchmark_* --strict` | **21/21 exit 0**（零误报 / 零漏报 / 零判反） |
 
-一句话：**在 4,791 个从未见过的真实入口上，规则层没有确认误报；65 个独立根因全部逐条人工核查过源码（作者自述 + 代码形态双重确认）。**
+一句话：**在 6,743 个从未见过的真实入口上，规则层没有确认误报；84 个独立根因全部逐条人工核查过源码（作者自述 + 代码形态双重确认）。**
 
 ## 二、逐仓数字
 
 | 仓库 | 入口 | 路由级 P0 | 独立根因 | benchmark |
 |---|---|---|---|---|
+| jeecg-boot | 458 | 479 | 24 | ✔ |
 | eladmin-mp | 65 | 76 | 12 | ✔ |
 | DjanGoat | 36 | 12 | 12 | ✔ |
-| mall4j | 139 | 148 | 10 | ✔ |
 | mall | 246 | 253 | 8 | ✔ |
 | newbee-mall | 73 | 6 | 6 | ✔ |
-| newbee-mall-api | 62 | 66 | 5 | ✔ |
 | litemall | 219 | 223 | 5 | ✔ |
+| mall4j | 139 | 143 | 5 | ✔ |
+| newbee-mall-api | 62 | 65 | 4 | ✔ |
 | My-Blog | 54 | 3 | 3 | ✔ |
 | Employee-Management-System | 4 | 2 | 2 | ✔ |
 | RuoYi | 305 | 1 | 1 | ✔ |
 | waynboot-mall | 163 | 163 | 1 | ✔ |
+| Synthetix V3 | 1,411 | 1 | 1 | ✔ |
 | Compound | 450 | 0 | 0 | ✔ |
 | Comet | 357 | 0 | 0 | ✔ |
 | OpenZeppelin | 1,989 | 0 | 0 | ✔ |
 | AaveV3 | 553 | 0 | 0 | ✔ |
+| flaskr | 8 | 0 | 0 | ✔ |
+| sushiswap-zapper | 75 | 0 | 0 | ✔ |
 | UniswapV3 | 67 | 0 | 0 | ✔ |
 | FastAPI | 9 | 0 | 0 | ✔ |
 
@@ -59,6 +63,33 @@
 
 ## 四、逐仓独立根因（人工核查清单）
 
+### jeecg-boot（24 个根因）
+
+- **[cors]** `IndexController.chartInfo`（全局配置，影响 456 条路由） @ `IndexController.java:45`
+- **[cmdi]** `JobGroupController.loadById`（端点，影响 1 条路由） @ `JobGroupController.java:174`
+- **[deserial]** `JobGroupController.loadById`（端点，影响 1 条路由） @ `JobGroupController.java:174`
+- **[xss]** `JobInfoController.add`（端点，影响 1 条路由） @ `JobInfoController.java:102`
+- **[xss]** `JobInfoController.update`（端点，影响 1 条路由） @ `JobInfoController.java:108`
+- **[cmdi]** `JobLogController.logDetailPage`（端点，影响 1 条路由） @ `JobLogController.java:119`
+- **[deserial]** `JobLogController.logDetailPage`（端点，影响 1 条路由） @ `JobLogController.java:119`
+- **[cmdi]** `JobLogController.logDetailCat`（端点，影响 1 条路由） @ `JobLogController.java:137`
+- **[deserial]** `JobLogController.logDetailCat`（端点，影响 1 条路由） @ `JobLogController.java:137`
+- **[cmdi]** `JobLogController.logKill`（端点，影响 1 条路由） @ `JobLogController.java:159`
+- **[deserial]** `JobLogController.logKill`（端点，影响 1 条路由） @ `JobLogController.java:159`
+- **[hash]** `LoginController.login`（端点，影响 1 条路由） @ `LoginController.java:73`
+- **[hash]** `LoginController.randomImage`（端点，影响 1 条路由） @ `LoginController.java:499`
+- **[hash]** `LoginController.checkCaptcha`（端点，影响 1 条路由） @ `LoginController.java:605`
+- **[xss]** `SysAnnouncementController.showContent`（端点，影响 1 条路由） @ `SysAnnouncementController.java:488`
+- **[sqli]** `SysAnnouncementSendController.editById`（端点，影响 1 条路由） @ `SysAnnouncementSendController.java:197`
+- **[sqli]** `SysAnnouncementSendController.readAll`（端点，影响 1 条路由） @ `SysAnnouncementSendController.java:238`
+- **[sqli]** `SysDepartController.queryIdTree`（端点，影响 1 条路由） @ `SysDepartController.java:277`
+- **[sqli]** `SysUserController.frozenBatch`（端点，影响 1 条路由） @ `SysUserController.java:253`
+- **[redir]** `ThirdLoginController.render`（端点，影响 1 条路由） @ `ThirdLoginController.java:67`
+- **[redir]** `ThirdLoginController.oauth2LoginCallback`（端点，影响 1 条路由） @ `ThirdLoginController.java:294`
+- **[redir]** `ThirdLoginController.oauth2LoginCallback#2`（端点，影响 1 条路由） @ `ThirdLoginController.java:358`
+- **[hash]** `SystemApiController.queryUserAuths`（端点，影响 1 条路由） @ `SystemApiController.java:396`
+- **[hardcoded_secret]** `[secret-file] JeecgBaseConfig.java`（文件级，影响 1 条路由） @ `JeecgBaseConfig.java:1`
+
 ### eladmin-mp（12 个根因）
 
 - **[authz]** `AliPayController.toPayAsPc`（端点，影响 1 条路由） @ `AliPayController.java:68`
@@ -76,31 +107,18 @@
 
 ### DjanGoat（12 个根因）
 
-- **[deserial]** `reset_password`（端点，影响 1 条路由） @ `views.py:81`
-- **[redir]** `sessions_index`（端点，影响 1 条路由） @ `views.py:23`
-- **[spel]** `api_index`（端点，影响 1 条路由） @ `views.py:13`
-- **[spel]** `api_id`（端点，影响 1 条路由） @ `views.py:24`
-- **[cmdi]** `upload`（端点，影响 1 条路由） @ `views.py:40`
 - **[authz]** `admin_get_user`（端点，影响 1 条路由） @ `views.py:21`
 - **[authz]** `admin_delete_user`（端点，影响 1 条路由） @ `views.py:39`
 - **[authz]** `admin_update_user`（端点，影响 1 条路由） @ `views.py:53`
 - **[sqli]** `admin_analytics`（端点，影响 1 条路由） @ `views.py:86`
-- **[authz]** `user_pay`（端点，影响 1 条路由） @ `views.py:70`
+- **[deserial]** `reset_password`（端点，影响 1 条路由） @ `views.py:81`
+- **[redir]** `sessions_index`（端点，影响 1 条路由） @ `views.py:23`
 - **[authz]** `user_view`（端点，影响 1 条路由） @ `views.py:65`
+- **[cmdi]** `upload`（端点，影响 1 条路由） @ `views.py:40`
+- **[authz]** `user_pay`（端点，影响 1 条路由） @ `views.py:70`
+- **[spel]** `api_index`（端点，影响 1 条路由） @ `views.py:13`
+- **[spel]** `api_id`（端点，影响 1 条路由） @ `views.py:24`
 - **[hardcoded_secret]** `[secret-file] settings.py`（文件级，影响 1 条路由） @ `settings.py:1`
-
-### mall4j（10 个根因）
-
-- **[cors]** `SysConfigController.page`（全局配置，影响 139 条路由） @ `SysConfigController.java:54`
-- **[authz]** `CaptchaController.get`（端点，影响 1 条路由） @ `CaptchaController.java:38`
-- **[authz]** `CaptchaController.check`（端点，影响 1 条路由） @ `CaptchaController.java:43`
-- **[authz]** `DeliveryController.checkDelivery`（端点，影响 1 条路由） @ `DeliveryController.java:48`
-- **[authz]** `NoticeController.getNoticeById`（端点，影响 1 条路由） @ `NoticeController.java:58`
-- **[authz]** `ProdController.prodInfo`（端点，影响 1 条路由） @ `ProdController.java:69`
-- **[authz]** `ProdController.moreBuyProdList`（端点，影响 1 条路由） @ `ProdController.java:117`
-- **[xss]** `UserCollectionController.addOrCancel`（端点，影响 1 条路由） @ `UserCollectionController.java:65`
-- **[authz]** `FileController.uploadElementFile`（端点，影响 1 条路由） @ `FileController.java:44`
-- **[authz]** `FileController.uploadTinymceEditorImages`（端点，影响 1 条路由） @ `FileController.java:53`
 
 ### mall（8 个根因）
 
@@ -122,14 +140,6 @@
 - **[authz]** `OrderController.paySuccess`（端点，影响 1 条路由） @ `OrderController.java:147`
 - **[hash]** `PersonalController.login`（端点，影响 1 条路由） @ `PersonalController.java:62`
 
-### newbee-mall-api（5 个根因）
-
-- **[cors]** `NewBeeAdminCarouselAPI.list`（全局配置，影响 62 条路由） @ `NewBeeAdminCarouselAPI.java:54`
-- **[weakrand]** `NewBeeAdminUploadAPI.upload`（端点，影响 1 条路由） @ `NewBeeAdminUploadAPI.java:49`
-- **[weakrand]** `NewBeeAdminUploadAPI.uploadV2`（端点，影响 1 条路由） @ `NewBeeAdminUploadAPI.java:83`
-- **[hash]** `NewBeeMallPersonalAPI.updateInfo`（端点，影响 1 条路由） @ `NewBeeMallPersonalAPI.java:95`
-- **[xss]** `NewBeeMallUserAddressAPI.updateMallUserAddress`（端点，影响 1 条路由） @ `NewBeeMallUserAddressAPI.java:59`
-
 ### litemall（5 个根因）
 
 - **[cors]** `WxAddressController.list`（全局配置，影响 219 条路由） @ `WxAddressController.java:42`
@@ -137,6 +147,21 @@
 - **[xss]** `AdminGoodsController.update`（端点，影响 1 条路由） @ `AdminGoodsController.java:61`
 - **[xss]** `AdminGoodsController.create`（端点，影响 1 条路由） @ `AdminGoodsController.java:87`
 - **[hardcoded_secret]** `[secret-file] JwtHelper.java`（文件级，影响 1 条路由） @ `JwtHelper.java:1`
+
+### mall4j（5 个根因）
+
+- **[cors]** `SysConfigController.page`（全局配置，影响 139 条路由） @ `SysConfigController.java:54`
+- **[authz]** `DeliveryController.checkDelivery`（端点，影响 1 条路由） @ `DeliveryController.java:48`
+- **[xss]** `UserCollectionController.addOrCancel`（端点，影响 1 条路由） @ `UserCollectionController.java:65`
+- **[authz]** `FileController.uploadElementFile`（端点，影响 1 条路由） @ `FileController.java:44`
+- **[authz]** `FileController.uploadTinymceEditorImages`（端点，影响 1 条路由） @ `FileController.java:53`
+
+### newbee-mall-api（4 个根因）
+
+- **[cors]** `NewBeeAdminCarouselAPI.list`（全局配置，影响 62 条路由） @ `NewBeeAdminCarouselAPI.java:54`
+- **[weakrand]** `NewBeeAdminUploadAPI.upload`（端点，影响 1 条路由） @ `NewBeeAdminUploadAPI.java:49`
+- **[weakrand]** `NewBeeAdminUploadAPI.uploadV2`（端点，影响 1 条路由） @ `NewBeeAdminUploadAPI.java:83`
+- **[hash]** `NewBeeMallPersonalAPI.updateInfo`（端点，影响 1 条路由） @ `NewBeeMallPersonalAPI.java:95`
 
 ### My-Blog（3 个根因）
 
@@ -156,6 +181,10 @@
 ### waynboot-mall（1 个根因）
 
 - **[cors]** `SeckillOrderCallbackController.submit`（全局配置，影响 163 条路由） @ `SeckillOrderCallbackController.java:32`
+
+### Synthetix V3（1 个根因）
+
+- **[unchecked_low_level_calls]** `processCcipReceive`（端点，影响 1 条路由） @ `CrossChain.sol:50`
 
 ## 五、怎么复现
 

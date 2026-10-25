@@ -4375,9 +4375,9 @@ _sp86 = subprocess.run(
      "doctor"], capture_output=True, text=True)
 check("M42：doctor exit 0（依赖/规则表/指纹/补丁器全就绪）",
       _sp86.returncode, 0)
-check("M42：doctor 输出含六段自检 + PASS 尾标（M85 升段）",
+check("M42：doctor 输出含七段自检 + PASS 尾标（M85 升段 / M117 扩到七段）",
       all(s in _sp86.stdout for s in
-          ("[1/6]", "[2/6]", "[3/6]", "[4/6]", "[5/6]", "[6/6]", "PASS")), True)
+          ("[1/7]", "[2/7]", "[3/7]", "[4/7]", "[5/7]", "[6/7]", "[7/7]", "PASS")), True)
 check(f"M42：doctor 规则注册表 {len(_CATS)} 类全 OK（从 CATEGORIES 派生，免手工改数）",
       _sp86.stdout.count("  [OK]") >= len(_CATS)
       and f"共 {len(_CATS)} 类" in _sp86.stdout, True)
@@ -4726,9 +4726,9 @@ _sp93 = subprocess.run(
     [sys.executable, str(ROOT / "cli.py"), "doctor"],
     capture_output=True, text=True)
 _out93 = _sp93.stdout
-check("M93：doctor 退出码 0 且六段标题齐全",
+check("M93：doctor 退出码 0 且七段标题齐全",
       (_sp93.returncode == 0
-       and all(f"[{i}/6]" in _out93 for i in range(1, 7))), True)
+       and all(f"[{i}/7]" in _out93 for i in range(1, 8))), True)
 from cli import DOCTOR_PATCHERS as _DP93                            # noqa: E402
 check("M93：doctor 补丁器清单从 DOCTOR_PATCHERS 派生且全绿",
       (_out93.count("[OK] _fix_") == len(_DP93)
@@ -5828,7 +5828,7 @@ try:
          "--output", str(_d115 / "r.md"),
          "--advisory-dir", str(_d115 / "advisories")],
         capture_output=True, text=True)
-    _adv115 = list((_d115 / "advisories").glob("*.md"))
+    _adv115 = list((_d115 / "advisories").glob("GHSA-*.md"))
     _adv_text = _adv115[0].read_text(encoding="utf-8") if _adv115 else ""
     check("M115：3 条继承路由只生成 1 份独立根因披露草稿", len(_adv115), 1)
     check("M115：草稿含 3 条受影响路由 / Mermaid / PoC / Verified Patch",
@@ -6076,7 +6076,7 @@ finally:
 _r122 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                        capture_output=True, text=True, encoding="utf-8")
 check("M122：doctor 第六段存在且整体 exit 0",
-      (_r122.returncode == 0 and "[6/6]" in (_r122.stdout or "")), True)
+      (_r122.returncode == 0 and "[6/7]" in (_r122.stdout or "")), True)
 check("M122：wild_hunt.json ↔ WILD_HUNT_REPORT 四处核心数字一致",
       ("仓库数 / 入口总数 / 独立根因数 / 零误报 四处一致"
        in (_r122.stdout or "")), True)
@@ -6859,9 +6859,9 @@ for _cmd130 in ("hunt", "benchmark-gen"):
 _r130d = _sp130.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                     capture_output=True, text=True, encoding="utf-8")
 _out130 = _r130d.stdout or ""
-check("M130：doctor exit 0 且 25 类 / 20 类 / 六段齐全",
+check("M130：doctor exit 0 且 25 类 / 20 类 / 七段齐全",
       (_r130d.returncode, "共 25 类" in _out130, "（20 类）" in _out130,
-       "[6/6]" in _out130), (0, True, True, True))
+       "[7/7]" in _out130), (0, True, True, True))
 check("M130：doctor 覆盖 M87–M93 的四项新自检",
       ("SARIF 2.1.0 合规校验" in _out130
        and "PoC 合成器" in _out130
@@ -7045,7 +7045,7 @@ try:
          "--summary-json", str(_w135 / "s.json"),
          "--output", str(_w135 / "r.md")],
         capture_output=True, text=True, encoding="utf-8")
-    _adv135 = sorted((_w135 / "adv").glob("*.md"))
+    _adv135 = sorted((_w135 / "adv").glob("GHSA-*.md"))
     _a135 = _adv135[0].read_text(encoding="utf-8") if _adv135 else ""
     _s135 = json.loads((_w135 / "s.json").read_text(encoding="utf-8"))
     check("M135：披露草稿按**独立根因**生成（3 条路由 → 1 份）",
@@ -7346,6 +7346,224 @@ try:
            (_r144 / "src" / "Hdr.java").read_text(encoding="utf-8")), True)
 finally:
     _sh144.rmtree(_w144, ignore_errors=True)
+
+# ---- [145] Module 107：flaskr 官方教程应用（跨函数归属校验）----
+print("\n[145] flaskr 官方教程应用与跨函数归属校验（M107）")
+
+_fl145 = ROOT / "reference_repos" / "flaskr"
+if _fl145.exists():
+    from core.slicer.web_treesitter import WebTreeSitterSlicer as _W145
+    from core.agents.rule_detectors import verdict as _v145
+    _u145 = {u.unit_name: u for u in _W145(_fl145).extract_entry_units(_fl145)}
+    check("M145：堆叠装饰器不再吞路由（create/update/delete 全在切片里）",
+          sorted(_u145), ["create", "delete", "hello", "index", "login",
+                          "logout", "register", "update"])
+    check("M145：update/delete 的跨函数归属校验判确定性 False",
+          {"update": _v145("authz", _u145["update"].source_code),
+           "delete": _v145("authz", _u145["delete"].source_code)},
+          {"update": False, "delete": False})
+    check("M145：Hop 1 把 get_post 的 check_author 逻辑带进切片",
+          ("def get_post" in _u145["update"].source_code
+           and "check_author" in _u145["update"].source_code), True)
+    _j145 = ROOT / "benchmarks" / "results" / "flaskr.json"
+    if _j145.exists():
+        _d145 = json.loads(_j145.read_text(encoding="utf-8"))
+        check("M145：flaskr 全类目 0 True（官方教程应用零误报）",
+              (_d145["fp"], _d145["units"]), (0, 8))
+else:
+    print("  -- reference_repos/flaskr 不在，跳过 [145]")
+
+# ---- [146] Module 108：Synthetix V3 谓词式鉴权 / 反向条件 / 身份别名 ----
+print("\n[146] Synthetix V3 三个 Solidity 鉴权机制（M108）")
+
+from core.agents.rule_detectors import (                            # noqa: E402
+    _sol_predicate_authz_check as _pa146,
+    _sol_inverted_identity_guard as _ig146,
+    _sol_negated_identity_call as _nc146,
+)
+
+_p146 = ("modifier onlyOwner() { require(isOwner(), \"not owner\"); _; }\n"
+         "function transferOwnership(address n) public onlyOwner { _x(n); }\n"
+         "function isOwner() public view returns (bool) {"
+         " return _msgSender() == _owner; }\n")
+check("M146：谓词式鉴权（require(isOwner()) + isOwner 体比较）认出",
+      _pa146(_p146), True)
+check("M146：谓词不比较身份就不算（require(isReady()) 不是鉴权）",
+      _pa146("modifier m() { require(isReady()); _; }\n"
+             "function isReady() public view returns (bool) {"
+             " return _count > 0; }\n"), False)
+check("M146：if (nominee != _msgSender()) revert 算授权",
+      _ig146("function f() external {\n"
+             "  if (pool.nominatedOwner != _msgSender()) {\n"
+             "    revert Unauthorized();\n  }\n}\n"), True)
+check("M146：零地址检查 if (sender == address(0)) revert 不算授权",
+      _ig146("function f() external {\n"
+             "  if (_msgSender() == address(0)) { revert BadZero(); }\n}\n"),
+      False)
+check("M146：require(a != b) 不算授权（方向相反）",
+      _ig146("function f() external {\n"
+             "  require(_msgSender() != _owner, \"x\");\n}\n"), False)
+check("M146：地址别名 address s = _msgSender(); if (s != mgr) revert 算授权",
+      _ig146("function f() external {\n"
+             "  address s = _msgSender();\n"
+             "  if (s != rewardsManager) { revert Unauthorized(); }\n}\n"), True)
+check("M146：if (!_isApprovedOrOwner(_msgSender(), id)) revert 算授权",
+      _nc146("function f() public {\n"
+             "  if (!_isApprovedOrOwner(_msgSender(), id)) {\n"
+             "    revert Unauthorized();\n  }\n}\n"), True)
+check("M146：取反调用实参没有身份 → 不算授权",
+      _nc146("function f() public {\n"
+             "  if (!isValid(x)) { revert Bad(); }\n}\n"), False)
+if (ROOT / "reference_repos" / "synthetix-v3").exists():
+    _j146 = ROOT / "benchmarks" / "results" / "synthetixv3.json"
+    if _j146.exists():
+        _d146 = json.loads(_j146.read_text(encoding="utf-8"))
+        check("M146：Synthetix 生产范围 ≥1200 入口 / 四类 0 True",
+              (_d146["units"] >= 1200, _d146["fp"]), (True, 0))
+else:
+    print("  -- synthetix-v3 不在 reference_repos，跳过 [146] 真实仓部分")
+
+# ---- [147] Module 109：sushiswap-zapper（0.5.x 主网合约 / 谓词式 Ownable）----
+print("\n[147] sushiswap-zapper 0.5.x 主网合约（M109）")
+
+if (ROOT / "reference_repos" / "sushiswap-zapper").exists():
+    _j147 = ROOT / "benchmarks" / "results" / "sushizapper.json"
+    if _j147.exists():
+        _d147 = json.loads(_j147.read_text(encoding="utf-8"))
+        check("M147：75 入口 / 0 True（老版本合约零误报）",
+              (_d147["units"], _d147["fp"]), (75, 0))
+        check("M147：两个 transferOwnership 的谓词链都判 False",
+              all(v is False
+                  for v in _d147["ownership_verdicts"].values()), True)
+        _wh147 = ROOT / "benchmarks" / "results" / "wild_hunt.json"
+        if _wh147.exists():
+            check("M147：野战场达到 20 个真实仓库",
+                  len(json.loads(_wh147.read_text(encoding="utf-8"))
+                      .get("repos", [])) >= 20, True)
+else:
+    print("  -- sushiswap-zapper 不在 reference_repos，跳过 [147]")
+
+# ---- [148] Module 110：jeecg-boot 全局鉴权拦截器 ----
+print("\n[148] jeecg-boot 全局鉴权拦截器（M110）")
+
+from core.agents.rule_detectors import (                            # noqa: E402
+    _authz_auth_interceptor as _ai148,
+)
+
+check("M148：permissionInterceptor 注册在 /** 上 → 认作全局鉴权",
+      _ai148('registry.addInterceptor(permissionInterceptor)'
+             '.addPathPatterns("/**");'), True)
+check("M148：login/session 拦截器同义（new X() 形态也要认）",
+      (_ai148('registry.addInterceptor(new LoginInterceptor())'
+              '.addPathPatterns("/**");'),
+       _ai148('registry.addInterceptor(new SessionInterceptor())'
+              '.addPathPatterns("/**");')), (True, True))
+check("M148：纯 cookie 拦截器**不算**（解析 cookie 不等于鉴权）",
+      _ai148('registry.addInterceptor(new CookieInterceptor())'
+             '.addPathPatterns("/**");'), False)
+check("M148：encoding/metrics 拦截器**不算**鉴权（不误豁免）",
+      _ai148('registry.addInterceptor(new EncodingInterceptor())'
+             '.addPathPatterns("/**");\n'
+             'registry.addInterceptor(new MetricsInterceptor())'
+             '.addPathPatterns("/**");'), False)
+if (ROOT / "reference_repos" / "jeecg-boot").exists():
+    _d148 = json.loads((ROOT / "benchmarks" / "results" / "jeecg.json")
+                       .read_text(encoding="utf-8"))
+    check("M148：jeecg authz 零 True（xxl-job 160 条误报清零）",
+          _d148["authz_true"], 0)
+    check("M148：24 个已知根因按类目冻结（涨一条就红）",
+          _d148["non_authz_by_category"], _d148["frozen_non_authz"])
+else:
+    print("  -- jeecg-boot 不在 reference_repos，跳过 [148] 真实仓部分")
+
+# ---- [149] Module 111：披露包总目录 INDEX.md（按 CVSS 降序 / 零断链）----
+print("\n[149] 披露包总目录 INDEX.md（M111）")
+
+import tempfile as _tf149                                            # noqa: E402
+import shutil as _sh149                                              # noqa: E402
+import re as _re149                                                  # noqa: E402
+
+_w149 = Path(_tf149.mkdtemp(prefix="nexus_m149_"))
+try:
+    from core.context.advisory_exporter import _write_index as _wi149
+    (_w149 / "A.md").write_text(
+        "# CWE-79 · xss in Foo\n\n"
+        "**CVSS v3.1：4.3 MEDIUM** ｜ `CVSS:3.1/AV:N/AC:L`\n", encoding="utf-8")
+    (_w149 / "B.md").write_text(
+        "# CWE-89 · sqli in Bar **[Auto-Fix Verified]**\n\n"
+        "**CVSS v3.1：9.8 CRITICAL** ｜ `CVSS:3.1/AV:N/AC:L`\n",
+        encoding="utf-8")
+    _wi149(_w149, sorted(_w149.glob("*.md")))
+    _it149 = (_w149 / "INDEX.md").read_text(encoding="utf-8")
+    _sc149 = [float(x) for x in
+              _re149.findall(r"^\| ([\d.]+) \|", _it149, _re149.M)]
+    check("M149：INDEX.md 自动生成且按 CVSS 降序（9.8 → 4.3）",
+          _sc149, [9.8, 4.3])
+    check("M149：索引零断链（每份草稿都有链接）",
+          ("](B.md)" in _it149 and "](A.md)" in _it149), True)
+    check("M149：有自检补丁的草稿在索引里带徽章", "🔧" in _it149, True)
+finally:
+    _sh149.rmtree(_w149, ignore_errors=True)
+
+_adv149 = ROOT / "benchmarks" / "results" / "advisories"
+if _adv149.exists():
+    _drafts149 = list(_adv149.rglob("GHSA-*.md"))
+    _idx149 = _adv149 / "INDEX.md"
+    _itxt149 = _idx149.read_text(encoding="utf-8") if _idx149.exists() else ""
+    check("M149：21 仓披露包总目录存在且零断链",
+          (_idx149.exists(), bool(_drafts149),
+           all(f"]({p.name})" in _itxt149 for p in _drafts149)),
+          (True, True, True))
+    _first149 = _drafts149[0].read_text(encoding="utf-8") if _drafts149 else ""
+    check("M149：草稿含 Quick Reproduction Command 小节（命令可直接跑）",
+          ("## Quick Reproduction Command" in _first149
+           and "python cli.py scan" in _first149), True)
+else:
+    print("  -- advisories/ 不在，跳过 [149] 真实披露包部分")
+
+# ---- [150] Module 112：SARIF → GitHub PR 行级 review 载荷 ----
+print("\n[150] GitHub PR 行级 review 载荷（M112）")
+
+from core.context.pr_commenter import (                             # noqa: E402
+    build_review_payload as _brp150,
+)
+
+_repo150 = ROOT
+_p150 = _brp150([
+    {"file": str(_repo150 / "core" / "agents" / "rule_detectors.py"),
+     "line": 100, "category": "sqli", "severity": "HIGH",
+     "cwe": "CWE-89", "message": "拼接进 SQL"},
+    {"file": str(_repo150 / "core" / "agents" / "rule_detectors.py"),
+     "line": 100, "category": "xss", "severity": "MEDIUM", "cwe": "CWE-79"},
+    {"file": str(_repo150 / "a" / "b.py"), "line": 7, "category": "authz",
+     "severity": "CRITICAL", "cwe": "CWE-639"},
+], _repo150)
+check("M150：同一 (path,line) 的多条命中合并成一条评论（GitHub 会 422）",
+      len(_p150["comments"]), 2)
+check("M150：path 是相对根的 POSIX 路径 + line≥1 + side=RIGHT",
+      all(not c["path"].startswith("/") and "\\" not in c["path"]
+          and c["line"] >= 1 and c["side"] == "RIGHT"
+          for c in _p150["comments"]), True)
+check("M150：载荷结构符合 PR review API（body/event/comments）",
+      (_p150["event"], set(_p150) >= {"body", "event", "comments"}),
+      ("COMMENT", True))
+_p150b = _brp150([
+    {"file": str(_repo150 / "x.py"), "line": 3, "category": "cmdi",
+     "severity": "HIGH", "cwe": "CWE-78"},
+], _repo150, fix_text="--- a/x.py\n+++ b/x.py\n@@ -3,1 +3,1 @@\n-old\n+new\n")
+check("M150：有可用补丁时内嵌 ```suggestion 一键采纳代码块",
+      "```suggestion" in _p150b["comments"][0]["body"], True)
+_p150c = _brp150([
+    {"file": str(_repo150 / "y.py"), "line": 5, "category": "xss",
+     "severity": "HIGH", "cwe": "CWE-79"},
+], _repo150, fix_text="--- a/y.py\n+++ b/y.py\n@@ -5,1 +5,1 @@\n"
+                      "-old\n+new\n@@ -9,1 +9,1 @@\n-old2\n+new2\n")
+check("M150：多 hunk 的 diff 不给建议（行数对不上会改坏文件）",
+      "```suggestion" in _p150c["comments"][0]["body"], False)
+check("M150：cli 暴露 --gh-comments 开关",
+      "--gh-comments" in subprocess.run(
+          [sys.executable, str(ROOT / "cli.py"), "pr-scan", "--help"],
+          capture_output=True, text=True, encoding="utf-8").stdout, True)
 
 print()
 if FAILS:

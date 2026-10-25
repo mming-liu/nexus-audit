@@ -95,7 +95,25 @@ def export_advisories(root_causes: list[dict], repo: Path,
             patch = ("（本次未跑 `--fix` 或该类目没有确定性补丁器；"
                      "架构/配置类缺陷按建议手工修复。）")
         routes = "\n".join(f"- `{x}`" for x in rc["routes"]) or "- （无）"
-        body = f"""# {cwe} · {cat} in {comp}
+        # M111：一键复现命令单。三件事必须齐：仓库相对路径、单元名、类目 ——
+        # 只看 `python cli.py scan <repo> --auto` 无法定位到这一条，读者还得
+        # 自己在 65 份草稿里找。命令直接贴能跑的那种。
+        # M111：一键复现命令单。命令必须是**现在就能跑**的形态 —— 写一条
+        # 不存在的 `--unit` 出来，读者复制粘贴只会得到 argparse 报错，
+        # 那比没有这节更糟。定位靠"仓库 + 文件:行"，命令本身只做全仓复核。
+        repro = (
+            f"# 1) 离线复核本仓（本根因在输出里按 "
+            f"{rel}:{rc['line']} 定位）\n"
+            f"python cli.py scan {repo} --auto --offline\n\n"
+            f"# 2) 生成 PoC + 自检补丁 + 披露包\n"
+            f"python cli.py scan {repo} --auto --offline "
+            f"--emit-poc poc/ --fix --advisory-dir adv/\n\n"
+            f"# 3) 只看本类目（24 类中的 {cat}）\n"
+            f"python cli.py scan {repo} --categories {cat} --offline")
+        # M111：补丁可用性徽章 —— 只有**真的**有通过自检的 diff 才打标。
+        fix_badge = ("**[Auto-Fix Verified]**" if patch
+                     and "```diff" in patch else "")
+        body = f"""# {cwe} · {cat} in {comp} {fix_badge}
 
 **{_ghsa_id(rc["signature"])}** ｜ 规则层 P0 ｜ {rc["kind"]}
 **CVSS v3.1：{cvss["score"]:.1f} {cvss["severity"]}** ｜ `{cvss["vector"]}`
@@ -132,6 +150,12 @@ def export_advisories(root_causes: list[dict], repo: Path,
 
 {patch}
 
+## Quick Reproduction Command
+
+```bash
+{repro}
+```
+
 ## References
 
 - CWE: https://cwe.mitre.org/data/definitions/{cwe.split("-")[-1]}.html
@@ -142,4 +166,56 @@ def export_advisories(root_causes: list[dict], repo: Path,
         p = out_dir / name
         p.write_text(body, encoding="utf-8")
         written.append(p)
+    if written:
+        _write_index(out_dir, written)
     return written
+
+
+_INDEX_ROW_RE = re.compile(
+    r"^\*\*CVSS v3\.1：([\d.]+) (\w+)\*\*", re.M)
+_INDEX_TITLE_RE = re.compile(r"^# .*$", re.M)
+
+
+def _write_index(out_dir: Path, paths: list[Path]) -> None:
+    """M111：跨仓库披露总目录 `INDEX.md`，按 CVSS 降序。
+
+    每份草稿的标题行 + CVSS 行是**唯一事实源** —— 索引从草稿正文里读，
+    不重新算一遍分数（重算就会与正文漂移，两份数字打架时没人知道信哪个）。
+    """
+    rows: list[tuple[float, str, str, str, str]] = []
+    for p in paths:
+        try:
+            txt = p.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        m = _INDEX_ROW_RE.search(txt)
+        if not m:
+            continue
+        score, sev = float(m.group(1)), m.group(2)
+        t = _INDEX_TITLE_RE.search(txt)
+        title = (t.group(0)[2:].strip() if t else p.stem)
+        cwe = title.split("·")[0].strip() if "·" in title else ""
+        cat = (title.split("·")[1].strip().split()[0] if "·" in title else "")
+        rows.append((score, sev, cwe, cat, p.name))
+    rows.sort(key=lambda r: (-r[0], r[4]))
+    lines = [
+        "# 披露草稿总目录（nexus-audit `--advisory-dir`）",
+        "",
+        f"共 **{len(rows)}** 份 GHSA 草稿，按 CVSS v3.1 分值降序。",
+        "带 [Auto-Fix Verified] 的草稿内嵌通过自检的补丁 diff。",
+        "",
+        "| CVSS | 严重级 | CWE | 类目 | 草稿 |",
+        "|---|---|---|---|---|",
+    ]
+    for score, sev, cwe, cat, name in rows:
+        badge = ""
+        try:
+            if "Auto-Fix Verified" in (out_dir / name).read_text(
+                    encoding="utf-8"):
+                badge = " 🔧"
+        except OSError:
+            pass
+        lines.append(f"| {score:.1f} | {sev} | {cwe} | {cat} | "
+                     f"[{name}]({name}){badge} |")
+    (out_dir / "INDEX.md").write_text("\n".join(lines) + "\n",
+                                      encoding="utf-8")

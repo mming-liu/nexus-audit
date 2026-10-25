@@ -160,9 +160,23 @@ def main() -> int:
         n_adv = sum(1 for _ in adv.rglob("GHSA-*.md")) if adv.exists() else 0
         n_repos_adv = (sum(1 for p in adv.iterdir() if p.is_dir())
                        if adv.exists() else 0)
+        # M111：把 21 个仓的草稿汇总成**一个**总目录（每仓子目录里那份只覆盖
+        # 本仓，跨仓检索没有入口）。索引从草稿正文读 CVSS，不重算。
+        try:
+            # 脚本以 `python benchmarks/wild_hunt.py` 运行时 sys.path[0] 是
+            # benchmarks/，`core` 包不可见 —— 先把仓库根塞进去。
+            if str(ROOT) not in sys.path:
+                sys.path.insert(0, str(ROOT))
+            from core.context.advisory_exporter import _write_index
+            all_drafts = sorted(adv.rglob("GHSA-*.md"))
+            _write_index(adv, all_drafts)
+        except Exception as e:                               # noqa: BLE001
+            print(f"  ! INDEX.md 生成失败：{type(e).__name__}: {e}")
         agg["advisories"] = {"dir": str(adv), "files": n_adv,
-                             "repos": n_repos_adv}
-        print(f"\n披露草稿：{n_adv} 份 / {n_repos_adv} 个仓 → {adv}")
+                             "repos": n_repos_adv,
+                             "index": str(adv / "INDEX.md")}
+        print(f"\n披露草稿：{n_adv} 份 / {n_repos_adv} 个仓 → {adv}"
+              f"（总目录 INDEX.md）")
     if not args.only:
         AGG.write_text(json.dumps(agg, ensure_ascii=False, indent=2),
                        encoding="utf-8")

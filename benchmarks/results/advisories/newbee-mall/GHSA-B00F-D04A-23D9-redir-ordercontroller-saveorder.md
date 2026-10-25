@@ -1,4 +1,4 @@
-# CWE-601 · redir in OrderController.java
+# CWE-601 · redir in OrderController.java 
 
 **GHSA-B00F-D04A-23D9** ｜ 规则层 P0 ｜ endpoint
 **CVSS v3.1：4.3 MEDIUM** ｜ `CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:N`
@@ -88,6 +88,19 @@ public class Ordercontroller_saveorderPocTest {
 ## Verified Patch
 
 （本次未跑 `--fix` 或该类目没有确定性补丁器；架构/配置类缺陷按建议手工修复。）
+
+## Quick Reproduction Command
+
+```bash
+# 1) 离线复核本仓（本根因在输出里按 src/main/java/ltd/newbee/mall/controller/mall/OrderController.java:67 定位）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\newbee-mall-master --auto --offline
+
+# 2) 生成 PoC + 自检补丁 + 披露包
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\newbee-mall-master --auto --offline --emit-poc poc/ --fix --advisory-dir adv/
+
+# 3) 只看本类目（24 类中的 redir）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\newbee-mall-master --categories redir --offline
+```
 
 ## References
 

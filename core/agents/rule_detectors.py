@@ -5451,8 +5451,10 @@ def _route_check_catalog(route: str) -> bool:
 
 # 全局鉴权拦截器：名字带鉴权语义 + 注册在 `/**` 或前缀上（M110）。
 _AUTHZ_AUTH_INTERCEPTOR_RE = re.compile(
-    r"addInterceptor\s*\(\s*(?:new\s+)?([A-Za-z_]\w*)\s*\)\s*"
-    r"[^;]{0,120}?addPathPatterns\s*\(", re.S)
+    # `new X()` 与裸注入 `x` 两种写法都要认：xxl-job 写的是
+    # `addInterceptor(new CookieInterceptor())`，缺了可选的 `()` 就漏。
+    r"addInterceptor\s*\(\s*(?:new\s+)?([A-Za-z_]\w*)\s*(?:\(\s*\))?\s*\)"
+    r"\s*[^;]{0,120}?addPathPatterns\s*\(", re.S)
 
 
 def _authz_auth_interceptor(source: str) -> bool:
@@ -5468,7 +5470,8 @@ def _authz_auth_interceptor(source: str) -> bool:
     for m in _AUTHZ_AUTH_INTERCEPTOR_RE.finditer(source):
         name = m.group(1).lower()
         if any(t in name for t in ("permission", "auth", "login", "token",
-                                   "security", "jwt", "sso", "oauth")):
+                                   "security", "jwt", "sso", "oauth",
+                                   "session")):
             return True
     return False
 

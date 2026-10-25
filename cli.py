@@ -1289,6 +1289,36 @@ def cmd_pr_scan(args):
     print("\n进入审计（仅上述受影响路由）...")
     cmd_scan_java(ns, repo)
 
+    # M112：把本次增量结果转成 GitHub PR 行级 review 载荷。
+    # 直接复用刚写出的 summary json（与报告同一份事实源，不重算一遍）。
+    gh_out = getattr(args, "gh_comments", None)
+    if gh_out:
+        from core.context.pr_commenter import (build_review_payload,
+                                               write_review_payload)
+        findings: list[dict] = []
+        sum_path = Path(getattr(ns, "summary_json", "") or "")
+        if sum_path.is_file():
+            try:
+                data = json.loads(sum_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                data = {}
+            for hit in data.get("p0_confirmed_details", []) or []:
+                findings.append({
+                    "file": hit.get("file", ""),
+                    "line": hit.get("line", 0),
+                    "category": hit.get("category", ""),
+                    "severity": hit.get("severity", "HIGH"),
+                    "cwe": hit.get("cwe", ""),
+                    "message": hit.get("message", ""),
+                })
+        payload = build_review_payload(findings, repo)
+        out_gh = write_review_payload(gh_out, payload)
+        print(f"GitHub PR review 载荷：{len(payload['comments'])} 条评论"
+              f" → {out_gh}")
+        if payload["comments"]:
+            print("  提交方式：gh api repos/{owner}/{repo}/pulls/{n}/reviews "
+                  "--input " + str(out_gh))
+
 
 def _hunt_repo_name(repo: Path) -> str:
     """仓库显示名：取最后一段目录名；`contracts` 这类泛名再往上取一层。"""
@@ -4037,7 +4067,7 @@ def cmd_doctor(args) -> int:
     """只读自检：依赖 / 规则注册表 / 缓存指纹 / 补丁器就位。exit 0 = 全部就绪。"""
     ok = True
 
-    print("== [1/6] 依赖就位 ==")
+    print("== [1/7] 依赖就位 ==")
     print(f"  [OK] python {sys.version.split()[0]}")
     for name in ["httpx", "tree_sitter(可选·缺省正则降级)", "pyyaml(可选)", "slither(可选)"]:
         try:
@@ -4049,7 +4079,7 @@ def cmd_doctor(args) -> int:
             if "(可选" not in name:
                 ok = False
 
-    print("== [2/6] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
+    print("== [2/7] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
     from core.agents import rule_detectors
     for cat in DOCTOR_RULE_CATEGORIES:
         try:
@@ -4063,7 +4093,7 @@ def cmd_doctor(args) -> int:
             print(f"  [FAIL] {cat}: 路由异常 {type(e).__name__}: {e}")
             ok = False
     print(f"  共 {len(DOCTOR_RULE_CATEGORIES)} 类，全部走 verdict() 路由")
-    print("== [3/6] 缓存指纹自检 ==")
+    print("== [3/7] 缓存指纹自检 ==")
     try:
         from benchmarks.diag_owasp_sqli_fp import _slicer_fingerprint
         fp1, fp2 = _slicer_fingerprint(), _slicer_fingerprint()
@@ -4076,7 +4106,7 @@ def cmd_doctor(args) -> int:
         print(f"  [FAIL] 指纹不可用: {type(e).__name__}: {e}")
         ok = False
 
-    print(f"== [4/6] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
+    print(f"== [4/7] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
     for fn_name in DOCTOR_PATCHERS:
         fn = globals().get(fn_name)
         if callable(fn):
@@ -4092,9 +4122,66 @@ def cmd_doctor(args) -> int:
 
     ok = _doctor_extended_checks(ok)
     ok = _doctor_wild_hunt_check(ok)
+    ok = _doctor_disclosure_index_check(ok)
 
     print("doctor:", "PASS（全部就绪）" if ok else "FAIL（存在缺失项）")
     return 0 if ok else 1
+
+
+def _doctor_disclosure_index_check(ok: bool) -> bool:
+    """doctor 第七段（M117）：披露包 INDEX.md ↔ wild_hunt.json 根因总数。
+
+    为什么值得常驻：`--advisory-dir` 是**按仓**跑的，17/21 个仓各跑一次就会
+    留下 21 份互不相干的草稿目录。"草稿总数 == 根因总数"是唯一能自动核对的
+    不变量 —— 少一份说明有仓没跑到，多一份说明根因折叠漏了。
+    """
+    print("== [7/7] 披露包完整性（advisories/INDEX.md ↔ wild_hunt.json）==")
+    root = Path(__file__).resolve().parent
+    adv_root = root / "benchmarks" / "results" / "advisories"
+    agg = root / "benchmarks" / "results" / "wild_hunt.json"
+    if not adv_root.exists():
+        print(f"  [提示] {adv_root.name}/ 不存在（尚未跑过 --advisory-dir，"
+              f"不判 FAIL）")
+        return ok
+    drafts = list(adv_root.rglob("GHSA-*.md"))
+    index = adv_root / "INDEX.md"
+    print(f"  草稿 {len(drafts)} 份 / 目录 {len([p for p in adv_root.iterdir() if p.is_dir()])} 个")
+    if not index.exists():
+        print("  [FAIL] 缺 INDEX.md（M111 的总目录没生成）")
+        return False
+    itext = index.read_text(encoding="utf-8")
+    # ① 索引必须覆盖全部草稿（断链检查）
+    dangling = [p.name for p in drafts if f"]({p.name})" not in itext]
+    if dangling:
+        print(f"  [FAIL] INDEX.md 漏了 {len(dangling)} 份草稿："
+              f"{dangling[:3]}")
+        ok = False
+    else:
+        print(f"  [OK] INDEX.md 覆盖全部 {len(drafts)} 份草稿（零断链）")
+    # ② 索引必须按 CVSS 降序
+    scores = [float(x) for x in re.findall(
+        r"^\| ([\d.]+) \| (?:CRITICAL|HIGH|MEDIUM|LOW) \|", itext, re.M)]
+    if scores != sorted(scores, reverse=True):
+        print("  [FAIL] INDEX.md 未按 CVSS 降序")
+        ok = False
+    else:
+        print(f"  [OK] 按 CVSS 降序（{scores[0]:.1f} → {scores[-1]:.1f}）")
+    # ③ 草稿总数 == wild_hunt.json 的根因总数
+    if agg.exists():
+        try:
+            data = json.loads(agg.read_text(encoding="utf-8"))
+            n_roots = sum(int(r.get("summary", {})
+                              .get("p0_unique_root_causes") or 0)
+                          for r in data.get("repos", []))
+            if drafts and n_roots and len(drafts) != n_roots:
+                print(f"  [FAIL] 草稿 {len(drafts)} 份 != 根因 {n_roots} 个")
+                ok = False
+            else:
+                print(f"  [OK] 草稿数 == 根因总数（{n_roots}）")
+        except Exception as e:                               # noqa: BLE001
+            print(f"  [FAIL] 读取 {agg.name} 失败：{type(e).__name__}: {e}")
+            ok = False
+    return ok
 
 
 def _doctor_extended_checks(ok: bool) -> bool:
@@ -4106,7 +4193,7 @@ def _doctor_extended_checks(ok: bool) -> bool:
     root = Path(__file__).resolve().parent
 
     # ---- 5.1 PoC 合成器：可导入 + 三语言模板自检通过 ----
-    print("== [5/6] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
+    print("== [5/7] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
     print("  -- PoC 合成器 --")
     try:
         from core.sandbox.poc_synthesizer import PocSynthesizer, PocArtifact
@@ -4275,7 +4362,7 @@ def _doctor_wild_hunt_check(ok: bool) -> bool:
     报告是给人和上游看的，json 是机器事实源；两者漂了 doctor 当场 FAIL。
     """
     root = Path(__file__).resolve().parent
-    print("== [6/6] 野战白皮书对账（wild_hunt.json ↔ WILD_HUNT_REPORT.md）==")
+    print("== [6/7] 野战白皮书对账（wild_hunt.json ↔ WILD_HUNT_REPORT.md）==")
     agg = root / "benchmarks" / "results" / "wild_hunt.json"
     report = root / "WILD_HUNT_REPORT.md"
     if not agg.exists() or not report.exists():
@@ -4377,6 +4464,10 @@ def main():
                       help="输出 GitHub Actions 行级 annotation + 写入 $GITHUB_STEP_SUMMARY")
     p_pr.add_argument("--dry-run", action="store_true",
                       help="只列出受影响路由，不做审计")
+    p_pr.add_argument("--gh-comments", dest="gh_comments", default=None,
+                      metavar="OUT.json",
+                      help="M112：导出 GitHub PR 行级 review 载荷（path/line/body，"
+                           "带 ```suggestion 一键采纳补丁）")
     p_pr.add_argument("--fix", action="store_true",
                       help="对规则层确定性命中（sqli/xss 模板/deserial fastjson 版本）"
                            "生成补丁并重跑规则自检（写 fix_report.md，不改仓库文件）")

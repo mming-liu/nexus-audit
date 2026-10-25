@@ -1,4 +1,4 @@
-# CWE-330 · weakrand in BlogController.java
+# CWE-330 · weakrand in BlogController.java 
 
 **GHSA-4B23-2F14-FA3E** ｜ 规则层 P0 ｜ endpoint
 **CVSS v3.1：5.9 MEDIUM** ｜ `CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N`
@@ -70,6 +70,19 @@ public class Blogcontroller_uploadfilebyeditormdPocTest {
 ## Verified Patch
 
 （本次未跑 `--fix` 或该类目没有确定性补丁器；架构/配置类缺陷按建议手工修复。）
+
+## Quick Reproduction Command
+
+```bash
+# 1) 离线复核本仓（本根因在输出里按 src/main/java/com/site/blog/my/core/controller/admin/BlogController.java:185 定位）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\My-Blog-master --auto --offline
+
+# 2) 生成 PoC + 自检补丁 + 披露包
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\My-Blog-master --auto --offline --emit-poc poc/ --fix --advisory-dir adv/
+
+# 3) 只看本类目（24 类中的 weakrand）
+python cli.py scan C:\myFloders\git\nexus-audit\reference_repos\My-Blog-master --categories weakrand --offline
+```
 
 ## References
 
