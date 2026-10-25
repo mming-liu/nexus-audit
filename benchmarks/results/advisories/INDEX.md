@@ -1,6 +1,6 @@
 # 披露草稿总目录（nexus-audit `--advisory-dir`）
 
-共 **96** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
+共 **94** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
 带 [Auto-Fix Verified] 的草稿内嵌通过自检的补丁 diff。
 
 | CVSS | 严重级 | CWE | 类目 | 草稿 |
@@ -47,9 +47,7 @@
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-30B0-949A-0F04-authz-ordercontroller-paysuccess.md](GHSA-30B0-949A-0F04-authz-ordercontroller-paysuccess.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-3144-9418-F1B8-authz-generatorcontroller-querycolumns.md](GHSA-3144-9418-F1B8-authz-generatorcontroller-querycolumns.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-46A7-C6D9-4EA1-authz-user-view.md](GHSA-46A7-C6D9-4EA1-authz-user-view.md) |
-| 8.1 | HIGH | CWE-915 | mass_assignment | [GHSA-4BE6-AF7C-6427-mass-assignment-sysuseronlinecontroller-list.md](GHSA-4BE6-AF7C-6427-mass-assignment-sysuseronlinecontroller-list.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-50DD-1AF9-BA39-authz-verifycontroller-resetpass.md](GHSA-50DD-1AF9-BA39-authz-verifycontroller-resetpass.md) |
-| 8.1 | HIGH | CWE-915 | mass_assignment | [GHSA-540F-E470-0C97-mass-assignment-logincontroller-login.md](GHSA-540F-E470-0C97-mass-assignment-logincontroller-login.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-56DC-2FFD-B5EB-authz-filecontroller-uploadtinymceeditorimages.md](GHSA-56DC-2FFD-B5EB-authz-filecontroller-uploadtinymceeditorimages.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-58AE-1B4E-8B65-authz-generatorcontroller-querytables.md](GHSA-58AE-1B4E-8B65-authz-generatorcontroller-querytables.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-5E16-6BFD-9C29-authz-verifycontroller-resetemail.md](GHSA-5E16-6BFD-9C29-authz-verifycontroller-resetemail.md) |

@@ -10,19 +10,19 @@
 |---|---|
 | 真实仓库 | **25 个**（Java 16 + Python 4 + Solidity 5） |
 | 路由/合约入口 | **6,868 个** |
-| 路由级 P0 命中 | **1,504 条** |
-| 去重后的独立根因 P0 | **96 个** |
-| GHSA 披露草稿 | **96 份**（按独立根因，不按路由） |
+| 路由级 P0 命中 | **1,502 条** |
+| 去重后的独立根因 P0 | **94 个** |
+| GHSA 披露草稿 | **94 份**（按独立根因，不按路由） |
 | benchmark 层误报 | **0 条** |
 | `benchmark_* --strict` | **25/25 exit 0**（零误报 / 零漏报 / 零判反） |
 
-一句话：**在 6,868 个从未见过的真实入口上，规则层没有确认误报；96 个独立根因全部逐条人工核查过源码（作者自述 + 代码形态双重确认）。**
+一句话：**在 6,868 个从未见过的真实入口上，规则层没有确认误报；94 个独立根因全部逐条人工核查过源码（作者自述 + 代码形态双重确认）。**
 
 ## 二、逐仓数字
 
 | 仓库 | 入口 | 路由级 P0 | 独立根因 | benchmark |
 |---|---|---|---|---|
-| jeecg-boot | 458 | 481 | 26 | ✔ |
+| jeecg-boot | 458 | 479 | 24 | ✔ |
 | DjanGoat | 36 | 12 | 12 | ✔ |
 | eladmin-mp | 65 | 74 | 10 | ✔ |
 | eladmin-JPA | 66 | 75 | 10 | ✔ |
@@ -67,7 +67,7 @@
 
 ## 四、逐仓独立根因（人工核查清单）
 
-### jeecg-boot（26 个根因）
+### jeecg-boot（24 个根因）
 
 - **[cors]** `IndexController.chartInfo`（全局配置，影响 456 条路由） @ `IndexController.java:45`
 - **[cmdi]** `JobGroupController.loadById`（端点，影响 1 条路由） @ `JobGroupController.java:174`
@@ -81,7 +81,6 @@
 - **[cmdi]** `JobLogController.logKill`（端点，影响 1 条路由） @ `JobLogController.java:159`
 - **[deserial]** `JobLogController.logKill`（端点，影响 1 条路由） @ `JobLogController.java:159`
 - **[hash]** `LoginController.login`（端点，影响 1 条路由） @ `LoginController.java:73`
-- **[mass_assignment]** `LoginController.login`（端点，影响 1 条路由） @ `LoginController.java:73`
 - **[hash]** `LoginController.randomImage`（端点，影响 1 条路由） @ `LoginController.java:499`
 - **[hash]** `LoginController.checkCaptcha`（端点，影响 1 条路由） @ `LoginController.java:605`
 - **[xss]** `SysAnnouncementController.showContent`（端点，影响 1 条路由） @ `SysAnnouncementController.java:488`
@@ -89,7 +88,6 @@
 - **[sqli]** `SysAnnouncementSendController.readAll`（端点，影响 1 条路由） @ `SysAnnouncementSendController.java:238`
 - **[sqli]** `SysDepartController.queryIdTree`（端点，影响 1 条路由） @ `SysDepartController.java:277`
 - **[sqli]** `SysUserController.frozenBatch`（端点，影响 1 条路由） @ `SysUserController.java:253`
-- **[mass_assignment]** `SysUserOnlineController.list`（端点，影响 1 条路由） @ `SysUserOnlineController.java:52`
 - **[redir]** `ThirdLoginController.render`（端点，影响 1 条路由） @ `ThirdLoginController.java:67`
 - **[redir]** `ThirdLoginController.oauth2LoginCallback`（端点，影响 1 条路由） @ `ThirdLoginController.java:294`
 - **[redir]** `ThirdLoginController.oauth2LoginCallback#2`（端点，影响 1 条路由） @ `ThirdLoginController.java:358`

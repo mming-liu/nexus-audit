@@ -1,6 +1,6 @@
 {
-  "total_root_causes": 96,
-  "cluster_count": 53,
+  "total_root_causes": 94,
+  "cluster_count": 51,
   "cross_repo_clusters": 8,
   "conservation_ok": true,
   "clusters": [
@@ -346,26 +346,6 @@
       "category": "hash",
       "root_kind": "endpoint",
       "component": "SystemApiController.java",
-      "repo_count": 1,
-      "root_count": 1,
-      "repos": [
-        "jeecg-boot"
-      ]
-    },
-    {
-      "category": "mass_assignment",
-      "root_kind": "endpoint",
-      "component": "LoginController.java",
-      "repo_count": 1,
-      "root_count": 1,
-      "repos": [
-        "jeecg-boot"
-      ]
-    },
-    {
-      "category": "mass_assignment",
-      "root_kind": "endpoint",
-      "component": "SysUserOnlineController.java",
       "repo_count": 1,
       "root_count": 1,
       "repos": [

@@ -9423,6 +9423,23 @@ _MASS_TYPE_HINT_RE = re.compile(
     r"(?:user|account|admin|member|profile|staff|role)", re.I)
 
 
+def _entry_region(source: str) -> str:
+    """**入口自己的**代码区域（M122/M123：证据归属的统一口径）。
+
+    切片是"入口 + 同文件辅助 + 跨文件/父合约证据"拼起来的，证据段用
+    `// ---- xxx ----` 或 `// 来自 Xxx.java:46 [Hop 3]` 这类**注释行**分隔。
+    而 `entry_body()` 会剥掉注释 —— 剥完注释，证据段的**代码**就混进 body 了。
+
+    后果：别的方法里的 `Cipher.getInstance("DES/…")` / `BeanUtils.copyProperties`
+    会被算到当前入口头上（eladmin 4 条 crypto、jeecg 2 条 mass_assignment
+    实测都是这么来的）。
+
+    所以凡是"这个动作是入口自己做的吗"这类判据，都必须先按标记切段，
+    再看入口那一段。
+    """
+    return re.split(r"(?m)^[ \t]*//[ \t]*(?:----|来自)", source)[0]
+
+
 def _mass_target_has_priv_fields(text: str) -> bool:
     """目标模型/实参里是否出现权限字段。"""
     low = text.lower()
@@ -9433,7 +9450,7 @@ def mass_assignment_verdict(source: str) -> bool | None:
     """批量赋值（M123，第 26 类）。"""
     if _looks_solidity(source):
         return None
-    body = entry_body(source)
+    body = entry_body(_entry_region(source))
     if not body:
         return None
     if _looks_python(source):
@@ -9467,14 +9484,26 @@ def mass_assignment_verdict(source: str) -> bool | None:
         # 所以按"捕获里有没有逗号"判断，而不是看闭括号之后。
         if "," in dst_arg or re.match(r'\s*,\s*"', body[m.end():]):
             return False
+        # **方向**判定（M134 实测）：`copyProperties(实体, VO)` 是服务端 →
+        # 展示层的正常拷贝，不是批量赋值。危险方向只有"请求数据 → 实体"。
+        # jeecg 的 `copyProperties(sysUser, loginUser)` 是登录成功后把实体转
+        # 会话对象，与权限绑定无关；只看"目标是用户类"会把它判成漏洞。
+        src_name = src_arg.strip()
+        danger_src = bool(
+            re.search(rf"@RequestBody\s+[\w<>,\s\[\]]*\b{re.escape(src_name)}\b",
+                      body)
+            or re.search(rf"\bMap\s*<[^>]*>\s*{re.escape(src_name)}\b", body)
+            or re.match(r"(?i)^(?:req|request|param|params|data|payload"
+                        r"|form|body|map|m|dto|vo|input)$", src_name))
+        if not danger_src:
+            continue
         # 目标类型往往只以**声明**出现（`UserEntity u = new UserEntity();`），
         # 实体类体不在切片里 —— 从声明里取类型名判"是不是用户/权限实体"。
         dst_name = dst_arg.strip()
         tm = re.search(rf"\b([A-Z]\w*)\s+{re.escape(dst_name)}\b", body)
         dst_type = tm.group(1) if tm else ""
         if _mass_target_has_priv_fields(body) \
-                or _MASS_TYPE_HINT_RE.search(dst_type) \
-                or _MASS_TARGET_HINT_RE.search(src_arg):
+                or _MASS_TYPE_HINT_RE.search(dst_type):
             return True
     if _MASS_JAVA_SINK_RE.search(body):
         return None
@@ -9513,7 +9542,7 @@ def bad_randomness_verdict(source: str) -> bool | None:
     """链上伪随机（M124，第 27 类，SWC-120）。"""
     if not _looks_solidity(source):
         return None
-    body = entry_body(source)
+    body = entry_body(_entry_region(source))
     if not body:
         return None
     if _BAD_RAND_OK_RE.search(body):

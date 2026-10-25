@@ -1,6 +1,6 @@
 # 披露草稿总目录（nexus-audit `--advisory-dir`）
 
-共 **26** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
+共 **24** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
 带 [Auto-Fix Verified] 的草稿内嵌通过自检的补丁 diff。
 
 | CVSS | 严重级 | CWE | 类目 | 草稿 |
@@ -18,8 +18,6 @@
 | 9.8 | CRITICAL | CWE-89 | sqli | [GHSA-C13B-DD4D-336C-sqli-sysannouncementsendcontroller-readall.md](GHSA-C13B-DD4D-336C-sqli-sysannouncementsendcontroller-readall.md) |
 | 9.8 | CRITICAL | CWE-78 | cmdi | [GHSA-CD24-7BAA-9F23-cmdi-joblogcontroller-logdetailcat.md](GHSA-CD24-7BAA-9F23-cmdi-joblogcontroller-logdetailcat.md) |
 | 9.8 | CRITICAL | CWE-78 | cmdi | [GHSA-DE52-4B9B-FDCC-cmdi-jobgroupcontroller-loadbyid.md](GHSA-DE52-4B9B-FDCC-cmdi-jobgroupcontroller-loadbyid.md) |
-| 8.1 | HIGH | CWE-915 | mass_assignment | [GHSA-4BE6-AF7C-6427-mass-assignment-sysuseronlinecontroller-list.md](GHSA-4BE6-AF7C-6427-mass-assignment-sysuseronlinecontroller-list.md) |
-| 8.1 | HIGH | CWE-915 | mass_assignment | [GHSA-540F-E470-0C97-mass-assignment-logincontroller-login.md](GHSA-540F-E470-0C97-mass-assignment-logincontroller-login.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-EA41-287E-036C-cors-indexcontroller-chartinfo.md](GHSA-EA41-287E-036C-cors-indexcontroller-chartinfo.md) |
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-2F43-8D59-99C9-xss-jobinfocontroller-update.md](GHSA-2F43-8D59-99C9-xss-jobinfocontroller-update.md) |
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-5805-0E45-068A-xss-jobinfocontroller-add.md](GHSA-5805-0E45-068A-xss-jobinfocontroller-add.md) |

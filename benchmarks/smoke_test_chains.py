@@ -7654,9 +7654,9 @@ if _adv154.exists():
     _it154 = _idx154.read_text(encoding="utf-8") if _idx154.exists() else ""
     check("M154：草稿目录数与野战场数一致（25）",
           len([p for p in _adv154.iterdir() if p.is_dir()]), 25)
-    check("M154：总目录零断链（96 份全被索引）",
+    check("M154：总目录零断链（94 份全被索引）",
           (len(_drafts154), all(f"]({p.name})" in _it154
-                                for p in _drafts154)), (96, True))
+                                for p in _drafts154)), (94, True))
     check("M154：每份草稿都有 CVSS 向量与受影响组件小节",
           all("CVSS:3.1/" in p.read_text(encoding="utf-8")
               and "## Affected Component" in p.read_text(encoding="utf-8")
