@@ -1,0 +1,223 @@
+{
+  "bench": "mall_tiny",
+  "units": 40,
+  "total_units": 40,
+  "decided": 40,
+  "correct": 40,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 207,
+  "cors_rows": 40,
+  "cors_carriers": [
+    "GlobalCorsConfig"
+  ],
+  "unique_global_root_causes": 1,
+  "cors_anchor": {
+    "with_wildcard": true,
+    "with_allowlist": false,
+    "without_evidence": null,
+    "changed": true
+  },
+  "true_rows": [
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.register",
+      "category": "cors"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.login",
+      "category": "cors"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.refreshToken",
+      "category": "cors"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.getAdminInfo",
+      "category": "cors"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.logout",
+      "category": "cors"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.list",
+      "category": "cors"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.getItem",
+      "category": "cors"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.update",
+      "category": "cors"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.updatePassword",
+      "category": "cors"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.updateStatus",
+      "category": "cors"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.updateRole",
+      "category": "cors"
+    },
+    {
+      "file": "UmsAdminController.java",
+      "unit": "UmsAdminController.getRoleList",
+      "category": "cors"
+    },
+    {
+      "file": "UmsMenuController.java",
+      "unit": "UmsMenuController.create",
+      "category": "cors"
+    },
+    {
+      "file": "UmsMenuController.java",
+      "unit": "UmsMenuController.update",
+      "category": "cors"
+    },
+    {
+      "file": "UmsMenuController.java",
+      "unit": "UmsMenuController.getItem",
+      "category": "cors"
+    },
+    {
+      "file": "UmsMenuController.java",
+      "unit": "UmsMenuController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "UmsMenuController.java",
+      "unit": "UmsMenuController.list",
+      "category": "cors"
+    },
+    {
+      "file": "UmsMenuController.java",
+      "unit": "UmsMenuController.treeList",
+      "category": "cors"
+    },
+    {
+      "file": "UmsMenuController.java",
+      "unit": "UmsMenuController.updateHidden",
+      "category": "cors"
+    },
+    {
+      "file": "UmsResourceCategoryController.java",
+      "unit": "UmsResourceCategoryController.listAll",
+      "category": "cors"
+    },
+    {
+      "file": "UmsResourceCategoryController.java",
+      "unit": "UmsResourceCategoryController.create",
+      "category": "cors"
+    },
+    {
+      "file": "UmsResourceCategoryController.java",
+      "unit": "UmsResourceCategoryController.update",
+      "category": "cors"
+    },
+    {
+      "file": "UmsResourceCategoryController.java",
+      "unit": "UmsResourceCategoryController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "UmsResourceController.java",
+      "unit": "UmsResourceController.create",
+      "category": "cors"
+    },
+    {
+      "file": "UmsResourceController.java",
+      "unit": "UmsResourceController.update",
+      "category": "cors"
+    },
+    {
+      "file": "UmsResourceController.java",
+      "unit": "UmsResourceController.getItem",
+      "category": "cors"
+    },
+    {
+      "file": "UmsResourceController.java",
+      "unit": "UmsResourceController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "UmsResourceController.java",
+      "unit": "UmsResourceController.list",
+      "category": "cors"
+    },
+    {
+      "file": "UmsResourceController.java",
+      "unit": "UmsResourceController.listAll",
+      "category": "cors"
+    },
+    {
+      "file": "UmsRoleController.java",
+      "unit": "UmsRoleController.create",
+      "category": "cors"
+    },
+    {
+      "file": "UmsRoleController.java",
+      "unit": "UmsRoleController.update",
+      "category": "cors"
+    },
+    {
+      "file": "UmsRoleController.java",
+      "unit": "UmsRoleController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "UmsRoleController.java",
+      "unit": "UmsRoleController.listAll",
+      "category": "cors"
+    },
+    {
+      "file": "UmsRoleController.java",
+      "unit": "UmsRoleController.list",
+      "category": "cors"
+    },
+    {
+      "file": "UmsRoleController.java",
+      "unit": "UmsRoleController.updateStatus",
+      "category": "cors"
+    },
+    {
+      "file": "UmsRoleController.java",
+      "unit": "UmsRoleController.listMenu",
+      "category": "cors"
+    },
+    {
+      "file": "UmsRoleController.java",
+      "unit": "UmsRoleController.listResource",
+      "category": "cors"
+    },
+    {
+      "file": "UmsRoleController.java",
+      "unit": "UmsRoleController.allocMenu",
+      "category": "cors"
+    },
+    {
+      "file": "UmsRoleController.java",
+      "unit": "UmsRoleController.allocResource",
+      "category": "cors"
+    }
+  ]
+}

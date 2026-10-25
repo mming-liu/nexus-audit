@@ -6,7 +6,7 @@
   "correct": 66,
   "fp": 0,
   "reverse_fn": 0,
-  "rule_evaluations": 129,
+  "rule_evaluations": 133,
   "lock_functions": {
     "mint": false,
     "burn": false,

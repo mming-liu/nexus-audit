@@ -1,0 +1,44 @@
+{
+  "bench": "my_blog_layui",
+  "units": 64,
+  "total_units": 64,
+  "decided": 64,
+  "correct": 3,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 294,
+  "global_authz_units": 53,
+  "truth": {
+    "hash": 2,
+    "xss": 1
+  },
+  "truth_hits": {
+    "hash": 2,
+    "xss": 1
+  },
+  "unplanned": {},
+  "hash_anchor": {
+    "with_md5": true,
+    "with_sha256": false,
+    "changed": true
+  },
+  "xss_anchor": {
+    "with_model": true,
+    "without_model": null,
+    "changed": true
+  },
+  "true_rows": [
+    {
+      "unit": "AdminController.login#2",
+      "category": "hash"
+    },
+    {
+      "unit": "AdminController.userInfoUpdate",
+      "category": "hash"
+    },
+    {
+      "unit": "BlogController.gotoBlogEdit",
+      "category": "xss"
+    }
+  ]
+}

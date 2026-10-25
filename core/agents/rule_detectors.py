@@ -6293,8 +6293,8 @@ def python_cmdi_verdict(source: str) -> bool | None:
 
 _PY_SUBJECT_RE = re.compile(
     r"Depends\s*\(\s*get_current_user\s*\)|@login_required|@jwt_required|"
-    r"\bcurrent_user\b|\bg\s*\.\s*user\b|\brequest\s*\.\s*user\b|"
-    r"get_jwt_identity\s*\(|@requires_auth", re.I)
+    r"\bcurrent_user\b|\bg\s*\.\s*user\b|\bg\s*\.\s*current_user\b|"
+    r"\brequest\s*\.\s*user\b|get_jwt_identity\s*\(|@requires_auth", re.I)
 # Module 37：JWT 主体链第二形态（VAmPI）。Connexion/OpenAPI 无装饰器，
 # 主体经 `User.decode_auth_token(token)` 解出 claim 再取 `resp['sub']`
 # 作查询键 —— 机制与 get_jwt_identity 完全同类（"是谁"由 token 决定）。
@@ -6306,7 +6306,58 @@ _PY_OWNERSHIP_RE = re.compile(
     r"\.filter(?:_by)?\s*\([^)]*(?:user_id|owner_id)\s*=\s*current_user\s*\.\s*id|"
     r"\.filter\s*\([^)]*==\s*current_user\s*\.\s*id|"
     r"(?:user_id|owner_id)\s*=\s*current_user\s*\.\s*id|"
-    r"abort\s*\(\s*40[13]\s*\)", re.I)
+    r"abort\s*\(\s*40[13]\s*\)"
+    # M137：Flask 的 `g.current_user` 主体形态 —— flasky 的归属校验写成
+    #   `if g.current_user != post.author and not g.current_user.can(ADMIN):`
+    #   `return forbidden('Insufficient permissions')`
+    # 主体比较与拒绝分支都在，只是主体不在 `current_user` 而是 `g.current_user`；
+    # 另外 `comment.author = g.current_user` 是"新记录归属当前用户"的写法，
+    # 同样把资源绑到了主体上（写自己的资源不是越权面）。
+    r"|\bg\s*\.\s*current_user\b\s*[!=]="
+    r"|\.\s*(?:author|user|owner|user_id|owner_id)\s*=\s*g\s*\.\s*current_user\b"
+    r"|return\s+[\w.]*forbidden\s*\("
+    r"|raise\s+\w*(?:Forbidden|PermissionDenied)\w*", re.I)
+
+
+def _py_public_catalog_read(source: str, body: str) -> bool:
+    """公开内容只读面（M137，Flask 教程应用的 `/user/<username>` 形态）。
+
+    与 Java 侧 `_is_public_catalog_read` 同一套**正面证据**口径：
+
+      ① 无写动作（`db.session.add/commit/delete`、`.save()`、`.update(`、
+         INSERT/UPDATE/DELETE 语句都没有）；
+      ② 不碰主体私有资源（password / email / token / secret / order /
+         cart / wallet / admin 一律视为私有面）；
+      ③ **正面认出路由指向公开内容**（`// Route:` 里出现 posts / comments /
+         followers / timeline / user 这类"人人可见"的实体名）。
+
+    第 ③ 条是必要条件：认不出就不豁免，仍按 True/None 走 —— 否定式
+    （"没提到 user_id 就算公开"）会把 VAmPI 那种真正的对象级越权洗成安全。
+    """
+    if not body:
+        return False
+    if _PY_WRITE_CALL_RE.search(body):
+        return False
+    if _PY_PRIVATE_RES_RE.search(body):
+        return False
+    rm = re.search(r"//\s*Route:\s*(\S+)", source)
+    route = rm.group(1) if rm else ""
+    if not route:
+        return False
+    return bool(_PY_PUBLIC_ROUTE_RE.search(route))
+
+
+_PY_WRITE_CALL_RE = re.compile(
+    r"db\s*\.\s*session\s*\.\s*(?:add|add_all|delete|commit|merge|bulk_\w+)\s*\("
+    r"|\.\s*(?:save|delete|update|upsert)\s*\(\s*\)"
+    r"|\.\s*(?:update|delete)\s*\([^)]"
+    r"|\b(?:INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b", re.I)
+_PY_PRIVATE_RES_RE = re.compile(
+    r"\b(?:password|passwd|token|secret|api_key|email|credit|wallet|payment"
+    r"|order|cart|invoice|admin|permission|role)s?\b", re.I)
+_PY_PUBLIC_ROUTE_RE = re.compile(
+    r"(?:^|/)(?:posts?|comments?|followers?|followed_by|timeline|users?|profile"
+    r"|index|home|feed|articles?|tags?)(?:/|$|\?)", re.I)
 
 
 def python_authz_verdict(source: str) -> bool | None:
@@ -6318,6 +6369,16 @@ def python_authz_verdict(source: str) -> bool | None:
     # 但 `Depends(get_current_user)` 只证明"知道是谁"，主体可能继续下沉到
     # Service 做归属比对 —— 不能直接判安全（否则会吃掉 BOLA 的 None）。
     body = entry_body(source)
+    # M137：装饰器守卫证据头（`@admin_required` / `@permission_required`）。
+    #
+    # 只认**管理员面**（admin_required）→ 确定性 False：管理员对全站资源做
+    # 特权操作是设计意图，不是越权（flasky 的 edit_profile_admin 就是这个语义）。
+    # `permission_required(Permission.WRITE)` **不能**直接判 False —— 它只证明
+    # "这个角色能写"，不证明"只能写自己的"；把它当安全会把 BOLA 洗白。
+    # 那类仍走下面的主体/归属判据（`g.current_user != post.author` 等）。
+    _guards = re.findall(r"//\s*Auth-Guard:\s*(\w+)", source)
+    if "admin_required" in _guards:
+        return False
     if re.search(r"Depends\s*\(\s*(?:require|permission|login_required"
                  r"|auth_required|authorize)\w*", body, re.I):
         return False
@@ -6378,6 +6439,10 @@ def python_authz_verdict(source: str) -> bool | None:
     if resource_params and re.search(
             r"\.\s*(?:query|get|filter|filter_by|delete|update|execute|first|"
             r"scalar|one)\s*\(", source):
+        # M137：公开内容只读面（`/user/<username>` / `/posts/<id>/comments/`）。
+        # 正面认出是公开内容 + 无写动作 + 不碰私有资源 → 不是对象级越权面。
+        if _py_public_catalog_read(source, body):
+            return False
         return True
     return None
 
@@ -6872,6 +6937,54 @@ _SOLIDITY_MSGSENDER_MEMBER_RE = re.compile(
     # —— M54 实测：`require(_executionOperators[msg.sender], "only ...")`
     # 的逗号形态原先不匹配 ⇒ 权限映射检查被漏掉。
     r"(?:\)|,|!=\s*(?:0|address\s*\(\s*0\s*\))|&&)")
+
+
+# ---- M136：调用者键控的**授权映射**（MakerDAO dss `wards[msg.sender] == 1`）----
+#
+# `_SOLIDITY_MSGSENDER_MEMBER_RE` 只认"裸真值 / != 0 / &&"三种形态，碰上
+# dss 的显式等值写法就漏了：
+#
+#     modifier auth {
+#         require(wards[msg.sender] == 1, "Vat/not-authorized");
+#         _;
+#     }
+#
+# 于是 `rely` / `deny` / `file` / `cage` 这些只该管理员调的函数会被判成
+# "缺访问控制" —— 判反方向（把安全判成漏洞）。
+#
+# 判据挂机制，且**必须同时满足两条**，否则会把余额检查误当授权：
+#   ① 槽位是**调用者键控**的（`<映射>[msg.sender]`）；
+#   ② 与**真值常量**做**恒等**比较（`== 1` / `== true`，或反向
+#      `if (wards[msg.sender] == 0) { revert }` 的中止块）。
+# 只认 `==`：`balances[msg.sender] >= amount` 是资金充足性检查，
+# 授权与否跟它无关 —— 把它算成保护会吃掉真正的越权（铁律 22 的反面）。
+_SOL_CALLER_MAP_EQ_RE = re.compile(
+    r"(?:require|assert)\s*\(\s*[^;]{0,120}?"
+    r"[A-Za-z_]\w*(?:\s*\[[^\]]*\])?\s*\[\s*msg\s*\.\s*sender\s*\]"
+    r"\s*==\s*(?:1|true)\b"
+    r"|(?:require|assert)\s*\(\s*(?:1|true)\s*==\s*"
+    r"[A-Za-z_]\w*(?:\s*\[[^\]]*\])?\s*\[\s*msg\s*\.\s*sender\s*\]",
+    re.S)
+_SOL_CALLER_MAP_NEG_RE = re.compile(
+    r"if\s*\(\s*[A-Za-z_]\w*(?:\s*\[[^\]]*\])?\s*\[\s*msg\s*\.\s*sender\s*\]"
+    r"\s*==\s*(?:0|false)\s*\)", re.S)
+
+
+def _sol_caller_map_auth(text: str) -> bool:
+    """`wards[msg.sender] == 1` 型授权映射守卫（M136，MakerDAO dss）。
+
+    机制：**调用者键控的授权表**在条件里与真值常量做等值比较。
+    正向形态（`require(wards[msg.sender] == 1, ...)`）本身就中止；
+    反向形态（`if (wards[msg.sender] == 0) { revert ... }`）还要求块内
+    真的**中止**（`if` 里只写日志不是保护）。
+    """
+    if _SOL_CALLER_MAP_EQ_RE.search(text):
+        return True
+    for m in _SOL_CALLER_MAP_NEG_RE.finditer(text):
+        blk = _sol_block_body(text, m.end() - 1)
+        if blk and _sol_block_aborts(blk):
+            return True
+    return False
 
 # ---- M54：tx.origin 恒等比较（带"另一侧"捕获） ----
 #
@@ -7783,6 +7896,8 @@ def solidity_access_verdict(source: str) -> bool | None:
     # 当保护会把 initWallet 判反，方向错误比退回恶劣得多。
     protected = bool(_SOLIDITY_MSGSENDER_CHECK_RE.search(func_src)
                      or _SOLIDITY_MSGSENDER_MEMBER_RE.search(func_src)
+                     # M136：`wards[msg.sender] == 1` 型授权映射
+                     or _sol_caller_map_auth(func_src)
                      or _sol_identity_call_check(func_src)
                      # M108：谓词式 / 反向条件式授权
                      #
@@ -7815,6 +7930,8 @@ def solidity_access_verdict(source: str) -> bool | None:
         for body in _sol_modifier_bodies(mod_block):
             if (_SOLIDITY_MSGSENDER_CHECK_RE.search(body)
                     or _SOLIDITY_MSGSENDER_MEMBER_RE.search(body)
+                    # M136：dss 的 `modifier auth { require(wards[msg.sender] == 1) }`
+                    or _sol_caller_map_auth(body)
                     or _sol_identity_call_check(body)
                     or _sol_predicate_authz_check(body)
                     or _sol_inverted_identity_guard(body)):
@@ -7984,6 +8101,18 @@ def solidity_access_verdict(source: str) -> bool | None:
         return False
 
     # 危险动作（只看函数自身源码）
+    #
+    # M143：**一次性初始化入口**先退 None。带 `initializer` / `reinitializer(n)`
+    # 的函数只能跑一次，它的风险形态是"部署竞态 / 未初始化的代理被抢跑"，
+    # 与"任意时刻可调的特权入口缺授权"不是同一类判断（前者需要看部署流程，
+    # 后者看入口守卫）。把前者判 True 是把"缺证据"当"有漏洞"；
+    # 判 False 又会把真·抢跑问题洗白 —— 按铁律退回 None，交人工。
+    # 只认 `initializer` / `reinitializer`：`onlyInitializing` 是**内部**
+    # 初始化辅助函数的标记（本来就是 internal → 上面已判 False）。
+    _sig_tail = sig[sig.find(")") + 1:] if ")" in sig else sig
+    if re.search(r"\b(?:initializer|reinitializer)\b", _sig_tail):
+        return None
+
     danger = bool(_SOLIDITY_SELFDESTRUCT_RE.search(func_src))
     owner_write = _sol_owner_state_write(func_src) \
         or _sol_bare_transfer_ownership(func_src)
@@ -8121,6 +8250,11 @@ _ARITH_GUARD_RE = re.compile(
     r"([A-Za-z_]\w*(?:\s*\[\s*[^\]]*\s*\])?)\s*\)")
 _SOL_PRAGMA_RE = re.compile(r"//\s*pragma:\s*solidity\s+([^;]+);")
 _SOL_FUNC_PARAMS_RE = re.compile(r"\bfunction\s+[A-Za-z_]\w*\s*\(([^)]*)\)")
+# M143：`fallback` / `receive` / `constructor` **不写 function 关键字**。
+# 代理合约的 delegatecall 常常就写在 `fallback()` 里，形参表取不到就判不出
+# "目标是入口形参"（整条判据退 None）。
+_SOL_SPECIAL_PARAMS_RE = re.compile(
+    r"\b(?:fallback|receive|constructor)\s*\(([^)]*)\)")
 # 调用实参内的算术表达式：`msg.sender.transfer(numTokens * PRICE_PER_TOKEN);`
 # 官方真值标的就是这一行（tokensalechallenge:sell L33）—— 溢出发生在
 # 实参求值时，跟同函数里另一条被 require 保护的减法无关。
@@ -8140,6 +8274,69 @@ _ARITH_WRAP_RE = re.compile(
 # 时间戳溢出不在本类目的确定性范围内。
 _ARITH_KEYWORD_LHS = {"now", "block", "msg", "tx", "address", "uint", "uint256",
                       "int", "int256", "this"}
+
+
+# ---- M136：内联算术安全封装（MakerDAO dss 的 `_add` / `_sub` / `_mul`）----
+#
+# dss 不用 SafeMath 库，而是在合约里手写三个 internal 包装函数：
+#
+#     function _add(uint x, int y) internal pure returns (uint z) {
+#         z = x + uint(y);
+#         require(y >= 0 || z <= x);      // 加法回卷回验
+#         require(y <= 0 || z >= x);
+#     }
+#
+# 老版本 dss 写的是 `require((z = x + y) >= x);`（同一机制的内联形态）。
+# 两种写法都不是 `.add()`，`_SAFE_MATH_RE` 看不见；`_ARITH_GUARD_RE` 也
+# 看不见（它只认 `require(a >= b)` 这种裸标识符比较，结果是新算出来的 z）。
+# 于是这两个函数在 arithmetic 维度退 None —— 判据没看懂"结果被回验"。
+#
+# 判据挂机制（不挂函数名、不挂变量名）：
+#   ① 某个**局部结果变量**被赋值为含算术运算的表达式；
+#   ② 紧随其后的 require/assert 条件里，该结果变量与**表达式中的某个
+#      操作数**做关系比较（`<=` / `>=` / `<` / `>` / `==` / `!=`）。
+# 这就是回卷校验（wrap-around check）的定义式形态：把"算出来的值"和
+# "参与运算的原始量"比大小，越界即回滚。
+_SOL_ARITH_ASSIGN_RE = re.compile(
+    r"(?m)^\s*([A-Za-z_]\w*)\s*=\s*([^;=]*[-+*][^;=]*);")
+_SOL_ARITH_CHECK_RE = re.compile(
+    r"(?:require|assert)\s*\(([^;]{0,240}?)\)\s*;", re.S)
+# 内联在条件里的赋值形态：`require((z = x + y) >= x);`（老 dss 写法）
+_SOL_INLINE_COND_ARITH_RE = re.compile(
+    r"(?:require|assert)\s*\(\s*\(?\s*([A-Za-z_]\w*)\s*=\s*([^;()]*[-+*][^;()]*)"
+    r"\)?\s*(?:<=|>=|<|>|==|!=)\s*([A-Za-z_]\w*)")
+
+
+def _sol_inline_arith_results(body: str) -> set[str]:
+    """返回"被回卷校验覆盖的结果变量名"集合（M136）。
+
+    只看**纯局部变量**左值（`z = ...`）：映射/数组槽位的复合赋值
+    （`balances[x] += y`）不在此列 —— 那类的结果就是槽位本身，回验它
+    是马后炮，判据不给它记保护。
+    """
+    out: set[str] = set()
+    for m in _SOL_INLINE_COND_ARITH_RE.finditer(body):
+        result, expr, cmp_var = m.group(1), m.group(2), m.group(3)
+        operands = set(re.findall(r"\b([A-Za-z_]\w*)\b", expr)) - {result}
+        if cmp_var in operands:
+            out.add(result)
+    for m in _SOL_ARITH_ASSIGN_RE.finditer(body):
+        result, expr = m.group(1), m.group(2)
+        operands = set(re.findall(r"\b([A-Za-z_]\w*)\b", expr)) - {result}
+        if not operands:
+            continue
+        tail = body[m.end(): m.end() + 400]
+        for cm in _SOL_ARITH_CHECK_RE.finditer(tail):
+            cond = cm.group(1)
+            rel = re.search(rf"\b{re.escape(result)}\b\s*(?:<=|>=|<|>|==|!=)"
+                            rf"|(?:<=|>=|<|>|==|!=)\s*\b{re.escape(result)}\b",
+                            cond)
+            if not rel:
+                continue
+            if any(re.search(rf"\b{re.escape(o)}\b", cond) for o in operands):
+                out.add(result)
+                break
+    return out
 
 
 def _sol_pragma_major(source: str) -> int | None:
@@ -8168,8 +8365,12 @@ def _sol_pragma_major(source: str) -> int | None:
 
 
 def _sol_param_names(source: str) -> set[str]:
-    """函数签名里的形参名集合。"""
-    m = _SOL_FUNC_PARAMS_RE.search(source)
+    """函数签名里的形参名集合。
+
+    M143：`fallback` / `receive` / `constructor` 没有 `function` 关键字，
+    主正则匹配不到时回落到特殊入口正则。
+    """
+    m = _SOL_FUNC_PARAMS_RE.search(source) or _SOL_SPECIAL_PARAMS_RE.search(source)
     if not m:
         return set()
     out = set()
@@ -8252,6 +8453,10 @@ def solidity_arithmetic_verdict(source: str) -> bool | None:
 
     params = _sol_param_names(func_src)
 
+    # M136：先算"被回卷校验覆盖的结果变量"—— 它既用于 `exprs` 为空的
+    # 纯封装函数，也并入后面的 `checked_results`（局部声明形态的后置回验）。
+    inline_results = _sol_inline_arith_results(body)
+
     # ---- 收集算术表达式：(左值/宿主, 运算符, 右操作数文本, 是否复合赋值) ----
     # 复合赋值（`x += y`）与局部声明（`uint c = a * b;`）的**校验口径不同**：
     # 前者的结果就是 x 本身（回验 x 是马后炮），后者的结果是新算出来的
@@ -8270,6 +8475,13 @@ def solidity_arithmetic_verdict(source: str) -> bool | None:
         # 0.8+ 的 unchecked 分区里没有任何算术式（只有普通赋值或循环游标
         # `i++` / `i += 1`）⇒ 编译器保护块外 + 块内无回卷面 ⇒ 确定性 safe。
         # 老版本（scoped_unchecked=False）保持原语义：不归本类目管 → None。
+        #
+        # M136：整函数就是一个**内联算术封装**（dss 的 `_add`/`_sub`：
+        # `z = x + uint(y); require(y >= 0 || z <= x);`）—— 表达式形态
+        # 不被上面的收集器识别，但回卷校验已被 `_sol_inline_arith_results`
+        # 证实存在 ⇒ 确定性 safe。
+        if inline_results:
+            return False
         return False if scoped_unchecked else None
 
     # ---- 溢出校验集合 ----
@@ -8319,6 +8531,9 @@ def solidity_arithmetic_verdict(source: str) -> bool | None:
             continue                          # 没有运算 → 不是回验式校验
         for name in re.findall(r"\b([A-Za-z_]\w*)\b", arg):
             checked_results.add(name)
+    # M136：内联算术封装 —— 结果变量被紧随其后的 require 与操作数比大小
+    # （dss `z = x + uint(y); require(y >= 0 || z <= x);`）。
+    checked_results |= inline_results
     # ③ SafeMath 调用：`.sub(x)` / `.add(x)` —— 库自带溢出检查
     safemath = bool(_SAFE_MATH_RE.search(body))
     # ④ 回卷校验：比较式中出现 `A + B` 或 `A - B`，被比较量与表达式左值
@@ -9565,6 +9780,488 @@ def bad_randomness_verdict(source: str) -> bool | None:
     return True
 
 
+def _entry_region(source: str) -> str:
+    """入口段的**原始文本**：第一个证据段头之前的全部内容（M135 收口）。
+
+    与 `entry_body()` 的分工是**时序**，不是措辞：
+
+        _entry_region(source)  → 先按 `// ----` / `// 来自` 切段（此时注释还在）
+        entry_body(region)     → 再在入口段内部剥注释 + 截方法体
+
+    反过来做（先剥注释再切段）会把 `// ---- [Hop N] ----` 这个**边界**擦掉，
+    于是 Hop 3 的辅助代码混进入口体 —— M119 的 eladmin 四条 crypto 误报
+    就是这么来的。这个函数把那条修法固化成单一口径，避免每个类目各自
+    手抄一遍 `re.split`（两处拼写一旦漂移，边界就又漏了）。
+    """
+    return re.split(r"(?m)^[ \t]*//[ \t]*(?:----|来自)", source)[0]
+
+
+# ================= M139–M141：第 28～30 类规则 =================
+#
+# 三类的共同点：**危险来自"名字/路径/目标由数据决定"**，而不是某个固定 API。
+# 因此判据都锚在"数据 → 汇聚点"的可核对事实上，而不是"文件里有没有这个词"。
+
+# ---- 第 28 类：不安全反射（CWE-470）----
+_PY_REFLECT_SINKS = (
+    r"\bimportlib\s*\.\s*import_module\s*\(\s*([^,)]*)",
+    r"\b__import__\s*\(\s*([^,)]*)",
+    r"\bgetattr\s*\(\s*[^,]+,\s*([^,)]*)",
+    r"\bglobals\s*\(\s*\)\s*\[\s*([^\]]+)\]",
+)
+_JAVA_REFLECT_SINKS = (
+    r"\bClass\s*\.\s*forName\s*\(\s*([^,)]*)",
+    r"\.\s*loadClass\s*\(\s*([^,)]*)",
+    r"\.\s*get(?:Declared)?Method\s*\(\s*([^,)]*)",
+    r"\.\s*get(?:Declared)?Field\s*\(\s*([^,)]*)",
+)
+_PY_REFLECT_RE = re.compile("|".join(f"(?:{p})" for p in _PY_REFLECT_SINKS))
+_JAVA_REFLECT_RE = re.compile("|".join(f"(?:{p})" for p in _JAVA_REFLECT_SINKS))
+
+
+def _reflect_sink_arg(m: re.Match) -> str:
+    """从多分支合并的正则里取出**本次命中**的实参文本。"""
+    for g in m.groups():
+        if g is not None:
+            return g.strip()
+    return ""
+
+
+# 外部请求来源（Python / Java 的同一语义）：反射参数常常不是**裸形参**，
+# 而是先从请求里取出来赋给局部变量再传进去。只认形参会把整类漏掉。
+_REQUEST_SRC_RE = re.compile(
+    r"\brequest\s*\.\s*(?:args|form|values|json|data|files|get_json|GET|POST)"
+    r"|\brequest\s*\.\s*getParameter\b|\brequest\s*\.\s*getHeader\b"
+    r"|\bself\s*\.\s*request\s*\.\s*(?:args|form|json|GET|POST)"
+    r"|\bget_json\s*\(\s*\)", re.I)
+
+
+def _reflect_dynamic(arg: str, params: set[str], body: str) -> bool | None:
+    """实参是否"由外部数据决定"：True / False(常量) / None(缺证据)。
+
+    · 字符串字面量 → False（`Class.forName("com.mysql.cj.jdbc.Driver")`
+      是**正确**写法，判 True 就是纯误报）；
+    · 裸标识符：属入口形参 → True；否则看它最后一次赋值 —— 字面量 →
+      False，请求取值（`request.args.get(...)` / `request.getParameter(...)`）
+      → True，含形参 → True，其余退 None；
+    · 表达式：含形参/请求取值 → True；纯字面量拼接 → False。
+    """
+    a = arg.strip()
+    if not a:
+        return None
+    if re.fullmatch(r'"[^"]*"|\'[^\']*\'', a):
+        return False
+    if re.fullmatch(r"[A-Za-z_]\w*", a):
+        if a in params:
+            return True
+        rhs = _last_assign_rhs(body, a)
+        if rhs is not None:
+            r = rhs.strip()
+            if re.fullmatch(r'"[^"]*"|\'[^\']*\'', r):
+                return False
+            if _REQUEST_SRC_RE.search(r):
+                return True
+            if any(re.search(rf"\b{re.escape(p)}\b", r) for p in params):
+                return True
+            return None
+        return None
+    if any(re.search(rf"\b{re.escape(p)}\b", a) for p in params):
+        return True
+    if _REQUEST_SRC_RE.search(a):
+        return True
+    if re.fullmatch(r'"[^"]*"(?:\s*\+\s*"[^"]*")*', a):
+        return False
+    return None
+
+
+def _reflect_whitelisted(prefix: str, var: str) -> bool:
+    """调用点**之前**是否已有对该变量的白名单约束（M139）。
+
+    只认三种可核对形态：① `X.contains(var)`；② `var in X` / `var not in X`；
+    ③ `switch (var) { case "…": }`。字符过滤（replace/正则）不算 ——
+    它能改内容但不限定**取值集合**。
+    """
+    if not var or not re.fullmatch(r"[A-Za-z_]\w*", var):
+        return False
+    v = re.escape(var)
+    if re.search(rf"\b[A-Za-z_]\w*\s*\.\s*contains\s*\(\s*{v}\s*\)", prefix):
+        return True
+    if re.search(rf"\b{v}\s+(?:not\s+)?in\s+[A-Za-z_\[\({{'\"']", prefix):
+        return True
+    if re.search(rf"\bswitch\s*\(\s*{v}\s*\)\s*\{{[^}}]*\bcase\b", prefix, re.S):
+        return True
+    return False
+
+
+def unsafe_reflection_verdict(source: str) -> bool | None:
+    """不安全反射（CWE-470）：动态类名/模块名/方法名是否被白名单约束。
+
+    语言无关的同一口径：
+      · 没有反射汇聚点 → None（不归本类目管）；
+      · 汇聚点实参是**字面量** → False（`Class.forName("…Driver")` 是标准写法）；
+      · 实参来自入口形参且调用点前有白名单 → False；
+      · 实参来自入口形参且无白名单 → True；
+      · 实参来源判不出（成员变量/配置读取）→ None。
+
+    **只看入口段**（`_entry_region` + `entry_body`）：Hop 证据段里别的方法
+    的反射调用不算到当前入口头上 —— 与 M119 crypto 的证据归属同一条铁律。
+    """
+    region = _entry_region(source)
+    body = entry_body(region)
+    if not body:
+        return None
+    is_py = _looks_python(source)
+    pattern = _PY_REFLECT_RE if is_py else _JAVA_REFLECT_RE
+    if is_py:
+        params = set(_py_func_params(source))
+    else:
+        params = set(_bare_params(_entry_signature(source) or source))
+    hits = list(pattern.finditer(body))
+    if not hits:
+        return None
+    saw_unknown = False
+    for m in hits:
+        arg = _reflect_sink_arg(m)
+        if not arg:
+            saw_unknown = True
+            continue
+        dyn = _reflect_dynamic(arg, params, body)
+        if dyn is False:
+            continue                       # 常量：明确安全
+        if dyn is None:
+            saw_unknown = True
+            continue
+        prefix = body[:m.start()]
+        if _reflect_whitelisted(prefix, arg):
+            continue
+        return True
+    return None if saw_unknown else False
+
+
+# ---- 第 29 类：压缩包路径穿越（CWE-22）----
+_ZIP_ENTRY_TYPE_RE = re.compile(
+    r"\b(?:ZipEntry|JarEntry|TarArchiveEntry|ArchiveEntry)\b")
+_ZIP_NAME_GET_RE = re.compile(r"\.\s*getName\s*\(\s*\)")
+_JAVA_PATH_SINK_RE = re.compile(
+    r"new\s+(?:java\.io\.)?File\s*\([^;]*\)"
+    r"|Paths?\s*\.\s*(?:get|of)\s*\([^;]*\)"
+    r"|new\s+(?:java\.io\.)?File(?:Output|Input)Stream\s*\([^;]*\)"
+    r"|Files\s*\.\s*(?:copy|write|newOutputStream)\s*\([^;]*\)", re.S)
+# 规范化前缀校验：`getCanonicalPath().startsWith(...)` / `normalize().startsWith(...)`
+_ZIP_CANONICAL_GUARD_RE = re.compile(
+    r"\.\s*(?:getCanonicalPath|getCanonicalFile|normalize|toRealPath)\s*\(\s*\)"
+    r"[\s\S]{0,120}?\.\s*startsWith\s*\("
+    r"|\.\s*toRealPath\s*\(\s*\)[\s\S]{0,120}?\.\s*startsWith\s*\(")
+_PY_EXTRACT_RE = re.compile(
+    r"\.\s*(?:extractall|extract)\s*\(\s*([^)]*)\)")
+_PY_ZIP_FILTER_RE = re.compile(r"filter\s*=\s*['\"]data['\"]")
+_PY_PATH_PREFIX_GUARD_RE = re.compile(
+    r"os\s*\.\s*path\s*\.\s*(?:realpath|abspath)\s*\([^)]*\)[\s\S]{0,120}?"
+    r"(?:startswith|commonpath|relative_to)"
+    r"|Path\s*\([^)]*\)\s*\.\s*resolve\s*\(\s*\)[\s\S]{0,120}?"
+    r"(?:startswith|relative_to|is_relative_to)")
+
+
+def zip_slip_verdict(source: str) -> bool | None:
+    """压缩包路径穿越（Zip Slip，CWE-22）。
+
+    Java 侧：只有当 `ZipEntry/JarEntry/TarArchiveEntry` 的 `getName()` **真的
+    流进**文件路径/输出流时才成立 —— 一个只解压到内存的 zip 读取器不该被报。
+    Python 侧：`extractall/extract` 本身即落盘（PEP 706 的 `filter="data"`
+    是官方给出的标准防护）。
+
+    防护口径：`getCanonicalPath()/normalize()/toRealPath()` 后
+    `startsWith(...)` 前缀校验，或 Python 的 `filter="data"` /
+    `realpath(...).startswith(...)`。**只做 `..` 检查**不够（符号链接、
+    编码变体都能绕过），但按本仓的保守口径，它也不构成"确定性"的反证 ——
+    缺规范化前缀校验时仍判 True。
+    """
+    region = _entry_region(source)
+    body = entry_body(region)
+    if not body:
+        return None
+    if _looks_python(source):
+        hits = list(_PY_EXTRACT_RE.finditer(body))
+        if not hits:
+            return None
+        if _PY_ZIP_FILTER_RE.search(body):
+            return False
+        if _PY_PATH_PREFIX_GUARD_RE.search(source):
+            return False
+        return True
+    has_entry = bool(_ZIP_ENTRY_TYPE_RE.search(source))
+    if not has_entry or not _ZIP_NAME_GET_RE.search(body):
+        return None
+    # 条目名 → 文件路径/输出流：直接内联，或经一个局部变量中转。
+    names = set(re.findall(r"\b([A-Za-z_]\w*)\s*=\s*[^;]*?\.\s*getName\s*\(\s*\)",
+                           body))
+    flow = False
+    for sm in _JAVA_PATH_SINK_RE.finditer(body):
+        seg = sm.group(0)
+        if _ZIP_NAME_GET_RE.search(seg):
+            flow = True
+            break
+        if any(re.search(rf"\b{re.escape(n)}\b", seg) for n in names):
+            flow = True
+            break
+    if not flow:
+        return None
+    if _ZIP_CANONICAL_GUARD_RE.search(body):
+        return False
+    return True
+
+
+# ---- 第 30 类：不受信 delegatecall（SWC-112）----
+_SOL_DELEGATECALL_RE = re.compile(
+    r"(address\s*\([^)]*\)"                       # address(this) / address(x)
+    r"|[A-Za-z_]\w*(?:\s*\[[^\]]*\])?(?:\s*\([^)]*\))?)"  # impl / impls[id] / _implementation()
+    r"\s*\.\s*delegatecall")
+# 自委托（Multicall 常见写法）：`address(this).delegatecall(...)`
+_SOL_SELF_DELEGATE_RE = re.compile(
+    r"\b(?:address\s*\(\s*this\s*\)|this)\s*\.\s*delegatecall")
+# ERC-1967 实现槽读取：`_implementation()` / `getAddressSlot(...).value`
+_SOL_IMPL_SLOT_RE = re.compile(
+    r"\b_implementation\s*\(\s*\)|getAddressSlot\s*\(|"
+    r"ERC1967Utils\s*\.\s*(?:getImplementation|IMPLEMENTATION_SLOT)")
+# 身份**门控占位符**：`if (msg.sender == admin) { _; }`（Aave 的 ifAdmin）。
+# 恒等比较出现在条件里，入口体只在相等分支执行 —— 与 require 同义。
+_SOL_SENDER_EQ_GATE_RE = re.compile(
+    r"\b(?:require|assert|if)\s*\(\s*msg\s*\.\s*sender\s*==")
+# 一次性初始化守卫（M143）：`require(_implementation() == address(0))` /
+# `initializer` / `reinitializer(n)` / `onlyInitializing`。这类函数的目标
+# 地址由**部署时**指定，风险是部署竞态而不是部署后的权限提升 —— 与
+# "不受信 delegatecall（部署后目标可控）"不是同一类，按类目边界排除。
+_SOL_ONESHOT_INIT_RE = re.compile(
+    r"require\s*\(\s*(?:_implementation|implementation|_getImplementation"
+    r"|getImplementation)\s*\(\s*\)\s*==\s*address\s*\(\s*0\s*\)"
+    r"|require\s*\(\s*address\s*\(\s*this\s*\)\s*\.\s*code\s*\.\s*length"
+    r"\s*==\s*0\s*\)")
+_SOL_INITIALIZER_MOD_RE = re.compile(
+    r"\b(?:initializer|reinitializer|onlyInitializing)\b")
+
+
+def _sol_unconditional_revert(body: str) -> bool:
+    """函数**顶层的最后一条语句**是不是无条件 revert（M141）。
+
+    synthetix 的 `simulateUpgradeTo` 是一次"演练"：它临时改写实现槽、
+    delegatecall 到新实现，然后**无条件 revert** —— 整个交易回滚，
+    任何被委托代码写的状态都不可能留下来（EVM 的原子性事实）。
+    这种形态不是"目标不可信"，而是"根本没落地"。
+
+    判据只看**顶层**（花括号深度 0）的语句：`if (...) { revert; }` 里的
+    revert 不算（那是条件分支，函数还有正常出口）。语句按 `;` 切，
+    整块 `{...}` 跳过；行注释先剥掉（`// solhint-disable-next-line`
+    常紧贴在 `revert();` 上一行）。
+    """
+    clean = re.sub(r"//[^\n]*", "", body)
+    clean = re.sub(r"/\*.*?\*/", "", clean, flags=re.S)
+    depth = 0
+    stmts: list[str] = []
+    start = 0
+    for i, ch in enumerate(clean):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                start = i + 1
+        elif ch == ";" and depth == 0:
+            stmt = clean[start:i].strip()
+            if stmt:
+                stmts.append(stmt)
+            start = i + 1
+    return bool(stmts) and bool(re.match(r"^revert\b", stmts[-1]))
+
+
+def _sol_onlyproxy_guard(mod_block: str) -> bool:
+    """`onlyProxy` 型守卫（OZ UUPS）：校验"当前经代理调用 + 实现槽非零"。
+
+    实现体形态（OZ 5.x）：
+        modifier onlyProxy() {
+            _checkProxy();
+            _;
+        }
+        function _checkProxy() internal view virtual {
+            if (address(this) == __self) revert;      // 直调实现合约
+            if (_getImplementation() != address(0)) ...
+        }
+    判据挂机制：modifier（或其调用的辅助函数）里同时出现
+    `address(this) == __self` 与实现槽读取 —— 这是框架层的入口约束，
+    与身份校验等价（直调实现合约时 msg.sender 是任意人，必须拒绝）。
+    """
+    if not mod_block:
+        return False
+    ev = mod_block
+    has_self = bool(re.search(r"address\s*\(\s*this\s*\)\s*==\s*__self"
+                              r"|__self\s*==\s*address\s*\(\s*this\s*\)"
+                              r"|address\s*\(\s*this\s*\)\s*!=\s*__self", ev))
+    has_slot = bool(re.search(r"_getImplementation\s*\(\s*\)"
+                              r"|__self\s*\.\s*implementation", ev))
+    return bool(has_self and has_slot)
+
+
+def _sol_enclosing_function(text: str, pos: int) -> tuple[str, str]:
+    """返回包住 `pos` 的那个函数的 (签名段, 配平函数体)。
+
+    合成夹具/整合约文本里往往一次带好几个函数（`setImpl` + `run`），
+    而 `_sol_param_names()` 只认**第一个** `function` —— 直接拿整段做
+    "形参是否可控"的判断会张冠李戴（把另一个函数的形参算进来）。
+    真实切片里只有入口函数，本函数对它是恒等变换。
+
+    **`fallback` / `receive` / `constructor` 也必须算函数**（M143）：Solidity
+    里这三个特殊入口**不写 `function` 关键字**，而代理合约的 `delegatecall`
+    恰恰最常写在 `fallback()` 里。只认 `function` 的后果是：作用域定位失败，
+    `_sol_signature` 回落到**文件里第一个普通函数**的签名 —— 如果那个函数是
+    internal，整个 delegatecall 判定就被"内部不可达"提前判 False（把真问题
+    洗成安全）。
+    """
+    decl = (r"\bfunction\s+[A-Za-z_]\w*\s*\([^)]*\)[^{;]*"
+            r"|\b(?:fallback|receive|constructor)\s*\([^)]*\)[^{;]*")
+    best: tuple[str, str] = ("", "")
+    for m in re.finditer(decl, text):
+        brace = text.find("{", m.end() - 1)
+        if brace < 0 or brace > pos:
+            continue
+        body = _sol_block_body(text, brace)
+        if not body:
+            continue
+        if brace + len(body) < pos:
+            continue
+        best = (text[m.start():brace], body)
+    return best
+
+
+def solidity_delegatecall_verdict(source: str) -> bool | None:
+    """不受信 delegatecall（SWC-112）。
+
+    **排除面（判 False）**：
+      · `address(this).delegatecall(...)`（Multicall/自委托，目标是本合约）；
+      · 目标来自 ERC-1967 实现槽（`_implementation()` / `getAddressSlot`）；
+      · 函数受身份校验保护（`onlyOwner`/`auth`/`wards[msg.sender]` 等，
+        实现体真的比对了身份）；
+      · `onlyProxy` 型入口约束（OZ UUPS：拒绝直调实现合约）；
+      · internal/private（外部不可达）；
+      · 目标在 require 里与白名单/可信槽位做过比较。
+
+    **成立（True）**：目标来自**入口形参**，或来自本函数里刚从形参写入的
+    状态槽，且无上述任何保护。
+
+    其余（目标来源判不出的成员变量）→ None：单函数切片里看不到它是否可被
+    外部改写，"可能可写"不是"确定可写"。
+    """
+    if not _looks_solidity(source):
+        return None
+    func_src, mod_block, _inh = _split_sol_sections(source)
+    if not re.search(r"\bdelegatecall\b", func_src):
+        return None
+    # 只分析**包住 delegatecall 的那个函数**
+    first = _SOL_DELEGATECALL_RE.search(func_src)
+    if first is None:
+        # `delegatecall` 字面出现在注释/字符串/跨行拼接里，但没有可解析的
+        # `目标.delegatecall` 形态 → 缺证据，不硬判。
+        return None
+    scope_sig, scope_body = _sol_enclosing_function(func_src, first.start())
+    sig = scope_sig or _sol_signature(func_src)
+    scope = (scope_sig + "{" + scope_body + "}") if scope_body else func_src
+    if _sol_is_internal_only(sig):
+        return False
+    # M143：一次性初始化函数（`initializer` / `require(impl == address(0))`）
+    # —— 目标地址由部署时给定，不属于"部署后目标可控"这一类。
+    if (_SOL_INITIALIZER_MOD_RE.search(sig)
+            or _SOL_ONESHOT_INIT_RE.search(scope)):
+        return False
+    # M141：演练型函数（顶层最后一句无条件 revert）—— 状态不可能落地。
+    # 传的是**不含外层大括号**的函数体：`if (...) { revert; }` 里的 revert
+    # 算在深度 1，不当成"无条件"。
+    if _sol_unconditional_revert(scope_body or scope):
+        return False
+    targets = [m.group(1).strip() for m in _SOL_DELEGATECALL_RE.finditer(scope)]
+    if not targets:
+        return None
+    # 自委托：目标就是 address(this)
+    if all(re.fullmatch(r"(?:address\s*\(\s*this\s*\)|this)", t) for t in targets):
+        return False
+    if _SOL_SELF_DELEGATE_RE.search(scope):
+        rest = [t for t in targets
+                if not re.fullmatch(r"(?:address\s*\(\s*this\s*\)|this)", t)]
+        if not rest:
+            return False
+        targets = rest
+    # ERC-1967 实现槽
+    if _SOL_IMPL_SLOT_RE.search(scope):
+        targets = [t for t in targets if t not in {"_implementation()"}]
+        if not targets:
+            return False
+    # 保护：身份校验 or onlyProxy
+    protected = bool(_SOLIDITY_MSGSENDER_CHECK_RE.search(scope)
+                     or _SOLIDITY_MSGSENDER_MEMBER_RE.search(scope)
+                     or _sol_caller_map_auth(scope)
+                     # 门控占位符形态：`if (msg.sender == admin) { _; }`
+                     or _SOL_SENDER_EQ_GATE_RE.search(scope)
+                     or _sol_identity_call_check(scope)
+                     or _sol_predicate_authz_check(source)
+                     or _sol_inverted_identity_guard(scope)
+                     or _sol_negated_identity_call(scope)
+                     or _sol_onlyproxy_guard(mod_block)
+                     or _sol_indirect_identity_check(scope, mod_block, _inh))
+    if not protected:
+        # 只在**签名真的引用了**该 modifier 时才认它的实现体 —— 否则同文件里
+        # 一个没被用上的 onlyOwner 会凭空给本函数发保护（负面锚点必须能翻转）。
+        _VIS_KW = {"external", "public", "internal", "private", "view", "pure",
+                   "payable", "constant", "returns", "virtual", "override"}
+        tail = sig[sig.find(")") + 1:] if ")" in sig else ""
+        used_mods = {w for w in re.findall(r"\b([A-Za-z_]\w*)\b", tail)
+                     if w not in _VIS_KW}
+        mod_src = mod_block + "\n" + source
+        for mm in re.finditer(
+                r"\bmodifier\s+([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*[^{]*\{",
+                mod_src):
+            if used_mods and mm.group(1) not in used_mods:
+                continue
+            body = _sol_block_body(mod_src, mm.end() - 1)
+            if not body:
+                continue
+            if (_SOLIDITY_MSGSENDER_CHECK_RE.search(body)
+                    or _SOLIDITY_MSGSENDER_MEMBER_RE.search(body)
+                    or _sol_caller_map_auth(body)
+                    or _SOL_SENDER_EQ_GATE_RE.search(body)
+                    or _sol_onlyproxy_guard(body)):
+                protected = True
+                break
+            # `modifier onlyProxy() { _checkProxy(); _; }` —— 真正的
+            # `address(this) == __self` + 实现槽校验在**下一跳**的辅助函数里。
+            # 只看 modifier 体本身会漏掉整条 UUPS 入口约束（M143 实测）。
+            for _callee in re.findall(r"\b([A-Za-z_]\w*)\s*\(", body):
+                if _callee in {"if", "require", "revert", "assert"}:
+                    continue
+                _cb = _sol_func_body_by_name(mod_src, _callee)
+                if _cb and _sol_onlyproxy_guard(_cb):
+                    protected = True
+                    break
+            if protected:
+                break
+    if protected:
+        return False
+    params = _sol_param_names(sig)
+    # 目标在 require 里与白名单/可信槽位比较过 → 受约束
+    for t in targets:
+        base = re.sub(r"\s*\(.*$", "", t).strip()
+        if not base:
+            continue
+        if re.search(rf"(?:require|assert)\s*\([^;]{{0,120}}?\b{re.escape(base)}\b"
+                     rf"\s*==", scope):
+            return False
+    for t in targets:
+        base = re.sub(r"\s*\(.*$", "", t).strip()
+        if base in params:
+            return True
+        # 状态槽：本函数里刚从形参写入 → 目标可控
+        if params and re.search(
+                rf"\b{re.escape(base)}\s*=\s*[^;]*\b(?:"
+                + "|".join(re.escape(p) for p in params) + r")\b", scope):
+            return True
+    return None
+
+
 def verdict(category: str, source: str) -> bool | None:
     """对配置型类目给出确定性结论：True(有漏洞) / False(安全) / None(证据不足)。"""
     cfg = parse_config_block(source)
@@ -9584,7 +10281,7 @@ def verdict(category: str, source: str) -> bool | None:
         # `// 来自 Xxx.java:46 [Hop 3]` 这种注释行分隔的 —— 剥完注释，证据段
         # 的**代码**就混进 body 了（实测 `desEncrypt` 的 `Cipher.getInstance`
         # 仍在）。所以必须先对**原始 source** 按标记切段，再看入口那一段。
-        _region = re.split(r"(?m)^[ \t]*//[ \t]*(?:----|来自)", source)[0]
+        _region = _entry_region(source)
         _body = entry_body(_region)
         if not re.search(r"Cipher\s*\.\s*getInstance|\.\s*(?:doFinal|update)\s*\("
                          r"|new\s+\w*Cipher|encrypt|decrypt", _body, re.I):
@@ -9708,5 +10405,15 @@ def verdict(category: str, source: str) -> bool | None:
         if _looks_solidity(source):
             return solidity_arithmetic_verdict(source)
         return None
+
+    # M139–M141：第 28～30 类（跨语言：反射 / 压缩包穿越 / 不受信 delegatecall）
+    if category == "unsafe_reflection":
+        return unsafe_reflection_verdict(source)
+
+    if category == "zip_slip":
+        return zip_slip_verdict(source)
+
+    if category == "delegatecall_untrusted":
+        return solidity_delegatecall_verdict(source)
 
     return None

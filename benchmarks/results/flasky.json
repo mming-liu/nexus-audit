@@ -1,0 +1,71 @@
+{
+  "bench": "flasky",
+  "units": 39,
+  "total_units": 39,
+  "decided": 39,
+  "correct": 39,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 176,
+  "blueprints": [
+    "api",
+    "auth",
+    "main"
+  ],
+  "guarded_units": 19,
+  "guard_evidence_units": 9,
+  "guarded_verdicts": {
+    "edit_profile_admin": false,
+    "edit_post": false,
+    "moderate": false
+  },
+  "guard_reverse": {
+    "edit_profile_admin": {
+      "with_guard": false,
+      "without_guard": true,
+      "changed": true
+    }
+  },
+  "unit_names": [
+    "change_email",
+    "change_email_request",
+    "change_password",
+    "confirm",
+    "edit",
+    "edit_post",
+    "edit_profile",
+    "edit_profile_admin",
+    "follow",
+    "followed_by",
+    "followers",
+    "get_comment",
+    "get_comments",
+    "get_post",
+    "get_post_comments",
+    "get_posts",
+    "get_token",
+    "get_user",
+    "get_user_followed_posts",
+    "get_user_posts",
+    "index",
+    "login",
+    "logout",
+    "moderate",
+    "moderate_disable",
+    "moderate_enable",
+    "new_post",
+    "new_post_comment",
+    "password_reset",
+    "password_reset_request",
+    "post",
+    "register",
+    "resend_confirmation",
+    "server_shutdown",
+    "show_all",
+    "show_followed",
+    "unconfirmed",
+    "unfollow",
+    "user"
+  ],
+  "true_rows": []
+}

@@ -6,7 +6,7 @@
   "correct": 29,
   "fp": 0,
   "reverse_fn": 0,
-  "rule_evaluations": 42,
+  "rule_evaluations": 44,
   "lock_anchor": {
     "swap": {
       "with_lock": false,

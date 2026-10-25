@@ -1,0 +1,31 @@
+{
+  "bench": "openzeppelin_upgradeable",
+  "units": 2017,
+  "total_units": 2017,
+  "decided": 2017,
+  "correct": 2017,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 5394,
+  "modifier_evidence": {
+    "onlyInitializing": 553,
+    "initializer": 25,
+    "reinitializer": 5
+  },
+  "evidence_floors": {
+    "onlyInitializing": 500,
+    "initializer": 20,
+    "reinitializer": 5
+  },
+  "initializer_true": 0,
+  "onlyproxy_sibling": {
+    "available": true,
+    "onlyproxy_modifier": true,
+    "access_control": null
+  },
+  "mechanism_anchor": {
+    "erc1967_slot": false,
+    "param_target": true
+  },
+  "true_rows": []
+}

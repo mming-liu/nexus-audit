@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -29,14 +30,22 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+# M150：本进程要 print `✔/✘`，且子进程输出按 UTF-8 解码（run_job 里显式指定）
+# —— 写侧必须同样钉在 UTF-8，否则 Windows 控制台代码页会让整轮门禁崩在 println 上。
+from core.text_utils import ensure_utf8_stdio        # noqa: E402
+ensure_utf8_stdio()
+
 PY = sys.executable
 OUT = ROOT / "benchmarks" / "results" / "run_all.md"
 SCOREBOARD = ROOT / "benchmarks" / "results" / "SCOREBOARD.md"
 
 # (名称, 命令, 前置目录检查, 类别, 可并发)
 #   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
+# (名称, 命令, 前置目录检查, 类别, 可并发)
+#   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
 JOBS = [
-    ("冒烟测试 [1]-[122]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
+    ("冒烟测试 [1]-[185]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke", False),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target", True),
@@ -182,6 +191,27 @@ JOBS = [
     ("eladmin-JPA (双生对照)",
      ["benchmarks/benchmark_eladmin_jpa.py", "--strict"],
      "reference_repos/eladmin", "target", True),
+    # M136–M144：M135 段新增的五个野战仓（纯增量，插在既有靶场之后）。
+    #   · MakerDAO dss —— 0.6.x 旗舰；auth 映射守卫 + 内联算术封装
+    #   · flasky —— 多蓝图 + 自定义装饰器鉴权（Auth-Guard 证据头）
+    #   · mall-tiny —— Spring Security/JWT + MyBatis-Plus + 全局 CORS
+    #   · OZ Upgradeable —— initializer/onlyInitializing/onlyProxy 语义边界
+    #   · My-Blog-layui —— 与 M63 的 My-Blog 双生对照（MD5 口令 + 模板回显）
+    ("MakerDAO dss (auth 映射守卫)",
+     ["benchmarks/benchmark_makerdao_dss.py", "--strict"],
+     "reference_repos/dss", "target", True),
+    ("flasky (多蓝图装饰器鉴权)",
+     ["benchmarks/benchmark_flasky.py", "--strict"],
+     "reference_repos/flasky", "target", True),
+    ("mall-tiny (JWT + MyBatis-Plus + CORS)",
+     ["benchmarks/benchmark_mall_tiny.py", "--strict"],
+     "reference_repos/mall-tiny", "target", True),
+    ("OZ Upgradeable (initializer 语义)",
+     ["benchmarks/benchmark_openzeppelin_upgradeable.py", "--strict"],
+     "reference_repos/openzeppelin-contracts-upgradeable", "target", True),
+    ("My-Blog-layui (双生对照)",
+     ["benchmarks/benchmark_my_blog_layui.py", "--strict"],
+     "reference_repos/My-Blog-layui", "target", True),
     # 第 35/36/37 靶场（Module 108/109/110）：三个新野战仓。
     #   · Synthetix V3 —— Diamond 代理 + 谓词式鉴权（1264 生产入口 / 0 True）
     #   · sushiswap-zapper —— 0.5.x 主网合约 + 谓词式 Ownable（75 入口 / 0 True）
@@ -229,13 +259,27 @@ JOBS = [
     ("FastAPI (Python 异步真实模板)",
      ["benchmarks/benchmark_fastapi_wild.py", "--strict"],
      "reference_repos/fastapi-sql-template", "target", True),
+    # 第 47 项（M135）：跨仓聚类一致性。它不跑靶场，只对账：
+    #   · 各簇根因数之和 == wild_hunt.json 的独立根因总数（计数守恒）；
+    #   · 多仓共现簇 >= 8（低于就退化成一仓一簇，"跨仓同源"不成立）。
+    # 放在最后、串行段：它读的是前面各靶场产出的 results/*.json，跑早了
+    # 读到的还是上一轮的旧数。
+    ("跨仓聚类一致性（--check）",
+     ["benchmarks/cross_repo_clusters.py", "--check"],
+     None, "smoke", False),
 ]
 
 
 def run_job(name: str, cmd: list[str]) -> tuple[str, float, str]:
     t0 = time.monotonic()
+    # M150：**父子两侧编码必须对齐**。父进程这里显式 `encoding="utf-8"` 解码，
+    # 如果子进程按控制台代码页（Windows cp936）写，中文会解码失败、`p.stdout`
+    # 变成空 —— 门禁报告里就只剩一行 `UnicodeEncodeError`。只给子进程加环境
+    # 变量（PYTHONUTF8/PYTHONIOENCODING）比在每个靶场脚本里各写一遍 reconfigure
+    # 更彻底：44 个脚本一次覆盖，且不改变它们被单独运行时的行为。
+    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
     p = subprocess.run([PY, *cmd], cwd=ROOT, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
+                       encoding="utf-8", errors="replace", env=env)
     dt = time.monotonic() - t0
     ok = p.returncode == 0
     detail = (p.stdout + p.stderr).strip().splitlines()

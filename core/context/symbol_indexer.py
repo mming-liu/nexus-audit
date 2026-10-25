@@ -30,6 +30,10 @@ IMPORT_RE = re.compile(r"^\s*(?:from\s+([\w.]+)\s+import\s+(.+)|import\s+([\w.]+
 # 常见 Web 框架的路由装饰器
 ROUTE_DECORATOR_RE = re.compile(r"^(\s*)@(\w[\w.]*)\.?(route|get|post|put|patch|delete|head|options)?\s*\((.*)$", re.M)
 
+# M137：**无括号**装饰器（`@admin_required` / `@login_required`）。带参数的
+# 路由装饰器由上面那条收；这条只补"名字即声明"的守卫装饰器。
+_BARE_DECORATOR_RE = re.compile(r"^[ \t]*@[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*[ \t]*$", re.M)
+
 
 class SymbolIndexer:
     def __init__(self, repo_path: str | Path, language: str = "python_web"):
@@ -119,6 +123,18 @@ class SymbolIndexer:
                 d_start = text[:deco_anchor].count("\n") + 1
                 if _blk_start <= d_start <= start_line:
                     decorators.append(dm.group(0).strip())
+            # M137：**无括号装饰器**（`@admin_required` / `@login_required`）。
+            # ROUTE_DECORATOR_RE 要求装饰器带 `(...)`，于是不带参数的那些
+            # 从来没进过 decorators —— flasky 的 `edit_profile_admin` 因此
+            # 丢了 `@admin_required`（守卫证据头里自然也没有它）。
+            # 只收**装饰器块内**的行（`_blk_start..start_line`），不会把兄弟
+            # 函数的装饰器算进来。
+            for dm in _BARE_DECORATOR_RE.finditer(text[: m.start()]):
+                d_start = text[:dm.start()].count("\n") + 1
+                if _blk_start <= d_start <= start_line:
+                    token = dm.group(0).strip()
+                    if token not in decorators:
+                        decorators.append(token)
             # 相对/绝对文件标识
             # Module 24：键改为 name -> **列表**。此前 setdefault(name) 首见
             # 即占，多应用仓库（pygoat 20 个 Flask lab 都有 index/lab1/

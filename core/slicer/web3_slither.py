@@ -95,6 +95,8 @@ class SoliditySlicer:
         for sol in repo.rglob("*.sol"):
             if any(p in self.IGNORE for p in sol.parts):
                 continue
+            if sol.name.endswith(self.TEST_SUFFIXES):
+                continue
             try:
                 text = sol.read_text(encoding="utf-8", errors="replace")
             except OSError:
@@ -498,6 +500,13 @@ class SoliditySlicer:
         return units
 
     IGNORE = {"node_modules", "lib", "test/helpers"}
+    # Foundry 约定：`*.t.sol` 是测试合约、`*.s.sol` 是部署脚本 —— 两者都
+    # **不上链**，不是生产入口。M136 实测：dss 的 `flip.t.sol` / `vat.t.sol`
+    # 里有一批故意写坏的算术表达式（测试要覆盖溢出分支），把它们当生产
+    # 入口会让"生产协议零误报"这条门禁失去意义（误报全来自测试夹具）。
+    # 只按**文件名后缀**排除，不按目录名排除 —— 有的项目把测试放在 src/ 里
+    # （dss 就是），按目录排会漏。
+    TEST_SUFFIXES = (".t.sol", ".s.sol")
 
     # ---- Module 39：跨文件父合约继承索引 ----
 

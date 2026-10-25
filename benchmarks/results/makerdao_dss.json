@@ -1,0 +1,43 @@
+{
+  "bench": "dss",
+  "units": 234,
+  "total_units": 234,
+  "decided": 234,
+  "correct": 234,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 298,
+  "auth_verdicts": {
+    "rely": false,
+    "deny": false,
+    "file": false,
+    "cage": false
+  },
+  "auth_reverse": {
+    "rely": {
+      "with_auth": false,
+      "without_auth": null,
+      "changed": true
+    },
+    "deny": {
+      "with_auth": false,
+      "without_auth": null,
+      "changed": true
+    },
+    "file": {
+      "with_auth": false,
+      "without_auth": null,
+      "changed": true
+    },
+    "cage": {
+      "with_auth": false,
+      "without_auth": null,
+      "changed": true
+    }
+  },
+  "inline_arithmetic": {
+    "_add": false,
+    "_sub": false
+  },
+  "true_rows": []
+}

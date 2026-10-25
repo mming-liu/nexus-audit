@@ -22,6 +22,29 @@ from __future__ import annotations
 
 import re
 
+
+def ensure_utf8_stdio() -> None:
+    """把本进程的 stdout/stderr 钉在 UTF-8 上（Windows 代码页防御）。
+
+    M150 实测的坑：`run_all` 用管道捕获子进程输出时**显式**按 UTF-8 解码，
+    而子进程（`cli.py doctor` / 各靶场脚本）默认按控制台代码页（cp936）写 ——
+    于是中文被打成 GBK 字节、父进程按 UTF-8 解，`p.stdout` 直接变成 `None`，
+    随后 `"x" in p.stdout` 抛 `TypeError`。金字塔顶端还有个更早的塌方：
+    脚本自己 print `✔` 时在 GBK 下就 UnicodeEncodeError 了。
+
+    两类都靠同一件事解决：**入口脚本自己声明编码**。父进程那边已经显式用
+    UTF-8 解码，这里把写侧也对齐，整条链就自洽了。
+
+    幂等、无副作用：不支持 `reconfigure` 的流（被替换成 StringIO 的测试流）
+    直接跳过。返回 None，调用方放在模块顶部 import 之后即可。
+    """
+    import sys
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:                                 # noqa: BLE001
+            pass
+
 # 单遍扫描：字符串字面量 / 字符字面量 / 行注释 / 块注释 按出现顺序处理。
 # 不能分两步（先剥行注释再剥块注释）：`x(); // /**表示path` 这种行注释里含 `/*`，
 # 先剥行注释会留下孤立 `/**`，块注释正则会把后续真实代码整段吃掉。

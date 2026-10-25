@@ -238,6 +238,36 @@ contract {cls} is Test {{
 """
 
 
+# M141：不受信 delegatecall（SWC-112）—— 目标由调用方指定且无权限保护
+_SOL_DELEGATE = """
+contract Malicious {{
+    bool public pwned;
+
+    function pwn() external {{
+        // 被委托执行时写的是**受害者合约**的存储（delegatecall 语义）
+        pwned = true;
+    }}
+}}
+
+contract {cls} is Test {{
+    function testExploit() public {{
+        Victim victim = new Victim();
+        Malicious fakeImpl = new Malicious();
+
+        // 攻击者（非管理员）把委托目标换成自己的实现
+        vm.prank(address(0xBAD));
+        victim.upgrade(address(fakeImpl),
+                       abi.encodeWithSignature("pwn()"));
+
+        // 断言：攻击者指定的实现被借受害者上下文执行；
+        // 修复版 `require(target == address(this))` 会让这笔调用直接 revert
+        assertTrue(fakeImpl.pwned(),
+                   "expected delegatecall target hijack");
+    }}
+}}
+"""
+
+
 def _synth_solidity(unit: CodeUnit, category: str) -> str:
     cls = "Poc" + _safe_name(unit.unit_name)
     tpl = {"reentrancy": _SOL_REENTRANCY,
@@ -247,6 +277,7 @@ def _synth_solidity(unit: CodeUnit, category: str) -> str:
            "arithmetic": _SOL_ARITHMETIC,
            "unchecked_low_level_calls": _SOL_UNCHECKED,
            "unchecked": _SOL_UNCHECKED,
+           "delegatecall_untrusted": _SOL_DELEGATE,
            }.get(category, _SOL_ACCESS)
     body = tpl.format(cls=cls)
     return _SOL_HEADER.format(target=unit.unit_name, category=category,
@@ -326,6 +357,33 @@ def test_alg_none_forged_admin_token(client):
 '''
 
 
+# M139：不安全反射（CWE-470）—— 目标名由请求决定且无白名单
+_PY_REFLECT = '''
+
+def test_reflection_target_not_allowlisted(client):
+    """把模块/类名换成非白名单值：若服务端仍导入并执行，说明目标可控。"""
+    resp = client.get({call})
+    assert resp.status_code in (400, 403, 404), (
+        "非白名单的反射目标被接受（状态码 %s）" % resp.status_code)
+'''
+
+# M140：Zip Slip（CWE-22）—— 压缩包条目名逃逸目标目录
+_PY_ZIP_SLIP = '''
+
+def test_zip_slip_archive_rejected(client):
+    """上传含 `../` 条目的压缩包：解压结果不应落在目标目录之外。"""
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("../../escape.txt", "poc")
+    buf.seek(0)
+    resp = client.post({call}, files={{"f": (buf, "poc.zip")}})
+    assert resp.status_code in (400, 403, 422), (
+        "含 ../ 条目的压缩包被接受（状态码 %s）" % resp.status_code)
+'''
+
+
 def _extract_secret(unit: CodeUnit) -> str:
     from core.agents.rule_detectors import SECRET_ASSIGN_RE
     m = SECRET_ASSIGN_RE.search(unit.source_code or "")
@@ -338,7 +396,9 @@ def _synth_python(unit: CodeUnit, category: str) -> str:
     call = f'"{route}", params={{"{arg}": "1"}}'
     tpl = {"sqli": _PY_SQLI, "cors": _PY_CORS,
            "hardcoded_secret": _PY_SECRET,
-           "jwt_weakness": _PY_JWT}.get(category, _PY_AUTHZ)
+           "jwt_weakness": _PY_JWT,
+           "unsafe_reflection": _PY_REFLECT,
+           "zip_slip": _PY_ZIP_SLIP}.get(category, _PY_AUTHZ)
     return _PY_HEADER.format(target=unit.unit_name, category=category,
                               file=Path(unit.file_path).name,
                               line=unit.start_line,
@@ -430,6 +490,32 @@ _JAVA_JWT = """
 """
 
 
+# M139：不安全反射 —— 用 Runtime 这类非白名单类名探针
+_JAVA_REFLECT = """
+    @Test
+    void reflectionTargetNotAllowlisted() throws Exception {{
+        mockMvc.perform(get("{route}")
+                .param("{arg}", "java.lang.Runtime"))
+            .andExpect(status().is4xxClientError());
+    }}
+}}
+"""
+
+# M140：Zip Slip —— 上传含 `../` 条目的压缩包
+_JAVA_ZIP_SLIP = """
+    @Test
+    void zipSlipEntryRejected() throws Exception {{
+        // 条目名带 ../：落盘前必须被规范化前缀校验挡住
+        byte[] pocZip = new byte[0];   // 接入时换成真实构造的 zip 字节
+        mockMvc.perform(multipart("{route}")
+                .file(new org.springframework.mock.web.MockMultipartFile(
+                        "file", "poc.zip", "application/zip", pocZip)))
+            .andExpect(status().is4xxClientError());
+    }}
+}}
+"""
+
+
 def _synth_java(unit: CodeUnit, category: str) -> str:
     cls = _safe_name(unit.unit_name).capitalize()
     arg = _first_arg_name(unit)
@@ -438,7 +524,9 @@ def _synth_java(unit: CodeUnit, category: str) -> str:
         route = "/" + route
     tpl = {"sqli": _JAVA_SQLI, "cors": _JAVA_CORS,
            "hardcoded_secret": _JAVA_SECRET,
-           "jwt_weakness": _JAVA_JWT}.get(category, _JAVA_AUTHZ)
+           "jwt_weakness": _JAVA_JWT,
+           "unsafe_reflection": _JAVA_REFLECT,
+           "zip_slip": _JAVA_ZIP_SLIP}.get(category, _JAVA_AUTHZ)
     secret = _extract_secret(unit).replace("\\", "\\\\").replace('"', '\\"')
     body = tpl.format(route=route, arg=arg, secret=secret)
     return _JAVA_HEADER.format(target=unit.unit_name, category=category,

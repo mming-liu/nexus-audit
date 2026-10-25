@@ -1,6 +1,6 @@
 # 披露草稿总目录（nexus-audit `--advisory-dir`）
 
-共 **94** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
+共 **98** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
 带 [Auto-Fix Verified] 的草稿内嵌通过自检的补丁 diff。
 
 | CVSS | 严重级 | CWE | 类目 | 草稿 |
@@ -69,6 +69,7 @@
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-0C17-B7D9-3D49-cors-alipaycontroller-topayaspc.md](GHSA-0C17-B7D9-3D49-cors-alipaycontroller-topayaspc.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-5843-F579-35BD-cors-wxaddresscontroller-list.md](GHSA-5843-F579-35BD-cors-wxaddresscontroller-list.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-58FC-7768-A775-cors-sysconfigcontroller-page.md](GHSA-58FC-7768-A775-cors-sysconfigcontroller-page.md) |
+| 6.5 | MEDIUM | CWE-942 | cors | [GHSA-727F-1489-02A5-cors-umsadmincontroller-register.md](GHSA-727F-1489-02A5-cors-umsadmincontroller-register.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-A12D-66C6-19B8-cors-seckillordercallbackcontroller-submit.md](GHSA-A12D-66C6-19B8-cors-seckillordercallbackcontroller-submit.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-A12F-C348-60F5-cors-alipaycontroller-topayaspc.md](GHSA-A12F-C348-60F5-cors-alipaycontroller-topayaspc.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-AB88-BFFE-BC80-cors-newbeeadmincarouselapi-list.md](GHSA-AB88-BFFE-BC80-cors-newbeeadmincarouselapi-list.md) |
@@ -80,11 +81,13 @@
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-5805-0E45-068A-xss-jobinfocontroller-add.md](GHSA-5805-0E45-068A-xss-jobinfocontroller-add.md) |
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-B586-7443-2E6B-xss-sysannouncementcontroller-showcontent.md](GHSA-B586-7443-2E6B-xss-sysannouncementcontroller-showcontent.md) |
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-C7BF-E3EF-EA19-xss-admingoodscontroller-create.md](GHSA-C7BF-E3EF-EA19-xss-admingoodscontroller-create.md) |
+| 6.1 | MEDIUM | CWE-79 | xss | [GHSA-CEB7-E68C-C504-xss-blogcontroller-gotoblogedit.md](GHSA-CEB7-E68C-C504-xss-blogcontroller-gotoblogedit.md) |
 | 5.9 | MEDIUM | CWE-328 | hash | [GHSA-0FB4-044C-21E2-hash-logincontroller-randomimage.md](GHSA-0FB4-044C-21E2-hash-logincontroller-randomimage.md) |
 | 5.9 | MEDIUM | CWE-330 | weakrand | [GHSA-26D2-2208-32B7-weakrand-uploadcontroller-upload.md](GHSA-26D2-2208-32B7-weakrand-uploadcontroller-upload.md) |
 | 5.9 | MEDIUM | CWE-330 | weakrand | [GHSA-2C54-D87B-FB78-weakrand-uploadcontroller-uploadv2.md](GHSA-2C54-D87B-FB78-weakrand-uploadcontroller-uploadv2.md) |
 | 5.9 | MEDIUM | CWE-330 | weakrand | [GHSA-4B23-2F14-FA3E-weakrand-blogcontroller-uploadfilebyeditormd.md](GHSA-4B23-2F14-FA3E-weakrand-blogcontroller-uploadfilebyeditormd.md) |
 | 5.9 | MEDIUM | CWE-328 | hash | [GHSA-5560-F737-A81F-hash-logincontroller-checkcaptcha.md](GHSA-5560-F737-A81F-hash-logincontroller-checkcaptcha.md) |
+| 5.9 | MEDIUM | CWE-328 | hash | [GHSA-6BEF-E69E-9811-hash-admincontroller-login-2.md](GHSA-6BEF-E69E-9811-hash-admincontroller-login-2.md) |
 | 5.9 | MEDIUM | CWE-330 | weakrand | [GHSA-7A0A-A259-86AE-weakrand-newbeeadminuploadapi-upload.md](GHSA-7A0A-A259-86AE-weakrand-newbeeadminuploadapi-upload.md) |
 | 5.9 | MEDIUM | CWE-330 | weakrand | [GHSA-97ED-F1E4-74CF-weakrand-newbeeadminuploadapi-uploadv2.md](GHSA-97ED-F1E4-74CF-weakrand-newbeeadminuploadapi-uploadv2.md) |
 | 5.9 | MEDIUM | CWE-328 | hash | [GHSA-9A8A-F616-8091-hash-systemapicontroller-queryuserauths.md](GHSA-9A8A-F616-8091-hash-systemapicontroller-queryuserauths.md) |
@@ -94,6 +97,7 @@
 | 5.9 | MEDIUM | CWE-328 | hash | [GHSA-DD61-EF5D-D8E4-hash-admincontroller-passwordupdate.md](GHSA-DD61-EF5D-D8E4-hash-admincontroller-passwordupdate.md) |
 | 5.9 | MEDIUM | CWE-328 | hash | [GHSA-E2C0-460A-6E84-hash-logincontroller-login.md](GHSA-E2C0-460A-6E84-hash-logincontroller-login.md) |
 | 5.9 | MEDIUM | CWE-330 | weakrand | [GHSA-E85D-5F00-DEAB-weakrand-uploadcontroller-upload.md](GHSA-E85D-5F00-DEAB-weakrand-uploadcontroller-upload.md) |
+| 5.9 | MEDIUM | CWE-328 | hash | [GHSA-F526-8D13-5B59-hash-admincontroller-userinfoupdate.md](GHSA-F526-8D13-5B59-hash-admincontroller-userinfoupdate.md) |
 | 4.3 | MEDIUM | CWE-601 | redir | [GHSA-4369-2046-DD05-redir-thirdlogincontroller-render.md](GHSA-4369-2046-DD05-redir-thirdlogincontroller-render.md) |
 | 4.3 | MEDIUM | CWE-601 | redir | [GHSA-637B-FFB4-01C7-redir-sessions-index.md](GHSA-637B-FFB4-01C7-redir-sessions-index.md) |
 | 4.3 | MEDIUM | CWE-601 | redir | [GHSA-9F6A-91DA-6747-redir-thirdlogincontroller-oauth2logincallback-2.md](GHSA-9F6A-91DA-6747-redir-thirdlogincontroller-oauth2logincallback-2.md) |

@@ -285,7 +285,101 @@ class WebTreeSitterSlicer:
         for u in extra:
             self._expand_helpers(indexer, u)
         filtered = filtered + extra
+        # M137：装饰器守卫证据头（flasky 的 `@permission_required` /
+        # `@admin_required`）。放在**展开之后**：守卫装饰器不是被调函数，
+        # BFS 不会把它的实现体带进来，必须单独贴。
+        self._attach_auth_guards(repo, filtered)
         return filtered
+
+    # ---------------- M137：装饰器守卫证据头 ----------------
+    #
+    # Flask 生态把鉴权封进自定义装饰器（flasky 的 `permission_required` 与
+    # `admin_required`），路由函数体里**看不到任何** current_user / abort 字样
+    # —— 只看函数体的判据只能判"缺鉴权"。这与 Java 的 `@PreAuthorize` 是
+    # 同一个问题：授权声明在注解/装饰器上，不在方法体里。
+    #
+    # 但"装饰器名字"本身**不是证据**（铁律：看实现体不看名字）。所以切片层
+    # 做两件事：
+    #   ① 头部写 `// Auth-Guard: <名字>`（声明在哪儿，判据能读到）；
+    #   ② 把装饰器的**实现体**从仓库里找出来贴进证据段
+    #      （`// ---- 守卫装饰器实现体 [app/decorators.py:6] ----`），
+    #      判据据此核验"它真的会拒绝"（abort(403) / return forbidden(...)）。
+    # 找不到实现体时只写头部 —— 判据看到"只有名字"会退 None，不判安全。
+    _GUARD_NAMES = frozenset({
+        "permission_required", "admin_required", "login_required",
+        "jwt_required", "requires_auth", "auth_required", "token_required",
+        "roles_required", "roles_accepted", "permission_classes",
+    })
+
+    def _attach_auth_guards(self, repo: Path, units: List["CodeUnit"]) -> None:
+        cache: dict[str, tuple[str, int, str] | None] = {}
+        for u in units:
+            if not u.source_code:
+                continue
+            if "// Auth-Guard:" in u.source_code:
+                continue
+            names: list[str] = []
+            route = ""
+            for dec in (u.decorators_or_modifiers or []):
+                m = re.match(r"@\s*([A-Za-z_]\w*)", dec.strip())
+                if m and m.group(1) in self._GUARD_NAMES:
+                    names.append(m.group(1))
+                if not route:
+                    rm = re.search(
+                        r"\.\s*(?:route|get|post|put|patch|delete|api_route)"
+                        r"\s*\(\s*[rbuf]?['\"]([^'\"]+)", dec)
+                    if rm:
+                        route = rm.group(1)
+            names = list(dict.fromkeys(names))
+            if not names and not route:
+                continue
+            header = f"// Route: {route}\n" if route else ""
+            header += "".join(f"// Auth-Guard: {n}\n" for n in names)
+            evidence = ""
+            for n in names:
+                if n not in cache:
+                    cache[n] = self._find_decorator_def(repo, n)
+                info = cache[n]
+                if info:
+                    rel, line, body = info
+                    evidence += (f"\n\n// ---- 守卫装饰器实现体 [{rel}:{line}] ----\n"
+                                 f"{body}")
+            u.source_code = header + u.source_code + evidence
+
+    @staticmethod
+    def _find_decorator_def(repo: Path, name: str) -> tuple[str, int, str] | None:
+        """在仓库里找 `def <name>(...)` 的定义体（缩进配平，最多 40 行）。
+
+        只认**模块级/类级定义**：装饰器必须是可导入的可调用对象，
+        嵌套在别的函数里的同名 def 不可能是它在用的那个。
+        """
+        pat = re.compile(rf"(?m)^([ \t]*)def\s+{re.escape(name)}\s*\(")
+        for pf in sorted(repo.rglob("*.py")):
+            if any(part in IGNORE_DIRS for part in pf.parts):
+                continue
+            try:
+                text = pf.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            m = pat.search(text)
+            if not m:
+                continue
+            indent = len(m.group(1))
+            lines = text.splitlines()
+            start = text[:m.start()].count("\n") + 1
+            body = [lines[start - 1]]
+            for ln in lines[start:]:
+                if ln.strip() and (len(ln) - len(ln.lstrip())) <= indent:
+                    break
+                body.append(ln)
+                if len(body) >= 40:
+                    break
+            try:
+                rel = pf.relative_to(repo).as_posix()
+            except ValueError:
+                rel = pf.name
+            return rel, start, "\n".join(body).rstrip()
+        return None
 
     @staticmethod
     def _connexion_routes(repo_path: Path) -> dict[tuple[str, str], str]:

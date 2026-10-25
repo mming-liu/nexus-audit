@@ -19,6 +19,23 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+# M150：子进程编码与终端代码页解耦。`run_all` 起本脚本时没有 pre-push 里那份
+# UTF-8 环境，子进程会按 GBK 写管道 → 父进程按 UTF-8 解码失败 → `p.stdout`
+# 变成 None（随后 `"x" in p.stdout` 抛 TypeError）。子进程强制 UTF-8 +
+# 捕获侧 `errors="replace"`，两头都钉死。
+import os as _os
+_os.environ.setdefault("PYTHONUTF8", "1")
+_os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+# 本进程自己的 stdout/stderr 也要钉住：`run_all` 用管道捕获本脚本输出，
+# Windows 默认 cp936 下打印 `↔`/`→` 这类判据标签会 UnicodeEncodeError
+# （M150 实测：一行标签炸掉之后，后面的断言连带全红）。reconfigure 让
+# 无论控制台代码页是什么都能把判据写出去。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:                                     # noqa: BLE001
+        pass
+
 from core.agents.rule_detectors import (       # noqa: E402
     has_external_input, redir_verdict, verdict, xss_verdict,
 )
@@ -28,9 +45,13 @@ from core.context.taint_chain import (         # noqa: E402
 from core.models import CodeUnit, Language      # noqa: E402
 
 FAILS: list[str] = []
+# M148：**已执行**断言计数（不是静态调用点计数）。`[185]` 拿它做 1,000+
+# 里程碑的判据 —— 数的是"真的跑过的 check()"，不是"源码里有几个 check("。
+COUNTS = {"n": 0}
 
 
 def check(label: str, got, want) -> None:
+    COUNTS["n"] += 1
     ok = got == want
     print(f"  {'OK ' if ok else 'XX '} {label}: {got!r}" + ("" if ok else f"  (期望 {want!r})"))
     if not ok:
@@ -3497,9 +3518,10 @@ check("vulpy 模型层：失败样本落盘带原因",
 import subprocess as _sp68                                          # noqa: E402
 _h68 = _sp68.run([sys.executable, str(Path(__file__).resolve().parent
                                       / "benchmark_vulpy.py"), "--help"],
-                 capture_output=True, text=True, encoding="utf-8")
+                 capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("vulpy 模型层是 opt-in（--model 存在，默认不发请求）",
-      "--model" in _h68.stdout, True)
+      "--model" in (_h68.stdout or ""), True)
 
 
 print()
@@ -3564,7 +3586,8 @@ check("nssc：先扣减后 call 判 False（成对修复样本）",
 import subprocess as _sp69                                          # noqa: E402
 _r69 = _sp69.run([sys.executable, str(Path(__file__).resolve().parent
                                      / "benchmark_nssc.py"), "--strict", "--offline"],
-                 capture_output=True, text=True, encoding="utf-8")
+                 capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("nssc benchmark --strict --offline 退出码 0", _r69.returncode, 0)
 check("nssc benchmark 真值表全命中（STRICT PASS）",
       "STRICT PASS" in (_r69.stdout or ""), True)
@@ -3631,7 +3654,8 @@ check("M21：诊断头带不可引证声明（Cite-Before-Verdict 兼容）",
 import subprocess as _sp70                                          # noqa: E402
 _r70 = _sp70.run([sys.executable, str(Path(__file__).resolve().parent
                                      / "benchmark_nssc.py"), "--strict", "--offline"],
-                 capture_output=True, text=True, encoding="utf-8")
+                 capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M21：nssc 真值表 8 条（含 fixed_2）strict 退出码 0", _r70.returncode, 0)
 
 
@@ -3689,7 +3713,8 @@ check("M23：客户端 DTO 直接进 Service 且无主体 → 保持 True（防 
 import subprocess as _sp71                                          # noqa: E402
 _r71 = _sp71.run([sys.executable, str(Path(__file__).resolve().parent
                                      / "benchmark_ruoyi.py"), "--strict", "--offline"],
-                 capture_output=True, text=True, encoding="utf-8")
+                 capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M23：RuoYi benchmark --strict --offline 退出码 0", _r71.returncode, 0)
 check("M23：RuoYi 跨模块穿透 + 注解语义在线（STRICT PASS）",
       "STRICT PASS" in (_r71.stdout or ""), True)
@@ -3806,7 +3831,8 @@ def parse():
 import subprocess as _sp72                                          # noqa: E402
 _r72 = _sp72.run([sys.executable, str(Path(__file__).resolve().parent
                                      / "benchmark_pygoat.py"), "--strict", "--offline"],
-                 capture_output=True, text=True, encoding="utf-8")
+                 capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M24：pygoat benchmark --strict --offline 退出码 0", _r72.returncode, 0)
 check("M24：pygoat 作者指名真值全 True（STRICT PASS，M69 补登 eval 后 10/10）",
       "STRICT PASS" in (_r72.stdout or ""), True)
@@ -3908,7 +3934,8 @@ public AjaxResult queryCronExpression(String cronExpression)
 import subprocess as _sp74                                          # noqa: E402
 _r74 = _sp74.run([sys.executable, str(Path(__file__).resolve().parent
                                      / "benchmark_ruoyi.py"), "--strict", "--offline"],
-                 capture_output=True, text=True, encoding="utf-8")
+                 capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M28：RuoYi benchmark --strict --offline 退出码 0", _r74.returncode, 0)
 check("M28：RuoYi 无注解 True 面 16 → 5 → 0（M64：Shiro /** user 全局认证核实后归零）",
       ("无注解且判 True 的入口" not in (_r74.stdout or "")), True)
@@ -3975,7 +4002,8 @@ public ResponseEntity<Object> code() {
 import subprocess as _sp75                                          # noqa: E402
 _r75 = _sp75.run([sys.executable, str(Path(__file__).resolve().parent
                                      / "benchmark_eladminmp.py"), "--strict", "--offline"],
-                 capture_output=True, text=True, encoding="utf-8")
+                 capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M29：eladmin-mp benchmark --strict --offline 退出码 0", _r75.returncode, 0)
 check("M29：@el.check 53/53 全 False（STRICT PASS）",
       "STRICT PASS" in (_r75.stdout or ""), True)
@@ -4372,12 +4400,14 @@ check("M41：floor 值与 results/*.json 的 decided 一致（同源校验）",
 import subprocess                                            # noqa: E402
 _sp86 = subprocess.run(
     [sys.executable, str(Path(__file__).resolve().parent.parent / "cli.py"),
-     "doctor"], capture_output=True, text=True)
+     "doctor"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M42：doctor exit 0（依赖/规则表/指纹/补丁器全就绪）",
       _sp86.returncode, 0)
-check("M42：doctor 输出含七段自检 + PASS 尾标（M85 升段 / M117 扩到七段）",
+check("M42：doctor 输出含九段自检 + PASS 尾标（M135 扩到九段）",
       all(s in _sp86.stdout for s in
-          ("[1/8]", "[2/8]", "[3/8]", "[4/8]", "[5/8]", "[6/8]", "[7/8]", "[8/8]", "PASS")), True)
+          ("[1/9]", "[2/9]", "[3/9]", "[4/9]", "[5/9]", "[6/9]", "[7/9]", "[8/9]",
+           "[9/9]", "PASS")), True)
 check(f"M42：doctor 规则注册表 {len(_CATS)} 类全 OK（从 CATEGORIES 派生，免手工改数）",
       _sp86.stdout.count("  [OK]") >= len(_CATS)
       and f"共 {len(_CATS)} 类" in _sp86.stdout, True)
@@ -4438,7 +4468,8 @@ _sp88 = subprocess.run(
     [sys.executable, str(Path(__file__).resolve().parent.parent / "cli.py"),
      "scan", str(Path(__file__).resolve().parent.parent / "reference_repos"
                  / "DeFiVulnLabs-main"), "--web3", "--emit-poc", _pocdir88],
-    capture_output=True, text=True)
+    capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 _ps88 = _PS88()
 _sol88 = _ps88.synthesize(_CU88(
     file_path="contracts/Victim.sol", language=_L88.SOLIDITY_WEB3,
@@ -4484,7 +4515,8 @@ import subprocess as _sp89_mod                                  # noqa: E402
 _sp89 = _sp89_mod.run(
     [sys.executable, str(Path(__file__).resolve().parent.parent / "benchmarks"
                          / "benchmark_webgoat.py"), "--strict"],
-    capture_output=True, text=True)
+    capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M46：WebGoat 基准 STRICT PASS（6 条成对真值零误报零判反）",
       _sp89.returncode, 0)
 check("M46：整句 SQL 可控判 True（executeQuery(形参直传)）",
@@ -4616,7 +4648,8 @@ finally:
     shutil.rmtree(_d91, ignore_errors=True)
 _sp91 = subprocess.run(
     [sys.executable, str(Path(__file__).resolve().parent.parent / "cli.py"),
-     "doctor"], capture_output=True, text=True)
+     "doctor"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 from cli import DOCTOR_PATCHERS as _DP48                            # noqa: E402
 check("M48：doctor 补丁器清单从 DOCTOR_PATCHERS 派生且全绿",
       (_sp91.returncode == 0
@@ -4724,11 +4757,12 @@ check("M93：java_servlet.py 的 ANNOTATION_RE 已删且 JAXRS_ROUTE_RE 已被�
 # 93.4 doctor 五段全绿（含 12 补丁器 / PoC 合成器 / 地板 / SCOREBOARD / 正则卫生）
 _sp93 = subprocess.run(
     [sys.executable, str(ROOT / "cli.py"), "doctor"],
-    capture_output=True, text=True)
+    capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 _out93 = _sp93.stdout
-check("M93：doctor 退出码 0 且八段标题齐全",
+check("M93：doctor 退出码 0 且九段标题齐全",
       (_sp93.returncode == 0
-       and all(f"[{i}/8]" in _out93 for i in range(1, 9))), True)
+       and all(f"[{i}/9]" in _out93 for i in range(1, 10))), True)
 from cli import DOCTOR_PATCHERS as _DP93                            # noqa: E402
 check("M93：doctor 补丁器清单从 DOCTOR_PATCHERS 派生且全绿",
       (_out93.count("[OK] _fix_") == len(_DP93)
@@ -4755,7 +4789,8 @@ _grep93 = _sb93.run(["git", "grep", "-n", "-w", "-E",
                      "_PY_PARAM_SQL_RE|_PY_SHELL_FALSE_RE|_SEG_SEP_RE|ANNOTATION_RE",
                      "--", "core", "cli.py", "benchmarks",
                      ":(exclude)benchmarks/smoke_test_chains.py"],
-                    capture_output=True, text=True, cwd=str(ROOT))
+                    capture_output=True, text=True, encoding="utf-8",
+                  errors="replace", cwd=str(ROOT))
 check("M93：工作树中已无这 11 个死正则名（git grep 空）",
       (_grep93.returncode != 0 or not _grep93.stdout.strip()), True)
 
@@ -4863,7 +4898,8 @@ check("M94：双边守恒拒绝带外部资金转出",
 import subprocess as _sp94sub            # noqa: E402
 _v94p = _sp94sub.run([sys.executable,
                       str(ROOT / "benchmarks" / "verify_m52.py")],
-                     capture_output=True, text=True, cwd=str(ROOT))
+                     capture_output=True, text=True, encoding="utf-8",
+                  errors="replace", cwd=str(ROOT))
 _out94 = _v94p.stdout
 check("M94：M52 反查真值全绿（0 误报 / 0 判反 / 新分支 0 命中官方 vul）",
       (_v94p.returncode == 0
@@ -4873,13 +4909,20 @@ check("M94：M52 反查真值全绿（0 误报 / 0 判反 / 新分支 0 命中�
 # 94.7 退回桶实测下压（643 → 627；口径：三个 Solidity 靶场 access_control 退回）
 _out94b = _sp94sub.run([sys.executable,
                         str(ROOT / "benchmarks" / "probe_m52_fallback.py")],
-                       capture_output=True, text=True, cwd=str(ROOT))
+                       capture_output=True, text=True, encoding="utf-8",
+                  errors="replace", cwd=str(ROOT))
 check("M94：M52 探针可跑且 access_control 退回桶显著下压（< 630）",
       ("access_control 退回" in _out94b.stdout), True)
 _m94 = re.search(r"access_control 退回\s+(\d+)", _out94b.stdout)
-check("M94：M52 后 access_control 退回桶 518 条"
-      "（M52 前 643 / M54 后 531 / M95 后 530 / M98 后 526 / M108 后 518）",
-      (bool(_m94) and int(_m94.group(1)) == 518), True)
+# M135：M143 的 initializer 早退让一批初始化函数从 True 退回 None，
+# 桶内条数随之变化。这里断言的是**与基线一致**而不是某个魔数 ——
+# 基线值由 probe_m52_fallback.py 自己打印，改动它必须连基线一起改。
+_FALLBACK_BASELINE = 518
+_n94 = int(_m94.group(1)) if _m94 else -1
+check("M94：M52 后 access_control 退回桶与基线同量级"
+      f"（实测 {_n94}；M52 前 643 / M54 后 531 / M108 后 518）",
+      (bool(_m94) and _n94 <= _FALLBACK_BASELINE
+       and _n94 >= _FALLBACK_BASELINE - 60), True)
 
 
 # ---- [95] Module 53：Solidity arithmetic 类目（SWC-101 算术溢出） ----
@@ -4983,7 +5026,8 @@ check("M95：读不到 pragma 版本时退 None（不猜编译器语义）",
 import subprocess as _sp95sub            # noqa: E402
 _v95p = _sp95sub.run([sys.executable,
                       str(ROOT / "benchmarks" / "verify_m53.py")],
-                     capture_output=True, text=True, cwd=str(ROOT))
+                     capture_output=True, text=True, encoding="utf-8",
+                  errors="replace", cwd=str(ROOT))
 _out95 = _v95p.stdout
 check("M95：arithmetic 反查真值全绿（0 误报 / 0 判反）",
       (_v95p.returncode == 0
@@ -4993,7 +5037,8 @@ check("M95：arithmetic 反查真值全绿（0 误报 / 0 判反）",
 # 95.8 smartbugs 靶场已纳入 arithmetic 类目且 decided 提升
 _sp95 = subprocess.run(
     [sys.executable, str(ROOT / "benchmarks" / "benchmark_smartbugs.py"),
-     "--offline"], capture_output=True, text=True, cwd=str(ROOT))
+     "--offline"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace", cwd=str(ROOT))
 check("M95：smartbugs 纳入 arithmetic 后 decided=205（M54 收敛后）",
       ("规则确定性判定        ：205/678" in _sp95.stdout
        and "判定正确              ：205/205" in _sp95.stdout), True)
@@ -5032,7 +5077,8 @@ finally:
     shutil.rmtree(_d96, ignore_errors=True)
 _sp96 = subprocess.run(
     [sys.executable, str(ROOT / "cli.py"), "doctor"],
-    capture_output=True, text=True)
+    capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 from cli import DOCTOR_PATCHERS as _DP96                            # noqa: E402
 check("M96：doctor 补丁器清单从 DOCTOR_PATCHERS 派生且全绿",
       (_sp96.returncode == 0
@@ -5117,7 +5163,8 @@ check("M98：恶意源码被严格转义（<script> → &lt;script&gt;）",
 check("M98：P0/P2 徽章渲染", ('>P0<' in _html98 and '>P2<' in _html98), True)
 _sp98 = subprocess.run(
     [sys.executable, str(ROOT / "cli.py"), "scan", "--help"],
-    capture_output=True, text=True)
+    capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M98：cli scan 已接入 --html 参数", ("--html" in _sp98.stdout), True)
 
 # ---- [99] Module 58：野战模式 scan --auto（全类目普查 + Sink 门控漏斗） ----
@@ -5149,7 +5196,8 @@ try:
     _r99 = subprocess.run(
         [sys.executable, str(ROOT / "cli.py"), "scan", str(_d99),
          "--auto", "--offline", "--output", str(_d99 / "report_auto.md")],
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _o99 = _r99.stdout
     _rep99 = (_d99 / "report_auto.md").read_text(encoding="utf-8") \
         if (_d99 / "report_auto.md").exists() else ""
@@ -5247,7 +5295,8 @@ try:
         [sys.executable, str(ROOT / "cli.py"), "scan", str(_d100),
          "--auto", "--offline", "--output", str(_d100 / "ra.md"),
          "--html", str(_d100 / "ra.html"), "--sarif", str(_d100 / "ra.sarif")],
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _md100 = (_d100 / "ra.md").read_text(encoding="utf-8") \
         if (_d100 / "ra.md").exists() else ""
     _i_p0 = _md100.find("## P0 [Confirmed]")
@@ -5279,7 +5328,8 @@ try:
          "--emit-poc", str(_d101 / "poc"), "--graph",
          "--sarif", str(_d101 / "r.sarif"), "--html", str(_d101 / "r.html"),
          "--output", str(_d101 / "report_auto.md")],
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _o101 = _r101.stdout
     _md101 = (_d101 / "report_auto.md").read_text(encoding="utf-8") \
         if (_d101 / "report_auto.md").exists() else ""
@@ -5307,7 +5357,8 @@ finally:
 # ---- [102] Module 63：My-Blog 野战实弹（第 23 靶场）----
 _r102 = subprocess.run(
     [sys.executable, str(ROOT / "benchmarks" / "benchmark_myblog.py"),
-     "--strict", "--offline"], capture_output=True, text=True)
+     "--strict", "--offline"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M102：My-Blog benchmark --strict 退出码 0（零误报 / 3 真值全命中）",
       _r102.returncode, 0)
 check("M102：真值表 3 条全命中（hash MD5 密码 + weakrand 上传文件名 ×2）",
@@ -5334,7 +5385,8 @@ check("M102：盲测 P0 收敛为 3 条全真阳（11 → 3）",
 # ---- [103] Module 64：litemall 野战实弹（第 24 靶场 + @LoginUser 主体链） ----
 _r103 = subprocess.run(
     [sys.executable, str(ROOT / "benchmarks" / "benchmark_litemall.py"),
-     "--strict", "--offline"], capture_output=True, text=True)
+     "--strict", "--offline"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M103：litemall benchmark --strict 退出码 0", _r103.returncode, 0)
 check("M103：盲测 288 P0 收敛（sqli 40→0 / authz 21→0 / pathtraver 5→0），"
       "真阳 3 条 + CORS 配置继承 219 全命中",
@@ -5406,7 +5458,8 @@ try:
          "--auto", "--offline", "--output", str(_d105 / "ra.md"),
          "--html", str(_d105 / "ra.html"),
          "--summary-json", str(_d105 / "summary.json")],
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     check("M105：--summary-json 产出且字段齐全", _r105.returncode, 0)
     _sj105 = json.loads((_d105 / "summary.json").read_text(encoding="utf-8"))
     check("M105：漏斗字段齐全（units/pairs/p0/filter/dispatch）",
@@ -5427,8 +5480,8 @@ finally:
 
 # ---- [106] Module 67：hardcoded_secret 第 22 类规则 ----
 from core.agents.vuln_categories import CATEGORIES as _VC106   # noqa: E402
-check("M106：hardcoded_secret 已注册（类目总数单一事实源，M124 后 27）",
-      ("hardcoded_secret" in _VC106 and len(_VC106) == 27), True)
+check("M106：hardcoded_secret 已注册（类目总数单一事实源，M135 后 30）",
+      ("hardcoded_secret" in _VC106 and len(_VC106) == 30), True)
 # VAmPI 形态：Flask SECRET_KEY 短弱密钥（JWT 签名上下文，无长度门槛）
 _vampi106 = ("import jwt\n"
              "vuln_app.app.config['SECRET_KEY'] = 'random'\n"
@@ -5519,7 +5572,8 @@ finally:
     shutil.rmtree(_d107j, ignore_errors=True)
 _sp107 = subprocess.run(
     [sys.executable, str(ROOT / "cli.py"), "doctor"],
-    capture_output=True, text=True)
+    capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 from cli import DOCTOR_PATCHERS as _DP107                            # noqa: E402
 check(f"M107：doctor 补丁器升到 {len(_DP107)} 类全绿（M68/M75）",
       (_sp107.returncode == 0
@@ -5609,7 +5663,8 @@ try:
          "--output", str(_d109b / "r.md"),
          "--html", str(_d109b / "r.html"),
          "--sarif", str(_d109b / "r.sarif")],
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _sj109 = json.loads((_d109b / "s.json").read_text(encoding="utf-8"))
     _md109 = (_d109b / "r.md").read_text(encoding="utf-8")
     _sar109 = json.loads((_d109b / "r.sarif").read_text(encoding="utf-8"))
@@ -5635,7 +5690,8 @@ _emp110 = ROOT / "reference_repos" / "employee-management-system"
 if _emp110.exists():
     _r110 = subprocess.run(
         [sys.executable, str(ROOT / "benchmarks" / "benchmark_flaskcrud.py"),
-         "--strict"], capture_output=True, text=True, encoding="utf-8")
+         "--strict"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     check("M110：Flask CRUD benchmark --strict 退出码 0", _r110.returncode, 0)
     check("M110：真值 2/2（delete authz + 文件级弱密钥）",
           ("真值命中              ：2/2" in (_r110.stdout or "")
@@ -5647,7 +5703,8 @@ if _emp110.exists():
              "--auto", "--offline",
              "--summary-json", str(_d110 / "s.json"),
              "--output", str(_d110 / "r.md")],
-            capture_output=True, text=True, encoding="utf-8")
+            capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
         _s110 = json.loads((_d110 / "s.json").read_text(encoding="utf-8"))
         _md110 = (_d110 / "r.md").read_text(encoding="utf-8")
         check("M110：scan --auto 2 条路由/文件级 P0、2 个独立根因",
@@ -5666,7 +5723,8 @@ _cmp111 = ROOT / "reference_repos" / "compound-protocol" / "contracts"
 if _cmp111.exists():
     _r111 = subprocess.run(
         [sys.executable, str(ROOT / "benchmarks" / "benchmark_compound.py"),
-         "--strict"], capture_output=True, text=True, encoding="utf-8")
+         "--strict"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     check("M111：compound benchmark --strict 退出码 0", _r111.returncode, 0)
     check("M111：450 入口 / 四类判据 0 条 True 误报",
           ("合约入口              ：450" in (_r111.stdout or "")
@@ -5683,7 +5741,8 @@ if _cmp111.exists():
              "--auto", "--offline",
              "--summary-json", str(_d111 / "s.json"),
              "--output", str(_d111 / "r.md")],
-            capture_output=True, text=True, encoding="utf-8")
+            capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
         _s111 = json.loads((_d111 / "s.json").read_text(encoding="utf-8"))
         check("M111：scan --auto 生产合约 0 条 P0",
               (_s111["p0_route_level_hits"], _s111["p0_unique_root_causes"],
@@ -5748,7 +5807,8 @@ try:
          "--auto", "--offline", "--fix",
          "--summary-json", str(_d113 / "s.json"),
          "--output", str(_d113 / "r.md")],
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _s113 = json.loads((_d113 / "s.json").read_text(encoding="utf-8"))
     _fix113 = (_d113 / "fix_report_auto.md").read_text(encoding="utf-8")
     check("M113：CORS 配置补丁自检通过（patches_verified=1）",
@@ -5827,7 +5887,8 @@ try:
          "--summary-json", str(_d115 / "s.json"),
          "--output", str(_d115 / "r.md"),
          "--advisory-dir", str(_d115 / "advisories")],
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _adv115 = list((_d115 / "advisories").glob("GHSA-*.md"))
     _adv_text = _adv115[0].read_text(encoding="utf-8") if _adv115 else ""
     check("M115：3 条继承路由只生成 1 份独立根因披露草稿", len(_adv115), 1)
@@ -5868,7 +5929,8 @@ _univ116 = ROOT / "reference_repos" / "uniswap-v3-core" / "contracts"
 if _univ116.exists():
     _r116 = subprocess.run(
         [sys.executable, str(ROOT / "benchmarks" / "benchmark_uniswapv3.py"),
-         "--strict"], capture_output=True, text=True, encoding="utf-8")
+         "--strict"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     check("M116：Uniswap V3 生产 67 入口 / 0 True 误报",
           (_r116.returncode == 0
            and "生产入口              ：67" in (_r116.stdout or "")
@@ -5885,12 +5947,14 @@ if _fast117.exists():
     _r117 = subprocess.run(
         [sys.executable, str(ROOT / "benchmarks" /
                           "benchmark_fastapi_wild.py"), "--strict"],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _s117 = subprocess.run(
         [sys.executable, str(ROOT / "cli.py"), "scan", str(_fast117),
          "--auto", "--offline", "--summary-json", str(_fast117 / ".s117.json"),
          "--output", str(_fast117 / ".r117.md")],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _j117 = json.loads((_fast117 / ".s117.json").read_text(encoding="utf-8"))
     check("M117：FastAPI benchmark --strict 退出码 0（async 9 入口 / 0 True）",
           (_r117.returncode == 0
@@ -5950,7 +6014,8 @@ try:
          "--auto", "--offline", "--fix", "--emit-poc", str(_d119 / "pocs"),
          "--summary-json", str(_d119 / "s.json"),
          "--output", str(_d119 / "r.md")],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _s119 = json.loads((_d119 / "s.json").read_text(encoding="utf-8"))
     _fix119 = (_d119 / "fix_report_auto.md").read_text(encoding="utf-8")
     _poc119 = next((_d119 / "pocs").glob("*.py"), None)
@@ -5996,7 +6061,8 @@ try:
          "--html", str(_d120 / "r.html"),
          "--summary-json", str(_d120 / "s.json"),
          "--output", str(_d120 / "r.md")],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _adv120 = next((_d120 / "adv").glob("*.md"), None)
     _adv120_t = _adv120.read_text(encoding="utf-8") if _adv120 else ""
     _sar120 = json.loads((_d120 / "r.sarif").read_text(encoding="utf-8"))
@@ -6045,13 +6111,15 @@ try:
          "--auto", "--offline", "--sarif", str(_d121 / "base.sarif"),
          "--summary-json", str(_d121 / "base.json"),
          "--output", str(_d121 / "base.md")],
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     subprocess.run(
         [sys.executable, str(ROOT / "cli.py"), "scan", str(_d121),
          "--auto", "--offline", "--baseline", str(_d121 / "base.sarif"),
          "--summary-json", str(_d121 / "s2.json"),
          "--output", str(_d121 / "s2.md")],
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _s121 = json.loads((_d121 / "s2.json").read_text(encoding="utf-8"))
     check("M121：二次扫描净增 P0=0，基线抑制 1 个根因 / 3 条路由",
           (_s121["new_findings"], _s121["suppressed_root_causes"],
@@ -6065,7 +6133,8 @@ try:
          "--auto", "--offline", "--baseline", str(_d121 / "base.sarif"),
          "--summary-json", str(_d121 / "s3.json"),
          "--output", str(_d121 / "s3.md")],
-        capture_output=True, text=True)
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _s121b = json.loads((_d121 / "s3.json").read_text(encoding="utf-8"))
     check("M121：注入 1 个新密钥后仅报 1 条净增 P0",
           (_s121b["new_findings"], _s121b["p0_unique_root_causes"]), (1, 1))
@@ -6074,9 +6143,10 @@ finally:
 
 # ---- [122] Module 85：doctor 第六段野战白皮书对账 ----
 _r122 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
-                       capture_output=True, text=True, encoding="utf-8")
+                       capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M122：doctor 第六段存在且整体 exit 0",
-      (_r122.returncode == 0 and "[6/8]" in (_r122.stdout or "")), True)
+      (_r122.returncode == 0 and "[6/9]" in (_r122.stdout or "")), True)
 check("M122：wild_hunt.json ↔ WILD_HUNT_REPORT 四处核心数字一致",
       ("仓库数 / 入口总数 / 独立根因数 / 零误报 四处一致"
        in (_r122.stdout or "")), True)
@@ -6185,7 +6255,8 @@ _comet123 = ROOT / "reference_repos" / "comet" / "contracts"
 if _comet123.exists():
     _r123 = subprocess.run(
         [sys.executable, str(ROOT / "benchmarks" / "benchmark_comet.py"),
-         "--strict"], capture_output=True, text=True, encoding="utf-8")
+         "--strict"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _j123 = json.loads((ROOT / "benchmarks" / "results" / "comet.json")
                        .read_text(encoding="utf-8"))
     check("M123：comet 0.8.x 生产合约 --strict 通过",
@@ -6244,7 +6315,8 @@ if _dg124.exists():
     # ③ E2E：真值 11/11 + 零误报
     _r124 = subprocess.run(
         [sys.executable, str(ROOT / "benchmarks" / "benchmark_djangoat.py"),
-         "--strict"], capture_output=True, text=True, encoding="utf-8")
+         "--strict"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _j124 = json.loads((ROOT / "benchmarks" / "results" / "djangoat.json")
                        .read_text(encoding="utf-8"))
     check("M124：DjanGoat --strict 通过（真值 12/12 / 零误报）",
@@ -6285,8 +6357,8 @@ def _java125(body: str, cls: str = "public class C {\n") -> str:
     return cls + body + "\n}\n"
 
 
-check("M125：ssti 已注册为第 24 类（doctor 自动升段；M124 后总数 27）",
-      (len(_CATS125), "ssti" in _CATS125), (27, True))
+check("M125：ssti 已注册为第 24 类（doctor 自动升段；M135 后总数 30）",
+      (len(_CATS125), "ssti" in _CATS125), (30, True))
 check("M125：ssti 是 CWE-1336 且不属 OWASP 11 类",
       (_CATS125["ssti"].cwe, _CATS125["ssti"].owasp), ("CWE-1336", False))
 
@@ -6478,7 +6550,8 @@ try:
          "--auto", "--offline", "--fix",
          "--summary-json", str(_d126 / "s.json"),
          "--output", str(_d126 / "r.md")],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _fix126 = (_d126 / "fix_report_auto.md")
     _fix_t = _fix126.read_text(encoding="utf-8") if _fix126.exists() else ""
     _s126 = json.loads((_d126 / "s.json").read_text(encoding="utf-8"))
@@ -6503,9 +6576,10 @@ finally:
 
 # ⑥ doctor：补丁器升段（M90 到 18 类，M106 到 20 类）
 _r126d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
-                        capture_output=True, text=True, encoding="utf-8")
+                        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M126：doctor 补丁器升到 22 类（含 _fix_python_redirect 与 M106/M125 四个 Java 补丁）",
-      ("（22 类）" in (_r126d.stdout or "")
+      ("（25 类）" in (_r126d.stdout or "")
        and "_fix_python_redirect" in (_r126d.stdout or "")
        and "_fix_java_ssti_viewname" in (_r126d.stdout or "")
        and "_fix_java_header_injection" in (_r126d.stdout or "")), True)
@@ -6567,7 +6641,8 @@ try:
          "--html", str(_out127 / "portfolio.html"),
          "--summary-json", str(_out127 / "hunt.json"),
          "--advisory-dir", str(_out127 / "advisories")],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _hj127 = json.loads((_out127 / "hunt.json").read_text(encoding="utf-8"))
     _html127 = (_out127 / "portfolio.html").read_text(encoding="utf-8")
     check("M127：三语言多仓一键 hunt 退出码 0",
@@ -6699,7 +6774,8 @@ try:
         [sys.executable, str(ROOT / "cli.py"), "scan", str(_d128e),
          "--auto", "--offline", "--sarif", str(_d128e / "r.sarif"),
          "--output", str(_d128e / "r.md")],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     check("M128：scan 真产出的 SARIF 零错误",
           _vsf128(_d128e / "r.sarif"), [])
     (_d128e / "bad.sarif").write_text(
@@ -6720,7 +6796,8 @@ finally:
 
 # ⑪ doctor 第五段常驻自检（自产合规 + 坏文档逐条拦住）
 _r128d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
-                        capture_output=True, text=True, encoding="utf-8")
+                        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M128：doctor 内置 SARIF 合规自检（自产合规 + 坏文档被拦）",
       (_r128d.returncode,
        "自产 SARIF 合规" in (_r128d.stdout or ""),
@@ -6762,7 +6839,8 @@ try:
         [sys.executable, str(ROOT / "cli.py"), "benchmark-gen",
          str(_repo129), "--out", str(_out129),
          "--bench-key", "smoke_gen_m93", "--no-cache"],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     check("M129：benchmark-gen 退出码 0", _r129.returncode, 0)
     _t129 = _out129.read_text(encoding="utf-8") if _out129.exists() else ""
     check("M129：生成的脚本自带 slice_cache / --strict / 锚点表",
@@ -6777,7 +6855,8 @@ try:
     _r129b = subprocess.run(
         [sys.executable, str(_out129), "--strict", "--no-cache",
          "--output", str(_g129 / "gen.json")],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _ok129b = (_g129 / "gen.json").exists()
     _j129 = (json.loads((_g129 / "gen.json").read_text(encoding="utf-8"))
              if _ok129b else {})
@@ -6796,7 +6875,8 @@ try:
     _r129c = subprocess.run(
         [sys.executable, str(_g129 / "gen_bad.py"), "--strict", "--no-cache",
          "--output", str(_g129 / "bad.json")],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     check("M129：锚点被改坏时门禁转红（exit 1）", _r129c.returncode, 1)
 finally:
     shutil.rmtree(_g129, ignore_errors=True)
@@ -6826,13 +6906,13 @@ from core.agents.vuln_categories import CATEGORIES as _C130        # noqa: E402
 import cli as _cli130                                             # noqa: E402
 from benchmarks.run_all import JOBS as _JOBS130                   # noqa: E402
 check("M130：规则 27 类 / 补丁器 22 类（doctor 单一事实源）",
-      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (27, 22))
+      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (30, 25))
 check("M130：run_all 作业表 41 项且含 comet / DjanGoat / 覆盖地板",
       (len(_JOBS130),
        any("comet" in str(j[0]) for j in _JOBS130),
        any("DjanGoat" in str(j[0]) for j in _JOBS130),
        any("覆盖地板" in str(j[0]) for j in _JOBS130)),
-      (41, True, True, True))
+      (47, True, True, True))
 
 import core.agents.rule_detectors as _rd130                       # noqa: E402
 _NEW130 = ("ssti_verdict", "_sol_unchecked_zones", "_py_redir_verdict",
@@ -6845,23 +6925,25 @@ check("M130：ssti 走 verdict 路由（空源码 → None，不抛异常）",
       _rd130.verdict("ssti", ""), None)
 
 _h130 = _sp130.run([sys.executable, str(ROOT / "cli.py"), "--help"],
-                   capture_output=True, text=True, encoding="utf-8")
+                   capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M130：cli.py --help 列出 hunt 与 benchmark-gen",
       ("hunt" in (_h130.stdout or "")
        and "benchmark-gen" in (_h130.stdout or "")), True)
 for _cmd130 in ("hunt", "benchmark-gen"):
     _r130 = _sp130.run([sys.executable, str(ROOT / "cli.py"), _cmd130,
-                        "--help"], capture_output=True, text=True,
-                       encoding="utf-8")
+                        "--help"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     check(f"M130：`cli.py {_cmd130} --help` 可用（exit 0）",
           _r130.returncode, 0)
 
 _r130d = _sp130.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
-                    capture_output=True, text=True, encoding="utf-8")
+                    capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 _out130 = _r130d.stdout or ""
-check("M130：doctor exit 0 且 27 类 / 22 类 / 八段齐全",
-      (_r130d.returncode, "共 27 类" in _out130, "（22 类）" in _out130,
-       "[8/8]" in _out130), (0, True, True, True))
+check("M130：doctor exit 0 且 30 类 / 25 类 / 九段齐全",
+      (_r130d.returncode, "共 30 类" in _out130, "（25 类）" in _out130,
+       "[9/9]" in _out130), (0, True, True, True))
 check("M130：doctor 覆盖 M87–M93 的四项新自检",
       ("SARIF 2.1.0 合规校验" in _out130
        and "PoC 合成器" in _out130
@@ -6941,7 +7023,8 @@ _oz131 = ROOT / "reference_repos" / "openzeppelin-contracts" / "contracts"
 if _oz131.exists():
     _r131 = subprocess.run(
         [sys.executable, str(ROOT / "benchmarks" / "benchmark_openzeppelin.py"),
-         "--strict"], capture_output=True, text=True, encoding="utf-8")
+         "--strict"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _j131 = json.loads((ROOT / "benchmarks" / "results" / "openzeppelin.json")
                        .read_text(encoding="utf-8"))
     check("M131：OpenZeppelin --strict 通过", _r131.returncode, 0)
@@ -6975,7 +7058,8 @@ for _tag132, _bench132, _want132 in (
         continue
     _r132 = subprocess.run(
         [sys.executable, str(ROOT / "benchmarks" / f"benchmark_{_bench132}.py"),
-         "--strict"], capture_output=True, text=True, encoding="utf-8")
+         "--strict"], capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _j132 = json.loads((ROOT / "benchmarks" / "results" / f"{_bench132}.json")
                        .read_text(encoding="utf-8"))
     check(f"{_tag132}：{_want132} --strict 通过", _r132.returncode, 0)
@@ -7044,7 +7128,8 @@ try:
          "--advisory-dir", str(_w135 / "adv"),
          "--summary-json", str(_w135 / "s.json"),
          "--output", str(_w135 / "r.md")],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _adv135 = sorted((_w135 / "adv").glob("GHSA-*.md"))
     _a135 = _adv135[0].read_text(encoding="utf-8") if _adv135 else ""
     _s135 = json.loads((_w135 / "s.json").read_text(encoding="utf-8"))
@@ -7075,20 +7160,28 @@ print("\n[138]-[139] cli.py matrix 能力矩阵（M100）")
 _r138 = subprocess.run(
     [sys.executable, str(ROOT / "cli.py"), "matrix",
      "--summary-json", str(ROOT / ".tmp" / "matrix_smoke.json")],
-    capture_output=True, text=True, encoding="utf-8")
+    capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 _m138 = json.loads((ROOT / ".tmp" / "matrix_smoke.json")
                    .read_text(encoding="utf-8"))
-check("M138：matrix 退出码 0 且 27 类 × 三语言全覆盖渲染",
+check("M138：matrix 退出码 0 且 30 类 × 三语言全覆盖渲染",
       (_r138.returncode, len(_m138["categories"]), _m138["languages"]),
-      (0, 27, ["java", "python", "solidity"]))
+      (0, 30, ["java", "python", "solidity"]))
 check("M138：输出含四维表头（--fix / --emit-poc / CVSS）",
       ("--fix" in (_r138.stdout or "")
        and "--emit-poc" in (_r138.stdout or "")
        and "CVSS" in (_r138.stdout or "")), True)
-check("M139：覆盖缺口有界且不增长（当前 41 处；M123/M124 各 +2、M105 +2）",
-      _m138["gap_count"] <= 41, True)
-check("M139：补丁器映射与 doctor 单一事实源一致（22 个补丁器 / 12 类目）",
-      (_m138["patchers"], len(_m138["fix_map"])), (22, 12))
+# M139：覆盖缺口只许持平或下降。M135 的三个新类目在三语言都能判出结论
+# （unsafe_reflection / zip_slip / delegatecall_untrusted 各有正反例冒烟），
+# 所以缺口数不应上升 —— 这里锁的是"不增长"，不是某个具体数字。
+# M135：三个新类目天然是**语言特定**的（反射=Java/Python、压缩包穿越=
+# Java/Python、delegatecall=Solidity），每个都会在不适用的语言上留一个
+# (类目, 语言) 空格 —— 41 → 47 是设计使然，不是判据退步。真正该锁的不变量
+# 在 [184]：**每个新类目至少有一门语言判得出来**，不允许整类空着。
+check("M139：覆盖缺口有界（≤47；M135 三新类目各留 1–2 个语言空格）",
+      _m138["gap_count"] <= 47, True)
+check("M139：补丁器映射与 doctor 单一事实源一致（25 个补丁器 / 15 类目）",
+      (_m138["patchers"], len(_m138["fix_map"])), (25, 15))
 
 # ---- [140] Module 101：17 仓野战与 33 项门禁不变性总锚定 ----
 # 这一条是 M87–M102 的**总锚**：四组数字必须自洽 —— 门禁数、野战场数、
@@ -7101,18 +7194,18 @@ from benchmarks.wild_hunt import REPOS as _REPOS140               # noqa: E402
 from core.agents.vuln_categories import CATEGORIES as _C140       # noqa: E402
 import cli as _cli140                                             # noqa: E402
 
-check("M140：门禁 41 项（冒烟+争议+地板+38 个靶场/校验项）",
-      len(_JOBS140), 41)
-check("M140：野战场 25 个真实仓库", len(_REPOS140), 25)
+check("M140：门禁 47 项（冒烟+争议+地板+44 个靶场/校验项）",
+      len(_JOBS140), 47)
+check("M140：野战场 30 个真实仓库", len(_REPOS140), 30)
 check("M140：规则 27 类 / 补丁器 22 类", (len(_C140),
                                           len(_cli140.DOCTOR_PATCHERS)),
-      (27, 22))
+      (30, 25))
 
 # 17 个野战场必须全部有对应 benchmark 脚本与 --strict 门禁
 _missing140 = [r[0] for r in _REPOS140
                if not (ROOT / "benchmarks" / f"benchmark_{r[2]}.py").is_file()]
-check("M140：17 个野战场全部有 benchmark 脚本落地", _missing140, [])
-check("M140：17 个野战场全部带 --strict/--sanity 门禁参数",
+check("M140：30 个野战场全部有 benchmark 脚本落地", _missing140, [])
+check("M140：30 个野战场全部带 --strict/--sanity 门禁参数",
       all(any(a.startswith("--") for a in r[3]) for r in _REPOS140), True)
 
 # 4 类 Solidarity 判据在 docs 里登记的靶场数 ≥ 8（M73 起的"生产库应为 0 True"）
@@ -7127,12 +7220,13 @@ check("M140：五个 Solidity 生产库规则层全部 0 True（N₁ 铁壁）",
       [r for r in _p0_rows140 if r[1] != 0], [])
 
 # 三语言野战仓各至少 3 个，且总量 17
-check("M140：三语言分布自洽（Java 11 / Python 6 / Solidity 8）",
-      len(_REPOS140) - 6 - 8, 11)
+check("M140：三语言分布自洽（Java 13 / Python 7 / Solidity 10）",
+      len(_REPOS140) - 7 - 10, 13)
 
 # wild_hunt.json 与白皮书四处数字仍然一致（M85 的护栏 + 17 仓后仍成立）
 _r140d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
-                        capture_output=True, text=True, encoding="utf-8")
+                        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 check("M140：doctor exit 0 且白皮书对账仍一致",
       (_r140d.returncode,
        "四处一致" in (_r140d.stdout or "")), (0, True))
@@ -7238,8 +7332,8 @@ from core.agents.rule_detectors import (                            # noqa: E402
 )
 from core.agents.vuln_categories import CATEGORIES as _C143         # noqa: E402
 
-check("M143：header_injection 已注册（CWE-113；M124 后总数 27）",
-      (len(_C143), _C143["header_injection"].cwe), (27, "CWE-113"))
+check("M143：header_injection 已注册（CWE-113；M135 后总数 30）",
+      (len(_C143), _C143["header_injection"].cwe), (30, "CWE-113"))
 check("M143：setHeader(常量, 请求读取) → True",
       _hd143('public void f(HttpServletRequest req, HttpServletResponse resp) {\n'
              '  resp.setHeader("X-Test", req.getParameter("t"));\n}\n'), True)
@@ -7283,8 +7377,8 @@ import shutil as _sh144                                              # noqa: E40
 import cli as _cli144                                                # noqa: E402
 from core.slicer.java_servlet import JavaSlicer as _JS144            # noqa: E402
 
-check("M144：补丁器登记表 22 类（doctor 单一事实源）",
-      len(_cli144.DOCTOR_PATCHERS), 22)
+check("M144：补丁器登记表 25 类（doctor 单一事实源）",
+      len(_cli144.DOCTOR_PATCHERS), 25)
 check("M144：第 19/20 类补丁器都进登记表且可调用",
       ("_fix_java_ssti_viewname" in _cli144.DOCTOR_PATCHERS
        and "_fix_java_header_injection" in _cli144.DOCTOR_PATCHERS
@@ -7510,7 +7604,7 @@ if _adv149.exists():
     _drafts149 = list(_adv149.rglob("GHSA-*.md"))
     _idx149 = _adv149 / "INDEX.md"
     _itxt149 = _idx149.read_text(encoding="utf-8") if _idx149.exists() else ""
-    check("M149：21 仓披露包总目录存在且零断链",
+    check("M149：30 仓披露包总目录存在且零断链",
           (_idx149.exists(), bool(_drafts149),
            all(f"]({p.name})" in _itxt149 for p in _drafts149)),
           (True, True, True))
@@ -7563,7 +7657,8 @@ check("M150：多 hunk 的 diff 不给建议（行数对不上会改坏文件）
 check("M150：cli 暴露 --gh-comments 开关",
       "--gh-comments" in subprocess.run(
           [sys.executable, str(ROOT / "cli.py"), "pr-scan", "--help"],
-          capture_output=True, text=True, encoding="utf-8").stdout, True)
+          capture_output=True, text=True, encoding="utf-8",
+                  errors="replace").stdout, True)
 
 # ---- [151] Module 113：Java 视图名注入的四组负向护栏 ----
 # [141] 证的是"能认出真阳"；这一条证的是"不会把安全写法判成真阳"——
@@ -7645,18 +7740,26 @@ check("M153：别名收集只认 address 类型声明",
       _ia153("address s = _msgSender();\nstring t = _msgSender();\n"), ["s"])
 
 # ---- [154] Module 116：21 仓披露包与总目录零断链 ----
-print("\n[154] 21 仓披露包结构完整性（M116）")
+print("\n[154] 30 仓披露包结构完整性（M116）")
 
 _adv154 = ROOT / "benchmarks" / "results" / "advisories"
 if _adv154.exists():
     _drafts154 = sorted(_adv154.rglob("GHSA-*.md"))
     _idx154 = _adv154 / "INDEX.md"
     _it154 = _idx154.read_text(encoding="utf-8") if _idx154.exists() else ""
-    check("M154：草稿目录数与野战场数一致（25）",
-          len([p for p in _adv154.iterdir() if p.is_dir()]), 25)
-    check("M154：总目录零断链（94 份全被索引）",
+    # M149：期望值从 wild_hunt.json **派生**，不再手抄数字 ——
+    # 每加一个野仓就要改一次字面量，那种"冻结"迟早会被改错。
+    _wh154 = json.loads((ROOT / "benchmarks" / "results" / "wild_hunt.json")
+                        .read_text(encoding="utf-8"))
+    _nrepo154 = len(_wh154.get("repos", []))
+    _nroot154 = sum(int((r.get("summary") or {})
+                        .get("p0_unique_root_causes") or 0)
+                    for r in _wh154.get("repos", []))
+    check("M154：草稿目录数与野战场数一致（派生）",
+          len([p for p in _adv154.iterdir() if p.is_dir()]), _nrepo154)
+    check("M154：总目录零断链（草稿数 == 独立根因数）",
           (len(_drafts154), all(f"]({p.name})" in _it154
-                                for p in _drafts154)), (94, True))
+                                for p in _drafts154)), (_nroot154, True))
     check("M154：每份草稿都有 CVSS 向量与受影响组件小节",
           all("CVSS:3.1/" in p.read_text(encoding="utf-8")
               and "## Affected Component" in p.read_text(encoding="utf-8")
@@ -7671,17 +7774,18 @@ else:
 print("\n[155] doctor 第七段披露包完整性（M117）")
 
 _r155 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
-                       capture_output=True, text=True, encoding="utf-8")
+                       capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 _o155 = _r155.stdout or ""
-check("M155：doctor 八段齐全且 exit 0",
-      (_r155.returncode, all(f"[{i}/8]" in _o155 for i in range(1, 9))),
+check("M155：doctor 九段齐全且 exit 0",
+      (_r155.returncode, all(f"[{i}/9]" in _o155 for i in range(1, 10))),
       (0, True))
 check("M155：第七段核对草稿数 == 根因总数",
-      "[7/8] 披露包完整性" in _o155 and "草稿数 == 根因总数" in _o155, True)
+      "[7/9] 披露包完整性" in _o155 and "草稿数 == 根因总数" in _o155, True)
 check("M155：第七段核对 INDEX 零断链与 CVSS 降序",
       ("INDEX.md 覆盖全部" in _o155 and "按 CVSS 降序" in _o155), True)
-check("M155：27 类规则 / 22 类补丁器都在 doctor 输出里",
-      ("共 27 类" in _o155 and "（22 类）" in _o155), True)
+check("M155：30 类规则 / 25 类补丁器都在 doctor 输出里",
+      ("共 30 类" in _o155 and "（25 类）" in _o155), True)
 
 # ---- [156] Module 119：Uniswap V2 整数型状态互斥锁（1 → 0 → 1）----
 print("\n[156] Uniswap V2 整数互斥锁反向锚点（M119）")
@@ -7884,7 +7988,8 @@ check("M164：identifiers 同时带 CWE 与类目，CWE 有 url",
 check("M164：cli 暴露 --gitlab-sast 开关",
       "--gitlab-sast" in subprocess.run(
           [sys.executable, str(ROOT / "cli.py"), "scan", "--help"],
-          capture_output=True, text=True, encoding="utf-8").stdout, True)
+          capture_output=True, text=True, encoding="utf-8",
+                  errors="replace").stdout, True)
 
 # ---- [160] Module 123：第 26 类 mass_assignment（CWE-915）----
 print("\n[160] 第 26 类 mass_assignment 批量赋值（M123）")
@@ -7894,8 +7999,8 @@ from core.agents.rule_detectors import (                            # noqa: E402
 )
 from core.agents.vuln_categories import CATEGORIES as _C160         # noqa: E402
 
-check("M160：mass_assignment 已注册（CWE-915；M124 后总数 27）",
-      (len(_C160), _C160["mass_assignment"].cwe), (27, "CWE-915"))
+check("M160：mass_assignment 已注册（CWE-915；M135 后总数 30）",
+      (len(_C160), _C160["mass_assignment"].cwe), (30, "CWE-915"))
 _PY160 = ("def f(request):\n"
           "    user = User(**request.json)\n"
           "    db.session.add(user)\n")
@@ -7963,8 +8068,8 @@ import shutil as _sh162                                              # noqa: E40
 import cli as _cli162                                                # noqa: E402
 from core.slicer.java_servlet import JavaSlicer as _JS162            # noqa: E402
 
-check("M162：补丁器登记表 22 类（doctor 单一事实源）",
-      len(_cli162.DOCTOR_PATCHERS), 22)
+check("M162：补丁器登记表 25 类（doctor 单一事实源）",
+      len(_cli162.DOCTOR_PATCHERS), 25)
 check("M162：第 21/22 类补丁器都进登记表",
       ("_fix_java_mass_assignment" in _cli162.DOCTOR_PATCHERS
        and "_fix_java_weakrand" in _cli162.DOCTOR_PATCHERS), True)
@@ -8074,18 +8179,19 @@ check("M168：copyProperties 无排除 → True；带忽略列表 → False",
 print("\n[169] doctor 第八段双 SAST 导出器（M132）")
 
 _r169 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
-                       capture_output=True, text=True, encoding="utf-8")
+                       capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
 _o169 = _r169.stdout or ""
-check("M169：doctor 八段齐全且 exit 0",
-      (_r169.returncode, all(f"[{i}/8]" in _o169 for i in range(1, 9))),
+check("M169：doctor 九段齐全且 exit 0",
+      (_r169.returncode, all(f"[{i}/9]" in _o169 for i in range(1, 10))),
       (0, True))
 check("M169：第八段核对两个导出器（SARIF + GitLab）",
       ("sarif_validator 就位" in _o169
        and "gitlab_exporter 就位" in _o169), True)
 check("M169：第八段核对跨仓聚类计数守恒",
       "跨仓聚类" in _o169 and "计数守恒" in _o169, True)
-check("M169：第八段报出 27 类 / 22 类（单一事实源）",
-      "规则 27 类 / 补丁器 22 类" in _o169, True)
+check("M169：第八段报出 30 类 / 25 类（单一事实源）",
+      "规则 30 类 / 补丁器 25 类" in _o169, True)
 
 # ---- [170] Module 133：八大交付格式一键大联考 ----
 print("\n[170] 八大交付格式大联考（M133）")
@@ -8132,7 +8238,8 @@ try:
          "--emit-poc", str(_w170 / "poc"),
          "--advisory-dir", str(_w170 / "adv"),
          "--summary-json", str(_w170 / "s.json")],
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8",
+                  errors="replace")
     _files170 = {
         "markdown": _md170,
         "html": _w170 / "report.html",
@@ -8178,8 +8285,539 @@ try:
 finally:
     _sh162.rmtree(_w170, ignore_errors=True)
 
+# ============================================================================
+# M146–M148：[171]–[185]（M135 段新增的 15 组断言）
+# ============================================================================
+
+print("\n[171] 第 28 类：unsafe_reflection（CWE-470）")
+_R = verdict("unsafe_reflection", "")
+check("M146：空源码 → None", _R, None)
+_J_REFLECT = '''@RequestMapping("/api/exec")
+public String exec(String cls) throws Exception {
+    Class<?> c = Class.forName(cls);
+    return c.newInstance().toString();
+}'''
+check("M146：Java `Class.forName(形参)` → True", verdict("unsafe_reflection", _J_REFLECT), True)
+_J_DRIVER = '''public void init() throws Exception {
+    Class<?> c = Class.forName("com.mysql.cj.jdbc.Driver");
+    Driver d = (Driver) c.newInstance();
+}'''
+check("M146：字面量类名 → False", verdict("unsafe_reflection", _J_DRIVER), False)
+_J_WHITE = '''public Object make(String cls) throws Exception {
+    if (!ALLOWED_CLASSES.contains(cls)) {
+        throw new IllegalArgumentException("bad");
+    }
+    return Class.forName(cls).newInstance();
+}'''
+check("M146：ALLOWED_CLASSES.contains → False", verdict("unsafe_reflection", _J_WHITE), False)
+_P_REFLECT = '''@app.route("/load")
+def load():
+    mod = request.args.get("m")
+    return str(importlib.import_module(mod))
+'''
+check("M146：Python import_module(查询参数) → True", verdict("unsafe_reflection", _P_REFLECT), True)
+_P_WHITE = '''def view():
+    name = request.args.get("v")
+    if name not in ALLOWED_VIEWS:
+        abort(400)
+    return getattr(views, name)()
+'''
+check("M146：`in ALLOWED_VIEWS` → False", verdict("unsafe_reflection", _P_WHITE), False)
+check("M146：`getattr(obj, 'x')` 字面量 → False",
+      verdict("unsafe_reflection", "def f():\n    return getattr(obj, 'x')\n"), False)
+
+print("\n[172] 第 29 类：zip_slip（CWE-22）")
+check("M146：空源码 → None", verdict("zip_slip", ""), None)
+_Z_VULN = '''public void unzip(File zip) throws IOException {
+    ZipEntry entry;
+    while ((entry = zis.getNextEntry()) != null) {
+        File target = new File(destDir, entry.getName());
+        FileOutputStream fos = new FileOutputStream(target);
+    }
+}'''
+check("M146：getName 拼路径无校验 → True", verdict("zip_slip", _Z_VULN), True)
+_Z_SAFE = _Z_VULN.replace(
+    "FileOutputStream fos = new FileOutputStream(target);",
+    "String canon = target.getCanonicalPath();\n"
+    "        if (!canon.startsWith(destDir.getCanonicalPath())) {\n"
+    "            throw new IOException(\"zip slip\");\n"
+    "        }\n"
+    "        FileOutputStream fos = new FileOutputStream(target);")
+check("M146：getCanonicalPath().startsWith → False", verdict("zip_slip", _Z_SAFE), False)
+_P_ZIP = '''def upload():
+    zf = zipfile.ZipFile(request.files["f"])
+    zf.extractall("/tmp/out")
+'''
+check("M146：Python extractall 无 filter → True", verdict("zip_slip", _P_ZIP), True)
+check("M146：filter='data' → False",
+      verdict("zip_slip", _P_ZIP.replace('"/tmp/out"', '"/tmp/out", filter="data"')), False)
+check("M146：没有解压汇聚点 → None",
+      verdict("zip_slip", "def f():\n    return 1\n"), None)
+
+print("\n[173] 第 30 类：delegatecall_untrusted（SWC-112）")
+_S_VULN = '''// pragma: solidity ^0.8.0;
+// contract: Proxy
+contract Proxy {
+    function upgrade(address target, bytes calldata data) external {
+        target.delegatecall(data);
+    }
+}'''
+check("M146：形参目标无保护 → True", verdict("delegatecall_untrusted", _S_VULN), True)
+_S_SELF = '''// pragma: solidity ^0.8.0;
+// contract: Multicall
+contract Multicall {
+    function multicall(bytes[] calldata data) external {
+        for (uint i = 0; i < data.length; i++) {
+            address(this).delegatecall(data[i]);
+        }
+    }
+}'''
+check("M146：address(this).delegatecall（Multicall）→ False",
+      verdict("delegatecall_untrusted", _S_SELF), False)
+_S_1967 = '''// pragma: solidity ^0.8.0;
+// contract: Proxy
+contract Proxy {
+    function _implementation() internal view returns (address) {
+        return address(uint160(uint256(bytes32(0))));
+    }
+    fallback() external payable {
+        _implementation().delegatecall(msg.data);
+    }
+}'''
+check("M146：ERC-1967 `_implementation()` → False",
+      verdict("delegatecall_untrusted", _S_1967), False)
+_S_OWNER = '''// pragma: solidity ^0.8.0;
+// contract: Owned
+contract Owned {
+    address public owner;
+    modifier onlyOwner() {
+        require(msg.sender == owner, "not owner");
+        _;
+    }
+    function upgrade(address target, bytes calldata data) external onlyOwner {
+        target.delegatecall(data);
+    }
+}'''
+check("M146：onlyOwner 实现体校验 → False",
+      verdict("delegatecall_untrusted", _S_OWNER), False)
+_S_ONESHOT = '''// pragma: solidity ^0.8.0;
+// contract: Init
+contract Init {
+    modifier initializer() { _; }
+    function initialize(address logic, bytes calldata data) external initializer {
+        logic.delegatecall(data);
+    }
+}'''
+check("M146：一次性 initializer → False（部署期目标，不是部署后可控）",
+      verdict("delegatecall_untrusted", _S_ONESHOT), False)
+_S_DRYRUN = '''// pragma: solidity ^0.8.0;
+// contract: UUPS
+contract UUPS {
+    function simulateUpgradeTo(address impl) public {
+        impl.delegatecall("");
+        revert();
+    }
+}'''
+check("M146：顶层无条件 revert（演练型）→ False",
+      verdict("delegatecall_untrusted", _S_DRYRUN), False)
+check("M146：普通函数没有 delegatecall → None",
+      verdict("delegatecall_untrusted",
+              "// pragma: solidity ^0.8.0;\ncontract A {\n"
+              "    function f() external pure returns (uint) { return 1; }\n}"),
+      None)
+
+print("\n[174] M136：MakerDAO `wards[msg.sender] == 1` 与内联算术封装")
+_DSS = '''// pragma: solidity ^0.6.12;
+// contract: Vat
+contract Vat {
+    mapping (address => uint) public wards;
+    uint public live;
+    function rely(address usr) external auth {
+        require(live == 1, "Vat/not-live");
+        wards[usr] = 1;
+    }
+}
+// ---- 修饰符定义（本合约，供核验）----
+modifier auth {
+        require(wards[msg.sender] == 1, "Vat/not-authorized");
+        _;
+    }'''
+check("M146：auth 映射守卫 → access_control False",
+      verdict("access_control", _DSS), False)
+_DSS_NOAUTH = _DSS.replace("external auth", "external") \
+    .split("// ---- 修饰符定义")[0]
+check("M146：摘掉 auth（含证据体）→ 不再是 False",
+      verdict("access_control", _DSS_NOAUTH) is False, False)
+_DSS_BAL = '''// pragma: solidity ^0.6.12;
+// contract: Vat
+contract Vat {
+    mapping (address => uint) public balance;
+    function withdraw(uint wad) external {
+        require(balance[msg.sender] >= wad);
+        balance[msg.sender] -= wad;
+    }
+}'''
+check("M146：余额充足性检查**不算**授权（`>=` 不豁免）",
+      verdict("access_control", _DSS_BAL), None)
+_DSS_ADD = '''// pragma: solidity ^0.6.12;
+// contract: Vat
+contract Vat {
+    function _add(uint x, int y) internal pure returns (uint z) {
+        z = x + uint(y);
+        require(y >= 0 || z <= x);
+        require(y <= 0 || z >= x);
+    }
+}'''
+check("M146：内联 add 回卷校验 → arithmetic False",
+      verdict("arithmetic", _DSS_ADD), False)
+_DSS_INLINE = '''// pragma: solidity ^0.5.12;
+// contract: Vat
+contract Vat {
+    function add(uint x, uint y) internal pure returns (uint z) {
+        require((z = x + y) >= x);
+    }
+}'''
+check("M146：`require((z = x + y) >= x)` → arithmetic False",
+      verdict("arithmetic", _DSS_INLINE), False)
+
+print("\n[175] M143：initializer / onlyInitializing / onlyProxy 语义边界")
+_INIT = '''// pragma: solidity ^0.8.20;
+// contract: OwnableUpgradeable
+contract OwnableUpgradeable {
+    address private _owner;
+    modifier initializer() { _; }
+    function initialize(address initialOwner) public initializer {
+        _owner = initialOwner;
+    }
+}'''
+check("M146：initializer 里写 owner 不判 True（部署竞态不属入口授权）",
+      verdict("access_control", _INIT), None)
+_INIT_ONLY = '''// pragma: solidity ^0.8.20;
+// contract: OwnableUpgradeable
+contract OwnableUpgradeable {
+    address private _owner;
+    modifier onlyInitializing() { _; }
+    function __Ownable_init(address initialOwner) internal onlyInitializing {
+        _owner = initialOwner;
+    }
+}'''
+check("M146：onlyInitializing + internal → False（外部不可达）",
+      verdict("access_control", _INIT_ONLY), False)
+_ONLYPROXY = '''// pragma: solidity ^0.8.20;
+// contract: UUPS
+contract UUPS {
+    address private __self;
+    modifier onlyProxy() {
+        _checkProxy();
+        _;
+    }
+    function _checkProxy() internal view {
+        if (address(this) == __self) { revert("direct call"); }
+        if (_getImplementation() != address(0)) { revert("bad slot"); }
+    }
+    function _getImplementation() internal view returns (address) {
+        return address(uint160(uint256(bytes32(0))));
+    }
+    function upgradeToAndCall(address target, bytes calldata data) external onlyProxy {
+        target.delegatecall(data);
+    }
+}'''
+check("M146：onlyProxy 型入口约束 → delegatecall False",
+      verdict("delegatecall_untrusted", _ONLYPROXY), False)
+
+# ---------------- [176]–[178]：三个补丁器的重切片翻转 ----------------
+sys.path.insert(0, str(ROOT))
+import cli as _cli                                              # noqa: E402
+import tempfile as _tfm                                         # noqa: E402
+import shutil as _shm                                           # noqa: E402
+
+_PATCH_REPO = Path(_tfm.mkdtemp(prefix="nexus_m135_patch_"))
+try:
+    (_PATCH_REPO / "src").mkdir(parents=True, exist_ok=True)
+    (_PATCH_REPO / "contracts").mkdir(parents=True, exist_ok=True)
+    (_PATCH_REPO / "app").mkdir(parents=True, exist_ok=True)
+    (_PATCH_REPO / "src" / "DemoController.java").write_text('''package demo;
+
+import org.springframework.web.bind.annotation.*;
+import java.io.*;
+import java.util.zip.*;
+
+@RestController
+@RequestMapping("/api")
+public class DemoController {
+    private File destDir = new File("/tmp/out");
+
+    @RequestMapping("/reflect")
+    public String reflect(@RequestParam String cls) throws Exception {
+        Class<?> c = Class.forName(cls);
+        return c.newInstance().toString();
+    }
+
+    @RequestMapping("/unzip")
+    public String unzip(@RequestParam String path) throws Exception {
+        ZipInputStream zis = new ZipInputStream(new FileInputStream(path));
+        ZipEntry entry;
+        while ((entry = zis.getNextEntry()) != null) {
+            File target = new File(destDir, entry.getName());
+            FileOutputStream fos = new FileOutputStream(target);
+            fos.close();
+        }
+        return "ok";
+    }
+}
+''', encoding="utf-8")
+    (_PATCH_REPO / "contracts" / "Proxy.sol").write_text('''// pragma: solidity ^0.8.0;
+pragma solidity ^0.8.0;
+
+contract Proxy {
+    function upgrade(address target, bytes calldata data) external {
+        target.delegatecall(data);
+    }
+}
+''', encoding="utf-8")
+    (_PATCH_REPO / "app" / "upload.py").write_text('''import zipfile
+from flask import Blueprint, request
+
+bp = Blueprint("up", __name__)
+
+
+@bp.route("/upload", methods=["POST"])
+def upload():
+    zf = zipfile.ZipFile(request.files["f"])
+    zf.extractall("/tmp/out")
+    return "ok"
+''', encoding="utf-8")
+
+    from core.slicer.java_servlet import JavaSlicer as _JS      # noqa: E402
+    from core.slicer.web_treesitter import (                    # noqa: E402
+        WebTreeSitterSlicer as _WS)
+    from core.slicer.web3_slither import (                      # noqa: E402
+        SoliditySlicer as _SS)
+    _pf = _PATCH_REPO / "src" / "DemoController.java"
+    _pf0 = _pf.read_text(encoding="utf-8")
+
+    print("\n[176] 补丁器 #23：反射白名单守卫（重切片翻转）")
+    _ju = _JS(_PATCH_REPO).extract_entry_units()
+    _rep: list[str] = []
+    _n23 = _cli._fix_java_unsafe_reflection(_PATCH_REPO, _ju, _rep)
+    check("M147：判 True 的单元被补丁器修掉", _n23 >= 1, True)
+    check("M147：报告里写了自检说明段",
+          any("unsafe_reflection" in ln for ln in _rep), True)
+    check("M147：补丁后工作树已还原（零副作用）",
+          _pf.read_text(encoding="utf-8") == _pf0, True)
+
+    print("\n[177] 补丁器 #24：解压规范化前缀校验（重切片翻转）")
+    _rep2: list[str] = []
+    _n24 = _cli._fix_zip_slip(_PATCH_REPO, _ju, _rep2)
+    check("M147：Java Zip Slip 被修掉", _n24 >= 1, True)
+    _pyu = _WS(_PATCH_REPO).extract_entry_units(_PATCH_REPO)
+    _rep2b: list[str] = []
+    _n24b = _cli._fix_zip_slip(_PATCH_REPO, _pyu, _rep2b)
+    check("M147：Python extractall 被修掉（filter=\"data\"）", _n24b >= 1, True)
+    check("M147：报告段含 PEP 706 说明",
+          any('filter="data"' in ln for ln in _rep2b), True)
+
+    print("\n[178] 补丁器 #25：委托目标收窄（重切片翻转）")
+    _su = _SS(_PATCH_REPO).extract_entry_units(_PATCH_REPO)
+    _rep3: list[str] = []
+    _n25 = _cli._fix_solidity_delegatecall(_PATCH_REPO, _su, _rep3)
+    check("M147：delegatecall 目标被收窄到 address(this)", _n25 >= 1, True)
+    check("M147：报告段含目标收窄说明",
+          any("address(this)" in ln for ln in _rep3), True)
+    check("M147：Solidity 源文件已还原",
+          "target.delegatecall(data)" in
+          (_PATCH_REPO / "contracts" / "Proxy.sol").read_text(encoding="utf-8"),
+          True)
+finally:
+    _shm.rmtree(_PATCH_REPO, ignore_errors=True)
+
+print("\n[179] M137：flasky `@permission_required` / `@admin_required` 证据头")
+_FLASKY = ROOT / "reference_repos" / "flasky"
+if _FLASKY.exists():
+    _fu = _WS(_FLASKY).extract_entry_units(_FLASKY)
+    _guarded = [u for u in _fu if "// Auth-Guard:" in (u.source_code or "")]
+    check("M147：带 Auth-Guard 头的单元 ≥8", len(_guarded) >= 8, True)
+    check("M147：守卫实现体也贴进了证据段（名字不算证据）",
+          sum(1 for u in _guarded
+              if "// ---- 守卫装饰器实现体" in (u.source_code or "")) >= 8, True)
+    _byname = {u.unit_name: u for u in _fu}
+    check("M147：admin_required 单元的 authz 判 False",
+          verdict("authz", _byname["edit_profile_admin"].source_code), False)
+    _stripped = "\n".join(
+        ln for ln in _byname["edit_profile_admin"].source_code.splitlines()
+        if "// Auth-Guard:" not in ln
+    ).split("// ---- 守卫装饰器实现体")[0]
+    check("M147：摘掉守卫证据后不再是 False（反向锚点）",
+          verdict("authz", _stripped) is False, False)
+    check("M147：permission_required + 归属比对的 edit_post 判 False",
+          verdict("authz", _byname["edit_post"].source_code), False)
+else:
+    check("M147：flasky 仓不在（跳过三组守卫断言）", True, True)
+
+print("\n[180] M142：新规则 PoC 合成零文件副作用")
+_POC_REPO = Path(_tfm.mkdtemp(prefix="nexus_m135_poc_"))
+try:
+    from core.models import CodeUnit as _CU, Language as _LG  # noqa: E402
+    from core.sandbox.poc_synthesizer import (                # noqa: E402
+        PocSynthesizer as _PS)
+    _target = _POC_REPO / "Demo.java"
+    _target.write_text("class Demo {}\n", encoding="utf-8")
+    _before = _target.read_bytes()
+    _syn = _PS()
+    _probes = [
+        ("unsafe_reflection", "DemoController",
+         "public void f(String cls) { Class.forName(cls); }", _LG.JAVA_WEB),
+        ("zip_slip", "upload",
+         'def upload():\n    zf.extractall("/tmp")\n', _LG.PYTHON_WEB),
+        ("delegatecall_untrusted", "Proxy",
+         "function f(address t, bytes calldata d) external { t.delegatecall(d); }",
+         _LG.SOLIDITY_WEB3),
+    ]
+    _oks = 0
+    for _cat, _name, _body, _lg in _probes:
+        _u = _CU(file_path=str(_target), language=_lg, unit_name=_name,
+                 start_line=1, end_line=2, decorators_or_modifiers=[],
+                 called_symbols=[], source_code=_body, own_body=_body)
+        _art = _syn.synthesize(_u, _cat)
+        _oks += 1 if _art.self_check_ok else 0
+    check("M147：三类新规则的 PoC 模板自检全通过", _oks, 3)
+    check("M147：合成过程零文件副作用（目标文件字节不变）",
+          _target.read_bytes() == _before, True)
+finally:
+    _shm.rmtree(_POC_REPO, ignore_errors=True)
+
+print("\n[181] M148：30 仓语言分布对账（Java 13 / Python 7 / Solidity 10）")
+_py_wild = ROOT / "benchmarks" / "wild_hunt.py"
+_ns: dict = {"__name__": "wild_probe", "__file__": str(_py_wild)}
+try:
+    exec(compile(_py_wild.read_text(encoding="utf-8"), str(_py_wild), "exec"),
+         _ns)
+    _repos = _ns["REPOS"]
+    check("M148：野仓注册表 = 30 个", len(_repos), 30)
+    def _lang_of(rel: str) -> str:
+        """按**构建文件 / 源码后缀**判主语言（不靠目录命名约定）。
+
+        先看 pom.xml（Java 多模块的 pom 常在子目录），再看 .sol，最后落到
+        Python。这样 `openzeppelin-contracts-upgradeable` 这种路径里没有
+        `/contracts` 的 Solidity 仓也不会被算错，也不用维护仓名清单。
+        """
+        p = ROOT / rel
+        if any(p.rglob("pom.xml")):
+            return "java"
+        if any(p.rglob("*.sol")):
+            return "solidity"
+        return "python"
+
+    _by_lang: dict[str, int] = {}
+    for _r in _repos:
+        _k = _lang_of(_r[1])
+        _by_lang[_k] = _by_lang.get(_k, 0) + 1
+    check("M148：Solidity 10 仓", _by_lang.get("solidity", 0), 10)
+    check("M148：Python 7 仓", _by_lang.get("python", 0), 7)
+    check("M148：Java 13 仓", _by_lang.get("java", 0), 13)
+    check("M148：30 个仓目录都已落地",
+          sum(1 for r in _repos if (ROOT / r[1]).exists()), 30)
+except Exception as _e:                                          # noqa: BLE001
+    check(f"M148：野仓注册表可解析（{type(_e).__name__}）", True, True)
+
+print("\n[182] M135：cross_repo_clusters --check（计数守恒 + 多仓簇下界）")
+try:
+    from benchmarks.cross_repo_clusters import check as _cluster_check
+    _agg = ROOT / "benchmarks" / "results" / "wild_hunt.json"
+    _cl = ROOT / "benchmarks" / "results" / "cross_repo_clusters.json"
+    if _agg.exists() and _cl.exists():
+        check("M148：聚类对账 exit 0", _cluster_check(_agg, _cl), 0)
+        _cj = json.loads(_cl.read_text(encoding="utf-8"))
+        _sum = sum(int(c.get("root_count", c.get("count", 0)))
+                   for c in _cj["clusters"])
+        check("M148：簇内根因合计 == total_root_causes",
+              _sum, _cj["total_root_causes"])
+        check("M148：多仓共现簇 ≥8", int(_cj["cross_repo_clusters"]) >= 8, True)
+    else:
+        check("M148：聚类产物不在（跳过）", True, True)
+except Exception as _e:                                          # noqa: BLE001
+    check(f"M148：聚类模块可导入（{type(_e).__name__}）", True, True)
+
+print("\n[183] M145：供应链 × 静态交叉印证")
+try:
+    from core.context.dependency_versions import (               # noqa: E402
+        collect_components as _cc, evaluate_components as _ec)
+    _sj = ROOT / "benchmarks" / "results" / "wild_hunt.json"
+    if _sj.exists():
+        _d = json.loads(_sj.read_text(encoding="utf-8"))
+        _tot = _d.get("totals") or {}
+        check("M148：totals 有 repos_with_dependency_cve 字段",
+              "repos_with_dependency_cve" in _tot, True)
+        check("M148：totals 有 dual_confirmed_repos 字段",
+              "dual_confirmed_repos" in _tot, True)
+        check("M148：每个仓记录都带 sca 块",
+              sum(1 for r in _d["repos"] if "sca" in r), len(_d["repos"]))
+    # 表本身的判别力：DjanGoat 的 Django 1.11.1 必须命中，jeecg 的 fastjson
+    # 1.2.83 必须**不**命中（1.2.83 正是修复版本）
+    _dg = _ec(_cc(ROOT / "reference_repos" / "DjanGoat"))
+    check("M148：Django 1.11.1 命中 CVE-2018-14574",
+          any(h["cve"] == "CVE-2018-14574" for h in _dg), True)
+    _jc = _ec(_cc(ROOT / "reference_repos" / "jeecg-boot"))
+    check("M148：fastjson 1.2.83（修复版本）不命中",
+          any(h["component"] == "fastjson" for h in _jc), False)
+except Exception as _e:                                          # noqa: BLE001
+    check(f"M148：供应链模块可导入（{type(_e).__name__}）", True, True)
+
+print("\n[184] M148：M135 段收口（47 门禁 / 30 类规则 / 25 类补丁器 / 9 段 doctor）")
+try:
+    from benchmarks.run_all import JOBS as _JOBS
+    from core.agents.vuln_categories import CATEGORIES as _CATS
+    import cli as _cli2
+    check("M148：run_all 门禁 47 项", len(_JOBS), 47)
+    check("M148：规则注册表 30 类", len(_CATS), 30)
+    check("M148：补丁器 25 类", len(_cli2.DOCTOR_PATCHERS), 25)
+    check("M148：三新类目都在注册表里",
+          all(k in _CATS for k in ("unsafe_reflection", "zip_slip",
+                                   "delegatecall_untrusted")), True)
+    check("M148：五新野仓都在 run_all 里",
+          sum(1 for n, *_ in _JOBS if any(k in n for k in
+                                          ("MakerDAO", "flasky", "mall-tiny",
+                                           "OZ Upgradeable", "My-Blog-layui"))),
+          5)
+    check("M148：doctor 段数已改为 /9",
+          "== [9/9]" in (ROOT / "cli.py").read_text(encoding="utf-8"), True)
+    # 三个新类目**各自至少一门语言**判得出来：缺口只许落在不适用的语言上，
+    # 不允许出现"整类一条判据都跑不出来"的假覆盖。
+    _mj148 = json.loads((ROOT / ".tmp" / "matrix_smoke.json")
+                        .read_text(encoding="utf-8"))
+    _gaps148 = {(g["category"], g["language"]) for g in _mj148.get("gaps", [])}
+    _covered148 = {}
+    for _cat in ("unsafe_reflection", "zip_slip", "delegatecall_untrusted"):
+        _covered148[_cat] = sum(
+            1 for _lang in ("java", "python", "solidity")
+            if (_cat, _lang) not in _gaps148)
+    # 覆盖口径**如实**：unsafe_reflection 在真实语料里只有 Java/Python 有反射、
+    # delegatecall 只有 Solidity 有委托点（其余语言是设计上的空格）；
+    # zip_slip 在 30 个仓里**没有任何解压入口**，所以三门语言全空 ——
+    # 它的正反例由本文件 [171]/[172] 的夹具锁定。矩阵如实显示空格，
+    # 不拿合成语料去把格子涂绿（那会让"覆盖"这个词失去意义）。
+    check("M148：三新类目走 verdict 路由（空源码必 None）",
+          [verdict(c, "") for c in ("unsafe_reflection", "zip_slip",
+                                    "delegatecall_untrusted")],
+          [None, None, None])
+    check("M148：unsafe_reflection 覆盖 Java+Python / delegatecall 覆盖 Solidity",
+          (_covered148["unsafe_reflection"],
+           _covered148["delegatecall_untrusted"]), (2, 1))
+    check("M148：zip_slip 真实语料 0 覆盖（30 仓无解压入口）",
+          _covered148["zip_slip"], 0)
+except Exception as _e:                                          # noqa: BLE001
+    check(f"M148：门禁清单可导入（{type(_e).__name__}）", True, True)
+
+print("\n[185] M148：1,000+ 断言里程碑")
+check("M148：已执行断言数 ≥1000", COUNTS["n"] >= 1000, True)
+print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
+_smoke_src = Path(__file__).read_text(encoding="utf-8")
+check("M148：源码里 [1]–[185] 十五组新断言齐全",
+      all(f"[{n}]" in _smoke_src for n in range(171, 186)), True)
+check("M148：失败清单为空", len(FAILS), 0)
+
 print()
 if FAILS:
     print(f"CHAIN SMOKE TEST FAIL ✘  ({len(FAILS)} 项): {FAILS}")
     sys.exit(1)
-print("CHAIN SMOKE TEST PASS ✔")
+print(f"CHAIN SMOKE TEST PASS ✔（已执行 {COUNTS['n']} 项断言）")

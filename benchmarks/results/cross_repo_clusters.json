@@ -1,9 +1,21 @@
 {
-  "total_root_causes": 94,
-  "cluster_count": 51,
+  "total_root_causes": 98,
+  "cluster_count": 53,
   "cross_repo_clusters": 8,
   "conservation_ok": true,
   "clusters": [
+    {
+      "category": "hash",
+      "root_kind": "endpoint",
+      "component": "AdminController.java",
+      "repo_count": 3,
+      "root_count": 4,
+      "repos": [
+        "My-Blog",
+        "My-Blog-layui",
+        "newbee-mall"
+      ]
+    },
     {
       "category": "authz",
       "root_kind": "endpoint",
@@ -68,17 +80,6 @@
       "repos": [
         "DjanGoat",
         "django-realworld"
-      ]
-    },
-    {
-      "category": "hash",
-      "root_kind": "endpoint",
-      "component": "AdminController.java",
-      "repo_count": 2,
-      "root_count": 2,
-      "repos": [
-        "My-Blog",
-        "newbee-mall"
       ]
     },
     {
@@ -210,6 +211,16 @@
       "root_count": 1,
       "repos": [
         "newbee-mall-api"
+      ]
+    },
+    {
+      "category": "cors",
+      "root_kind": "global-config",
+      "component": "cors:dc2614ad3e1f",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "mall-tiny"
       ]
     },
     {
@@ -490,6 +501,16 @@
       "root_count": 2,
       "repos": [
         "litemall"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "BlogController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "My-Blog-layui"
       ]
     },
     {

@@ -188,3 +188,172 @@ def parse_block(source: str) -> dict[str, str]:
             k, _, v = body.partition("=")
             out[k.strip().lower()] = v.strip()
     return out
+
+
+# ================= M145：供应链组件风险 ↔ 代码入口可达性 =================
+#
+# 要回答的问题：**"这个仓既用了有已知漏洞的组件版本，又有一条代码级 P0"的
+# 仓有几个？** 单看组件版本会给出"全库都在用旧依赖"的噪声，单看代码又看不见
+# "这条路由的 JSON 解析由 fastjson 1.2.31 承担"。两张表叠在一起才是"实锤"。
+#
+# 表的口径（刻意保守）：
+#   · 每条都写**修复版本**（fixed_in）与 CVE 编号，来自公开 advisory；
+#   · 只收"版本区间直接决定是否受影响"的条目 —— 收不进来的组件就报
+#     "未收录"，不猜；
+#   · 版本比较用 `compare_versions()`（人手写的 1.2.83.sec10 这类后缀按
+#     数字头比较），读不出版本一律不算命中。
+DEPENDENCY_ADVISORIES: dict[str, list[tuple[str, str, str]]] = {
+    # (fixed_in, CVE, 标题) —— 安装版本 < fixed_in 即受影响
+    "shiro-core": [
+        ("1.2.5", "CVE-2016-4437",
+         "Shiro-550：rememberMe 硬编码 AES 密钥 → 反序列化 RCE"),
+        ("1.7.1", "CVE-2020-1957",
+         "认证绕过：路径规范化差异导致未授权访问"),
+    ],
+    "shiro-web": [("1.2.5", "CVE-2016-4437", "同 shiro-core（Shiro-550）")],
+    "shiro-spring": [("1.2.5", "CVE-2016-4437", "同 shiro-core（Shiro-550）")],
+    "fastjson": [
+        ("1.2.83", "CVE-2022-25845",
+         "autoType 绕过 → 反序列化 gadget 链（1.2.83 起默认 safeMode）"),
+    ],
+    "log4j-core": [
+        ("2.17.1", "CVE-2021-44228",
+         "Log4Shell：JNDI lookup RCE（2.17.1 才完整修复）"),
+    ],
+    "commons-collections": [
+        ("3.2.2", "CVE-2015-6420",
+         "InvokerTransformer 反序列化 gadget（ysoserial 主链）"),
+    ],
+    "snakeyaml": [
+        ("2.0", "CVE-2022-1471",
+         "Constructor 实例化 RCE（2.0 起默认 SafeConstructor）"),
+    ],
+    "jackson-databind": [
+        ("2.9.10.8", "CVE-2020-36518",
+         "深层嵌套 JSON 栈溢出 DoS"),
+    ],
+    "django": [
+        ("1.11.15", "CVE-2018-14574",
+         "CommonMiddleware 开放重定向"),
+        ("1.11.5", "CVE-2017-12794",
+         "调试页 XSS（模板异常信息未转义）"),
+    ],
+    "djangorestframework": [
+        ("3.11.2", "CVE-2020-25626",
+         "可浏览 API 的 XSS（data-* 属性未转义）"),
+    ],
+    "pyjwt": [
+        ("2.4.0", "CVE-2022-29217",
+         "密钥类型混淆：非对称公钥可被当作 HMAC 密钥验签"),
+    ],
+    "jinja2": [
+        ("2.10.1", "CVE-2019-10906",
+         "沙箱逃逸（str.format_map 绕过 SandboxedEnvironment）"),
+    ],
+    "requests": [
+        ("2.20.0", "CVE-2018-18074",
+         "重定向到新主机时泄漏 Authorization 头"),
+    ],
+    "flask": [
+        ("0.12.3", "CVE-2018-1000656",
+         "特制 JSON 触发内存耗尽 DoS"),
+    ],
+    "werkzeug": [
+        ("0.15.3", "CVE-2019-14322",
+         "Windows 平台路径遍历（safe_join 未处理盘符）"),
+    ],
+    "urllib3": [
+        ("1.24.2", "CVE-2019-11324",
+         "证书验证绕过（CA 链处理缺陷）"),
+    ],
+    "sqlalchemy": [
+        ("1.3.0", "CVE-2019-7548",
+         "order_by/group_by 拼接用户输入 → SQL 注入"),
+    ],
+    "pyyaml": [
+        ("5.4", "CVE-2020-14343",
+         "full_load 可实例化任意 Python 对象 → RCE"),
+    ],
+    "pycrypto": [
+        ("2.7.0", "CVE-2013-7459",
+         "AES-NI 实现堆溢出（项目已停止维护，建议迁移 pycryptodome）"),
+    ],
+}
+
+
+def _norm_component(name: str) -> str:
+    return name.strip().lower().replace("_", "-")
+
+
+def collect_components(repo_root: str | Path) -> dict[str, str]:
+    """收集一个仓库的组件版本（Maven pom + Python requirements）。
+
+    **刻意不解析 package.json**：30 个野仓里的 JS 依赖绝大多数是
+    hardhat/editormd 这类**构建期**工具，不在运行时链路上 —— 把它们算进
+    "供应链风险"只会制造噪声。
+
+    同名组件多次出现时取**第一个**（父 pom / 主 requirements 优先），
+    并保留原样版本串（`1.2.83.sec10` 不截断，比较时再归一）。
+    """
+    root = Path(repo_root)
+    out: dict[str, str] = {}
+    if not root.exists():
+        return out
+    for name, ver in DependencyVersionResolver(root).versions().items():
+        out.setdefault(_norm_component(name), ver)
+    # requirements.txt 与 **requirements/ 目录下的分片**（flasky 就是
+    # `requirements/common.txt` + `dev.txt` 的布局，只按文件名 glob 会全漏）
+    req_files = [p for p in root.rglob("requirements*.txt")]
+    req_files += [p for p in root.rglob("*.txt")
+                  if p.parent.name == "requirements"]
+    seen: set[Path] = set()
+    for req in sorted(req_files, key=str)[:10]:
+        if req in seen:
+            continue
+        seen.add(req)
+        if any(p in ("node_modules", ".git", "venv", ".venv") for p in req.parts):
+            continue
+        try:
+            text = req.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            m = re.match(r"^\s*([A-Za-z0-9_.\-]+)\s*==\s*([\w.\-]+)", line)
+            if m:
+                out.setdefault(_norm_component(m.group(1)), m.group(2))
+    return out
+
+
+def evaluate_components(components: dict[str, str]) -> list[dict]:
+    """把组件版本对到已知 advisory 上，返回命中的条目列表。
+
+    每条：`{component, version, cve, title, fixed_in}`。版本读不出/未收录
+    的组件**不进结果**（"没收录"不等于"安全"，报告里会单列未收录项）。
+    """
+    hits: list[dict] = []
+    for name, ver in sorted(components.items()):
+        rules = DEPENDENCY_ADVISORIES.get(name)
+        if not rules:
+            continue
+        for fixed_in, cve, title in rules:
+            cmp = compare_versions(ver, fixed_in)
+            if cmp is None:
+                continue
+            if cmp < 0:
+                hits.append({"component": name, "version": ver, "cve": cve,
+                             "title": title, "fixed_in": fixed_in})
+    return hits
+
+
+def uncovered_components(components: dict[str, str]) -> dict[str, str]:
+    """有版本但**不在 advisory 表里**的组件（报告里如实列作"未收录"）。"""
+    return {k: v for k, v in sorted(components.items())
+            if k not in DEPENDENCY_ADVISORIES}
+
+
+# 同一组件多条命中只保留"最高危"的那条（版本区间由窄到宽）时的排序权重
+def severity_rank(cve: str) -> int:
+    """已知高危机型给更高权重（仅用于报告排序，不参与判定）。"""
+    high = ("CVE-2021-44228", "CVE-2016-4437", "CVE-2022-1471",
+            "CVE-2015-6420", "CVE-2022-25845", "CVE-2020-14343")
+    return 0 if cve in high else 1

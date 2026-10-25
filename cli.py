@@ -1837,6 +1837,10 @@ MATRIX_FIX_MAP: dict[str, tuple[str, ...]] = {
     "access_control": ("_fix_solidity_onlyowner", "_fix_solidity_initiator"),
     "arithmetic": ("_fix_solidity_arith_guard",),
     "unchecked_low_level_calls": ("_fix_solidity_unchecked_wrap",),
+    # M139–M141：第 28、29、30 类
+    "unsafe_reflection": ("_fix_java_unsafe_reflection",),
+    "zip_slip": ("_fix_zip_slip",),
+    "delegatecall_untrusted": ("_fix_solidity_delegatecall",),
 }
 
 
@@ -2224,6 +2228,8 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_python_yaml(repo, py, report)
         n += _fix_python_redirect(repo, py, report)
         n += _fix_hardcoded_secret(repo, py, report)
+        # M140：Python 侧 Zip Slip（`extractall(..., filter="data")`）
+        n += _fix_zip_slip(repo, py, report)
     if sol:
         n += _fix_solidity_txorigin(repo, sol, report)
         n += _fix_solidity_reentrancy(repo, sol, report)
@@ -2231,6 +2237,8 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_solidity_onlyowner(repo, sol, report)
         n += _fix_solidity_arith_guard(repo, sol, report)
         n += _fix_solidity_unchecked_wrap(repo, sol, report)
+        # M141：不受信 delegatecall → 目标收窄到 address(this)
+        n += _fix_solidity_delegatecall(repo, sol, report)
     if rest:
         n += _fix_cors_config(repo, rest, report)
         n += _fix_hardcoded_secret(repo, rest, report)
@@ -2240,6 +2248,9 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_java_header_injection(repo, rest, report)
         n += _fix_java_mass_assignment(repo, rest, report)
         n += _fix_java_weakrand(repo, rest, report)
+        # M139/M140：第 23、24 类 —— 反射白名单 / 解压前缀校验
+        n += _fix_java_unsafe_reflection(repo, rest, report)
+        n += _fix_zip_slip(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
     if n:
         out = Path(out_path)
@@ -3919,6 +3930,9 @@ DOCTOR_PATCHERS = [
     "_fix_java_ssti_viewname", "_fix_java_header_injection",
     # M125：第 21、22 类 —— 批量赋值忽略列表 / 弱随机源
     "_fix_java_mass_assignment", "_fix_java_weakrand",
+    # M139-M141：第 23、24、25 类 —— 反射白名单 / 解压前缀 / 委托目标
+    "_fix_java_unsafe_reflection", "_fix_zip_slip",
+    "_fix_solidity_delegatecall",
 ]
 
 
@@ -4226,6 +4240,245 @@ def _fix_java_weakrand(repo: Path, targets: list, lines: list) -> int:
     return fixed
 
 
+def _fix_java_unsafe_reflection(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 23 类（M139）：反射目标加**白名单守卫**。
+
+    修法（在反射调用前插一行守卫）：
+
+        java.util.Set<String> __allowedReflect = java.util.Set.of("java.lang.String");
+        if (!__allowedReflect.contains(cls)) { throw new IllegalArgumentException(...); }
+
+    为什么不改成 `Class.forName("常量")`：那会把"按名字查表"的动态能力改没，
+    业务直接坏掉 —— 是"看起来修了、实际把功能删了"的坏补丁。白名单保住
+    动态性，只把**取值集合**收窄到可信类。
+
+    变量名刻意不带点、不嵌括号：判据层 `_reflect_whitelisted` 认的就是
+    `<容器>.contains(<变量>)` 这一形态 —— 补丁必须能被自己的判据复核。
+    """
+    from core.agents.rule_detectors import (verdict as rule_verdict,
+                                            _JAVA_REFLECT_RE,
+                                            _reflect_sink_arg)
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("unsafe_reflection", src) is not True:
+            continue
+        var = ""
+        call = ""
+        for m in _JAVA_REFLECT_RE.finditer(src):
+            arg = _reflect_sink_arg(m)
+            if re.fullmatch(r"[A-Za-z_]\w*", arg):
+                var, call = arg, m.group(0)
+                break
+        if not var or not call:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        original = f.read_text(encoding="utf-8")
+        idx = original.find(call)
+        if idx < 0:
+            continue
+        line_start = original.rfind("\n", 0, idx) + 1
+        # 反射调用常在语句**中间**（`Class<?> c = Class.forName(cls);`）——
+        # 守卫要插在**整条语句之前**，缩进取行首缩进，不是调用点前的空白。
+        lead = re.match(r"[ \t]*", original[line_start:]).group(0)
+        guard = (f'{lead}java.util.Set<String> __allowedReflect = '
+                 f'java.util.Set.of("java.lang.String");\n'
+                 f'{lead}if (!__allowedReflect.contains({var})) {{ '
+                 f'throw new IllegalArgumentException('
+                 f'"reflection target not allowlisted"); }}\n')
+        patched = original[:line_start] + guard + original[line_start:]
+        v2 = None
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.context.java_impl_resolver import _FILE_CACHE as _FC
+            _FC.clear()
+            from core.slicer.java_servlet import JavaSlicer
+            u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = rule_verdict("unsafe_reflection", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE as _FC2
+            _FC2.clear()
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [java-unsafe-reflect] {u.unit_name}（`{f.name}`）",
+                      "```diff", *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 unsafe_reflection → False。",
+                      f"> 反射目标 `{var}` 现在必须先过白名单集合。", ""]
+    return fixed
+
+
+def _fix_zip_slip(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 24 类（M140）：解压落盘前的**规范化前缀校验**。
+
+    Java：在 `new File(dest, entry.getName())` 之后插三行 ——
+
+        java.io.File __destDir = new java.io.File(dest.toString()).getCanonicalFile();
+        java.io.File __canonTarget = target.getCanonicalFile();
+        if (!__canonTarget.getPath().startsWith(__destDir.getPath()
+                + java.io.File.separator)) { throw new java.io.IOException(...); }
+
+    关键点是**先规范化再比前缀**：只拼 `dest + name` 拦不住 `../`，
+    只 `contains("..")` 拦不住符号链接与编码变体。`toString()` 让 String
+    与 File 两种基路径都能编译（String 的 toString 是恒等）。
+
+    Python：`extractall(dest)` → `extractall(dest, filter="data")`（PEP 706）。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("zip_slip", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        original = f.read_text(encoding="utf-8")
+        patched = ""
+        note = ""
+        if _looks_python_src(src):
+            m = re.search(r"\.\s*extractall\s*\(", original)
+            if not m:
+                continue
+            patched = (original[:m.end()] + 'filter="data", '
+                       + original[m.end():])
+            note = '> `extractall(..., filter="data")`（PEP 706）。'
+        else:
+            fm = re.search(
+                r"(?m)^([ \t]*)(?:[A-Za-z_][\w.<>\[\]]*\s+)?([A-Za-z_]\w*)"
+                r"\s*=\s*new\s+File\s*\(\s*([A-Za-z_]\w*)\s*,\s*"
+                r"[^;]*?getName\s*\(\s*\)\s*\)\s*;",
+                original)
+            if not fm:
+                continue
+            indent, var, dest = fm.group(1), fm.group(2), fm.group(3)
+            guard = (
+                f"\n{indent}java.io.File __destDir = "
+                f"new java.io.File({dest}.toString()).getCanonicalFile();"
+                f"\n{indent}java.io.File __canonTarget = "
+                f"{var}.getCanonicalFile();"
+                f"\n{indent}if (!__canonTarget.getPath().startsWith("
+                f"__destDir.getPath() + java.io.File.separator)) {{ "
+                f"throw new java.io.IOException(\"Zip Slip detected\"); }}\n")
+            patched = original[:fm.end()] + guard + original[fm.end():]
+            note = ("> 规范化前缀校验：`getCanonicalFile()` 之后按 "
+                    f"`{dest}` 的规范路径比 `startsWith`。")
+        if patched == original:
+            continue
+        v2 = None
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.context.java_impl_resolver import _FILE_CACHE as _FC
+            _FC.clear()
+            u2 = _reslice_unit(repo, u, src, f)
+            v2 = rule_verdict("zip_slip", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE as _FC2
+            _FC2.clear()
+            if _looks_python_src(src):
+                from benchmarks.slice_cache import cached_units  # noqa: F401
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [zip-slip] {u.unit_name}（`{f.name}`）",
+                      "```diff", *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 zip_slip → False。", note, ""]
+    return fixed
+
+
+def _fix_solidity_delegatecall(repo: Path, targets: list, lines: list) -> int:
+    """补丁第 25 类（M141）：委托目标收窄到**可信集合**。
+
+    修法：在 `target.delegatecall(...)` 之前插一行
+
+        require(target == address(this), "delegatecall target not allowlisted");
+
+    `address(this)` 是**唯一**在"看不见对方代码"的前提下可证明可信的目标
+    （自委托只执行本合约自己的代码）。要保留跨合约委托的，把这里换成
+    管理员维护的白名单槽位即可 —— 判据认的是"目标被约束"这个机制，
+    不认具体是哪一个容器。
+    """
+    from core.agents.rule_detectors import verdict as rule_verdict
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("delegatecall_untrusted", src) is not True:
+            continue
+        m = re.search(r"([A-Za-z_]\w*)\s*\.\s*delegatecall", src)
+        if not m:
+            continue
+        target, stmt = m.group(1), m.group(0)
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        original = f.read_text(encoding="utf-8")
+        idx = original.find(stmt)
+        if idx < 0:
+            continue
+        line_start = original.rfind("\n", 0, idx) + 1
+        indent = original[line_start:idx]
+        if indent.strip():
+            continue
+        guard = (f'{indent}require({target} == address(this), '
+                 f'"delegatecall target not allowlisted");\n')
+        patched = original[:line_start] + guard + original[line_start:]
+        v2 = None
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.slicer.web3_slither import SoliditySlicer
+            u2 = next((x for x in SoliditySlicer(repo).extract_entry_units(repo)
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = (rule_verdict("delegatecall_untrusted", u2.source_code)
+                  if u2 else None)
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [sol-delegatecall] {u.unit_name}（`{f.name}`）",
+                      "```diff", *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 delegatecall_untrusted → False。",
+                      f"> 委托目标 `{target}` 现在必须等于 `address(this)`。", ""]
+    return fixed
+
+
+def _looks_python_src(src: str) -> bool:
+    from core.agents.rule_detectors import _looks_python
+    return _looks_python(src)
+
+
+def _reslice_unit(repo: Path, u, src: str, f: Path):
+    """按语言重切片并挑回同名单元（补丁自检用）。"""
+    from core.agents.rule_detectors import _looks_python
+    if _looks_python(src):
+        from core.slicer.web_treesitter import WebTreeSitterSlicer
+        units = WebTreeSitterSlicer(repo).extract_entry_units(repo)
+    else:
+        from core.slicer.java_servlet import JavaSlicer
+        units = JavaSlicer(repo).extract_entry_units()
+    return next((x for x in units
+                 if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+
+
 def _strip_scoreboard_timestamp(text: str) -> str:
     """去掉 SCOREBOARD 里的"生成时间"行。
 
@@ -4240,7 +4493,7 @@ def cmd_doctor(args) -> int:
     """只读自检：依赖 / 规则注册表 / 缓存指纹 / 补丁器就位。exit 0 = 全部就绪。"""
     ok = True
 
-    print("== [1/8] 依赖就位 ==")
+    print("== [1/9] 依赖就位 ==")
     print(f"  [OK] python {sys.version.split()[0]}")
     for name in ["httpx", "tree_sitter(可选·缺省正则降级)", "pyyaml(可选)", "slither(可选)"]:
         try:
@@ -4252,7 +4505,7 @@ def cmd_doctor(args) -> int:
             if "(可选" not in name:
                 ok = False
 
-    print("== [2/8] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
+    print("== [2/9] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
     from core.agents import rule_detectors
     for cat in DOCTOR_RULE_CATEGORIES:
         try:
@@ -4266,7 +4519,7 @@ def cmd_doctor(args) -> int:
             print(f"  [FAIL] {cat}: 路由异常 {type(e).__name__}: {e}")
             ok = False
     print(f"  共 {len(DOCTOR_RULE_CATEGORIES)} 类，全部走 verdict() 路由")
-    print("== [3/8] 缓存指纹自检 ==")
+    print("== [3/9] 缓存指纹自检 ==")
     try:
         from benchmarks.diag_owasp_sqli_fp import _slicer_fingerprint
         fp1, fp2 = _slicer_fingerprint(), _slicer_fingerprint()
@@ -4279,7 +4532,7 @@ def cmd_doctor(args) -> int:
         print(f"  [FAIL] 指纹不可用: {type(e).__name__}: {e}")
         ok = False
 
-    print(f"== [4/8] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
+    print(f"== [4/9] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
     for fn_name in DOCTOR_PATCHERS:
         fn = globals().get(fn_name)
         if callable(fn):
@@ -4297,9 +4550,45 @@ def cmd_doctor(args) -> int:
     ok = _doctor_wild_hunt_check(ok)
     ok = _doctor_disclosure_index_check(ok)
     ok = _doctor_exporters_check(ok)
+    ok = _doctor_cross_repo_check(ok)
 
     print("doctor:", "PASS（全部就绪）" if ok else "FAIL（存在缺失项）")
     return 0 if ok else 1
+
+
+def _doctor_cross_repo_check(ok: bool) -> bool:
+    """doctor 第九段（M135）：跨仓聚类 ↔ wild_hunt 的**账**要对得上。
+
+    与 run_all 第 42 项是同一断言的两个入口（CI 里跑 run_all，人工自检
+    跑 doctor）。断言只有两条，但都是"结论级"的：
+
+      ① 计数守恒：簇内根因之和 == 采集的独立根因总数；
+      ② 多仓共现簇 ≥ 8：低于这个数聚类就已退化成一仓一簇。
+
+    产物不在（首次克隆、还没跑野战）时**不判 FAIL** —— 与第 7、8 段同一
+    口径：缺产物是"还没跑"，不是"跑坏了"。
+    """
+    print("== [9/9] 跨仓聚类一致性（M135）==")
+    root = Path(__file__).resolve().parent
+    agg = root / "benchmarks" / "results" / "wild_hunt.json"
+    cl = root / "benchmarks" / "results" / "cross_repo_clusters.json"
+    if not agg.exists() or not cl.exists():
+        print("  [提示] 缺 wild_hunt.json 或 cross_repo_clusters.json"
+              "（尚未跑野战，不判 FAIL）")
+        return ok
+    try:
+        sys.path.insert(0, str(root))
+        from benchmarks.cross_repo_clusters import check as _cluster_check
+        rc = _cluster_check(agg, cl)
+        if rc == 0:
+            print("  [OK] 聚类与采集对账通过")
+        else:
+            print("  [FAIL] 聚类与采集对账不通过（见上方明细）")
+            ok = False
+    except Exception as e:                               # noqa: BLE001
+        print(f"  [FAIL] 跨仓聚类校验异常：{type(e).__name__}: {e}")
+        ok = False
+    return ok
 
 
 def _doctor_exporters_check(ok: bool) -> bool:
@@ -4309,7 +4598,7 @@ def _doctor_exporters_check(ok: bool) -> bool:
     任一条的 schema 校验器被改坏，用户那边是"报告上传失败"而不是"门禁变红"
     —— CI 里看不出来。这里把两个校验器都跑一遍自产文档 + 一份坏文档。
     """
-    print("== [8/8] 双 SAST 导出器与跨仓聚类（SARIF / GitLab / clusters）==")
+    print("== [8/9] 双 SAST 导出器与跨仓聚类（SARIF / GitLab / clusters）==")
     root = Path(__file__).resolve().parent
     try:
         from core.context.sarif_validator import validate_sarif
@@ -4369,7 +4658,7 @@ def _doctor_disclosure_index_check(ok: bool) -> bool:
     留下 21 份互不相干的草稿目录。"草稿总数 == 根因总数"是唯一能自动核对的
     不变量 —— 少一份说明有仓没跑到，多一份说明根因折叠漏了。
     """
-    print("== [7/8] 披露包完整性（advisories/INDEX.md ↔ wild_hunt.json）==")
+    print("== [7/9] 披露包完整性（advisories/INDEX.md ↔ wild_hunt.json）==")
     root = Path(__file__).resolve().parent
     adv_root = root / "benchmarks" / "results" / "advisories"
     agg = root / "benchmarks" / "results" / "wild_hunt.json"
@@ -4427,7 +4716,7 @@ def _doctor_extended_checks(ok: bool) -> bool:
     root = Path(__file__).resolve().parent
 
     # ---- 5.1 PoC 合成器：可导入 + 三语言模板自检通过 ----
-    print("== [5/8] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
+    print("== [5/9] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
     print("  -- PoC 合成器 --")
     try:
         from core.sandbox.poc_synthesizer import PocSynthesizer, PocArtifact
@@ -4596,7 +4885,7 @@ def _doctor_wild_hunt_check(ok: bool) -> bool:
     报告是给人和上游看的，json 是机器事实源；两者漂了 doctor 当场 FAIL。
     """
     root = Path(__file__).resolve().parent
-    print("== [6/8] 野战白皮书对账（wild_hunt.json ↔ WILD_HUNT_REPORT.md）==")
+    print("== [6/9] 野战白皮书对账（wild_hunt.json ↔ WILD_HUNT_REPORT.md）==")
     agg = root / "benchmarks" / "results" / "wild_hunt.json"
     report = root / "WILD_HUNT_REPORT.md"
     if not agg.exists() or not report.exists():
@@ -4661,10 +4950,11 @@ def main():
     p_scan.add_argument("--graph", action="store_true",
                         help="M49：报告中内嵌 Mermaid 污点传播路径图"
                              "（入口 → Hop → Sink 行号）")
-    p_scan.add_argument("--emit-poc", default=None, metavar="DIR",
+    p_scan.add_argument("--emit-poc", "--synth-poc", dest="emit_poc",
+                        default=None, metavar="DIR",
                         help="M45：把规则层确定性 True 命中合成为可运行 PoC "
                              "骨架（Solidity .t.sol / Python pytest / Java MockMvc）"
-                             "并落盘到 DIR")
+                             "并落盘到 DIR（--synth-poc 是同一开关的别名）")
     p_scan.add_argument("--sarif", default=None, metavar="OUT.sarif",
                         help="将命中结果导出为 SARIF v2.1.0（GitHub Code Scanning 格式）")
     p_scan.add_argument("--gitlab-sast", dest="gitlab_sast", default=None,

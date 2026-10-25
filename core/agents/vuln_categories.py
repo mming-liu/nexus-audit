@@ -442,6 +442,70 @@ CATEGORIES: dict[str, VulnCategory] = {
                   "② 只在注释里写「注意溢出」不算防护；"
                   "③ 对加法用 require(a >= b) 不构成溢出防护。"),
     ),
+
+    # ---------------- M139：第 28 类 —— 不安全反射（CWE-470） ----------------
+    "unsafe_reflection": VulnCategory(
+        key="unsafe_reflection", display="不安全反射 / 动态类加载",
+        cwe="CWE-470", owasp=False,
+        sink_question=(
+            "函数是否用**运行时可控的字符串**决定要加载/调用的类型或方法？包括："
+            "① Java `Class.forName(x)` / `ClassLoader.loadClass(x)` /"
+            " `clazz.getMethod(x)` + `Method.invoke(...)` / `newInstance()`；"
+            "② Python `importlib.import_module(x)` / `__import__(x)` /"
+            " `getattr(obj, x)` / `globals()[x]`，且 x 来自路径/查询/表单参数。"
+            "只算「名字由外部数据决定」的形态；`Class.forName(\"java.sql.Driver\")`"
+            " 这类**字符串常量**不算。"),
+        property=(
+            "被加载/被调用的名字是否被**白名单**约束（`ALLOWED_*` / `WHITELIST` /"
+            " `SAFE_CLASSES` 集合的 `contains(...)` / `in {...}` / 字典查表），"
+            "或名字本身是源码里的字面量？"
+            "注意：① 白名单必须在调用点**之前**生效且覆盖到该值；"
+            "② 仅做字符过滤（replace/正则去点号）不构成白名单；"
+            "③ 反射调用的是固定常量方法名、只有参数是外部值时，本属性为 Yes。"),
+    ),
+
+    # ---------------- M140：第 29 类 —— 压缩包路径穿越（CWE-22） ----------------
+    "zip_slip": VulnCategory(
+        key="zip_slip", display="压缩包路径穿越（Zip Slip）",
+        cwe="CWE-22", owasp=False, needs_taint=False,
+        sink_question=(
+            "函数是否把**压缩包内的条目名**当成文件路径落盘？包括："
+            "① Java `ZipEntry.getName()` / `JarEntry.getName()` /"
+            " `TarArchiveEntry.getName()` 流向 `new File(dest, name)` /"
+            " `Paths.get(...)` / `FileOutputStream(...)`；"
+            "② Python `zipfile.ZipFile(...).extractall(...)` /"
+            " `TarFile.extractall(...)` / `extract(member, path)`。"
+            "注意：条目名来自压缩包本身，攻击者可以造出 `../../etc/cron.d/x`。"),
+        property=(
+            "落盘前是否把条目名限制在目标目录内？有效防护包括："
+            "① `getCanonicalPath()` / `normalize()` 后 `startsWith(destDir)` 前缀校验；"
+            "② PEP 706 的 `extractall(..., filter=\"data\")`；"
+            "③ 显式拒绝含 `..` 或绝对路径的条目名，并**在写出之前**中止。"
+            "注意：① 只拼接目标目录不做前缀校验不算防护；"
+            "② 只检查 `contains(\"..\")` 而不做规范化，遇到符号链接/编码变体"
+            "仍可绕过 —— 缺规范化前缀校验时仍应判定防护不足。"),
+    ),
+
+    # ---------------- M141：第 30 类 —— 不受信 delegatecall（SWC-112） ----------------
+    "delegatecall_untrusted": VulnCategory(
+        key="delegatecall_untrusted", display="不受信 delegatecall（代理目标可控）",
+        cwe="CWE-829", owasp=False, needs_taint=False,
+        sink_question=(
+            "函数是否对外部可控的**委托调用目标**执行了 `delegatecall`？即："
+            "`target.delegatecall(...)` 里的 target 来自函数形参，或来自"
+            "**没有权限保护**的可写状态变量（任何人可改），且该函数可被外部调用"
+            "（external/public，且不是 `internal/private`）。"),
+        property=(
+            "调用目标是否被约束在可信集合内？有效防护包括："
+            "① 目标写死为 `address(this)`（Multicall/自委托形态）；"
+            "② 目标来自 ERC-1967 的 `_implementation()` / `getAddressSlot` 存储槽"
+            "（由代理框架维护，外部改不了）；"
+            "③ 函数受 `onlyOwner` / `onlyAdmin` / `auth` / `onlyProxy` 一类"
+            "modifier 保护，且其**实现体**真的做了身份校验；"
+            "④ 目标在 require 里与白名单常量/管理员设定的槽位比对。"
+            "注意：① 名字叫 onlyOwner 但实现体没有身份比对不算防护；"
+            "② 只在注释里声明「仅管理员」不算。"),
+    ),
 }
 
 ALL_KEYS = list(CATEGORIES.keys())
