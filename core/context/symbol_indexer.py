@@ -87,12 +87,43 @@ class SymbolIndexer:
                     end_line = text[: m2.start()].count("\n")
                     break
             # 装饰器
+            #
+            # M107：**堆叠装饰器**。flaskr 的标准写法是路由 + 鉴权两层：
+            #     @bp.route("/create", methods=("GET", "POST"))
+            #     @login_required
+            #     def create():
+            # 旧实现只认"紧邻 def 上一行"（`start_line-1 <= d_start <= start_line`），
+            # 而 `@login_required` 没有括号、ROUTE_DECORATOR_RE 匹配不上，
+            # 于是 `@bp.route` 因为隔了一行被丢弃 —— 整个 create/update/delete
+            # 三条路由在切片里**彻底消失**（flaskr 实测 5 个单元而非 8 个）。
+            #
+            # 现在先算出 `def` 上方**连续装饰器块**的起始行，块内全部装饰器
+            # 都收。向上扫时遇空行即停；装饰器跨行（括号未闭合）时允许最多
+            # 3 行续行，避免一路吃进上一个函数体。
+            _blk_start = start_line
+            _i = start_line - 1
+            _seen_at = False
+            _extra = 0
+            while _i >= 1:
+                _ln = lines[_i - 1].strip()
+                if not _ln:
+                    break
+                if _ln.startswith("@"):
+                    _blk_start = _i
+                    _seen_at = True
+                    _i -= 1
+                    continue
+                if _seen_at and _extra < 3:
+                    _extra += 1
+                    _blk_start = _i
+                    _i -= 1
+                    continue
+                break
             decorators = []
             for dm in ROUTE_DECORATOR_RE.finditer(text[: m.start()]):
-                # ^(\s*)@ 的 \s* 会吞掉前置空行，跳过前导空白后按装饰器真实行计算
                 deco_anchor = dm.start() + len(dm.group(1))
                 d_start = text[:deco_anchor].count("\n") + 1
-                if start_line - 1 <= d_start <= start_line:
+                if _blk_start <= d_start <= start_line:
                     decorators.append(dm.group(0).strip())
             # 相对/绝对文件标识
             # Module 24：键改为 name -> **列表**。此前 setdefault(name) 首见

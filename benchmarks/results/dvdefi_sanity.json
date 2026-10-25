@@ -2,8 +2,8 @@
   "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\damn-vulnerable-defi-master",
   "units": 164,
   "true": 1,
-  "false": 198,
-  "none": 129,
+  "false": 210,
+  "none": 117,
   "true_rows": [
     {
       "dir": "naive-receiver",

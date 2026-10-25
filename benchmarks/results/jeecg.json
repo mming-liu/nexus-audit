@@ -1,0 +1,2566 @@
+{
+  "bench": "jeecg",
+  "units": 487,
+  "total_units": 487,
+  "decided": 487,
+  "correct": 487,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 2723,
+  "authz_true": 0,
+  "non_authz_by_category": {
+    "cors": 1,
+    "cmdi": 4,
+    "deserial": 4,
+    "xss": 3,
+    "hash": 4,
+    "sqli": 4,
+    "redir": 3
+  },
+  "frozen_non_authz": {
+    "cmdi": 4,
+    "deserial": 4,
+    "hash": 4,
+    "sqli": 4,
+    "xss": 3,
+    "redir": 3,
+    "cors": 1
+  },
+  "true_rows": [
+    {
+      "file": "IndexController.java",
+      "unit": "IndexController.chartInfo",
+      "category": "cors"
+    },
+    {
+      "file": "IndexController.java",
+      "unit": "IndexController.toLogin",
+      "category": "cors"
+    },
+    {
+      "file": "IndexController.java",
+      "unit": "IndexController.loginDo",
+      "category": "cors"
+    },
+    {
+      "file": "IndexController.java",
+      "unit": "IndexController.logout",
+      "category": "cors"
+    },
+    {
+      "file": "IndexController.java",
+      "unit": "IndexController.help",
+      "category": "cors"
+    },
+    {
+      "file": "JobApiController.java",
+      "unit": "JobApiController.api",
+      "category": "cors"
+    },
+    {
+      "file": "JobCodeController.java",
+      "unit": "JobCodeController.save",
+      "category": "cors"
+    },
+    {
+      "file": "JobGroupController.java",
+      "unit": "JobGroupController.pageList",
+      "category": "cors"
+    },
+    {
+      "file": "JobGroupController.java",
+      "unit": "JobGroupController.save",
+      "category": "cors"
+    },
+    {
+      "file": "JobGroupController.java",
+      "unit": "JobGroupController.update",
+      "category": "cors"
+    },
+    {
+      "file": "JobGroupController.java",
+      "unit": "JobGroupController.remove",
+      "category": "cors"
+    },
+    {
+      "file": "JobGroupController.java",
+      "unit": "JobGroupController.loadById",
+      "category": "cmdi"
+    },
+    {
+      "file": "JobGroupController.java",
+      "unit": "JobGroupController.loadById",
+      "category": "deserial"
+    },
+    {
+      "file": "JobGroupController.java",
+      "unit": "JobGroupController.loadById",
+      "category": "cors"
+    },
+    {
+      "file": "JobInfoController.java",
+      "unit": "JobInfoController.pageList",
+      "category": "cors"
+    },
+    {
+      "file": "JobInfoController.java",
+      "unit": "JobInfoController.add",
+      "category": "xss"
+    },
+    {
+      "file": "JobInfoController.java",
+      "unit": "JobInfoController.add",
+      "category": "cors"
+    },
+    {
+      "file": "JobInfoController.java",
+      "unit": "JobInfoController.update",
+      "category": "xss"
+    },
+    {
+      "file": "JobInfoController.java",
+      "unit": "JobInfoController.update",
+      "category": "cors"
+    },
+    {
+      "file": "JobInfoController.java",
+      "unit": "JobInfoController.remove",
+      "category": "cors"
+    },
+    {
+      "file": "JobInfoController.java",
+      "unit": "JobInfoController.pause",
+      "category": "cors"
+    },
+    {
+      "file": "JobInfoController.java",
+      "unit": "JobInfoController.start",
+      "category": "cors"
+    },
+    {
+      "file": "JobInfoController.java",
+      "unit": "JobInfoController.nextTriggerTime",
+      "category": "cors"
+    },
+    {
+      "file": "JobLogController.java",
+      "unit": "JobLogController.getJobsByGroup",
+      "category": "cors"
+    },
+    {
+      "file": "JobLogController.java",
+      "unit": "JobLogController.pageList",
+      "category": "cors"
+    },
+    {
+      "file": "JobLogController.java",
+      "unit": "JobLogController.logDetailPage",
+      "category": "cmdi"
+    },
+    {
+      "file": "JobLogController.java",
+      "unit": "JobLogController.logDetailPage",
+      "category": "deserial"
+    },
+    {
+      "file": "JobLogController.java",
+      "unit": "JobLogController.logDetailPage",
+      "category": "cors"
+    },
+    {
+      "file": "JobLogController.java",
+      "unit": "JobLogController.logDetailCat",
+      "category": "cmdi"
+    },
+    {
+      "file": "JobLogController.java",
+      "unit": "JobLogController.logDetailCat",
+      "category": "deserial"
+    },
+    {
+      "file": "JobLogController.java",
+      "unit": "JobLogController.logDetailCat",
+      "category": "cors"
+    },
+    {
+      "file": "JobLogController.java",
+      "unit": "JobLogController.logKill",
+      "category": "cmdi"
+    },
+    {
+      "file": "JobLogController.java",
+      "unit": "JobLogController.logKill",
+      "category": "deserial"
+    },
+    {
+      "file": "JobLogController.java",
+      "unit": "JobLogController.logKill",
+      "category": "cors"
+    },
+    {
+      "file": "JobLogController.java",
+      "unit": "JobLogController.clearLog",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.pageList",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.add",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.update",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.remove",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.updatePwd",
+      "category": "cors"
+    },
+    {
+      "file": "AuthorityRuleController.java",
+      "unit": "AuthorityRuleController.apiQueryAllRulesForMachine",
+      "category": "cors"
+    },
+    {
+      "file": "AuthorityRuleController.java",
+      "unit": "AuthorityRuleController.apiAddAuthorityRule",
+      "category": "cors"
+    },
+    {
+      "file": "AuthorityRuleController.java",
+      "unit": "AuthorityRuleController.apiUpdateParamFlowRule",
+      "category": "cors"
+    },
+    {
+      "file": "AuthorityRuleController.java",
+      "unit": "AuthorityRuleController.apiDeleteRule",
+      "category": "cors"
+    },
+    {
+      "file": "DegradeController.java",
+      "unit": "DegradeController.apiQueryMachineRules",
+      "category": "cors"
+    },
+    {
+      "file": "DegradeController.java",
+      "unit": "DegradeController.apiAddRule",
+      "category": "cors"
+    },
+    {
+      "file": "DegradeController.java",
+      "unit": "DegradeController.apiUpdateRule",
+      "category": "cors"
+    },
+    {
+      "file": "DegradeController.java",
+      "unit": "DegradeController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "ParamFlowRuleController.java",
+      "unit": "ParamFlowRuleController.apiQueryAllRulesForMachine",
+      "category": "cors"
+    },
+    {
+      "file": "ParamFlowRuleController.java",
+      "unit": "ParamFlowRuleController.apiAddParamFlowRule",
+      "category": "cors"
+    },
+    {
+      "file": "ParamFlowRuleController.java",
+      "unit": "ParamFlowRuleController.apiUpdateParamFlowRule",
+      "category": "cors"
+    },
+    {
+      "file": "ParamFlowRuleController.java",
+      "unit": "ParamFlowRuleController.apiDeleteRule",
+      "category": "cors"
+    },
+    {
+      "file": "SystemController.java",
+      "unit": "SystemController.apiQueryMachineRules",
+      "category": "cors"
+    },
+    {
+      "file": "SystemController.java",
+      "unit": "SystemController.apiAdd",
+      "category": "cors"
+    },
+    {
+      "file": "SystemController.java",
+      "unit": "SystemController.apiUpdateIfNotNull",
+      "category": "cors"
+    },
+    {
+      "file": "SystemController.java",
+      "unit": "SystemController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "GatewayApiController.java",
+      "unit": "GatewayApiController.queryApis",
+      "category": "cors"
+    },
+    {
+      "file": "GatewayApiController.java",
+      "unit": "GatewayApiController.addApi",
+      "category": "cors"
+    },
+    {
+      "file": "GatewayApiController.java",
+      "unit": "GatewayApiController.updateApi",
+      "category": "cors"
+    },
+    {
+      "file": "GatewayApiController.java",
+      "unit": "GatewayApiController.deleteApi",
+      "category": "cors"
+    },
+    {
+      "file": "GatewayFlowRuleController.java",
+      "unit": "GatewayFlowRuleController.queryFlowRules",
+      "category": "cors"
+    },
+    {
+      "file": "GatewayFlowRuleController.java",
+      "unit": "GatewayFlowRuleController.addFlowRule",
+      "category": "cors"
+    },
+    {
+      "file": "GatewayFlowRuleController.java",
+      "unit": "GatewayFlowRuleController.updateFlowRule",
+      "category": "cors"
+    },
+    {
+      "file": "GatewayFlowRuleController.java",
+      "unit": "GatewayFlowRuleController.deleteFlowRule",
+      "category": "cors"
+    },
+    {
+      "file": "FlowControllerV2.java",
+      "unit": "FlowControllerV2.apiQueryMachineRules",
+      "category": "cors"
+    },
+    {
+      "file": "FlowControllerV2.java",
+      "unit": "FlowControllerV2.apiAddFlowRule",
+      "category": "cors"
+    },
+    {
+      "file": "FlowControllerV2.java",
+      "unit": "FlowControllerV2.apiUpdateFlowRule",
+      "category": "cors"
+    },
+    {
+      "file": "FlowControllerV2.java",
+      "unit": "FlowControllerV2.apiDeleteRule",
+      "category": "cors"
+    },
+    {
+      "file": "SwaggerResourceController.java",
+      "unit": "SwaggerResourceController.securityConfiguration",
+      "category": "cors"
+    },
+    {
+      "file": "SwaggerResourceController.java",
+      "unit": "SwaggerResourceController.uiConfiguration",
+      "category": "cors"
+    },
+    {
+      "file": "CommonController.java",
+      "unit": "CommonController.noauth",
+      "category": "cors"
+    },
+    {
+      "file": "CommonController.java",
+      "unit": "CommonController.upload",
+      "category": "cors"
+    },
+    {
+      "file": "DuplicateCheckController.java",
+      "unit": "DuplicateCheckController.doDuplicateCheck",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.login",
+      "category": "hash"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.login",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.getUserInfo",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.logout",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.loginfo",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.visitInfo",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.selectDepart",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.sms",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.phoneLogin",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.getEncryptedString",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.randomImage",
+      "category": "hash"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.randomImage",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.switchVue3Menu",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.mLogin",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.checkCaptcha",
+      "category": "hash"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.checkCaptcha",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.getLoginQrcode",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.scanLoginQrcode",
+      "category": "cors"
+    },
+    {
+      "file": "LoginController.java",
+      "unit": "LoginController.getQrcodeToken",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.eidt",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.doReleaseData",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.doReovkeData",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.listByUser",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.syncNotic",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.showContent",
+      "category": "xss"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.showContent",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementController.java",
+      "unit": "SysAnnouncementController.vue3List",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementSendController.java",
+      "unit": "SysAnnouncementSendController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementSendController.java",
+      "unit": "SysAnnouncementSendController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementSendController.java",
+      "unit": "SysAnnouncementSendController.eidt",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementSendController.java",
+      "unit": "SysAnnouncementSendController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementSendController.java",
+      "unit": "SysAnnouncementSendController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementSendController.java",
+      "unit": "SysAnnouncementSendController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementSendController.java",
+      "unit": "SysAnnouncementSendController.editById",
+      "category": "sqli"
+    },
+    {
+      "file": "SysAnnouncementSendController.java",
+      "unit": "SysAnnouncementSendController.editById",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementSendController.java",
+      "unit": "SysAnnouncementSendController.getMyAnnouncementSend",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementSendController.java",
+      "unit": "SysAnnouncementSendController.readAll",
+      "category": "sqli"
+    },
+    {
+      "file": "SysAnnouncementSendController.java",
+      "unit": "SysAnnouncementSendController.readAll",
+      "category": "cors"
+    },
+    {
+      "file": "SysAnnouncementSendController.java",
+      "unit": "SysAnnouncementSendController.getOne",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.queryPageList#2",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.loadOne",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.loadTreeChildren",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.loadTreeRoot",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.checkCode",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.loadDict",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.loadDictItem",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.loadAllData",
+      "category": "cors"
+    },
+    {
+      "file": "SysCategoryController.java",
+      "unit": "SysCategoryController.getChildListBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysCheckRuleController.java",
+      "unit": "SysCheckRuleController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysCheckRuleController.java",
+      "unit": "SysCheckRuleController.checkByCode",
+      "category": "cors"
+    },
+    {
+      "file": "SysCheckRuleController.java",
+      "unit": "SysCheckRuleController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysCheckRuleController.java",
+      "unit": "SysCheckRuleController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysCheckRuleController.java",
+      "unit": "SysCheckRuleController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysCheckRuleController.java",
+      "unit": "SysCheckRuleController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysCheckRuleController.java",
+      "unit": "SysCheckRuleController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysCheckRuleController.java",
+      "unit": "SysCheckRuleController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysCheckRuleController.java",
+      "unit": "SysCheckRuleController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.queryListByForm",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.queryFileList",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.addText",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.addFile",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.deleteOne",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.getFileViewDomain",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysCommentController.java",
+      "unit": "SysCommentController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysDataLogController.java",
+      "unit": "SysDataLogController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDataLogController.java",
+      "unit": "SysDataLogController.queryCompareList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDataLogController.java",
+      "unit": "SysDataLogController.queryDataVerList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDataSourceController.java",
+      "unit": "SysDataSourceController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDataSourceController.java",
+      "unit": "SysDataSourceController.queryOptions",
+      "category": "cors"
+    },
+    {
+      "file": "SysDataSourceController.java",
+      "unit": "SysDataSourceController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysDataSourceController.java",
+      "unit": "SysDataSourceController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysDataSourceController.java",
+      "unit": "SysDataSourceController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysDataSourceController.java",
+      "unit": "SysDataSourceController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysDataSourceController.java",
+      "unit": "SysDataSourceController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysDataSourceController.java",
+      "unit": "SysDataSourceController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysDataSourceController.java",
+      "unit": "SysDataSourceController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.queryMyDeptTreeList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.queryTreeList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.queryDepartTreeSync",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.queryParentIds",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.queryIdTree",
+      "category": "sqli"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.queryIdTree",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.searchBy",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.listAll",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.queryTreeByKeyWord",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.getDepartName",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartController.java",
+      "unit": "SysDepartController.getUsersByDepartId",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.loadDatarule",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.saveDatarule",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.queryDeptRolePermission",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.saveDeptRolePermission",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartPermissionController.java",
+      "unit": "SysDepartPermissionController.queryTreeListForDeptRole",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.getDeptRoleList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.deptRoleAdd",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.getDeptRoleByUserId",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.loadDatarule",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.saveDatarule",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysDepartRoleController.java",
+      "unit": "SysDepartRoleController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.treeList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.queryAllDictItems",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.getDictText",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.getDictItems",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.loadDict",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.loadDictOrderByValue",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.loadDictItem",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.loadTreeData",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.queryTableData",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.refleshCache",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.deleteList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.deletePhysic",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictController.java",
+      "unit": "SysDictController.back",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictItemController.java",
+      "unit": "SysDictItemController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictItemController.java",
+      "unit": "SysDictItemController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictItemController.java",
+      "unit": "SysDictItemController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictItemController.java",
+      "unit": "SysDictItemController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictItemController.java",
+      "unit": "SysDictItemController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysDictItemController.java",
+      "unit": "SysDictItemController.doDictItemCheck",
+      "category": "cors"
+    },
+    {
+      "file": "SysFilesController.java",
+      "unit": "SysFilesController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysFilesController.java",
+      "unit": "SysFilesController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysFilesController.java",
+      "unit": "SysFilesController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysFilesController.java",
+      "unit": "SysFilesController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysFilesController.java",
+      "unit": "SysFilesController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysFilesController.java",
+      "unit": "SysFilesController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysFilesController.java",
+      "unit": "SysFilesController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysFilesController.java",
+      "unit": "SysFilesController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysFillRuleController.java",
+      "unit": "SysFillRuleController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysFillRuleController.java",
+      "unit": "SysFillRuleController.testFillRule",
+      "category": "cors"
+    },
+    {
+      "file": "SysFillRuleController.java",
+      "unit": "SysFillRuleController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysFillRuleController.java",
+      "unit": "SysFillRuleController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysFillRuleController.java",
+      "unit": "SysFillRuleController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysFillRuleController.java",
+      "unit": "SysFillRuleController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysFillRuleController.java",
+      "unit": "SysFillRuleController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysFillRuleController.java",
+      "unit": "SysFillRuleController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysFillRuleController.java",
+      "unit": "SysFillRuleController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysFillRuleController.java",
+      "unit": "SysFillRuleController.executeByRuleCode",
+      "category": "cors"
+    },
+    {
+      "file": "SysFillRuleController.java",
+      "unit": "SysFillRuleController.executeByRuleCodeBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysFormFileController.java",
+      "unit": "SysFormFileController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysFormFileController.java",
+      "unit": "SysFormFileController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysFormFileController.java",
+      "unit": "SysFormFileController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysFormFileController.java",
+      "unit": "SysFormFileController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysFormFileController.java",
+      "unit": "SysFormFileController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysFormFileController.java",
+      "unit": "SysFormFileController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysFormFileController.java",
+      "unit": "SysFormFileController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysFormFileController.java",
+      "unit": "SysFormFileController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysGatewayRouteController.java",
+      "unit": "SysGatewayRouteController.updateAll",
+      "category": "cors"
+    },
+    {
+      "file": "SysGatewayRouteController.java",
+      "unit": "SysGatewayRouteController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysGatewayRouteController.java",
+      "unit": "SysGatewayRouteController.clearRedis",
+      "category": "cors"
+    },
+    {
+      "file": "SysGatewayRouteController.java",
+      "unit": "SysGatewayRouteController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysLogController.java",
+      "unit": "SysLogController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysLogController.java",
+      "unit": "SysLogController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysLogController.java",
+      "unit": "SysLogController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysPermissionController.java",
+      "unit": "SysPermissionController.list",
+      "category": "cors"
+    },
+    {
+      "file": "SysPermissionController.java",
+      "unit": "SysPermissionController.getSystemMenuList",
+      "category": "cors"
+    },
+    {
+      "file": "SysPermissionController.java",
+      "unit": "SysPermissionController.getSystemSubmenu",
+      "category": "cors"
+    },
+    {
+      "file": "SysPermissionController.java",
+      "unit": "SysPermissionController.getSystemSubmenuBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysPositionController.java",
+      "unit": "SysPositionController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysPositionController.java",
+      "unit": "SysPositionController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysPositionController.java",
+      "unit": "SysPositionController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysPositionController.java",
+      "unit": "SysPositionController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysPositionController.java",
+      "unit": "SysPositionController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysPositionController.java",
+      "unit": "SysPositionController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysPositionController.java",
+      "unit": "SysPositionController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysPositionController.java",
+      "unit": "SysPositionController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysPositionController.java",
+      "unit": "SysPositionController.queryByCode",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleController.java",
+      "unit": "SysRoleController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleController.java",
+      "unit": "SysRoleController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleController.java",
+      "unit": "SysRoleController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleController.java",
+      "unit": "SysRoleController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleController.java",
+      "unit": "SysRoleController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleController.java",
+      "unit": "SysRoleController.queryall",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleController.java",
+      "unit": "SysRoleController.checkUsername",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleController.java",
+      "unit": "SysRoleController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleController.java",
+      "unit": "SysRoleController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleController.java",
+      "unit": "SysRoleController.loadDatarule",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleController.java",
+      "unit": "SysRoleController.saveDatarule",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleController.java",
+      "unit": "SysRoleController.queryTreeList",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleIndexController.java",
+      "unit": "SysRoleIndexController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleIndexController.java",
+      "unit": "SysRoleIndexController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleIndexController.java",
+      "unit": "SysRoleIndexController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleIndexController.java",
+      "unit": "SysRoleIndexController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleIndexController.java",
+      "unit": "SysRoleIndexController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysRoleIndexController.java",
+      "unit": "SysRoleIndexController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysTenantController.java",
+      "unit": "SysTenantController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysTenantController.java",
+      "unit": "SysTenantController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysTenantController.java",
+      "unit": "SysTenantController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysTenantController.java",
+      "unit": "SysTenantController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysTenantController.java",
+      "unit": "SysTenantController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysTenantController.java",
+      "unit": "SysTenantController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysTenantController.java",
+      "unit": "SysTenantController.queryList",
+      "category": "cors"
+    },
+    {
+      "file": "SysTenantController.java",
+      "unit": "SysTenantController.getCurrentUserTenant",
+      "category": "cors"
+    },
+    {
+      "file": "SysUploadController.java",
+      "unit": "SysUploadController.uploadMinio",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserAgentController.java",
+      "unit": "SysUserAgentController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserAgentController.java",
+      "unit": "SysUserAgentController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserAgentController.java",
+      "unit": "SysUserAgentController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserAgentController.java",
+      "unit": "SysUserAgentController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserAgentController.java",
+      "unit": "SysUserAgentController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserAgentController.java",
+      "unit": "SysUserAgentController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserAgentController.java",
+      "unit": "SysUserAgentController.queryByUserName",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserAgentController.java",
+      "unit": "SysUserAgentController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserAgentController.java",
+      "unit": "SysUserAgentController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.frozenBatch",
+      "category": "sqli"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.frozenBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.queryUserRole",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.checkOnlyUser",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.changePassword",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.getUserDepartsList",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.generateUserId",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.queryUserByDepId",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.queryUserComponentData",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.queryByIds",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.updatePassword",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.userRoleList",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.addSysUserRole",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.deleteUserRole",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.deleteUserRoleBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.departUserList",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.queryByDepartId",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.queryByOrgCodeForAddressList",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.editSysDepartWithUser",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.deleteUserInDepart",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.deleteUserInDepartBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.getCurrentUserDeparts",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserController.java",
+      "unit": "SysUserController.userRegister",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserOnlineController.java",
+      "unit": "SysUserOnlineController.list",
+      "category": "cors"
+    },
+    {
+      "file": "SysUserOnlineController.java",
+      "unit": "SysUserOnlineController.forceLogout",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdAppController.java",
+      "unit": "ThirdAppController.getEnabledType",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdAppController.java",
+      "unit": "ThirdAppController.syncWechatEnterpriseUserToApp",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdAppController.java",
+      "unit": "ThirdAppController.syncWechatEnterpriseUserToLocal",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdAppController.java",
+      "unit": "ThirdAppController.syncWechatEnterpriseDepartToApp",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdAppController.java",
+      "unit": "ThirdAppController.syncWechatEnterpriseDepartToLocal",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdAppController.java",
+      "unit": "ThirdAppController.syncDingtalkDepartToApp",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdAppController.java",
+      "unit": "ThirdAppController.syncDingtalkDepartToLocal",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdAppController.java",
+      "unit": "ThirdAppController.syncDingtalkUserToApp",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdAppController.java",
+      "unit": "ThirdAppController.syncDingtalkUserToLocal",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdAppController.java",
+      "unit": "ThirdAppController.sendMessageTest",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdAppController.java",
+      "unit": "ThirdAppController.recallMessageTest",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdLoginController.java",
+      "unit": "ThirdLoginController.render",
+      "category": "redir"
+    },
+    {
+      "file": "ThirdLoginController.java",
+      "unit": "ThirdLoginController.render",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdLoginController.java",
+      "unit": "ThirdLoginController.loginThird",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdLoginController.java",
+      "unit": "ThirdLoginController.thirdUserCreate",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdLoginController.java",
+      "unit": "ThirdLoginController.checkPassword",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdLoginController.java",
+      "unit": "ThirdLoginController.getThirdLoginUser",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdLoginController.java",
+      "unit": "ThirdLoginController.bindingThirdPhone",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdLoginController.java",
+      "unit": "ThirdLoginController.oauth2LoginCallback",
+      "category": "redir"
+    },
+    {
+      "file": "ThirdLoginController.java",
+      "unit": "ThirdLoginController.oauth2LoginCallback",
+      "category": "cors"
+    },
+    {
+      "file": "ThirdLoginController.java",
+      "unit": "ThirdLoginController.oauth2LoginCallback#2",
+      "category": "redir"
+    },
+    {
+      "file": "ThirdLoginController.java",
+      "unit": "ThirdLoginController.oauth2LoginCallback#2",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.add",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.eidt",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.pauseJob",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.resumeJob",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.execute",
+      "category": "cors"
+    },
+    {
+      "file": "OssFileController.java",
+      "unit": "OssFileController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "OssFileController.java",
+      "unit": "OssFileController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "OssFileController.java",
+      "unit": "OssFileController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "ActuatorRedisController.java",
+      "unit": "ActuatorRedisController.getRedisInfo",
+      "category": "cors"
+    },
+    {
+      "file": "ActuatorRedisController.java",
+      "unit": "ActuatorRedisController.getKeysSize",
+      "category": "cors"
+    },
+    {
+      "file": "ActuatorRedisController.java",
+      "unit": "ActuatorRedisController.getKeysSizeReport",
+      "category": "cors"
+    },
+    {
+      "file": "ActuatorRedisController.java",
+      "unit": "ActuatorRedisController.memoryForReport",
+      "category": "cors"
+    },
+    {
+      "file": "ActuatorRedisController.java",
+      "unit": "ActuatorRedisController.infoForReport",
+      "category": "cors"
+    },
+    {
+      "file": "ActuatorRedisController.java",
+      "unit": "ActuatorRedisController.getMemoryInfo",
+      "category": "cors"
+    },
+    {
+      "file": "ActuatorRedisController.java",
+      "unit": "ActuatorRedisController.queryDiskInfo",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageController.java",
+      "unit": "SysMessageController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageController.java",
+      "unit": "SysMessageController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageController.java",
+      "unit": "SysMessageController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageController.java",
+      "unit": "SysMessageController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageController.java",
+      "unit": "SysMessageController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageController.java",
+      "unit": "SysMessageController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageController.java",
+      "unit": "SysMessageController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageController.java",
+      "unit": "SysMessageController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageTemplateController.java",
+      "unit": "SysMessageTemplateController.queryPageList",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageTemplateController.java",
+      "unit": "SysMessageTemplateController.add",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageTemplateController.java",
+      "unit": "SysMessageTemplateController.edit",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageTemplateController.java",
+      "unit": "SysMessageTemplateController.delete",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageTemplateController.java",
+      "unit": "SysMessageTemplateController.deleteBatch",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageTemplateController.java",
+      "unit": "SysMessageTemplateController.queryById",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageTemplateController.java",
+      "unit": "SysMessageTemplateController.exportXls",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageTemplateController.java",
+      "unit": "SysMessageTemplateController.importExcel",
+      "category": "cors"
+    },
+    {
+      "file": "SysMessageTemplateController.java",
+      "unit": "SysMessageTemplateController.sendMessage",
+      "category": "cors"
+    },
+    {
+      "file": "TestSocketController.java",
+      "unit": "TestSocketController.sendAll",
+      "category": "cors"
+    },
+    {
+      "file": "TestSocketController.java",
+      "unit": "TestSocketController.sendUser",
+      "category": "cors"
+    },
+    {
+      "file": "CasClientController.java",
+      "unit": "CasClientController.validateLogin",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.sendSysAnnouncement",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.sendBusAnnouncement",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.sendTemplateAnnouncement",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.sendBusTemplateAnnouncement",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.parseTemplateByCode",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.updateSysAnnounReadFlag",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getUserByName",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.queryAllRole",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getRoleIdsByUsername",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getDepartIdsByOrgCode",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getAllSysDepart",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getDeptHeadByDepId",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getParentDepartId",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getDynamicDbSourceByCode",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.sendWebSocketMsg",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.queryAllUserByIds",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.queryAllUserBackCombo",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.queryAllUser",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.meetingSignWebsocket",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.queryUserByNames",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getUserRoleSet",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getUserPermissionSet",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.hasOnlineAuth",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.queryUserRoles",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.queryUserAuths",
+      "category": "hash"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.queryUserAuths",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.selectAllById",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.queryDeptUsersByUserId",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.queryPermissionDataRule",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getCacheUser",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.translateDict",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.sendEmailMsg",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.loadCategoryDictItem",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.loadDictItem",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getDictItems",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getManyDictItems",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.loadDictItemByKeyword",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.translateManyDict",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.queryTableDictByKeys",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.translateDictFromTable",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.translateDictFromTableByKeys",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.sendTemplateMessage",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getTemplateContent",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.saveDataLog",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.addSysFiles",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.getFileUrl",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.updateAvatar",
+      "category": "cors"
+    },
+    {
+      "file": "SystemApiController.java",
+      "unit": "SystemApiController.sendAppChatSocket",
+      "category": "cors"
+    },
+    {
+      "file": "DlMockController.java",
+      "unit": "DlMockController.mockChange1",
+      "category": "cors"
+    },
+    {
+      "file": "DlMockController.java",
+      "unit": "DlMockController.mockChange2",
+      "category": "cors"
+    },
+    {
+      "file": "DlMockController.java",
+      "unit": "DlMockController.mockChange3",
+      "category": "cors"
+    },
+    {
+      "file": "DlMockController.java",
+      "unit": "DlMockController.mockChange4",
+      "category": "cors"
+    },
+    {
+      "file": "DlMockController.java",
+      "unit": "DlMockController.mockImmediateSaveRow",
+      "category": "cors"
+    },
+    {
+      "file": "DlMockController.java",
+      "unit": "DlMockController.mockImmediateSaveAll",
+      "category": "cors"
+    },
+    {
+      "file": "DlMockController.java",
+      "unit": "DlMockController.getMockData",
+      "category": "cors"
+    },
+    {
+      "file": "DlMockController.java",
+      "unit": "DlMockController.getMockDdjhData",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.getJsonData",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.asynTreeList",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.user",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.userInfo",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.role",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.service",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.permission",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.permissionNoPage",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.area",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.getYearCountInfo",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.getMonthCountInfo",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.getCntrNoCountInfo",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.getCabinetCountInfo",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.getTubiao",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.queryDiskInfo",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.projects",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.activity",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.teams",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.radar",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.taskProcess",
+      "category": "cors"
+    },
+    {
+      "file": "MockController.java",
+      "unit": "MockController.getUserInfo",
+      "category": "cors"
+    },
+    {
+      "file": "OnlCgformDemoController.java",
+      "unit": "OnlCgformDemoController.enhanceJavaListHttp",
+      "category": "cors"
+    },
+    {
+      "file": "OnlCgformDemoController.java",
+      "unit": "OnlCgformDemoController.enhanceJavaHttp",
+      "category": "cors"
+    },
+    {
+      "file": "VxeMockController.java",
+      "unit": "VxeMockController.mockChange1",
+      "category": "cors"
+    },
+    {
+      "file": "VxeMockController.java",
+      "unit": "VxeMockController.mockChange2",
+      "category": "cors"
+    },
+    {
+      "file": "VxeMockController.java",
+      "unit": "VxeMockController.mockChange3",
+      "category": "cors"
+    },
+    {
+      "file": "VxeMockController.java",
+      "unit": "VxeMockController.mockChange4",
+      "category": "cors"
+    },
+    {
+      "file": "VxeMockController.java",
+      "unit": "VxeMockController.mockImmediateSaveRow",
+      "category": "cors"
+    },
+    {
+      "file": "VxeMockController.java",
+      "unit": "VxeMockController.mockImmediateSaveAll",
+      "category": "cors"
+    },
+    {
+      "file": "VxeMockController.java",
+      "unit": "VxeMockController.getMockData",
+      "category": "cors"
+    },
+    {
+      "file": "VxeMockController.java",
+      "unit": "VxeMockController.getMockDdjhData",
+      "category": "cors"
+    },
+    {
+      "file": "JcloudDemoProviderController.java",
+      "unit": "JcloudDemoProviderController.getMessage",
+      "category": "cors"
+    }
+  ]
+}

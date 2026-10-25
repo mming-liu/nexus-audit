@@ -1,0 +1,27 @@
+{
+  "bench": "flaskr",
+  "units": 8,
+  "total_units": 8,
+  "decided": 8,
+  "correct": 8,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 37,
+  "unit_names": [
+    "create",
+    "delete",
+    "hello",
+    "index",
+    "login",
+    "logout",
+    "register",
+    "update"
+  ],
+  "ownership_verdicts": {
+    "update": false,
+    "delete": false
+  },
+  "hop1_expanded": true,
+  "check_author_in_slice": true,
+  "true_rows": []
+}

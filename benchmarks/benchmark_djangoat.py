@@ -42,7 +42,9 @@ SQL 注入，但 `.raw(` 不在 Python sqli 的 sink 词表里（词表只收 `.
 
 ## 门禁（--strict）
 
-- 切片 ≥30 入口，其中 ≥20 条带 `django:` 路由证据（M88 通道生效）；
+- 切片 ≥30 入口，且 `urls.py` 解析器独立解析出 ≥20 条路由（M88 通道生效）。
+  注意指标问的是**解析器**，不是"带 `django:` 标记的单元数" —— M107 修好
+  堆叠装饰器后这些视图先被装饰器通道收走，标记数会掉但覆盖反而变好；
 - 零误报：真值表之外的任何单元任何类目都不许判 True；
 - 零漏报：11 条真值全部命中 True（含文件级密钥）。
 """
@@ -114,8 +116,20 @@ def main() -> int:
     routed = [u for u in units
               if any(d.startswith("django:")
                      for d in u.decorators_or_modifiers)]
+    # M107：独立量一下 **urls.py 通道本身**解析出多少条路由。
+    #
+    # 之前用"带 `django:` 标记的单元数"当通道指标，M107 修好堆叠装饰器后
+    # 这些视图先被 `@require_http_methods(...)` 装饰器通道收走，`_django_entries`
+    # 按 (file, start_line) 去重就不再追加标记 —— 单元数从 13 涨到 36（覆盖变好），
+    # 指标反而掉成 0。指标的口径错了，不是通道坏了：直接问 urls.py 解析器。
+    try:
+        _dj_routes = WebTreeSitterSlicer(repo)._django_routes(Path(repo))
+    except Exception:                                        # noqa: BLE001
+        _dj_routes = []
+    dj_channel = len(_dj_routes)
     print(f"靶场：{repo}")
-    print(f"      切片单元 {len(units)} 个，其中 Django 路由表证据 {len(routed)} 条")
+    print(f"      切片单元 {len(units)} 个 ｜ urls.py 解析路由 {dj_channel} 条"
+          f" ｜ 带 django: 标记的单元 {len(routed)} 条")
 
     fp = fn = 0
     rows: list[dict] = []
@@ -163,7 +177,8 @@ def main() -> int:
     print("DjanGoat 结果（规则层，Django urls.py 路由表驱动）")
     print("=" * 72)
     print(f"  切片单元              ：{len(units)}")
-    print(f"  路由证据（django:）   ：{len(routed)}")
+    print(f"  urls.py 解析路由      ：{dj_channel}")
+    print(f"  带 django: 标记的单元 ：{len(routed)}")
     print(f"  规则判定次数（unit×类目）：{n_decided}")
     print(f"  真值命中              ：{truth_n - fn}/{truth_n}")
     print(f"  误报                  ：{fp}")
@@ -176,8 +191,8 @@ def main() -> int:
     bad = []
     if len(units) < MIN_UNITS:
         bad.append(f"切片 {len(units)} < {MIN_UNITS}")
-    if len(routed) < MIN_DJANGO_ROUTED:
-        bad.append(f"路由证据 {len(routed)} < {MIN_DJANGO_ROUTED}")
+    if dj_channel < MIN_DJANGO_ROUTED:
+        bad.append(f"urls.py 解析路由 {dj_channel} < {MIN_DJANGO_ROUTED}")
     if fp:
         bad.append(f"误报 {fp} 条")
     if fn:
@@ -189,7 +204,11 @@ def main() -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({
         "bench": "djangoat", "units": len(units), "total_units": len(units),
-        "django_routed": len(routed),
+        # M107：`django_routed` 的口径 = **urls.py 解析器**解析出的路由数
+        # （不再是"带 django: 标记的单元数"——装饰器通道修好后那些视图先被
+        # 收走，标记数会掉到 0，但通道其实更好了）。
+        "django_routed": dj_channel,
+        "django_marked_units": len(routed),
         # SCOREBOARD 口径：decided = 本门禁**登记真值**的条数（真值表 + 文件级密钥），
         # 不是 rule 求值次数 —— 后者是 120（36 单元 × 全类目），塞进 decided
         # 会让覆盖率算成 333%（分母分子不同量纲）。

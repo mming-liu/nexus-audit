@@ -165,6 +165,25 @@ JOBS = [
     ("waynboot-mall (Sa-Token 双端商城)",
      ["benchmarks/benchmark_waynboot.py", "--strict"],
      "reference_repos/waynboot-mall", "target", True),
+    # 第 35/36/37 靶场（Module 108/109/110）：三个新野战仓。
+    #   · Synthetix V3 —— Diamond 代理 + 谓词式鉴权（1264 生产入口 / 0 True）
+    #   · sushiswap-zapper —— 0.5.x 主网合约 + 谓词式 Ownable（75 入口 / 0 True）
+    #   · jeecg-boot —— 全局鉴权拦截器（xxl-job 160 条误报清零）+ 24 个已知根因冻结
+    ("Synthetix V3 (Diamond 代理)",
+     ["benchmarks/benchmark_synthetixv3.py", "--strict"],
+     "reference_repos/synthetix-v3", "target", True),
+    ("sushiswap-zapper (0.5.x 主网合约)",
+     ["benchmarks/benchmark_sushizapper.py", "--strict"],
+     "reference_repos/sushiswap-zapper", "target", True),
+    ("jeecg-boot (全局鉴权拦截器)",
+     ["benchmarks/benchmark_jeecg.py", "--strict"],
+     "reference_repos/jeecg-boot", "target", True),
+    # 第 34 靶场（Module 107）：flaskr（Flask 官方教程应用）。
+    # 全类目 0 True + 跨函数归属校验（get_post 里的 author_id != g.user['id']）
+    # 必须被判成确定性 False —— 证明 Python 切片器的 Hop 1 展开确实生效。
+    ("flaskr (Flask 官方教程应用)",
+     ["benchmarks/benchmark_flaskr.py", "--strict"],
+     "reference_repos/flaskr", "target", True),
     # 第 33 靶场（Module 98）：mall4j（主体链 `SecurityUtils.getUser()`）。
     # C 端五个"我的资源"控制器必须 authz 零 True（归属写死在查询条件里）；
     # 公开资源查询与后台上传如实登记为人工复核面（计数冻结，涨一条就红）。

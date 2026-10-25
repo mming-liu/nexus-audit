@@ -26,8 +26,8 @@
   "distribution": {
     "authz": {
       "true": 1,
-      "false": 14,
-      "none": 58
+      "false": 17,
+      "none": 55
     },
     "sqli": {
       "true": 0,

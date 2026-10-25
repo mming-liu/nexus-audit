@@ -4877,9 +4877,9 @@ _out94b = _sp94sub.run([sys.executable,
 check("M94：M52 探针可跑且 access_control 退回桶显著下压（< 630）",
       ("access_control 退回" in _out94b.stdout), True)
 _m94 = re.search(r"access_control 退回\s+(\d+)", _out94b.stdout)
-check("M94：M52 后 access_control 退回桶 526 条"
-      "（M52 前 643 / M54 后 531 / M95 后 530 / M96-M98 后 526）",
-      (bool(_m94) and int(_m94.group(1)) == 526), True)
+check("M94：M52 后 access_control 退回桶 518 条"
+      "（M52 前 643 / M54 后 531 / M95 后 530 / M98 后 526 / M108 后 518）",
+      (bool(_m94) and int(_m94.group(1)) == 518), True)
 
 
 # ---- [95] Module 53：Solidity arithmetic 类目（SWC-101 算术溢出） ----
@@ -6226,15 +6226,21 @@ if _dg124.exists():
     _dj124 = [u for u in _units124
               if any(d.startswith("django:") for d in u.decorators_or_modifiers)]
     _paths124 = {Path(u.file_path).as_posix() for u in _dj124}
+    # M107 之后这些视图先被 `@require_http_methods(...)` 装饰器通道收走，
+    # `_django_entries` 按 (file, start_line) 去重就不再追加 `django:` 标记 ——
+    # 所以通道指标改问**解析器**本身，标记数只作参考。
+    _djroutes124 = _W124(_dg124)._django_routes(_dg124)
+    _djpaths124 = {Path(str(r[1] or "")).as_posix() for r in _djroutes124}
     check("M124：DjanGoat 切片 ≥30 入口（装饰器通道只有 13）",
           len(_units124) >= 30, True)
-    check("M124：≥20 条带 django: 路由证据",
-          len(_dj124) >= 20, True)
+    check("M124：urls.py 解析器解析出 ≥20 条路由（M88 通道生效）",
+          len(_djroutes124) >= 20, True)
     check("M124：点号链经 __init__ 再导出落到真实模块",
-          any(p.endswith("app/views/users/views.py") for p in _paths124), True)
+          any(p.endswith("app/views/users/views.py")
+              for p in (_djpaths124 | _paths124)), True)
     check("M124：include(...) 与 as_view(...) 不进通道（无假入口）",
-          all("include" not in d and "as_view" not in d
-              for u in _dj124 for d in u.decorators_or_modifiers), True)
+          all("include" not in str(r[2]) and "as_view" not in str(r[2])
+              for r in _djroutes124), True)
     # ③ E2E：真值 11/11 + 零误报
     _r124 = subprocess.run(
         [sys.executable, str(ROOT / "benchmarks" / "benchmark_djangoat.py"),
@@ -6495,12 +6501,14 @@ try:
 finally:
     shutil.rmtree(_d126, ignore_errors=True)
 
-# ⑥ doctor：补丁器升到 18 类
+# ⑥ doctor：补丁器升段（M90 到 18 类，M106 到 20 类）
 _r126d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                         capture_output=True, text=True, encoding="utf-8")
-check("M126：doctor 补丁器升到 18 类（含 _fix_python_redirect）",
-      ("（18 类）" in (_r126d.stdout or "")
-       and "_fix_python_redirect" in (_r126d.stdout or "")), True)
+check("M126：doctor 补丁器升到 20 类（含 _fix_python_redirect 与 M106 两个 Java 补丁）",
+      ("（20 类）" in (_r126d.stdout or "")
+       and "_fix_python_redirect" in (_r126d.stdout or "")
+       and "_fix_java_ssti_viewname" in (_r126d.stdout or "")
+       and "_fix_java_header_injection" in (_r126d.stdout or "")), True)
 
 # ---- [127] Module 91：`cli.py hunt` 多仓批量野战 + Portfolio 大屏 ----
 # 把"手工逐仓跑 scan --auto"变成一条命令。价值不在省几次回车，而在
@@ -6817,14 +6825,14 @@ check("M130：新增模块落在指纹目录内（M88 slicer / M92 context）",
 from core.agents.vuln_categories import CATEGORIES as _C130        # noqa: E402
 import cli as _cli130                                             # noqa: E402
 from benchmarks.run_all import JOBS as _JOBS130                   # noqa: E402
-check("M130：规则 25 类 / 补丁器 18 类（doctor 单一事实源）",
-      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (25, 18))
-check("M130：run_all 作业表 33 项且含 comet / DjanGoat / 覆盖地板",
+check("M130：规则 25 类 / 补丁器 20 类（doctor 单一事实源）",
+      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (25, 20))
+check("M130：run_all 作业表 37 项且含 comet / DjanGoat / 覆盖地板",
       (len(_JOBS130),
        any("comet" in str(j[0]) for j in _JOBS130),
        any("DjanGoat" in str(j[0]) for j in _JOBS130),
        any("覆盖地板" in str(j[0]) for j in _JOBS130)),
-      (33, True, True, True))
+      (37, True, True, True))
 
 import core.agents.rule_detectors as _rd130                       # noqa: E402
 _NEW130 = ("ssti_verdict", "_sol_unchecked_zones", "_py_redir_verdict",
@@ -6851,8 +6859,8 @@ for _cmd130 in ("hunt", "benchmark-gen"):
 _r130d = _sp130.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                     capture_output=True, text=True, encoding="utf-8")
 _out130 = _r130d.stdout or ""
-check("M130：doctor exit 0 且 25 类 / 18 类 / 六段齐全",
-      (_r130d.returncode, "共 25 类" in _out130, "（18 类）" in _out130,
+check("M130：doctor exit 0 且 25 类 / 20 类 / 六段齐全",
+      (_r130d.returncode, "共 25 类" in _out130, "（20 类）" in _out130,
        "[6/6]" in _out130), (0, True, True, True))
 check("M130：doctor 覆盖 M87–M93 的四项新自检",
       ("SARIF 2.1.0 合规校验" in _out130
@@ -7079,8 +7087,8 @@ check("M138：输出含四维表头（--fix / --emit-poc / CVSS）",
        and "CVSS" in (_r138.stdout or "")), True)
 check("M139：覆盖缺口有界且不增长（当前 36 处；M105 加 header_injection +2）",
       _m138["gap_count"] <= 36, True)
-check("M139：补丁器映射与 doctor 单一事实源一致（18 个补丁器 / 12 类目）",
-      (_m138["patchers"], len(_m138["fix_map"])), (18, 12))
+check("M139：补丁器映射与 doctor 单一事实源一致（20 个补丁器 / 12 类目）",
+      (_m138["patchers"], len(_m138["fix_map"])), (20, 12))
 
 # ---- [140] Module 101：17 仓野战与 33 项门禁不变性总锚定 ----
 # 这一条是 M87–M102 的**总锚**：四组数字必须自洽 —— 门禁数、野战场数、
@@ -7093,12 +7101,12 @@ from benchmarks.wild_hunt import REPOS as _REPOS140               # noqa: E402
 from core.agents.vuln_categories import CATEGORIES as _C140       # noqa: E402
 import cli as _cli140                                             # noqa: E402
 
-check("M140：门禁 33 项（冒烟+争议+地板+30 个靶场/校验项）",
-      len(_JOBS140), 33)
-check("M140：野战场 17 个真实仓库", len(_REPOS140), 17)
-check("M140：规则 25 类 / 补丁器 18 类", (len(_C140),
+check("M140：门禁 37 项（冒烟+争议+地板+34 个靶场/校验项）",
+      len(_JOBS140), 37)
+check("M140：野战场 21 个真实仓库", len(_REPOS140), 21)
+check("M140：规则 25 类 / 补丁器 20 类", (len(_C140),
                                           len(_cli140.DOCTOR_PATCHERS)),
-      (25, 18))
+      (25, 20))
 
 # 17 个野战场必须全部有对应 benchmark 脚本与 --strict 门禁
 _missing140 = [r[0] for r in _REPOS140
@@ -7119,8 +7127,8 @@ check("M140：五个 Solidity 生产库规则层全部 0 True（N₁ 铁壁）",
       [r for r in _p0_rows140 if r[1] != 0], [])
 
 # 三语言野战仓各至少 3 个，且总量 17
-check("M140：三语言分布自洽（Java 9 / Python 3 / Solidity 5）",
-      len(_REPOS140) - 3 - 5, 9)
+check("M140：三语言分布自洽（Java 10 / Python 4 / Solidity 7）",
+      len(_REPOS140) - 4 - 7, 10)
 
 # wild_hunt.json 与白皮书四处数字仍然一致（M85 的护栏 + 17 仓后仍成立）
 _r140d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
@@ -7266,6 +7274,78 @@ if _jsc143.exists():
                 if "CRLFInjection" in Path(u.file_path).name]
     check("M143：java-sec-code CRLFInjection 专用真阳命中",
           [_hd143(u.source_code) for u in _crlf143], [True])
+
+# ---- [144] Module 106：第 19/20 类 Java 补丁器 E2E（自检必须翻 False）----
+print("\n[144] 第 19/20 类 Java 补丁器（视图名白名单 / 响应头 CRLF 清洗）（M106）")
+
+import tempfile as _tf144                                            # noqa: E402
+import shutil as _sh144                                              # noqa: E402
+import cli as _cli144                                                # noqa: E402
+from core.slicer.java_servlet import JavaSlicer as _JS144            # noqa: E402
+
+check("M144：补丁器登记表 20 类（doctor 单一事实源）",
+      len(_cli144.DOCTOR_PATCHERS), 20)
+check("M144：第 19/20 类补丁器都进登记表且可调用",
+      ("_fix_java_ssti_viewname" in _cli144.DOCTOR_PATCHERS
+       and "_fix_java_header_injection" in _cli144.DOCTOR_PATCHERS
+       and callable(getattr(_cli144, "_fix_java_ssti_viewname", None))
+       and callable(getattr(_cli144, "_fix_java_header_injection", None))), True)
+
+_w144 = Path(_tf144.mkdtemp(prefix="nexus_m144_"))
+try:
+    _r144 = _w144 / "repo"
+    (_r144 / "src").mkdir(parents=True)
+    (_r144 / "src" / "Sst.java").write_text(
+        "package x;\n"
+        "import org.springframework.stereotype.Controller;\n"
+        "import org.springframework.web.bind.annotation.GetMapping;\n"
+        "import org.springframework.web.bind.annotation.RequestParam;\n"
+        "\n"
+        "@Controller\n"
+        "public class Sst {\n"
+        "    @GetMapping(\"/v\")\n"
+        "    public String v(@RequestParam String para) {\n"
+        "        return \"vul/ssti/\" + para;\n"
+        "    }\n"
+        "}\n", encoding="utf-8")
+    (_r144 / "src" / "Hdr.java").write_text(
+        "package x;\n"
+        "import javax.servlet.http.HttpServletResponse;\n"
+        "import org.springframework.web.bind.annotation.GetMapping;\n"
+        "import org.springframework.web.bind.annotation.RequestParam;\n"
+        "\n"
+        "public class Hdr {\n"
+        "    @GetMapping(\"/h\")\n"
+        "    public void h(@RequestParam String name, HttpServletResponse resp) {\n"
+        "        resp.setHeader(\"Content-Disposition\","
+        " \"attachment; filename=\" + name);\n"
+        "    }\n"
+        "}\n", encoding="utf-8")
+    _us144 = list(_JS144(_r144).extract_entry_units())
+    _rep144: list[str] = []
+    _n144a = _cli144._fix_java_ssti_viewname(_r144, _us144, _rep144)
+    _n144b = _cli144._fix_java_header_injection(_r144, _us144, _rep144)
+    _txt144 = "\n".join(_rep144)
+    check("M144：第 19 类补丁生效并自检通过（视图名白名单 → ssti False）",
+          _n144a, 1)
+    check("M144：第 20 类补丁生效并自检通过（头值 CRLF 清洗 → False）",
+          _n144b, 1)
+    check("M144：diff 里能逐字看到修复动作",
+          ("__safeView.contains(para)" in _txt144
+           and 'replaceAll("[\\\\r\\\\n]", "")' in _txt144), True)
+    check("M144：补丁报告带自检声明与原因说明",
+          (_txt144.count("自检通过") >= 2
+           and "白屏" in _txt144 and "不加括号" in _txt144), True)
+    # 关键：两个补丁都不能改变文件最终内容（自检后必须还原）
+    check("M144：自检后源码字节级还原（不把仓库改脏）",
+          ("return \"vul/ssti/\" + para;" in
+           (_r144 / "src" / "Sst.java").read_text(encoding="utf-8")
+           and "__safeView" not in
+           (_r144 / "src" / "Sst.java").read_text(encoding="utf-8")
+           and "replaceAll" not in
+           (_r144 / "src" / "Hdr.java").read_text(encoding="utf-8")), True)
+finally:
+    _sh144.rmtree(_w144, ignore_errors=True)
 
 print()
 if FAILS:

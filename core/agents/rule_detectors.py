@@ -5449,6 +5449,30 @@ def _route_check_catalog(route: str) -> bool:
     return bool(route) and bool(_AUTHZ_CATALOG_ROUTE_RE.match(route))
 
 
+# 全局鉴权拦截器：名字带鉴权语义 + 注册在 `/**` 或前缀上（M110）。
+_AUTHZ_AUTH_INTERCEPTOR_RE = re.compile(
+    r"addInterceptor\s*\(\s*(?:new\s+)?([A-Za-z_]\w*)\s*\)\s*"
+    r"[^;]{0,120}?addPathPatterns\s*\(", re.S)
+
+
+def _authz_auth_interceptor(source: str) -> bool:
+    """装配证据里是否有**名字带鉴权语义**的全局拦截器（M110）。
+
+    机制：Spring 的 `HandlerInterceptor` 只要注册在路由上就会对匹配的请求
+    生效；名字里带 permission/auth/login/token/security/jwt/sso/oauth 的
+    拦截器，其职责就是鉴权（这是框架层的命名约定，不是业务猜测）。
+
+    刻意**不看**通用拦截器（encoding/metrics/trace/log）：那类拦截器不鉴权，
+    把它们当保护会把所有"靠全局拦截器"的项目一律豁免成 None，等于把判据关掉。
+    """
+    for m in _AUTHZ_AUTH_INTERCEPTOR_RE.finditer(source):
+        name = m.group(1).lower()
+        if any(t in name for t in ("permission", "auth", "login", "token",
+                                   "security", "jwt", "sso", "oauth")):
+            return True
+    return False
+
+
 def authz_verdict(source: str) -> bool | None:
     """越权/未授权的确定性判定：False(有校验) / True(入参直查且无主体) / None。"""
     body = entry_body(source)
@@ -5666,6 +5690,24 @@ def authz_verdict(source: str) -> bool | None:
         # （mall-admin 全部 controller 都无方法级注解，但未登录请求在
         # 过滤器层就被 401；不豁免会把整个安全的生产级项目判成漏洞。）
         if "[global-authz]" in source:
+            return None
+        # 4-豁免）**全局鉴权拦截器**（M110，jeecg-boot/xxl-job 实测形态）。
+        #
+        # 装配证据里出现"名字带鉴权语义的拦截器注册在 /** 上"：
+        #     [interceptor] interceptor urlPatterns=['/**'] 来源 WebMvcConfig.java
+        #     registry.addInterceptor(permissionInterceptor).addPathPatterns("/**");
+        #     registry.addInterceptor(cookieInterceptor).addPathPatterns("/**");
+        #
+        # xxl-job 的 160 个后台接口全部靠这个 `PermissionInterceptor` 统一拦，
+        # controller 方法体里一个主体判断都没有 —— 方法层看不见 ≠ 没有鉴权。
+        # 与 `[global-authz]` 同一口径：**退 None，不判 False**（静态切片无法
+        # 证明拦截器实现真的会拒绝）。
+        #
+        # 只认**名字里带鉴权语义**的拦截器（permission/auth/login/token/
+        # security/jwt/sso/oauth）。`encodingInterceptor` / `metricsInterceptor`
+        # 这类通用拦截器不算 —— 那正是 `_AUTHZ_GLOBAL_GUARD_RE` 当初排除
+        # `/ **` 的理由，现在用"名字语义"把这个口子补回来。
+        if _authz_auth_interceptor(source):
             return None
         # M64 litemall 淬火⑦：显式 token 鉴权模块 —— 模块鉴权模型是
         # "逐路由显式声明主体"（@LoginUser resolver），未声明主体的路由
@@ -6565,6 +6607,156 @@ def _sol_identity_call_check(text: str) -> bool:
             continue
         return True
     return False
+
+
+def _sol_predicate_authz_check(text: str) -> bool:
+    """**谓词式**授权（M108，synthetix 实测形态）。
+
+        modifier onlyOwner() { require(isOwner(), "caller is not the owner"); _; }
+        function isOwner() public view returns (bool) {
+            return _msgSender() == _owner;
+        }
+
+    身份比较被封进一个谓词函数，外层只看得到 `require(isOwner(), …)` ——
+    任何"在 require 里找 `==`"的判据都看不见它，于是 `transferOwnership`
+    被判成"缺访问控制"（sushiswap-zapper 两条误报就是这么来的）。
+
+    判据挂机制：① 在全文里找出**函数体内部做了身份比较**的谓词函数名；
+    ② 该函数名出现在 require/assert 条件里，或出现在 `if (...)` 条件里且
+    该 if 的分支**会中止**。
+    """
+    preds: set[str] = set()
+    for m in re.finditer(
+            r"\bfunction\s+([A-Za-z_]\w*)\s*\([^)]*\)[^{;]*\{", text):
+        blk = _sol_block_body(text, m.end() - 1)
+        if not blk:
+            continue
+        if _SOL_IDENTITY_FN_RE.search(blk) and re.search(r"[!=]=", blk):
+            # 排除"只比零地址"的谓词：那不是身份判定
+            if not re.fullmatch(r"[\s\S]*?[!=]=\s*address\s*\(\s*0\s*\)"
+                                r"[\s\S]*", blk):
+                preds.add(m.group(1))
+    if not preds:
+        return False
+    for name in preds:
+        if re.search(rf"\b(?:require|assert)\s*\([^;]{{0,160}}?\b{name}\s*\(",
+                     text):
+            return True
+        for m in _IF_RE.finditer(text):
+            close = _sol_match_paren(text, m.end() - 1)
+            if close < 0:
+                continue
+            cond = text[m.end():close]
+            if not re.search(rf"\b{name}\s*\(", cond):
+                continue
+            blk = _sol_block_body_at(text, close + 1)
+            if blk and _sol_block_aborts(blk):
+                return True
+    return False
+
+
+def _sol_inverted_identity_guard(text: str) -> bool:
+    """**反向条件**式授权：`if (X != _msgSender()) { revert }`（M108）。
+
+    与 `require(X == _msgSender())` **完全等价** —— 中止发生在"不相等"分支。
+    M96 记的是"只认 `==` 不认 `!=`"，那句针对的是 `require`：`require(sender
+    != address(0))` 是零地址检查，不是授权。但**反过来**写在 if 里就翻面了：
+
+        require(a != b)      → 要求"不等"，不是授权
+        if (a != b) revert   → 要求"相等"，是授权
+
+    synthetix 的 `acceptPoolOwnership` 就是后者：
+        if (pool.nominatedOwner != ERC2771Context._msgSender()) {
+            revert AccessError.Unauthorized(...);
+        }
+
+    排除项：对手方是 `address(0)` / 同义零地址（那是零地址检查）。
+
+    M108 补丁：**身份别名**。synthetix 的 `SnapshotRewardsDistributor` 写成
+
+        address sender = ERC2771Context._msgSender();
+        if (sender != rewardsManager) { revert ... }
+
+    条件里没有身份函数，只有别名变量 `sender` —— 必须先把别名认出来，
+    否则这条守卫看不见（与 M95 的 `_sol_identity_alias_check` 同一机制，
+    只是那边认 `==`、这边认 if 里的 `!=`）。
+    """
+    aliases = set(_sol_identity_aliases(text))
+    for m in _IF_RE.finditer(text):
+        close = _sol_match_paren(text, m.end() - 1)
+        if close < 0:
+            continue
+        cond = text[m.end():close]
+        blk = _sol_block_body_at(text, close + 1)
+        if not blk or not _sol_block_aborts(blk):
+            continue
+        for part in re.split(r"\|\||&&", cond):
+            if "!=" not in part:
+                continue
+            if re.search(r"address\s*\(\s*0\s*\)|\b0x0+\b", part):
+                continue
+            if _SOL_IDENTITY_FN_RE.search(part):
+                return True
+            if any(re.search(rf"\b{re.escape(a)}\b", part) for a in aliases):
+                return True
+    return False
+
+
+def _sol_identity_aliases(text: str) -> list[str]:
+    """收集 `address x = <身份函数>;` 形态的别名变量名（M108）。"""
+    out: list[str] = []
+    for m in re.finditer(
+            r"\baddress\s+(?:payable\s+)?([A-Za-z_]\w*)\s*=\s*([^;]+);", text):
+        if _SOL_IDENTITY_FN_RE.search(m.group(2)):
+            out.append(m.group(1))
+    return out
+
+
+def _sol_negated_identity_call(text: str) -> bool:
+    """`if (!<校验>(<身份函数>, …)) { revert }` 型授权（M108）。
+
+        if (!_isApprovedOrOwner(ERC2771Context._msgSender(), tokenId)) {
+            revert AccessError.Unauthorized(ERC2771Context._msgSender());
+        }
+
+    与 `require(_isApprovedOrOwner(_msgSender(), tokenId))` **同义** ——
+    只是把"取反 + 中止"写成了 if。旧判据只认 require 形态，synthetix 的
+    ERC721.transferFrom 因此被判成缺访问控制。
+
+    判据挂机制（两条同时成立）：
+      ① `if (!<call>(...))` 形状，且该 if 的分支**会中止**；
+      ② 该 call 的实参里有**身份函数**（`_msgSender()`/`msg.sender`/`_sender()`）。
+    实参里没有身份就不是授权判定 —— 那是普通过滤条件，不算保护。
+    """
+    for m in _IF_RE.finditer(text):
+        close = _sol_match_paren(text, m.end() - 1)
+        if close < 0:
+            continue
+        cond = text[m.end():close]
+        cm = re.search(r"!\s*([A-Za-z_]\w*)\s*\(", cond)
+        if not cm:
+            continue
+        blk = _sol_block_body_at(text, close + 1)
+        if not blk or not _sol_block_aborts(blk):
+            continue
+        cclose = _sol_match_paren(cond, cm.end() - 1)
+        args = cond[cm.end():cclose] if cclose > 0 else ""
+        if _SOL_IDENTITY_FN_RE.search(args):
+            return True
+    return False
+
+
+def _sol_block_body_at(text: str, pos: int) -> str:
+    """从 `pos` 起**跳过空白**再取 `{...}` 块（M108）。
+
+    `_sol_block_body` 要求下标正好落在 `{` 上。守卫写法的 `)` 与 `{` 之间
+    常有空格或换行（`if (!f(x)) {` / `if (a != b)\\n{`），直接传 `close+1`
+    会拿到空白 → 返回空串 → 判定静默失效（不是报错，是永远判 False）。
+    """
+    i = pos
+    while i < len(text) and text[i] in " \t\r\n":
+        i += 1
+    return _sol_block_body(text, i)
 
 
 def _sol_block_aborts(body: str) -> bool:
@@ -7505,7 +7697,17 @@ def solidity_access_verdict(source: str) -> bool | None:
     # 当保护会把 initWallet 判反，方向错误比退回恶劣得多。
     protected = bool(_SOLIDITY_MSGSENDER_CHECK_RE.search(func_src)
                      or _SOLIDITY_MSGSENDER_MEMBER_RE.search(func_src)
-                     or _sol_identity_call_check(func_src))
+                     or _sol_identity_call_check(func_src)
+                     # M108：谓词式 / 反向条件式授权
+                     #
+                     # 谓词要拿**整条切片**去找定义：`require(isOwner(), …)`
+                     # 里的 `isOwner` 是零参函数，它的体在切片的辅助/父合约
+                     # 证据段里（`return _msgSender() == _owner;`），只看
+                     # func_src 永远解析不到。切片是按单元拼的，证据段里不会
+                     # 混进无关合约的函数，所以这个范围是安全的。
+                     or _sol_predicate_authz_check(source)
+                     or _sol_inverted_identity_guard(func_src)
+                     or _sol_negated_identity_call(func_src))
     if not protected and _sol_identity_alias_check(func_src):
         protected = True
     if not protected and re.search(
@@ -7519,7 +7721,9 @@ def solidity_access_verdict(source: str) -> bool | None:
         for body in _sol_modifier_bodies(mod_block):
             if (_SOLIDITY_MSGSENDER_CHECK_RE.search(body)
                     or _SOLIDITY_MSGSENDER_MEMBER_RE.search(body)
-                    or _sol_identity_call_check(body)):
+                    or _sol_identity_call_check(body)
+                    or _sol_predicate_authz_check(body)
+                    or _sol_inverted_identity_guard(body)):
                 protected = True
                 break
             # M54：块形态 `if (msg.sender != owner) { throw; }` ——

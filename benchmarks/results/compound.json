@@ -6,7 +6,7 @@
   "correct": 445,
   "fp": 0,
   "reverse_fn": 0,
-  "rule_evaluations": 978,
+  "rule_evaluations": 981,
   "anchors": [
     {
       "unit": "Timelock.sol:setPendingAdmin",

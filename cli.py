@@ -2182,6 +2182,9 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_cors_config(repo, rest, report)
         n += _fix_hardcoded_secret(repo, rest, report)
         n += _fix_mp_concat(repo, rest, report)
+        # M106：第 19、20 类 —— 两个 Java 侧确定性补丁
+        n += _fix_java_ssti_viewname(repo, rest, report)
+        n += _fix_java_header_injection(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
     if n:
         out = Path(out_path)
@@ -3857,7 +3860,167 @@ DOCTOR_PATCHERS = [
     "_fix_solidity_arith_guard", "_fix_solidity_unchecked_wrap",
     "_fix_hardcoded_secret", "_fix_cors_config", "_fix_jwt_weakness",
     "_fix_python_redirect",
+    # M106：第 19、20 类 —— Java 视图名注入白名单 / 响应头 CRLF 清洗
+    "_fix_java_ssti_viewname", "_fix_java_header_injection",
 ]
+
+
+def _fix_java_ssti_viewname(repo: Path, targets: list, lines: list) -> int:
+    r"""补丁第 19 类（Module 106）：Thymeleaf/Spring MVC **视图名注入**。
+
+    修法：在 `return "<字面量>" + <形参>` 之前插一行**视图名白名单**守卫 ——
+
+        java.util.Set<String> __safeView = java.util.Set.of("index", "home");
+        if (!__safeView.contains(para)) { return "error/404"; }
+
+    **不采用**"给方法补 `@ResponseBody`"：那会把整条路由的语义从"渲染视图"
+    改成"直接输出字符串"，页面会白屏 —— 是"看起来修了、实际把业务改坏"的
+    坏补丁。白名单守卫保留视图机制，只把不认识的名字挡在门外。
+
+    守卫刻意写成**不嵌套括号**的两行（`__safeView.contains(para)`），
+    这样 `ssti_verdict` 的白名单正则（`if\s*\([^)]*\.contains\(\s*var\s*\)`）
+    能逐字匹配到 —— 补丁必须能被自己的判据复核，否则自检就是自欺。
+    """
+    from core.agents.rule_detectors import (verdict as rule_verdict,
+                                            _SSTI_THYMELEAF_RET_RE)
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("ssti", src) is not True:
+            continue
+        m = next((x for x in _SSTI_THYMELEAF_RET_RE.finditer(src)
+                  if x.group(1) is not None), None)
+        if not m:
+            continue
+        var = m.group(3)
+        ret_txt = m.group(0)
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        idx = original.find(ret_txt)
+        if idx < 0:
+            continue
+        line_start = original.rfind("\n", 0, idx) + 1
+        indent = original[line_start:idx]
+        if indent.strip():
+            continue                       # 不是行首 → 交人工
+        guard = (f"{indent}java.util.Set<String> __safeView = "
+                 f"java.util.Set.of(\"index\", \"home\");\n"
+                 f"{indent}if (!__safeView.contains({var})) {{ "
+                 f"return \"error/404\"; }}\n")
+        patched = original[:line_start] + guard + original[line_start:]
+        v2 = None
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            # 清跨文件实现体缓存：`java_impl_resolver._FILE_CACHE` 按路径缓存、
+            # 不看 mtime —— 不清就永远读回未修补的旧内容，自检必然看到 True。
+            from core.context.java_impl_resolver import _FILE_CACHE as _FC
+            _FC.clear()
+            from benchmarks.slice_cache import cached_units  # noqa: F401
+            from core.slicer.java_servlet import JavaSlicer
+            u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path) == f), None)
+            v2 = rule_verdict("ssti", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE as _FC2
+            _FC2.clear()
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(),
+                                        patched.splitlines(),
+                                        fromfile=f"a/{f.name}",
+                                        tofile=f"b/{f.name}", lineterm="")
+            lines += [f"## [java-ssti-view] {u.unit_name}（`{f.name}`）",
+                      "```diff", *diff, "```", "",
+                      "> 自检通过：重切片 + 重跑 ssti 规则 → False。",
+                      f"> 视图名前加白名单守卫（`{var}` 只允许已知视图名），",
+                      "> 不认识的路径返回 error/404 —— 不给 @ResponseBody，",
+                      "> 那会把'渲染视图'改成'输出字符串'，页面直接白屏。", ""]
+    return fixed
+
+
+def _fix_java_header_injection(repo: Path, targets: list,
+                               lines: list) -> int:
+    """补丁第 20 类（Module 106）：HTTP 响应头 CRLF 注入。
+
+    修法：把响应头的 value 表达式整体包一层 CR/LF 清洗 ——
+
+        resp.setHeader("Content-Disposition",
+                       ("attachment; filename=" + name).replaceAll("[\\r\\n]", ""));
+
+    必须**整体加括号**：`"a" + b.replaceAll(...)` 只清洗了 `b`，
+    `"a" + b` 里若 `a` 本身含 CR/LF 仍会被注入；而且运算符优先级会让
+    拼接发生在清洗之后。括号是这条补丁的正确性前提，不是风格问题。
+    """
+    from core.agents.rule_detectors import (verdict as rule_verdict,
+                                            _HDR_SINK_RE, _HDR_SANITIZE_RE,
+                                            _hdr_value_idents,
+                                            _ssti_call_args,
+                                            _bare_params, _entry_signature,
+                                            _REQUEST_READ_RE)
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("header_injection", src) is not True:
+            continue
+        params = set(_bare_params(_entry_signature(src)))
+        for m in _HDR_SINK_RE.finditer(src):
+            args = _ssti_call_args(src, m.end() - 1)
+            if len(args) < 2:
+                continue
+            value = args[1]
+            if _HDR_SANITIZE_RE.search(value):
+                continue
+            idents = _hdr_value_idents(value)
+            if not (params & idents or _REQUEST_READ_RE.search(value)):
+                continue
+            f = Path(u.file_path)
+            if not f.is_file():
+                continue
+            with open(f, encoding="utf-8", newline="") as fh:
+                original = fh.read()
+            idx = original.find(value)
+            if idx < 0:
+                continue
+            # 只在实参**恰好**是这一段时替换（避免把子串误替换）
+            patched = (original[:idx] + f"({value}).replaceAll(\"[\\\\r\\\\n]\", \"\")"
+                       + original[idx + len(value):])
+            v2 = None
+            try:
+                with open(f, "w", encoding="utf-8", newline="") as fh:
+                    fh.write(patched)
+                from core.context.java_impl_resolver import _FILE_CACHE as _FC
+                _FC.clear()
+                from core.slicer.java_servlet import JavaSlicer
+                u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                           if x.unit_name == u.unit_name
+                           and Path(x.file_path) == f), None)
+                v2 = rule_verdict("header_injection",
+                                  u2.source_code) if u2 else None
+            finally:
+                with open(f, "w", encoding="utf-8", newline="") as fh:
+                    fh.write(original)
+                from core.context.java_impl_resolver import _FILE_CACHE as _FC2
+                _FC2.clear()
+            if v2 is False:
+                fixed += 1
+                diff = difflib.unified_diff(original.splitlines(),
+                                            patched.splitlines(),
+                                            fromfile=f"a/{f.name}",
+                                            tofile=f"b/{f.name}", lineterm="")
+                lines += [f"## [java-hdr-crlf] {u.unit_name}（`{f.name}`）",
+                          "```diff", *diff, "```", "",
+                          "> 自检通过：重切片 + 重跑 header_injection → False。",
+                          "> 头值整体加括号后 replaceAll 剥掉 CR/LF ——",
+                          "> 不加括号只会清洗最后一段拼接，等于没修。", ""]
+            break                          # 一个单元修一处即可
+    return fixed
 
 
 def _strip_scoreboard_timestamp(text: str) -> str:

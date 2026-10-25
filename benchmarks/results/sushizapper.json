@@ -1,0 +1,15 @@
+{
+  "bench": "sushizapper",
+  "units": 75,
+  "total_units": 75,
+  "decided": 75,
+  "correct": 75,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 143,
+  "ownership_verdicts": {
+    "Sushiswap_ZapIn_General_V2.sol": false,
+    "Sushiswap_ZapOut_General_V1.sol": false
+  },
+  "true_rows": []
+}

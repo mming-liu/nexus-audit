@@ -1,0 +1,20 @@
+{
+  "bench": "synthetixv3",
+  "units": 1264,
+  "total_units": 1264,
+  "all_units": 1981,
+  "decided": 1264,
+  "correct": 1264,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 3331,
+  "production_prefixes": [
+    "protocol/",
+    "markets/",
+    "auxiliary/",
+    "utils/core-contracts/contracts/token/",
+    "utils/core-contracts/contracts/storage/",
+    "utils/core-contracts/contracts/utils/"
+  ],
+  "true_rows": []
+}
