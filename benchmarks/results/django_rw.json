@@ -1,0 +1,36 @@
+{
+  "bench": "django_rw",
+  "units": 11,
+  "total_units": 11,
+  "drf_actions": 10,
+  "decided": 11,
+  "correct": 10,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 43,
+  "authz_true": [
+    "ArticleViewSet.update"
+  ],
+  "public_read_verdicts": {
+    "ArticleViewSet.list": false,
+    "ArticleViewSet.retrieve": false
+  },
+  "drf_units": [
+    "ArticleViewSet.create",
+    "ArticleViewSet.list",
+    "ArticleViewSet.retrieve",
+    "ArticleViewSet.update",
+    "ArticlesFavoriteAPIView.delete",
+    "ArticlesFavoriteAPIView.post",
+    "LoginAPIView.post",
+    "ProfileFollowAPIView.delete",
+    "ProfileFollowAPIView.post",
+    "RegistrationAPIView.post"
+  ],
+  "true_rows": [
+    {
+      "unit": "ArticleViewSet.update",
+      "category": "authz"
+    }
+  ]
+}

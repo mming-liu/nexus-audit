@@ -1,0 +1,395 @@
+{
+  "bench": "eladmin_jpa",
+  "units": 66,
+  "total_units": 66,
+  "decided": 66,
+  "correct": -9,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 408,
+  "roots_by_category": {
+    "authz": 9,
+    "cors": 1
+  },
+  "frozen_non_authz": {
+    "cors": 1
+  },
+  "authz_entries": 9,
+  "true_rows": [
+    {
+      "file": "AliPayController.java",
+      "unit": "AliPayController.toPayAsPc",
+      "category": "authz"
+    },
+    {
+      "file": "AliPayController.java",
+      "unit": "AliPayController.toPayAsPc",
+      "category": "cors"
+    },
+    {
+      "file": "AliPayController.java",
+      "unit": "AliPayController.toPayAsWeb",
+      "category": "authz"
+    },
+    {
+      "file": "AliPayController.java",
+      "unit": "AliPayController.toPayAsWeb",
+      "category": "cors"
+    },
+    {
+      "file": "AliPayController.java",
+      "unit": "AliPayController.notify",
+      "category": "cors"
+    },
+    {
+      "file": "LocalStorageController.java",
+      "unit": "LocalStorageController.exportFile",
+      "category": "cors"
+    },
+    {
+      "file": "LocalStorageController.java",
+      "unit": "LocalStorageController.uploadPicture",
+      "category": "cors"
+    },
+    {
+      "file": "S3StorageController.java",
+      "unit": "S3StorageController.exportS3Storage",
+      "category": "cors"
+    },
+    {
+      "file": "S3StorageController.java",
+      "unit": "S3StorageController.downloadS3Storage",
+      "category": "cors"
+    },
+    {
+      "file": "DeptController.java",
+      "unit": "DeptController.exportDept",
+      "category": "cors"
+    },
+    {
+      "file": "DeptController.java",
+      "unit": "DeptController.getDeptSuperior",
+      "category": "cors"
+    },
+    {
+      "file": "DictController.java",
+      "unit": "DictController.exportDict",
+      "category": "cors"
+    },
+    {
+      "file": "DictController.java",
+      "unit": "DictController.queryAllDict",
+      "category": "cors"
+    },
+    {
+      "file": "DictDetailController.java",
+      "unit": "DictDetailController.getDictDetailMaps",
+      "category": "cors"
+    },
+    {
+      "file": "DictDetailController.java",
+      "unit": "DictDetailController.deleteDictDetail",
+      "category": "cors"
+    },
+    {
+      "file": "JobController.java",
+      "unit": "JobController.exportJob",
+      "category": "cors"
+    },
+    {
+      "file": "MenuController.java",
+      "unit": "MenuController.exportMenu",
+      "category": "cors"
+    },
+    {
+      "file": "MenuController.java",
+      "unit": "MenuController.buildMenus",
+      "category": "cors"
+    },
+    {
+      "file": "MenuController.java",
+      "unit": "MenuController.queryAllMenu",
+      "category": "cors"
+    },
+    {
+      "file": "MenuController.java",
+      "unit": "MenuController.childMenu",
+      "category": "cors"
+    },
+    {
+      "file": "MenuController.java",
+      "unit": "MenuController.getMenuSuperior",
+      "category": "cors"
+    },
+    {
+      "file": "RoleController.java",
+      "unit": "RoleController.findRoleById",
+      "category": "cors"
+    },
+    {
+      "file": "RoleController.java",
+      "unit": "RoleController.exportRole",
+      "category": "cors"
+    },
+    {
+      "file": "RoleController.java",
+      "unit": "RoleController.queryAllRole",
+      "category": "cors"
+    },
+    {
+      "file": "RoleController.java",
+      "unit": "RoleController.getRoleLevel",
+      "category": "cors"
+    },
+    {
+      "file": "RoleController.java",
+      "unit": "RoleController.updateRoleMenu",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.exportUser",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.centerUser",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.updateUserPass",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.resetPwd",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.updateUserAvatar",
+      "category": "cors"
+    },
+    {
+      "file": "UserController.java",
+      "unit": "UserController.updateUserEmail",
+      "category": "cors"
+    },
+    {
+      "file": "VerifyController.java",
+      "unit": "VerifyController.resetEmail",
+      "category": "authz"
+    },
+    {
+      "file": "VerifyController.java",
+      "unit": "VerifyController.resetEmail",
+      "category": "cors"
+    },
+    {
+      "file": "VerifyController.java",
+      "unit": "VerifyController.resetPass",
+      "category": "authz"
+    },
+    {
+      "file": "VerifyController.java",
+      "unit": "VerifyController.resetPass",
+      "category": "cors"
+    },
+    {
+      "file": "VerifyController.java",
+      "unit": "VerifyController.validated",
+      "category": "authz"
+    },
+    {
+      "file": "VerifyController.java",
+      "unit": "VerifyController.validated",
+      "category": "cors"
+    },
+    {
+      "file": "AuthController.java",
+      "unit": "AuthController.getUserInfo",
+      "category": "cors"
+    },
+    {
+      "file": "OnlineController.java",
+      "unit": "OnlineController.exportOnlineUser",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.exportQuartzJob",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.exportQuartzJobLog",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.queryQuartzJobLog",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.updateQuartzJobStatus",
+      "category": "cors"
+    },
+    {
+      "file": "QuartzJobController.java",
+      "unit": "QuartzJobController.executionQuartzJob",
+      "category": "cors"
+    },
+    {
+      "file": "AppController.java",
+      "unit": "AppController.exportApp",
+      "category": "cors"
+    },
+    {
+      "file": "DatabaseController.java",
+      "unit": "DatabaseController.exportDatabase",
+      "category": "cors"
+    },
+    {
+      "file": "DatabaseController.java",
+      "unit": "DatabaseController.testConnect",
+      "category": "cors"
+    },
+    {
+      "file": "DatabaseController.java",
+      "unit": "DatabaseController.uploadDatabase",
+      "category": "cors"
+    },
+    {
+      "file": "DeployController.java",
+      "unit": "DeployController.exportDeployData",
+      "category": "cors"
+    },
+    {
+      "file": "DeployController.java",
+      "unit": "DeployController.uploadDeploy",
+      "category": "cors"
+    },
+    {
+      "file": "DeployController.java",
+      "unit": "DeployController.serverReduction",
+      "category": "cors"
+    },
+    {
+      "file": "DeployController.java",
+      "unit": "DeployController.serverStatus",
+      "category": "cors"
+    },
+    {
+      "file": "DeployController.java",
+      "unit": "DeployController.startServer",
+      "category": "cors"
+    },
+    {
+      "file": "DeployController.java",
+      "unit": "DeployController.stopServer",
+      "category": "cors"
+    },
+    {
+      "file": "DeployHistoryController.java",
+      "unit": "DeployHistoryController.exportDeployHistory",
+      "category": "cors"
+    },
+    {
+      "file": "ServerDeployController.java",
+      "unit": "ServerDeployController.exportServerDeploy",
+      "category": "cors"
+    },
+    {
+      "file": "ServerDeployController.java",
+      "unit": "ServerDeployController.testConnectServerDeploy",
+      "category": "cors"
+    },
+    {
+      "file": "SysLogController.java",
+      "unit": "SysLogController.exportLog",
+      "category": "cors"
+    },
+    {
+      "file": "SysLogController.java",
+      "unit": "SysLogController.exportErrorLog",
+      "category": "cors"
+    },
+    {
+      "file": "SysLogController.java",
+      "unit": "SysLogController.queryUserLog",
+      "category": "cors"
+    },
+    {
+      "file": "SysLogController.java",
+      "unit": "SysLogController.queryErrorLog",
+      "category": "cors"
+    },
+    {
+      "file": "SysLogController.java",
+      "unit": "SysLogController.queryErrorLogDetail",
+      "category": "cors"
+    },
+    {
+      "file": "SysLogController.java",
+      "unit": "SysLogController.delAllErrorLog",
+      "category": "cors"
+    },
+    {
+      "file": "SysLogController.java",
+      "unit": "SysLogController.delAllInfoLog",
+      "category": "cors"
+    },
+    {
+      "file": "GenConfigController.java",
+      "unit": "GenConfigController.queryGenConfig",
+      "category": "authz"
+    },
+    {
+      "file": "GenConfigController.java",
+      "unit": "GenConfigController.queryGenConfig",
+      "category": "cors"
+    },
+    {
+      "file": "GeneratorController.java",
+      "unit": "GeneratorController.queryAllTables",
+      "category": "cors"
+    },
+    {
+      "file": "GeneratorController.java",
+      "unit": "GeneratorController.queryTables",
+      "category": "authz"
+    },
+    {
+      "file": "GeneratorController.java",
+      "unit": "GeneratorController.queryTables",
+      "category": "cors"
+    },
+    {
+      "file": "GeneratorController.java",
+      "unit": "GeneratorController.queryColumns",
+      "category": "authz"
+    },
+    {
+      "file": "GeneratorController.java",
+      "unit": "GeneratorController.queryColumns",
+      "category": "cors"
+    },
+    {
+      "file": "GeneratorController.java",
+      "unit": "GeneratorController.syncColumn",
+      "category": "cors"
+    },
+    {
+      "file": "GeneratorController.java",
+      "unit": "GeneratorController.generatorCode",
+      "category": "authz"
+    },
+    {
+      "file": "GeneratorController.java",
+      "unit": "GeneratorController.generatorCode",
+      "category": "cors"
+    }
+  ]
+}

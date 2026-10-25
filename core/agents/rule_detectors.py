@@ -5476,11 +5476,76 @@ def _authz_auth_interceptor(source: str) -> bool:
     return False
 
 
+def _drf_authz_verdict(source: str, body: str, action: str) -> bool | None:
+    """DRF 类视图的鉴权判定（M121）。
+
+    DRF 把鉴权声明放在**类属性** `permission_classes` 上，方法体里看不到 ——
+    切片器已把它写进头部（`// Permission-Classes:` + `// View-Action:`）。
+
+    判据分读写两种动作，因为它们的安全含义完全不同：
+
+      · **读动作**（`list`/`retrieve`/`get`）：`AllowAny` /
+        `IsAuthenticatedOrReadOnly` / `IsAuthenticated` 都表示"这个读是被允许的"，
+        django-realworld 的 `ArticleViewSet.retrieve` 就是公开读 → **False**。
+      · **写动作**（`create`/`update`/`partial_update`/`destroy`/`post`/…）：
+        `IsAuthenticated` / `IsAuthenticatedOrReadOnly` 只要求**登录**，不核对
+        **归属** —— 任何登录用户都能改别人的文章，这是 BOLA → **True**。
+        只有 `IsAdminUser` / `IsOwnerOrReadOnly` / `IsAuthorOrReadOnly`，
+        或方法体里出现 `request.user` 与资源属主的比较，才算核对了归属 → False。
+
+    "只要求登录 ≠ 核对归属"这条区分是本判据的核心：把它混为一谈，
+    要么给 django-realworld 报假阳（retrieve），要么漏掉真阳（update）。
+    """
+    perms = ""
+    pm = re.search(r"//\s*Permission-Classes:\s*(.+)", source)
+    if pm:
+        perms = pm.group(1).strip()
+    pl = perms.lower()
+    reads = {"list", "retrieve", "get"}
+    writes = {"create", "update", "partial_update", "destroy",
+              "post", "put", "patch", "delete"}
+    act = action.lower()
+    if act in reads:
+        if any(t in pl for t in ("allowany", "isauthenticated",
+                                 "isadminuser")):
+            return False
+        return None
+    if act not in writes:
+        return None
+    # 显式核对归属的三条证据
+    if any(t in pl for t in ("isadminuser", "isownerorreadonly",
+                             "isauthororreadonly", "isowner")):
+        return False
+    if re.search(r"request\s*\.\s*user\b[^;\n]{0,80}?(?:!=|==)"
+                 r"|\b(?:!=|==)[^;\n]{0,80}?request\s*\.\s*user\b", body):
+        return False
+    if re.search(r"\.\s*author\b[^;\n]{0,60}(?:!=|==)[^;\n]{0,60}"
+                 r"request\s*\.\s*user", body):
+        return False
+    # **先取现成资源**才谈得上越权。`create` / "收藏" / "关注" / 登录注册
+    # 都不从 queryset 取别人的对象 —— 结构上没有可被越权的资源，
+    # 判 True 只会造出一批假阳（django-realworld 实测 8 条里只有 1 条真）。
+    if not re.search(r"self\s*\.\s*queryset\s*\.\s*get\s*\("
+                     r"|self\s*\.\s*get_object\s*\("
+                     r"|\bget_object_or_404\s*\(", body):
+        return False
+    if "isauthenticated" in pl:
+        return True                    # 登录即可写 = 未核对归属
+    if "allowany" in pl:
+        return True                    # 匿名即可写
+    return None
+
+
 def authz_verdict(source: str) -> bool | None:
     """越权/未授权的确定性判定：False(有校验) / True(入参直查且无主体) / None。"""
     body = entry_body(source)
     if not body:
         return None
+
+    # M121：DRF 类视图（切片头带 `// View-Action:`）走专门的口径。
+    _va = re.search(r"//\s*View-Action:\s*(\w+)", source)
+    if _va:
+        return _drf_authz_verdict(source, body, _va.group(1))
 
     # 0) 认证入口本身不做授权判定。登录接口的"资源"就是凭据库，身份由口令校验
     #    建立；把 `login(loginName, password)` 的入参当成"直查资源"是口径错误。
@@ -5893,6 +5958,24 @@ def python_sqli_verdict(source: str) -> bool | None:
         # 只有 ORM 调用：filter/filter_by/get 按字段绑定，天然参数化
         if re.search(r"\.\s*(?:filter|filter_by|get|query|first|all)\s*\(", source):
             return False
+        # M120：**非 execute 形态的参数化封装**。fastapi-realworld 的
+        # `databases` 库走自己的方法名：
+        #     await self._force_fetch(query, values={"slug": slug})
+        # SQL 里是 `:slug` 占位符，值是**另一个实参** —— 与
+        # `execute(sql, (x,))` 完全同构，只是方法名不在 sink 词表里。
+        # 判据挂机制：SQL 字面量里有占位符（`:name` / `$1` / `%(x)s` / `?`）
+        # 且同一次调用还带第二个实参。
+        for m in re.finditer(r"\b\w*(?:fetch|execute|select|query|run)\w*\s*\(",
+                             source, re.I):
+            args = _balanced_cond(source, m.end())
+            if args is None:
+                continue
+            parts = _split_args(args)
+            if len(parts) < 2 or not parts[1].strip():
+                continue
+            first = parts[0]
+            if re.search(r"[:$][A-Za-z_]\w*|\$\d+|%\([^)]*\)s|\?", first):
+                return False           # 占位符 + 独立实参 = 绑定
         return None
     saw_safe = False
     for m in _PY_SQL_SINK_RE.finditer(source):
@@ -9307,6 +9390,24 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category == "crypto":
         alg = extract_cipher_alg(source, cfg)
+        if not alg:
+            return None
+        # M122：**证据归属**。切片会把 Hop 2/3 的辅助类贴进证据段
+        # （`// 来自 EncryptUtils.java:46 [Hop 3]`）。如果入口体里根本没有
+        # 加解密调用，那么 DES/Cipher 属于**别的方法**，算到当前入口头上就是
+        # 假阳 —— eladmin 实测 `RoleController.getRoleLevel` / `UserController.
+        # centerUser` 四条的 DES 全来自 Hop 3 的 `EncryptUtils.desEncrypt`。
+        # 归属不了就退 None（"缺证据不下结论"），而不是判 True。
+        #
+        # 关键：`entry_body()` 会**剥掉注释**，而跨文件/Hop 证据段恰恰是用
+        # `// 来自 Xxx.java:46 [Hop 3]` 这种注释行分隔的 —— 剥完注释，证据段
+        # 的**代码**就混进 body 了（实测 `desEncrypt` 的 `Cipher.getInstance`
+        # 仍在）。所以必须先对**原始 source** 按标记切段，再看入口那一段。
+        _region = re.split(r"(?m)^[ \t]*//[ \t]*(?:----|来自)", source)[0]
+        _body = entry_body(_region)
+        if not re.search(r"Cipher\s*\.\s*getInstance|\.\s*(?:doFinal|update)\s*\("
+                         r"|new\s+\w*Cipher|encrypt|decrypt", _body, re.I):
+            return None
         return cipher_is_weak(alg) if alg else None
 
     if category == "hash":
@@ -9390,6 +9491,13 @@ def verdict(category: str, source: str) -> bool | None:
         return xpathi_verdict(source)
 
     if category == "authz":
+        # M121：DRF 类视图切片带 `// View-Action:` 头 —— 走 Django/DRF 专门口径，
+        # 不能扔给通用的 Java 风格判据（它看不见类级 permission_classes）。
+        if "// View-Action:" in source or "// View-Action:" in source.replace(
+                "\r", ""):
+            return _drf_authz_verdict(source, entry_body(source),
+                                      re.search(r"//\s*View-Action:\s*(\w+)",
+                                                source).group(1))
         if _looks_python(source):
             return python_authz_verdict(source)
         return authz_verdict(source)

@@ -57,12 +57,26 @@ _CALL_EXCLUDE = {"if", "for", "while", "with", "range", "len", "str", "int",
 #   `re_path(r'^x/', views.f)`  —— Django 2.0+
 #   `path('x/', views.f)`       —— Django 2.0+ 简写
 _DJ_URL_CALL_RE = re.compile(r"(?<![\w.])(?:url|re_path|path)\s*\(")
+# M121：DRF 类视图两条通道。
+#   · `url(r'^x$', XxxAPIView.as_view())`
+#   · `router.register(r'articles', ArticleViewSet)`
+_DJ_AS_VIEW_RE = re.compile(r"^([A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)*)\s*\.\s*as_view\s*\(")
+_DJ_ROUTER_REG_RE = re.compile(r"\.\s*register\s*\(")
+# APIView/GenericAPIView 的 HTTP 动作方法
+_DJ_CBV_ACTIONS = ("get", "post", "put", "patch", "delete")
+# ViewSet 的六个标准动作（DefaultRouter 会把它们映射到 GET/POST/PUT/PATCH/DELETE）
+_DJ_VIEWSET_ACTIONS = ("list", "create", "retrieve", "update",
+                       "partial_update", "destroy")
 # 只认 `urlpatterns` 真的被赋值成列表的文件 —— 否则 `pathlib.Path(...)`、
 # `re_path` 之类同名词在任何 Python 文件里都会触发本通道。
 _DJ_URLPATTERNS_RE = re.compile(r"(?m)^\s*urlpatterns\s*(?:\+?=)\s*\[")
 _DJ_IMPORT_RE = re.compile(
-    r"(?m)^[ \t]*from[ \t]+([\w.]+)[ \t]+import[ \t]+([^\n#]+)"
-    r"|^[ \t]*import[ \t]+([\w.]+)")
+    # M121：`from .views import (\n  A, B,\n  C\n)` —— **括号跨行**的导入是 DRF
+    # 项目里的标准写法（django-realworld 每个 urls.py 都这么写）。只认单行
+    # 的话名字一个都进不了 alias map，类视图路由全部落不到模块（实测 63 条
+    # 路由的 mod 全是 None）。这里允许行为 `(` 时跨行取到配平的 `)`。
+    r"(?m)^[ \t]*from[ \t]+([\w.]+)[ \t]+import[ \t]+(\([^)]*\)|[^\n#]+)"
+    r"|^[ \t]*import[ \t]+([\w.]+)", re.S)
 
 
 def _dj_split_args(s: str) -> list[str]:
@@ -147,9 +161,21 @@ def _dj_module_rel(mod: str, leaf: str, base: Path, repo: Path) -> str | None:
         d = base
         for _ in range(dots - 1):
             d = d.parent
-        for comp in ([c for c in rest.split(".") if c] + [leaf]):
-            d = d / comp
-        for cand in (d.with_suffix(".py"), d / "__init__.py"):
+        comps = [c for c in rest.split(".") if c]
+        # ① 先按"leaf 也是模块名"解（`from . import views` / `from .users import views`）
+        dd = d
+        for comp in comps + [leaf]:
+            dd = dd / comp
+        for cand in (dd.with_suffix(".py"), dd / "__init__.py"):
+            if cand.is_file():
+                return cand.relative_to(repo).as_posix()
+        # ② M121：leaf 是**模块内的符号名**（`from .views import ArticleViewSet`）。
+        #    此时模块就是 `mod` 本身，leaf 不该参与路径拼接 —— 直接落到
+        #    `views.py`，符号由 indexer 的 symbol_table 去取。
+        dd = d
+        for comp in comps:
+            dd = dd / comp
+        for cand in (dd.with_suffix(".py"), dd / "__init__.py"):
             if cand.is_file():
                 return cand.relative_to(repo).as_posix()
         return None
@@ -336,9 +362,19 @@ class WebTreeSitterSlicer:
     def _django_routes(cls, repo_path: Path) -> list[tuple[str, str | None, str]]:
         """解析全仓 `urls.py`，返回 [(view 函数名, 模块相对路径 or None, 路由标签)]。
 
-        只认 `urlpatterns = [` / `+=` 真的被赋值的文件；`include(...)`、
-        `Xxx.as_view(...)`（类视图）与解析不出的点号链一律跳过 ——
-        宁可这条路由不进来，也不拿一个猜的模块名去匹同名函数。
+        只认 `urlpatterns = [` / `+=` 真的被赋值的文件；`include(...)` 与
+        解析不出的点号链一律跳过 —— 宁可这条路由不进来，也不拿一个猜的
+        模块名去匹同名函数。
+
+        M121：**DRF 类视图**两条通道都打通了（此前一律跳过，django-realworld
+        整个仓库只切出 1 个单元）：
+          · `url(r'^x$', XxxAPIView.as_view())` → 取 `XxxAPIView` 的
+            `get/post/put/patch/delete` 动作方法；
+          · `router.register(r'articles', ArticleViewSet)` → 取 ViewSet 的
+            `list/create/retrieve/update/partial_update/destroy`。
+        两条都以 `("Class.method", mod, label)` 形式返回，由
+        `_django_entries` 走**类方法**解析（`symbol_table` 里键是
+        `Class.method`）。
         """
         routes: list[tuple[str, str | None, str]] = []
         for pf in sorted(repo_path.rglob("*.py")):
@@ -348,30 +384,109 @@ class WebTreeSitterSlicer:
                 text = pf.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            if not _DJ_URLPATTERNS_RE.search(text):
+            is_urlconf = bool(_DJ_URLPATTERNS_RE.search(text))
+            if not is_urlconf and not _DJ_ROUTER_REG_RE.search(text):
                 continue
             aliases = _dj_alias_map(text, pf, repo_path)
-            for m in _DJ_URL_CALL_RE.finditer(text):
-                args = _dj_split_args(_dj_call_args(text, m.end() - 1))
-                if len(args) < 2:
+            if is_urlconf:
+                for m in _DJ_URL_CALL_RE.finditer(text):
+                    args = _dj_split_args(_dj_call_args(text, m.end() - 1))
+                    if len(args) < 2:
+                        continue
+                    view = args[1].strip()
+                    if not view or "include" in view:
+                        continue
+                    label = cls._django_route_label(args[0])
+                    avm = _DJ_AS_VIEW_RE.search(view)
+                    if avm:
+                        dotted = [p.strip() for p in avm.group(1).split(".")
+                                  if p.strip()]
+                        if not dotted:
+                            continue
+                        klass = dotted[-1]
+                        mod = (aliases.get(klass) if len(dotted) == 1
+                               else _dj_resolve(dotted[:-1], aliases, repo_path))
+                        for act in _DJ_CBV_ACTIONS:
+                            routes.append((f"{klass}.{act}", mod, label))
+                        continue
+                    vm = re.fullmatch(
+                        r"([A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)*)", view)
+                    if not vm:
+                        continue
+                    dotted = [p.strip() for p in vm.group(1).split(".")
+                              if p.strip()]
+                    if not dotted:
+                        continue
+                    func = dotted[-1]
+                    if len(dotted) == 1:
+                        mod = aliases.get(func)
+                    else:
+                        mod = _dj_resolve(dotted[:-1], aliases, repo_path)
+                    routes.append((func, mod, label))
+            # DRF Router：`router.register(r'articles', ArticleViewSet)`
+            for rm in _DJ_ROUTER_REG_RE.finditer(text):
+                rargs = _dj_split_args(_dj_call_args(text, rm.end() - 1))
+                if len(rargs) < 2:
                     continue
-                view = args[1].strip()
-                if not view or "include" in view or "as_view" in view:
+                prefix = cls._django_route_label(rargs[0].lstrip("r"))
+                vs = rargs[1].strip()
+                vm2 = re.fullmatch(r"([A-Za-z_]\w*)", vs)
+                if not vm2:
                     continue
-                vm = re.fullmatch(r"([A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)*)",
-                                  view)
-                if not vm:
-                    continue
-                dotted = [p.strip() for p in vm.group(1).split(".") if p.strip()]
-                if not dotted:
-                    continue
-                func = dotted[-1]
-                if len(dotted) == 1:
-                    mod = aliases.get(func)
-                else:
-                    mod = _dj_resolve(dotted[:-1], aliases, repo_path)
-                routes.append((func, mod, cls._django_route_label(args[0])))
+                klass = vm2.group(1)
+                mod = aliases.get(klass)
+                for act in _DJ_VIEWSET_ACTIONS:
+                    routes.append((f"{klass}.{act}", mod, f"/{prefix}"))
         return routes
+
+    @staticmethod
+    def _django_class_method(indexer, klass: str, meth: str,
+                             mod: str | None) -> dict | None:
+        """在类体行号范围内找同名方法（M121）。
+
+        三条约束缺一不可：① 类符号存在（可带模块限定）；② 方法符号与类
+        **同文件**；③ 方法起始行落在 `[类起始行, 类结束行]` 之间。
+        `__init__` 之类的噪声天然被"方法名 + 范围"两条挡住。
+        """
+        classes = indexer.symbol_table.get(klass, [])
+        if not classes:
+            return None
+        if mod:
+            classes = [c for c in classes
+                       if Path(c["file"]).as_posix().endswith(mod)] or classes
+        for c in classes:
+            cf = Path(c["file"]).resolve()
+            for cand in indexer.symbol_table.get(meth, []):
+                if Path(cand["file"]).resolve() != cf:
+                    continue
+                if c["start"] <= cand["start"] <= c["end"]:
+                    return cand
+        return None
+
+    @staticmethod
+    def _drf_header(path: Path, klass: str, meth: str) -> str:
+        """类视图切片头（M121）：`// Permission-Classes:` + `// View-Action:`。
+
+        从**类体范围内**取 `permission_classes = (...)` 的字面量内容。
+        取不到就只写动作名 —— 缺证据时宁可让判据看到"没有权限类声明"，
+        也不要凭空补一个 `IsAuthenticated`（那会把真漏洞洗成安全）。
+        """
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
+        m = re.search(rf"(?ms)^class\s+{re.escape(klass)}\b.*?(?=^class\s|\Z)",
+                      text)
+        body = m.group(0) if m else ""
+        perms = ""
+        pm = re.search(r"(?m)^[ \t]*permission_classes\s*=\s*\(([^)]*)\)", body)
+        if pm:
+            perms = ", ".join(
+                x.strip() for x in pm.group(1).split(",") if x.strip())
+        hdr = f"// View-Action: {meth}\n"
+        if perms:
+            hdr += f"// Permission-Classes: {perms}\n"
+        return hdr
 
     def _django_entries(self, indexer: SymbolIndexer, existing: list,
                         repo_path: Path) -> List["CodeUnit"]:
@@ -390,6 +505,30 @@ class WebTreeSitterSlicer:
         have = {(Path(u.file_path).resolve(), u.start_line) for u in existing}
         out: List[CodeUnit] = []
         for func, mod, label in routes:
+            # M121：`Class.method` 形态（DRF 类视图）。indexer 里类与方法都按
+            # **裸名**索引（没有 `Class.method` 键），所以按"方法行号落在类体
+            # 范围内 + 同文件"精确定位 —— 不靠名字猜。
+            if "." in func:
+                klass, meth = func.rsplit(".", 1)
+                picked = self._django_class_method(indexer, klass, meth, mod)
+                if picked is None:
+                    continue
+                key = (Path(picked["file"]).resolve(), picked["start"])
+                if key in have:
+                    continue
+                unit = indexer.make_code_unit(
+                    picked, [f"django:{label}"], name=func)
+                if unit:
+                    # M121：把类级 `permission_classes` 与动作名写进切片头。
+                    # DRF 的鉴权声明在**类属性**上，方法级切片里看不到 ——
+                    # 不注入的话 authz 只能看到 `self.queryset.get(slug=slug)`，
+                    # 无从判断"这个动作是公开读还是需登录写"。
+                    hdr = self._drf_header(Path(picked["file"]), klass, meth)
+                    if hdr:
+                        unit.source_code = hdr + (unit.source_code or "")
+                    out.append(unit)
+                    have.add(key)
+                continue
             cands = indexer.symbol_table.get(func, [])
             if not cands:
                 continue

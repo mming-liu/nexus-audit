@@ -6,7 +6,7 @@
   "correct": 487,
   "fp": 0,
   "reverse_fn": 0,
-  "rule_evaluations": 2723,
+  "rule_evaluations": 2718,
   "authz_true": 0,
   "non_authz_by_category": {
     "cors": 1,

@@ -165,6 +165,23 @@ JOBS = [
     ("waynboot-mall (Sa-Token 双端商城)",
      ["benchmarks/benchmark_waynboot.py", "--strict"],
      "reference_repos/waynboot-mall", "target", True),
+    # 第 38/39/40/41 靶场（Module 119/120/121/122）：四个新野战仓。
+    #   · Uniswap V2 —— 整数型状态互斥锁 1→0→1（29 入口 / 0 True / 反向锚点）
+    #   · fastapi-realworld —— 多模块 APIRouter + 跨行装饰器（19 入口 / 0 True）
+    #   · django-realworld —— DRF 类视图 + permission_classes（10 动作 / 1 条真 BOLA）
+    #   · eladmin —— Spring Data JPA 原版，与 eladmin-mp 双生对照（66 入口）
+    ("Uniswap V2 (整数互斥锁)",
+     ["benchmarks/benchmark_uniswapv2.py", "--strict"],
+     "reference_repos/uniswap-v2-core", "target", True),
+    ("fastapi-realworld (多模块 APIRouter)",
+     ["benchmarks/benchmark_fastapi_rw.py", "--strict"],
+     "reference_repos/fastapi-realworld", "target", True),
+    ("django-realworld (DRF 类视图)",
+     ["benchmarks/benchmark_django_rw.py", "--strict"],
+     "reference_repos/django-realworld", "target", True),
+    ("eladmin-JPA (双生对照)",
+     ["benchmarks/benchmark_eladmin_jpa.py", "--strict"],
+     "reference_repos/eladmin", "target", True),
     # 第 35/36/37 靶场（Module 108/109/110）：三个新野战仓。
     #   · Synthetix V3 —— Diamond 代理 + 谓词式鉴权（1264 生产入口 / 0 True）
     #   · sushiswap-zapper —— 0.5.x 主网合约 + 谓词式 Ownable（75 入口 / 0 True）

@@ -6827,12 +6827,12 @@ import cli as _cli130                                             # noqa: E402
 from benchmarks.run_all import JOBS as _JOBS130                   # noqa: E402
 check("M130：规则 25 类 / 补丁器 20 类（doctor 单一事实源）",
       (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (25, 20))
-check("M130：run_all 作业表 37 项且含 comet / DjanGoat / 覆盖地板",
+check("M130：run_all 作业表 41 项且含 comet / DjanGoat / 覆盖地板",
       (len(_JOBS130),
        any("comet" in str(j[0]) for j in _JOBS130),
        any("DjanGoat" in str(j[0]) for j in _JOBS130),
        any("覆盖地板" in str(j[0]) for j in _JOBS130)),
-      (37, True, True, True))
+      (41, True, True, True))
 
 import core.agents.rule_detectors as _rd130                       # noqa: E402
 _NEW130 = ("ssti_verdict", "_sol_unchecked_zones", "_py_redir_verdict",
@@ -7101,9 +7101,9 @@ from benchmarks.wild_hunt import REPOS as _REPOS140               # noqa: E402
 from core.agents.vuln_categories import CATEGORIES as _C140       # noqa: E402
 import cli as _cli140                                             # noqa: E402
 
-check("M140：门禁 37 项（冒烟+争议+地板+34 个靶场/校验项）",
-      len(_JOBS140), 37)
-check("M140：野战场 21 个真实仓库", len(_REPOS140), 21)
+check("M140：门禁 41 项（冒烟+争议+地板+38 个靶场/校验项）",
+      len(_JOBS140), 41)
+check("M140：野战场 25 个真实仓库", len(_REPOS140), 25)
 check("M140：规则 25 类 / 补丁器 20 类", (len(_C140),
                                           len(_cli140.DOCTOR_PATCHERS)),
       (25, 20))
@@ -7127,8 +7127,8 @@ check("M140：五个 Solidity 生产库规则层全部 0 True（N₁ 铁壁）",
       [r for r in _p0_rows140 if r[1] != 0], [])
 
 # 三语言野战仓各至少 3 个，且总量 17
-check("M140：三语言分布自洽（Java 10 / Python 4 / Solidity 7）",
-      len(_REPOS140) - 4 - 7, 10)
+check("M140：三语言分布自洽（Java 11 / Python 6 / Solidity 8）",
+      len(_REPOS140) - 6 - 8, 11)
 
 # wild_hunt.json 与白皮书四处数字仍然一致（M85 的护栏 + 17 仓后仍成立）
 _r140d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
@@ -7682,6 +7682,137 @@ check("M155：第七段核对 INDEX 零断链与 CVSS 降序",
       ("INDEX.md 覆盖全部" in _o155 and "按 CVSS 降序" in _o155), True)
 check("M155：25 类规则 / 20 类补丁器都在 doctor 输出里",
       ("共 25 类" in _o155 and "（20 类）" in _o155), True)
+
+# ---- [156] Module 119：Uniswap V2 整数型状态互斥锁（1 → 0 → 1）----
+print("\n[156] Uniswap V2 整数互斥锁反向锚点（M119）")
+
+_uv156 = ROOT / "reference_repos" / "uniswap-v2-core"
+if _uv156.exists():
+    _j156 = json.loads((ROOT / "benchmarks" / "results" / "uniswapv2.json")
+                       .read_text(encoding="utf-8"))
+    check("M156：29 入口 / 四类 0 True（生产 AMM 零误报）",
+          (_j156["units"], _j156["fp"]), (29, 0))
+    check("M156：swap/mint/burn 带整数锁时判 False（锁被认出）",
+          all(a["with_lock"] is False
+              for a in _j156["lock_anchor"].values()), True)
+    check("M156：摘掉 lock 修饰符后**失去保护**（不是 False）",
+          all(a["without_lock"] is not False
+              for a in _j156["lock_anchor"].values()), True)
+    # 判据直测：整数 1→0→1 与布尔 true→false→true 同构
+    from core.agents.rule_detectors import verdict as _v156
+    _LOCK156 = ("pragma solidity ^0.8.0;\ncontract C {\n"
+                "  uint private unlocked = 1;\n"
+                "  modifier lock() {\n"
+                "    require(unlocked == 1, 'LOCKED');\n"
+                "    unlocked = 0; _; unlocked = 1;\n"
+                "  }\n"
+                "  function swap() external lock {\n"
+                "    uint amt = balances[msg.sender];\n"
+                '    (bool ok, ) = msg.sender.call{value: amt}("");\n'
+                '    require(ok, "x");\n'
+                "    balances[msg.sender] = 0;\n"
+                "  }\n}\n")
+    check("M156：整数锁 1→0→1 判 False（与 bool 锁同构）",
+          _v156("reentrancy", _LOCK156), False)
+    # 锁的**承重结构**直测：三段式缺一不可（前检 / 加锁 / 恢复）。
+    from core.agents.rule_detectors import (
+        _sol_mutex_modifier_names as _mm156,
+    )
+    _MOD156 = ('modifier lock() { require(unlocked == 1, "L");\n'
+               "  unlocked = 0; _; unlocked = 1; }\n")
+    check("M156：三段式齐全 → 认出 lock 这个互斥 modifier",
+          _mm156(_MOD156), {"lock"})
+    check("M156：漏写恢复（unlocked = 1）→ 不算锁",
+          _mm156(_MOD156.replace("_; unlocked = 1;", "_;")), set())
+    check("M156：漏写前检（require）→ 不算锁（防半吊子互斥）",
+          _mm156(_MOD156.replace('require(unlocked == 1, "L");', "")), set())
+else:
+    print("  -- uniswap-v2-core 不在 reference_repos，跳过 [156]")
+
+# ---- [157] Module 120：跨行装饰器 + 多模块 APIRouter + 参数化 SQL ----
+print("\n[157] fastapi-realworld 跨行装饰器与参数化 SQL（M120）")
+
+_fa157 = ROOT / "reference_repos" / "fastapi-realworld"
+if _fa157.exists():
+    _j157 = json.loads((ROOT / "benchmarks" / "results" / "fastapi_rw.json")
+                       .read_text(encoding="utf-8"))
+    check("M157：19 条路由全部切出（跨行装饰器不再被吞）",
+          _j157["units"], 19)
+    check("M157：全类目 0 True（生产级 FastAPI 零误报）",
+          _j157["fp"], 0)
+    check("M157：占位符 + 独立实参的参数化 SQL 判 False",
+          _j157["param_sql_verdict"], False)
+else:
+    print("  -- fastapi-realworld 不在 reference_repos，跳过 [157]")
+
+# ---- [158] Module 121：DRF 类视图 + permission_classes 读写分治 ----
+print("\n[158] DRF 类视图与 permission_classes（M121）")
+
+from core.agents.rule_detectors import (                            # noqa: E402
+    _drf_authz_verdict as _drf158,
+)
+
+_B158 = ("def update(self, request, slug):\n"
+         "    instance = self.queryset.get(slug=slug)\n"
+         "    return Response({})\n")
+check("M158：只要求登录的写动作 → True（BOLA）",
+      _drf158("// View-Action: update\n"
+              "// Permission-Classes: IsAuthenticatedOrReadOnly\n", _B158,
+              "update"), True)
+check("M158：有 IsOwnerOrReadOnly → False（核对了归属）",
+      _drf158("// View-Action: update\n"
+              "// Permission-Classes: IsAuthenticated, IsOwnerOrReadOnly\n",
+              _B158, "update"), False)
+check("M158：读动作（retrieve）→ False（公开读被允许）",
+      _drf158("// View-Action: retrieve\n"
+              "// Permission-Classes: IsAuthenticatedOrReadOnly\n", _B158,
+              "retrieve"), False)
+check("M158：不取现成资源的 create → False（结构上没有别人的资源）",
+      _drf158("// View-Action: create\n"
+              "// Permission-Classes: IsAuthenticatedOrReadOnly\n",
+              "def create(self, request):\n"
+              "    return Response({})\n", "create"), False)
+_dj158 = ROOT / "reference_repos" / "django-realworld"
+if _dj158.exists():
+    _j158 = json.loads((ROOT / "benchmarks" / "results" / "django_rw.json")
+                       .read_text(encoding="utf-8"))
+    check("M158：django-realworld 10 个 DRF 动作 / 1 条真 BOLA / 公开读 False",
+          (_j158["drf_actions"], _j158["authz_true"],
+           _j158["public_read_verdicts"]),
+          (10, ["ArticleViewSet.update"],
+           {"ArticleViewSet.list": False, "ArticleViewSet.retrieve": False}))
+else:
+    print("  -- django-realworld 不在 reference_repos，跳过 [158] 真实仓部分")
+
+# ---- [159] Module 122：eladmin JPA 双生对照 + crypto 证据归属 ----
+print("\n[159] eladmin（JPA）双生对照（M122）")
+
+_ea159 = ROOT / "reference_repos" / "eladmin"
+if _ea159.exists():
+    _j159 = json.loads((ROOT / "benchmarks" / "results" / "eladmin_jpa.json")
+                       .read_text(encoding="utf-8"))
+    check("M159：66 入口 / crypto 零 True（证据归属修正）",
+          (_j159["units"], _j159["roots_by_category"].get("crypto", 0)),
+          (66, 0))
+    check("M159：非 authz 根因与冻结表一致（只有 1 个全局 CORS）",
+          _j159["roots_by_category"].get("cors"), 1)
+    # 证据归属直测：Hop 3 的 DES 不能算到入口头上
+    from core.agents.rule_detectors import verdict as _v159
+    _HOP159 = ("@GetMapping(\"/level\")\n"
+               "public R getLevel() { return R.ok(levels()); }\n"
+               "// 来自 EncryptUtils.java:46 [Hop 3]\n"
+               "public static String desEncrypt(String s) throws Exception {\n"
+               "  Cipher c = Cipher.getInstance(\"DES/CBC/PKCS5Padding\");\n"
+               "  return \"\";\n}\n")
+    check("M159：Hop 3 证据段里的 DES 不归属到入口（判 None）",
+          _v159("crypto", _HOP159), None)
+    check("M159：入口体自己 `Cipher.getInstance(\"DES/…\")` 仍判 True",
+          _v159("crypto",
+                "public void f(String s) throws Exception {\n"
+                "  Cipher c = Cipher.getInstance(\"DES/CBC/PKCS5Padding\");\n"
+                "  c.doFinal(s.getBytes());\n}\n"), True)
+else:
+    print("  -- eladmin 不在 reference_repos，跳过 [159]")
 
 print()
 if FAILS:

@@ -1,0 +1,28 @@
+{
+  "bench": "uniswapv2",
+  "units": 29,
+  "total_units": 29,
+  "decided": 29,
+  "correct": 29,
+  "fp": 0,
+  "reverse_fn": 0,
+  "rule_evaluations": 42,
+  "lock_anchor": {
+    "swap": {
+      "with_lock": false,
+      "without_lock": null,
+      "changed": true
+    },
+    "mint": {
+      "with_lock": false,
+      "without_lock": null,
+      "changed": true
+    },
+    "burn": {
+      "with_lock": false,
+      "without_lock": null,
+      "changed": true
+    }
+  },
+  "true_rows": []
+}

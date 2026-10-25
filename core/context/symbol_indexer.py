@@ -88,36 +88,30 @@ class SymbolIndexer:
                     break
             # 装饰器
             #
-            # M107：**堆叠装饰器**。flaskr 的标准写法是路由 + 鉴权两层：
-            #     @bp.route("/create", methods=("GET", "POST"))
-            #     @login_required
-            #     def create():
-            # 旧实现只认"紧邻 def 上一行"（`start_line-1 <= d_start <= start_line`），
-            # 而 `@login_required` 没有括号、ROUTE_DECORATOR_RE 匹配不上，
-            # 于是 `@bp.route` 因为隔了一行被丢弃 —— 整个 create/update/delete
-            # 三条路由在切片里**彻底消失**（flaskr 实测 5 个单元而非 8 个）。
+            # M107：**堆叠装饰器**（`@bp.route` + `@login_required` + `def`）。
+            # M120：**跨行装饰器**（FastAPI 的 `@router.post(\n "",\n ...)`）。
+            # 两者都会让"只认紧邻上一行"的旧实现整条路由消失 ——
+            # flaskr 丢 3 条、fastapi-realworld 19 条只切出 6 条。
             #
-            # 现在先算出 `def` 上方**连续装饰器块**的起始行，块内全部装饰器
-            # 都收。向上扫时遇空行即停；装饰器跨行（括号未闭合）时允许最多
-            # 3 行续行，避免一路吃进上一个函数体。
+            # 算法：从 def 往上逐行累计，直到"从该行到 def"的**括号配平**；
+            # 配平后若该行以 `@` 开头，它就是装饰器块起点，再往上把**堆叠**的
+            # 单行装饰器一并收进来。
             _blk_start = start_line
             _i = start_line - 1
-            _seen_at = False
-            _extra = 0
             while _i >= 1:
-                _ln = lines[_i - 1].strip()
-                if not _ln:
+                _s = lines[_i - 1].strip()
+                if not _s:
                     break
-                if _ln.startswith("@"):
-                    _blk_start = _i
-                    _seen_at = True
+                _frag = "\n".join(lines[_i - 1: start_line - 1])
+                if _frag.count("(") != _frag.count(")"):
                     _i -= 1
                     continue
-                if _seen_at and _extra < 3:
-                    _extra += 1
+                if _s.startswith("@"):
                     _blk_start = _i
-                    _i -= 1
-                    continue
+                    _j = _i - 1
+                    while _j >= 1 and lines[_j - 1].strip().startswith("@"):
+                        _blk_start = _j
+                        _j -= 1
                 break
             decorators = []
             for dm in ROUTE_DECORATOR_RE.finditer(text[: m.start()]):
