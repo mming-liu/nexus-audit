@@ -5594,6 +5594,11 @@ def authz_verdict(source: str) -> bool | None:
     # 作者显式声明匿名可达，不按"缺鉴权"判 True。
     if "@PermitAll" in source:
         return None
+    # M199：OAuth2 授权服务器的 token/revoke 端点，身份由 client_id +
+    # client_secret / refresh_token 建立，不是"匿名访问用户资源"。
+    if re.search(r"create_token_response|create_revocation_response|"
+                 r"class\s+(?:TokenView|RevokeTokenView)\b", source):
+        return None
 
     # 1a) FastAPI `Depends(require_superuser)` / `Depends(get_current_user)`
     #     是框架级认证/权限依赖（M80 实测）。依赖名必须是认证语义；
@@ -6470,6 +6475,11 @@ def python_authz_verdict(source: str) -> bool | None:
     # 但 `Depends(get_current_user)` 只证明"知道是谁"，主体可能继续下沉到
     # Service 做归属比对 —— 不能直接判安全（否则会吃掉 BOLA 的 None）。
     body = entry_body(source)
+    # M199：OAuth2 授权服务器的 token/revoke 端点（Django OAuth Toolkit）：
+    # 身份由 client credentials/refresh token 建立，不判"匿名越权"。
+    if re.search(r"create_token_response|create_revocation_response|"
+                 r"class\s+(?:TokenView|RevokeTokenView)\b", source):
+        return None
     # M137：装饰器守卫证据头（`@admin_required` / `@permission_required`）。
     #
     # 只认**管理员面**（admin_required）→ 确定性 False：管理员对全站资源做
@@ -6478,7 +6488,7 @@ def python_authz_verdict(source: str) -> bool | None:
     # "这个角色能写"，不证明"只能写自己的"；把它当安全会把 BOLA 洗白。
     # 那类仍走下面的主体/归属判据（`g.current_user != post.author` 等）。
     _guards = re.findall(r"//\s*Auth-Guard:\s*(\w+)", source)
-    if "admin_required" in _guards:
+    if "admin_required" in _guards or "@admin_required" in source:
         return False
     # M184：Flask-JWT-Extended 的装饰器证据头（切片器把无括号装饰器
     # 归一成 // Auth-Guard: jwt_required）。
@@ -10771,7 +10781,7 @@ def log_injection_verdict(source: str) -> bool | None:
 # ================= M187/M188：第 35/36 类 DeFi 规则 =================
 
 _ERC20_CALL_RE = re.compile(r"\b([A-Za-z_]\w*)\s*\.\s*(transfer|transferFrom)\s*\(")
-_ORACLE_CALL_RE = re.compile(r"\b\w*(?:latestRoundData|latestAnswer)\s*\(")
+_ORACLE_CALL_RE = re.compile(r"\b\w*latestRoundData\s*\(")
 _ORACLE_PRICE_GUARD_RE = re.compile(
     r"\b(?:price|answer|oraclePrice)\s*>\s*0|"
     r"require\s*\([^)]*\b(?:price|answer)\s*>\s*0")
@@ -10835,11 +10845,79 @@ def oracle_stale_price_verdict(source: str) -> bool | None:
         return None
     if not _ORACLE_CALL_RE.search(body):
         return None
+    # 只读展示函数不构成"用过期价清算/铸币"的利用面；价格消费必须在
+    # 状态变更路径上。Aave 的 UiPoolDataProvider 是典型只读聚合器。
+    sig = _sol_signature(entry_body(source) or source)
+    if _sol_is_readonly(sig):
+        return False
     has_price = _ORACLE_PRICE_GUARD_RE.search(body) is not None
     has_fresh = _ORACLE_FRESH_GUARD_RE.search(body) is not None
     if has_price and has_fresh:
         return False
     return True
+
+
+
+# ================= M203/M204：第 37/38 类规则 =================
+
+_CSRF_DISABLE_RE = re.compile(
+    r"\.\s*csrf\s*\(\s*\)\s*\.\s*disable\s*\(\s*\)|"
+    r"csrf\s*\(\s*csrf\s*->\s*csrf\s*\.\s*disable\s*\(\s*\)|"
+    r"@csrf_exempt\b")
+
+
+def csrf_disabled_verdict(source: str) -> bool | None:
+    """第 37 类（M203）：有状态会话应用显式关闭 CSRF。"""
+    if not _CSRF_DISABLE_RE.search(source):
+        return None
+    # 无状态 API（JWT / Token / STATELESS）关 CSRF 是设计意图。
+    if re.search(r"SessionCreationPolicy\s*\.\s*STATELESS|"
+                 r"STATELESS|JwtAuthentication|JWT|TokenAuthentication|"
+                 r"rest_framework\.authentication", source, re.I):
+        return False
+    if not _looks_python(source):
+        # Java 侧这是 SecurityConfig 的配置语句（不是路由入口）；
+        # 没有 STATELESS/JWT 证据就判关闭。
+        return True
+    body = entry_body(source) or source
+    # 只读视图 / 无写动作的豁免不构成 CSRF 面。
+    if not re.search(r"@(?:Post|Put|Patch|Delete)Mapping|methods\s*=\s*\[[^\]]*"
+                     r"(?:POST|PUT|PATCH|DELETE)|request\.(?:POST|FILES)|"
+                     r"\.save\s*\(|\.delete\s*\(", source):
+        return None
+    return True
+
+
+_JAVA_REGEX_COMPILE_RE = re.compile(
+    r"\bPattern\s*\.\s*compile\s*\(\s*([^)]*)\)")
+_JAVA_REGEX_MATCHES_RE = re.compile(
+    r"\b([A-Za-z_]\w*)\s*\.\s*matches\s*\(\s*([^)]*)\)")
+
+
+def regex_dos_verdict(source: str) -> bool | None:
+    """第 38 类（M204）：外部字符串直接当正则模式，未 quote/escape。"""
+    body = entry_body(source) or source
+    py = _looks_python(source)
+    if py:
+        m = re.search(r"\bre\s*\.\s*(?:compile|search|match|findall|fullmatch)"
+                      r"\s*\(\s*([^,)]+)", body)
+        if not m:
+            return None
+        arg = m.group(1).strip()
+        if re.fullmatch(r"[\"'][^\"']*[\"']", arg) or "re.escape" in arg:
+            return False
+        if re.search(r"request\s*\.", arg) or re.fullmatch(r"[A-Za-z_]\w*", arg):
+            return True
+        return None
+    m = _JAVA_REGEX_COMPILE_RE.search(body) or _JAVA_REGEX_MATCHES_RE.search(body)
+    if not m:
+        return None
+    arg = (m.group(2) if m.re is _JAVA_REGEX_MATCHES_RE else m.group(1)).strip()
+    if re.fullmatch(r"\"[^\"]*\"|'[^']*'", arg) or "Pattern.quote" in arg:
+        return False
+    if re.fullmatch(r"[A-Za-z_]\w*", arg) or re.search(r"request\s*\.", arg):
+        return True
+    return None
 
 
 def verdict(category: str, source: str) -> bool | None:
@@ -11015,5 +11093,9 @@ def verdict(category: str, source: str) -> bool | None:
         return unchecked_erc20_return_verdict(source)
     if category == "oracle_stale_price":
         return oracle_stale_price_verdict(source)
+    if category == "csrf_disabled":
+        return csrf_disabled_verdict(source)
+    if category == "regex_dos":
+        return regex_dos_verdict(source)
 
     return None

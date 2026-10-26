@@ -1,0 +1,14 @@
+{
+  "total_units": 139,
+  "true": 1,
+  "known_true": [
+    [
+      "transfer",
+      "unchecked_erc20_return"
+    ]
+  ],
+  "unknown": [],
+  "patch_verified": 1,
+  "fp": 0,
+  "pass": true
+}

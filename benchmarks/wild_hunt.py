@@ -104,6 +104,15 @@ REPOS = [
     ("ruoyi-vue-pro", "reference_repos/ruoyi-vue-pro", "ruoyi_vue_pro",
      ["--strict"]),
     ("solmate", "reference_repos/solmate/src", "solmate", ["--strict"]),
+    # —— M199–M202：第 43–46 号野仓（46 仓里程碑）——
+    ("django-oauth-toolkit", "reference_repos/django-oauth-toolkit",
+     "django_oauth", ["--strict"]),
+    ("flask-admin", "reference_repos/flask-admin", "flask_admin",
+     ["--strict"]),
+    ("Sentinel", "reference_repos/Sentinel/sentinel-dashboard", "sentinel",
+     ["--strict"]),
+    ("aave-v3-periphery", "reference_repos/aave-v3-periphery/contracts",
+     "aavev3_periphery", ["--strict"]),
 ]
 
 P0_LINE = re.compile(r"^- \*\*\[([a-z_]+)\]\*\* `")

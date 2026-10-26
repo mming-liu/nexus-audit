@@ -45,7 +45,7 @@ SCOREBOARD = ROOT / "benchmarks" / "results" / "SCOREBOARD.md"
 # (名称, 命令, 前置目录检查, 类别, 可并发)
 #   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
 JOBS = [
-    ("冒烟测试 [1]-[220]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
+    ("冒烟测试 [1]-[230]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke", False),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target", True),
@@ -259,6 +259,16 @@ JOBS = [
     ("FastAPI (Python 异步真实模板)",
      ["benchmarks/benchmark_fastapi_wild.py", "--strict"],
      "reference_repos/fastapi-sql-template", "target", True),
+    # ---- M199–M202：第 43–46 野仓（第三波） ----
+    ("django-oauth-toolkit (OAuth2 授权服务器)",
+     ["benchmarks/benchmark_django_oauth.py", "--strict"],
+     "reference_repos/django-oauth-toolkit", "target", True),
+    ("flask-admin (后台管理)", ["benchmarks/benchmark_flask_admin.py", "--strict"],
+     "reference_repos/flask-admin", "target", True),
+    ("Sentinel (Dashboard 权限)", ["benchmarks/benchmark_sentinel.py", "--strict"],
+     "reference_repos/Sentinel/sentinel-dashboard", "target", True),
+    ("aave-v3-periphery (外围合约)", ["benchmarks/benchmark_aavev3_periphery.py", "--strict"],
+     "reference_repos/aave-v3-periphery/contracts", "target", True),
     # ---- M183–M186：第 39–42 野仓（第二波） ----
     ("morpho-blue (极简借贷核心)", ["benchmarks/benchmark_morpho_blue.py", "--strict"],
      "reference_repos/morpho-blue/src", "target", True),

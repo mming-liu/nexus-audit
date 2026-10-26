@@ -595,6 +595,30 @@ CATEGORIES: dict[str, VulnCategory] = {
             "block.timestamp - updatedAt <= 阈值，或 answeredInRound 检查）？"
             "只判 price > 0 不判 updatedAt 仍可被过期价格攻击。"),
     ),
+    # ---------------- M203：第 37 类 —— CSRF 防护被关闭（CWE-352） ----------------
+    "csrf_disabled": VulnCategory(
+        key="csrf_disabled", display="CSRF 防护被关闭",
+        cwe="CWE-352", owasp=False, needs_taint=False,
+        sink_question=(
+            "有状态会话应用是否显式关闭 CSRF（Spring .csrf().disable()、"
+            "Django @csrf_exempt）并接受写请求？"),
+        property=(
+            "是否是无状态 API（SessionCreationPolicy.STATELESS / JWT / "
+            "Token 认证），或只对只读/无副作用接口豁免？"
+            "注意：无状态 JWT API 关 CSRF 是设计意图，不是漏洞。"),
+    ),
+
+    # ---------------- M204：第 38 类 —— 正则 DoS（CWE-1333） ----------------
+    "regex_dos": VulnCategory(
+        key="regex_dos", display="正则表达式 DoS",
+        cwe="CWE-1333", owasp=False, needs_taint=False,
+        sink_question=(
+            "外部可控字符串是否被直接当作正则模式传给 Pattern.compile / "
+            "String.matches / re.compile / re.search / re.match？"),
+        property=(
+            "模式是否为常量，或已用 Pattern.quote / re.escape 转义？"
+            "只对输入做长度限制不消除指数回溯，不算防护。"),
+    ),
 }
 
 ALL_KEYS = list(CATEGORIES.keys())

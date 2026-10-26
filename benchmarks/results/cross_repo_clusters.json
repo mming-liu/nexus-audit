@@ -1,7 +1,7 @@
 {
-  "total_root_causes": 191,
-  "cluster_count": 115,
-  "cross_repo_clusters": 13,
+  "total_root_causes": 204,
+  "cluster_count": 123,
+  "cross_repo_clusters": 14,
   "conservation_ok": true,
   "clusters": [
     {
@@ -104,6 +104,17 @@
       "repos": [
         "DjanGoat",
         "django-realworld"
+      ]
+    },
+    {
+      "category": "log_injection",
+      "root_kind": "endpoint",
+      "component": "ParamFlowRuleController.java",
+      "repo_count": 2,
+      "root_count": 2,
+      "repos": [
+        "Sentinel",
+        "jeecg-boot"
       ]
     },
     {
@@ -713,6 +724,36 @@
     {
       "category": "log_injection",
       "root_kind": "endpoint",
+      "component": "AuthController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "Sentinel"
+      ]
+    },
+    {
+      "category": "log_injection",
+      "root_kind": "endpoint",
+      "component": "ClusterAssignController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "Sentinel"
+      ]
+    },
+    {
+      "category": "log_injection",
+      "root_kind": "endpoint",
+      "component": "ClusterConfigController.java",
+      "repo_count": 1,
+      "root_count": 3,
+      "repos": [
+        "Sentinel"
+      ]
+    },
+    {
+      "category": "log_injection",
+      "root_kind": "endpoint",
       "component": "DlMockController.java",
       "repo_count": 1,
       "root_count": 1,
@@ -733,19 +774,19 @@
     {
       "category": "log_injection",
       "root_kind": "endpoint",
-      "component": "OnlCgformDemoController.java",
+      "component": "MachineRegistryController.java",
       "repo_count": 1,
-      "root_count": 2,
+      "root_count": 1,
       "repos": [
-        "jeecg-boot"
+        "Sentinel"
       ]
     },
     {
       "category": "log_injection",
       "root_kind": "endpoint",
-      "component": "ParamFlowRuleController.java",
+      "component": "OnlCgformDemoController.java",
       "repo_count": 1,
-      "root_count": 1,
+      "root_count": 2,
       "repos": [
         "jeecg-boot"
       ]
@@ -791,6 +832,26 @@
       ]
     },
     {
+      "category": "log_injection",
+      "root_kind": "endpoint",
+      "component": "introspect.py",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "django-oauth-toolkit"
+      ]
+    },
+    {
+      "category": "mass_assignment",
+      "root_kind": "endpoint",
+      "component": "base.py",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "django-oauth-toolkit"
+      ]
+    },
+    {
       "category": "redir",
       "root_kind": "endpoint",
       "component": "LoginController.java",
@@ -828,6 +889,16 @@
       "root_count": 3,
       "repos": [
         "jeecg-boot"
+      ]
+    },
+    {
+      "category": "redir",
+      "root_kind": "endpoint",
+      "component": "__init__.py",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "flask-admin"
       ]
     },
     {
@@ -1168,6 +1239,16 @@
       "root_count": 1,
       "repos": [
         "mall4j"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "rediscli.py",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "flask-admin"
       ]
     }
   ]

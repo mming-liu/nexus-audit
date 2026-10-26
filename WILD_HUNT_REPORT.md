@@ -1,25 +1,25 @@
-# 野战白皮书 —— 42 个真实开源生产仓库（M151–M166 收官）
+# 野战白皮书 —— 46 个真实开源生产仓库（M151–M166 收官）
 
 > 本文所有数字由 `benchmarks/wild_hunt.py` **实跑**产出，唯一事实源是
 > `benchmarks/results/wild_hunt.json`（`cli.py doctor` 第六段会对账，
 > 数字漂了当场 FAIL）。规则层离线可复现，不含模型层数字。
 
-## 一、总量（42 仓 / 191 独立根因 / 零误报）
+## 一、总量（46 仓 / 204 独立根因 / 零误报）
 
 | 项 | 数值 |
 |---|---|
-| 真实仓库 | **42 个**（Java 18 + Python 10 + Solidity 14） |
-| 路由/合约入口 | **15,339 个** |
-| 路由级 P0 命中 | **4,981 条** |
-| 去重后的独立根因 P0 | **191 个** |
-| GHSA 披露草稿 | **191 份**（按独立根因，不按路由） |
+| 真实仓库 | **46 个**（Java 19 + Python 12 + Solidity 15） |
+| 路由/合约入口 | **15,576 个** |
+| 路由级 P0 命中 | **4,994 条** |
+| 去重后的独立根因 P0 | **204 个** |
+| GHSA 披露草稿 | **204 份**（按独立根因，不按路由） |
 | benchmark 层误报 | **0 条** |
 | benchmark 层判反 | **0 条** |
-| benchmark_* --strict | **42/42 exit 0** |
+| benchmark_* --strict | **46/46 exit 0** |
 | 供应链命中已知 advisory 的仓库 | **7 个** |
 | 供应链 × 代码双重实锤 | **5 个** |
 
-一句话：**在 15,339 个真实入口上，规则层没有确认误报；191 个独立根因全部由规则层确定性判据产出，PoC/补丁自检可复核。**
+一句话：**在 15,576 个真实入口上，规则层没有确认误报；204 个独立根因全部由规则层确定性判据产出，PoC/补丁自检可复核。**
 
 ## 二、逐仓数字
 
@@ -33,6 +33,7 @@
 | spring-boot-demo | Java | 80 | 85 | 12 | ✔ | CVE-2022-21363、CVE-2023-24162 |
 | newbee-mall | Java | 73 | 11 | 11 | ✔ | — |
 | newbee-mall-api | Java | 62 | 70 | 9 | ✔ | — |
+| Sentinel | Java | 56 | 8 | 8 | ✔ | — |
 | mall | Java | 246 | 253 | 8 | ✔ | — |
 | My-Blog | Java | 54 | 6 | 6 | ✔ | — |
 | apollo | Java | 200 | 6 | 6 | ✔ | — |
@@ -41,7 +42,9 @@
 | xxl-job | Java | 36 | 5 | 5 | ✔ | — |
 | My-Blog-layui | Java | 64 | 3 | 3 | ✔ | — |
 | RuoYi | Java | 305 | 3 | 3 | ✔ | — |
+| flask-admin | Python | 15 | 3 | 3 | ✔ | — |
 | Employee-Management-System | Python | 4 | 2 | 2 | ✔ | — |
+| django-oauth-toolkit | Python | 18 | 2 | 2 | ✔ | — |
 | django-realworld | Python | 11 | 2 | 2 | ✔ | CVE-2017-12794、CVE-2018-14574、CVE-2020-25626、CVE-2022-29217 |
 | solmate | Solidity | 144 | 2 | 2 | ✔ | — |
 | Synthetix V3 | Solidity | 1411 | 1 | 1 | ✔ | — |
@@ -56,6 +59,7 @@
 | OpenZeppelin | Solidity | 1989 | 0 | 0 | ✔ | — |
 | Uniswap V2 | Solidity | 29 | 0 | 0 | ✔ | — |
 | UniswapV3 | Solidity | 67 | 0 | 0 | ✔ | — |
+| aave-v3-periphery | Solidity | 148 | 0 | 0 | ✔ | — |
 | fastapi-realworld | Python | 19 | 0 | 0 | ✔ | — |
 | flask-jwt-extended | Python | 0 | 0 | 0 | ✔ | — |
 | flask-realworld | Python | 26 | 0 | 0 | ✔ | CVE-2019-7548 |
@@ -250,6 +254,17 @@
 - **[hash]** `NewBeeMallPersonalAPI.updateInfo`（endpoint，影响 1 条路由） @ `NewBeeMallPersonalAPI.java:95`
 - **[xss]** `NewBeeMallPersonalAPI.updateInfo`（endpoint，影响 1 条路由） @ `NewBeeMallPersonalAPI.java:95`
 
+### Sentinel（Java）— 8 个独立根因
+
+- **[log_injection]** `AuthController.login`（endpoint，影响 1 条路由） @ `AuthController.java:52`
+- **[log_injection]** `MachineRegistryController.receiveHeartBeat`（endpoint，影响 1 条路由） @ `MachineRegistryController.java:43`
+- **[log_injection]** `ParamFlowRuleController.apiUpdateParamFlowRule`（endpoint，影响 1 条路由） @ `ParamFlowRuleController.java:193`
+- **[log_injection]** `ClusterAssignController.apiAssignAllClusterServersOfApp`（endpoint，影响 1 条路由） @ `ClusterAssignController.java:50`
+- **[log_injection]** `ClusterAssignController.apiAssignSingleClusterServersOfApp`（endpoint，影响 1 条路由） @ `ClusterAssignController.java:70`
+- **[log_injection]** `ClusterConfigController.apiGetClusterServerStateOfApp`（endpoint，影响 1 条路由） @ `ClusterConfigController.java:148`
+- **[log_injection]** `ClusterConfigController.apiGetClusterClientStateOfApp`（endpoint，影响 1 条路由） @ `ClusterConfigController.java:167`
+- **[log_injection]** `ClusterConfigController.apiGetClusterStateOfApp`（endpoint，影响 1 条路由） @ `ClusterConfigController.java:186`
+
 ### mall（Java）— 8 个独立根因
 
 - **[cors]** `EsProductController.importAllList`（global-config，影响 246 条路由） @ `EsProductController.java:31`
@@ -315,10 +330,21 @@
 - **[xss]** `CommonController.uploadFile`（endpoint，影响 1 条路由） @ `CommonController.java:75`
 - **[xss]** `CommonController.uploadFiles`（endpoint，影响 1 条路由） @ `CommonController.java:102`
 
+### flask-admin（Python）— 3 个独立根因
+
+- **[xss]** `execute_view`（endpoint，影响 1 条路由） @ `rediscli.py:183`
+- **[redir]** `upload`（endpoint，影响 1 条路由） @ `__init__.py:1009`
+- **[redir]** `action_edit`（endpoint，影响 1 条路由） @ `__init__.py:1429`
+
 ### Employee-Management-System（Python）— 2 个独立根因
 
 - **[authz]** `delete`（endpoint，影响 1 条路由） @ `app.py:63`
 - **[hardcoded_secret]** `[secret-file] app.py`（file-level，影响 1 条路由） @ `app.py:1`
+
+### django-oauth-toolkit（Python）— 2 个独立根因
+
+- **[mass_assignment]** `AuthorizationView`（endpoint，影响 1 条路由） @ `base.py:120`
+- **[log_injection]** `IntrospectTokenView`（endpoint，影响 1 条路由） @ `introspect.py:70`
 
 ### django-realworld（Python）— 2 个独立根因
 
@@ -387,7 +413,7 @@ python cli.py matrix
 > **反向锚点**（把证据摘掉，判定必须跟着翻），M139–M141 三条的补丁器都要求
 > "重切片后 True → False"，M135/M145 两条是把结论拿去和另一张表对账。
 
-## 七、42 仓供应链组件风险 × 代码入口可达性对照
+## 七、46 仓供应链组件风险 × 代码入口可达性对照
 
 这一节回答一个单看任一表都答不出的问题：**哪些仓既用了已知有漏洞的组件版本，又真有一条代码级 P0？**
 
@@ -395,7 +421,7 @@ python cli.py matrix
 - CVE 对照表是**人工维护的保守清单**（每条都带修复版本与编号），未收录的组件不计命中、也不算安全 —— 报告里如实标成「未收录」。
 - 「代码级 P0」列取同仓的**独立根因数**（去重后），与 `wild_hunt.json` 同一口径。
 
-扫描组件 104 个，命中已知 advisory 的仓库 **7 个**，涉及 CVE：CVE-2013-7459、CVE-2017-12794、CVE-2018-1000656、CVE-2018-14574、CVE-2018-18074、CVE-2019-10906、CVE-2019-11324、CVE-2019-14322、CVE-2019-7548、CVE-2020-25626、CVE-2022-21363、CVE-2022-29217、CVE-2023-24162。
+扫描组件 107 个，命中已知 advisory 的仓库 **7 个**，涉及 CVE：CVE-2013-7459、CVE-2017-12794、CVE-2018-1000656、CVE-2018-14574、CVE-2018-18074、CVE-2019-10906、CVE-2019-11324、CVE-2019-14322、CVE-2019-7548、CVE-2020-25626、CVE-2022-21363、CVE-2022-29217、CVE-2023-24162。
 
 | 仓库 | 语言 | 组件（版本） | CVE | 代码级 P0 根因 | 交叉结论 |
 |---|---|---|---|---|---|
@@ -412,6 +438,7 @@ python cli.py matrix
 | newbee-mall | Java | — | — | 11 | 仅代码（组件版本未命中已知 advisory） |
 | newbee-mall-api | Java | — | — | 9 | 仅代码（组件版本未命中已知 advisory） |
 | mall | Java | — | — | 8 | 仅代码（组件版本未命中已知 advisory） |
+| Sentinel | Java | — | — | 8 | 仅代码（组件版本未命中已知 advisory） |
 | My-Blog | Java | — | — | 6 | 仅代码（组件版本未命中已知 advisory） |
 | apollo | Java | — | — | 6 | 仅代码（组件版本未命中已知 advisory） |
 | litemall | Java | — | — | 5 | 仅代码（组件版本未命中已知 advisory） |
@@ -419,8 +446,10 @@ python cli.py matrix
 | xxl-job | Java | — | — | 5 | 仅代码（组件版本未命中已知 advisory） |
 | RuoYi | Java | — | — | 3 | 仅代码（组件版本未命中已知 advisory） |
 | My-Blog-layui | Java | — | — | 3 | 仅代码（组件版本未命中已知 advisory） |
+| flask-admin | Python | — | — | 3 | 仅代码（组件版本未命中已知 advisory） |
 | Employee-Management-System | Python | — | — | 2 | 仅代码（组件版本未命中已知 advisory） |
 | solmate | Solidity | — | — | 2 | 仅代码（组件版本未命中已知 advisory） |
+| django-oauth-toolkit | Python | — | — | 2 | 仅代码（组件版本未命中已知 advisory） |
 | waynboot-mall | Java | — | — | 1 | 仅代码（组件版本未命中已知 advisory） |
 | Synthetix V3 | Solidity | — | — | 1 | 仅代码（组件版本未命中已知 advisory） |
 

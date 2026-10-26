@@ -5518,7 +5518,7 @@ finally:
 # ---- [106] Module 67：hardcoded_secret 第 22 类规则 ----
 from core.agents.vuln_categories import CATEGORIES as _VC106   # noqa: E402
 check("M106：hardcoded_secret 已注册（类目总数单一事实源，M157 后 34）",
-      ("hardcoded_secret" in _VC106 and len(_VC106) == 36), True)
+      ("hardcoded_secret" in _VC106 and len(_VC106) == 38), True)
 # VAmPI 形态：Flask SECRET_KEY 短弱密钥（JWT 签名上下文，无长度门槛）
 _vampi106 = ("import jwt\n"
              "vuln_app.app.config['SECRET_KEY'] = 'random'\n"
@@ -6395,7 +6395,7 @@ def _java125(body: str, cls: str = "public class C {\n") -> str:
 
 
 check("M125：ssti 已注册为第 24 类（doctor 自动升段；M157 后总数 32）",
-      (len(_CATS125), "ssti" in _CATS125), (36, True))
+      (len(_CATS125), "ssti" in _CATS125), (38, True))
 check("M125：ssti 是 CWE-1336 且不属 OWASP 11 类",
       (_CATS125["ssti"].cwe, _CATS125["ssti"].owasp), ("CWE-1336", False))
 
@@ -6615,8 +6615,8 @@ finally:
 _r126d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                         capture_output=True, text=True, encoding="utf-8",
                   errors="replace")
-check("M126：doctor 补丁器升到 31 类（含 _fix_python_redirect 与 M106/M125 四个 Java 补丁）",
-      ("（31 类）" in (_r126d.stdout or "")
+check("M126：doctor 补丁器升到 33 类（含 _fix_python_redirect 与 M106/M125 四个 Java 补丁）",
+      ("（33 类）" in (_r126d.stdout or "")
        and "_fix_python_redirect" in (_r126d.stdout or "")
        and "_fix_java_ssti_viewname" in (_r126d.stdout or "")
        and "_fix_java_header_injection" in (_r126d.stdout or "")), True)
@@ -6942,14 +6942,14 @@ check("M130：新增模块落在指纹目录内（M88 slicer / M92 context）",
 from core.agents.vuln_categories import CATEGORIES as _C130        # noqa: E402
 import cli as _cli130                                             # noqa: E402
 from benchmarks.run_all import JOBS as _JOBS130                   # noqa: E402
-check("M130：规则 36 类 / 补丁器 31 类（doctor 单一事实源）",
-      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (36, 31))
-check("M130：run_all 作业表 59 项且含 comet / DjanGoat / 覆盖地板",
+check("M130：规则 38 类 / 补丁器 33 类（doctor 单一事实源）",
+      (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (38, 33))
+check("M130：run_all 作业表 63 项且含 comet / DjanGoat / 覆盖地板",
       (len(_JOBS130),
        any("comet" in str(j[0]) for j in _JOBS130),
        any("DjanGoat" in str(j[0]) for j in _JOBS130),
        any("覆盖地板" in str(j[0]) for j in _JOBS130)),
-      (59, True, True, True))
+      (63, True, True, True))
 
 import core.agents.rule_detectors as _rd130                       # noqa: E402
 _NEW130 = ("ssti_verdict", "_sol_unchecked_zones", "_py_redir_verdict",
@@ -6979,7 +6979,7 @@ _r130d = _sp130.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                   errors="replace")
 _out130 = _r130d.stdout or ""
 check("M130：doctor exit 0 且 32 类 / 27 类 / 十段齐全",
-      (_r130d.returncode, "共 36 类" in _out130, "（31 类）" in _out130,
+      (_r130d.returncode, "共 38 类" in _out130, "（33 类）" in _out130,
        "[10/10]" in _out130), (0, True, True, True))
 check("M130：doctor 覆盖 M87–M93 的四项新自检",
       ("SARIF 2.1.0 合规校验" in _out130
@@ -7203,7 +7203,7 @@ _m138 = json.loads((ROOT / ".tmp" / "matrix_smoke.json")
                    .read_text(encoding="utf-8"))
 check("M138：matrix 退出码 0 且 32 类 × 三语言全覆盖渲染",
       (_r138.returncode, len(_m138["categories"]), _m138["languages"]),
-      (0, 36, ["java", "python", "solidity"]))
+      (0, 38, ["java", "python", "solidity"]))
 check("M138：输出含四维表头（--fix / --emit-poc / CVSS）",
       ("--fix" in (_r138.stdout or "")
        and "--emit-poc" in (_r138.stdout or "")
@@ -7215,10 +7215,10 @@ check("M138：输出含四维表头（--fix / --emit-poc / CVSS）",
 # Java/Python、delegatecall=Solidity），每个都会在不适用的语言上留一个
 # (类目, 语言) 空格 —— 41 → 47 是设计使然，不是判据退步。真正该锁的不变量
 # 在 [184]：**每个新类目至少有一门语言判得出来**，不允许整类空着。
-check("M139：覆盖缺口有界（≤59；M171 两新类目各留不适用的语言空格）",
-      _m138["gap_count"] <= 59, True)
-check("M139：补丁器映射与 doctor 单一事实源一致（31 个补丁器 / 25 类目）",
-      (_m138["patchers"], len(_m138["fix_map"])), (31, 25))
+check("M139：覆盖缺口有界（≤64；M171 两新类目各留不适用的语言空格）",
+      _m138["gap_count"] <= 64, True)
+check("M139：补丁器映射与 doctor 单一事实源一致（31 个补丁器 / 27 类目）",
+      (_m138["patchers"], len(_m138["fix_map"])), (33, 27))
 
 # ---- [140] Module 101：17 仓野战与 33 项门禁不变性总锚定 ----
 # 这一条是 M87–M102 的**总锚**：四组数字必须自洽 —— 门禁数、野战场数、
@@ -7232,11 +7232,11 @@ from core.agents.vuln_categories import CATEGORIES as _C140       # noqa: E402
 import cli as _cli140                                             # noqa: E402
 
 check("M140：门禁 51 项（冒烟+争议+地板+48 个靶场/校验项）",
-      len(_JOBS140), 59)
-check("M140：野战场 42 个真实仓库", len(_REPOS140), 42)
-check("M140：规则 36 类 / 补丁器 31 类", (len(_C140),
+      len(_JOBS140), 63)
+check("M140：野战场 46 个真实仓库", len(_REPOS140), 46)
+check("M140：规则 38 类 / 补丁器 33 类", (len(_C140),
                                           len(_cli140.DOCTOR_PATCHERS)),
-      (36, 31))
+      (38, 33))
 
 # 17 个野战场必须全部有对应 benchmark 脚本与 --strict 门禁
 _missing140 = [r[0] for r in _REPOS140
@@ -7257,8 +7257,8 @@ check("M140：五个 Solidity 生产库规则层全部 0 True（N₁ 铁壁）",
       [r for r in _p0_rows140 if r[1] != 0], [])
 
 # 三语言野战仓各至少 3 个，且总量 17
-check("M140：三语言分布自洽（Java 18 / Python 10 / Solidity 14）",
-      len(_REPOS140) - 10 - 14, 18)
+check("M140：三语言分布自洽（Java 19 / Python 12 / Solidity 15）",
+      len(_REPOS140) - 12 - 15, 19)
 
 # wild_hunt.json 与白皮书四处数字仍然一致（M85 的护栏 + 17 仓后仍成立）
 _r140d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
@@ -7370,7 +7370,7 @@ from core.agents.rule_detectors import (                            # noqa: E402
 from core.agents.vuln_categories import CATEGORIES as _C143         # noqa: E402
 
 check("M143：header_injection 已注册（CWE-113；M187 后总数 36）",
-      (len(_C143), _C143["header_injection"].cwe), (36, "CWE-113"))
+      (len(_C143), _C143["header_injection"].cwe), (38, "CWE-113"))
 check("M143：setHeader(常量, 请求读取) → True",
       _hd143('public void f(HttpServletRequest req, HttpServletResponse resp) {\n'
              '  resp.setHeader("X-Test", req.getParameter("t"));\n}\n'), True)
@@ -7414,8 +7414,8 @@ import shutil as _sh144                                              # noqa: E40
 import cli as _cli144                                                # noqa: E402
 from core.slicer.java_servlet import JavaSlicer as _JS144            # noqa: E402
 
-check("M144：补丁器登记表 31 类（doctor 单一事实源）",
-      len(_cli144.DOCTOR_PATCHERS), 31)
+check("M144：补丁器登记表 33 类（doctor 单一事实源）",
+      len(_cli144.DOCTOR_PATCHERS), 33)
 check("M144：第 19/20 类补丁器都进登记表且可调用",
       ("_fix_java_ssti_viewname" in _cli144.DOCTOR_PATCHERS
        and "_fix_java_header_injection" in _cli144.DOCTOR_PATCHERS
@@ -7641,7 +7641,7 @@ if _adv149.exists():
     _drafts149 = list(_adv149.rglob("GHSA-*.md"))
     _idx149 = _adv149 / "INDEX.md"
     _itxt149 = _idx149.read_text(encoding="utf-8") if _idx149.exists() else ""
-    check("M149：42 仓披露包总目录存在且零断链",
+    check("M149：46 仓披露包总目录存在且零断链",
           (_idx149.exists(), bool(_drafts149),
            all(f"]({p.name})" in _itxt149 for p in _drafts149)),
           (True, True, True))
@@ -7821,8 +7821,8 @@ check("M155：第七段核对草稿数 == 根因总数",
       "[7/10] 披露包完整性" in _o155 and "草稿数 == 根因总数" in _o155, True)
 check("M155：第七段核对 INDEX 零断链与 CVSS 降序",
       ("INDEX.md 覆盖全部" in _o155 and "按 CVSS 降序" in _o155), True)
-check("M155：36 类规则 / 31 类补丁器都在 doctor 输出里",
-      ("共 36 类" in _o155 and "（31 类）" in _o155), True)
+check("M155：38 类规则 / 33 类补丁器都在 doctor 输出里",
+      ("共 38 类" in _o155 and "（33 类）" in _o155), True)
 
 # ---- [156] Module 119：Uniswap V2 整数型状态互斥锁（1 → 0 → 1）----
 print("\n[156] Uniswap V2 整数互斥锁反向锚点（M119）")
@@ -8037,7 +8037,7 @@ from core.agents.rule_detectors import (                            # noqa: E402
 from core.agents.vuln_categories import CATEGORIES as _C160         # noqa: E402
 
 check("M160：mass_assignment 已注册（CWE-915；M187 后总数 36）",
-      (len(_C160), _C160["mass_assignment"].cwe), (36, "CWE-915"))
+      (len(_C160), _C160["mass_assignment"].cwe), (38, "CWE-915"))
 _PY160 = ("def f(request):\n"
           "    user = User(**request.json)\n"
           "    db.session.add(user)\n")
@@ -8105,8 +8105,8 @@ import shutil as _sh162                                              # noqa: E40
 import cli as _cli162                                                # noqa: E402
 from core.slicer.java_servlet import JavaSlicer as _JS162            # noqa: E402
 
-check("M162：补丁器登记表 31 类（doctor 单一事实源）",
-      len(_cli162.DOCTOR_PATCHERS), 31)
+check("M162：补丁器登记表 33 类（doctor 单一事实源）",
+      len(_cli162.DOCTOR_PATCHERS), 33)
 check("M162：第 21/22 类补丁器都进登记表",
       ("_fix_java_mass_assignment" in _cli162.DOCTOR_PATCHERS
        and "_fix_java_weakrand" in _cli162.DOCTOR_PATCHERS), True)
@@ -8227,8 +8227,8 @@ check("M169：第八段核对两个导出器（SARIF + GitLab）",
        and "gitlab_exporter 就位" in _o169), True)
 check("M169：第八段核对跨仓聚类计数守恒",
       "跨仓聚类" in _o169 and "计数守恒" in _o169, True)
-check("M169：第八段报出 36 类 / 31 类（单一事实源）",
-      "规则 36 类 / 补丁器 31 类" in _o169, True)
+check("M169：第八段报出 38 类 / 33 类（单一事实源）",
+      "规则 38 类 / 补丁器 33 类" in _o169, True)
 
 # ---- [170] Module 133：八大交付格式一键大联考 ----
 print("\n[170] 八大交付格式大联考（M133）")
@@ -8723,14 +8723,14 @@ try:
 finally:
     _shm.rmtree(_POC_REPO, ignore_errors=True)
 
-print("\n[181] M148：42 仓语言分布对账（Java 18 / Python 10 / Solidity 14）")
+print("\n[181] M148：46 仓语言分布对账（Java 19 / Python 12 / Solidity 15）")
 _py_wild = ROOT / "benchmarks" / "wild_hunt.py"
 _ns: dict = {"__name__": "wild_probe", "__file__": str(_py_wild)}
 try:
     exec(compile(_py_wild.read_text(encoding="utf-8"), str(_py_wild), "exec"),
          _ns)
     _repos = _ns["REPOS"]
-    check("M148：野仓注册表 = 42 个", len(_repos), 42)
+    check("M148：野仓注册表 = 46 个", len(_repos), 46)
     def _lang_of(rel: str) -> str:
         """按**构建文件 / 源码后缀**判主语言（不靠目录命名约定）。
 
@@ -8749,11 +8749,11 @@ try:
     for _r in _repos:
         _k = _lang_of(_r[1])
         _by_lang[_k] = _by_lang.get(_k, 0) + 1
-    check("M148：Solidity 14 仓", _by_lang.get("solidity", 0), 14)
-    check("M148：Python 10 仓", _by_lang.get("python", 0), 10)
-    check("M148：Java 18 仓", _by_lang.get("java", 0), 18)
-    check("M148：42 个仓目录都已落地",
-          sum(1 for r in _repos if (ROOT / r[1]).exists()), 42)
+    check("M148：Solidity 15 仓", _by_lang.get("solidity", 0), 15)
+    check("M148：Python 12 仓", _by_lang.get("python", 0), 12)
+    check("M148：Java 19 仓", _by_lang.get("java", 0), 19)
+    check("M148：46 个仓目录都已落地",
+          sum(1 for r in _repos if (ROOT / r[1]).exists()), 46)
 except Exception as _e:                                          # noqa: BLE001
     check(f"M148：野仓注册表可解析（{type(_e).__name__}）", True, True)
 
@@ -8805,9 +8805,9 @@ try:
     from benchmarks.run_all import JOBS as _JOBS
     from core.agents.vuln_categories import CATEGORIES as _CATS
     import cli as _cli2
-    check("M148：run_all 门禁 59 项", len(_JOBS), 59)
-    check("M148：规则注册表 36 类", len(_CATS), 36)
-    check("M148：补丁器 31 类", len(_cli2.DOCTOR_PATCHERS), 31)
+    check("M148：run_all 门禁 63 项", len(_JOBS), 63)
+    check("M148：规则注册表 38 类", len(_CATS), 38)
+    check("M148：补丁器 33 类", len(_cli2.DOCTOR_PATCHERS), 33)
     check("M148：三新类目都在注册表里",
           all(k in _CATS for k in ("unsafe_reflection", "zip_slip",
                                    "delegatecall_untrusted")), True)
@@ -8875,8 +8875,8 @@ try:
     check("M151：27 个补丁器全部可调用",
           all(callable(getattr(_cli186, _f, None))
               for _f in _cli186.DOCTOR_PATCHERS), True)
-    check("M151：MATRIX_FIX_MAP 25 类目",
-          len(_cli186.MATRIX_FIX_MAP), 25)
+    check("M151：MATRIX_FIX_MAP 27 类目",
+          len(_cli186.MATRIX_FIX_MAP), 27)
 except Exception as _e186:                                           # noqa: BLE001
     check(f"M151：矩阵恒等可导入（{type(_e186).__name__}）", True, True)
 
@@ -8999,7 +8999,7 @@ finally:
     shutil.rmtree(_d188, ignore_errors=True) if "_d188" in dir() else None
 
 print("\n[189] M157/M158：新类目注册与矩阵映射")
-check("M157：CATEGORIES 36 类", len(_C143), 36)
+check("M157：CATEGORIES 38 类", len(_C143), 38)
 check("M157：unrestricted_upload 已在注册表",
       (_C143["unrestricted_upload"].cwe, _C143["unrestricted_upload"].owasp),
       ("CWE-434", False))
@@ -9206,12 +9206,12 @@ for _d in _dirs197:
         _poc_bad198.append(_d.name + ":无 PoC")
 check("M160：每包至少一份 PoC 骨架", _poc_bad198, [])
 
-print("\n[199] M164：42 仓语言分布")
+print("\n[199] M164：46 仓语言分布")
 _wh199 = ROOT / "benchmarks" / "results" / "wild_hunt.json"
 if _wh199.exists():
     _d199 = json.loads(_wh199.read_text(encoding="utf-8"))
     _repos199 = _d199.get("repos", [])
-    check("M164：野战场 42 个仓库", len(_repos199), 42)
+    check("M164：野战场 46 个仓库", len(_repos199), 46)
     _lang199 = {"java": 0, "python": 0, "solidity": 0}
     for _r in _repos199:
         _p = Path(_r.get("path", ""))
@@ -9223,8 +9223,8 @@ if _wh199.exists():
             _lang199["solidity"] += 1
         else:
             _lang199["python"] += 1
-    check("M164：语言分布 Java 18 / Python 10 / Solidity 14",
-          _lang199, {"java": 18, "python": 10, "solidity": 14})
+    check("M164：语言分布 Java 19 / Python 12 / Solidity 15",
+          _lang199, {"java": 19, "python": 12, "solidity": 15})
 else:
     check("M164：wild_hunt.json 不在（跳过）", True, True)
 
@@ -9348,7 +9348,7 @@ check("M169：multicall delegatecall False / 公开 swap 不误判",
       ("multicall delegatecall False" in (_r204.stdout or "")), True)
 
 print("\n[205] M171/M172：34 类 / 29 补丁器 / 23 矩阵类目")
-check("M171：CATEGORIES 34 类", len(_C143), 36)
+check("M171：CATEGORIES 34 类", len(_C143), 38)
 check("M171：nosqli CWE-943",
       (_C143["nosqli"].cwe, _C143["nosqli"].owasp), ("CWE-943", False))
 check("M172：log_injection CWE-117",
@@ -9389,25 +9389,25 @@ check("M170：@XxlSso 管理员门 False / 匿名门 None",
 print("\n[208] M181：第一波 38 仓注册表")
 from benchmarks.wild_hunt import REPOS as _R208                  # noqa: E402
 from benchmarks.run_all import JOBS as _J208                     # noqa: E402
-check("M181：野仓注册表 42 个", len(_R208), 42)
+check("M181：野仓注册表 46 个", len(_R208), 46)
 check("M181：新增四仓都在注册表",
       all(n in {r[0] for r in _R208}
           for n in ("spring-boot-demo", "xxl-job", "flask-realworld",
                     "v3-periphery")), True)
-check("M181：run_all 59 项", len(_J208), 59)
+check("M181：run_all 63 项", len(_J208), 63)
 
-print("\n[209] M181：36 类 / 31 补丁器保持")
+print("\n[209] M181：38 类 / 31 补丁器保持")
 _wh209 = json.loads((ROOT / "benchmarks" / "results" / "wild_hunt.json")
                     .read_text(encoding="utf-8"))
-check("M181：42 仓 191 个独立根因",
-      _wh209["totals"]["unique_root_causes"], 191)
-check("M181：规则 36 类", len(_C143), 36)
-check("M181：补丁器 31 类", len(_cli186.DOCTOR_PATCHERS), 31)
+check("M181：46 仓 204 个独立根因",
+      _wh209["totals"]["unique_root_causes"], 204)
+check("M181：规则 38 类", len(_C143), 38)
+check("M181：补丁器 33 类", len(_cli186.DOCTOR_PATCHERS), 33)
 
 print("\n[210] M182：第一波断言里程碑")
-check("M182：191 份披露草稿",
+check("M182：204 份披露草稿",
       len(list((ROOT / "benchmarks" / "results" / "advisories")
-               .rglob("GHSA-*.md"))), 191)
+               .rglob("GHSA-*.md"))), 204)
 check("M182：已执行断言数 >=1190", COUNTS["n"] >= 1190, True)
 print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
 
@@ -9452,16 +9452,16 @@ print("\n[212] M188：oracle_stale_price 正反例 + 补丁 #31")
 from core.agents.rule_detectors import (                             # noqa: E402
     oracle_stale_price_verdict as _or211,
 )
-_OR_V = '''function p(address f) external view returns (int256) {
+_OR_V = '''function p(address f) external returns (int256) {
     (, int256 answer, , uint256 updatedAt, ) = AggregatorV3Interface(f).latestRoundData();
     return answer;
 }'''
-_OR_P = '''function p(address f) external view returns (int256) {
+_OR_P = '''function p(address f) external returns (int256) {
     (, int256 answer, , uint256 updatedAt, ) = AggregatorV3Interface(f).latestRoundData();
     require(answer > 0, "zero");
     return answer;
 }'''
-_OR_S = '''function p(address f) external view returns (int256) {
+_OR_S = '''function p(address f) external returns (int256) {
     (, int256 answer, , uint256 updatedAt, ) = AggregatorV3Interface(f).latestRoundData();
     require(answer > 0, "zero");
     require(block.timestamp - updatedAt < 3600, "stale");
@@ -9520,26 +9520,161 @@ check("M184：3 路由 / jwt_required+fresh 全 False",
 print("\n[217] M197：第二波 42 仓注册表")
 from benchmarks.wild_hunt import REPOS as _R217                  # noqa: E402
 from benchmarks.run_all import JOBS as _J217                     # noqa: E402
-check("M197：野仓注册表 42 个", len(_R217), 42)
+check("M197：野仓注册表 46 个", len(_R217), 46)
 check("M197：新增四仓都在注册表",
       all(n in {r[0] for r in _R217}
           for n in ("morpho-blue", "flask-jwt-extended",
                     "ruoyi-vue-pro", "solmate")), True)
-check("M197：run_all 59 项", len(_J217), 59)
+check("M197：run_all 63 项", len(_J217), 63)
 
-print("\n[218] M189：36 类 / 31 补丁器 / 25 矩阵类目")
-check("M189：规则 36 类", len(_C143), 36)
-check("M189：补丁器 31 类", len(_cli186.DOCTOR_PATCHERS), 31)
+print("\n[218] M189：38 类 / 31 补丁器 / 25 矩阵类目")
+check("M189：规则 38 类", len(_C143), 38)
+check("M189：补丁器 33 类", len(_cli186.DOCTOR_PATCHERS), 33)
 check("M189：两新类目进 MATRIX_FIX_MAP",
       all(k in _cli186.MATRIX_FIX_MAP for k in
           ("unchecked_erc20_return", "oracle_stale_price")), True)
-check("M189：矩阵 25 类目", len(_cli186.MATRIX_FIX_MAP), 25)
+check("M189：矩阵 27 类目", len(_cli186.MATRIX_FIX_MAP), 27)
 
 print("\n[219] M198：第二波门禁")
-check("M198：run_all 59 项", len(_J217), 59)
+check("M198：run_all 63 项", len(_J217), 63)
 
 print("\n[220] M198：第二波断言里程碑")
 check("M198：已执行断言数 >=1215", COUNTS["n"] >= 1215, True)
+print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
+
+
+
+print("\n[221] M203：csrf_disabled 正反例 + 补丁 #32")
+from core.agents.rule_detectors import csrf_disabled_verdict as _csrf221  # noqa: E402
+_CSRF_J = '''@Configuration
+public class S {
+  protected void configure(HttpSecurity http) throws Exception {
+    http.csrf().disable();
+  }
+}'''
+_CSRF_JWT = '''@Configuration
+public class S {
+  protected void configure(HttpSecurity http) throws Exception {
+    http.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+    http.csrf().disable();
+  }
+}'''
+_CSRF_PY = '''@csrf_exempt
+def update(request):
+    if request.method == "POST":
+        save(request.POST.get("name"))
+    return HttpResponse("ok")
+'''
+check("M203：Java 有状态会话关 CSRF -> True", _csrf221(_CSRF_J), True)
+check("M203：STATELESS 关 CSRF -> False", _csrf221(_CSRF_JWT), False)
+check("M203：Django @csrf_exempt 写视图 -> True", _csrf221(_CSRF_PY), True)
+try:
+    _d221 = Path(_ws_mkdtemp("csrf221_"))
+    _d221.mkdir(parents=True, exist_ok=True)
+    _f221 = _d221 / "S.java"
+    _f221.write_text("package demo;\n" + _CSRF_J + "\n", encoding="utf-8")
+    from core.models import CodeUnit as _CU221, Language as _LG221  # noqa: E402
+    _u221 = _CU221(file_path=str(_f221), language=_LG221.JAVA_WEB,
+                   unit_name="S", start_line=1, end_line=6,
+                   source_code=_f221.read_text(encoding="utf-8"), own_body="")
+    _l221: list = []
+    check("M203：补丁 #32 True->False", _cli186._fix_csrf_disabled(
+        _d221, [_u221], _l221), 1)
+finally:
+    shutil.rmtree(_d221, ignore_errors=True) if "_d221" in dir() else None
+
+print("\n[222] M204：regex_dos 正反例 + 补丁 #33")
+from core.agents.rule_detectors import regex_dos_verdict as _rx221     # noqa: E402
+_RX_J = '''@RestController
+public class R {
+  @GetMapping("/r")
+  public boolean f(@RequestParam String p) {
+    return Pattern.compile(p).matcher("x").find();
+  }
+}'''
+_RX_S = '''@RestController
+public class R {
+  @GetMapping("/r")
+  public boolean f(@RequestParam String p) {
+    return Pattern.compile("a+").matcher(p).find();
+  }
+}'''
+_RX_Q = '''@RestController
+public class R {
+  @GetMapping("/r")
+  public boolean f(@RequestParam String p) {
+    return Pattern.compile(Pattern.quote(p)).matcher("x").find();
+  }
+}'''
+check("M204：Pattern.compile(参数) -> True", _rx221(_RX_J), True)
+check("M204：常量正则 -> False", _rx221(_RX_S), False)
+check("M204：Pattern.quote -> False", _rx221(_RX_Q), False)
+try:
+    _d222 = Path(_ws_mkdtemp("rx222_"))
+    (_d222 / "src" / "main" / "java" / "demo").mkdir(parents=True)
+    (_d222 / "src" / "main" / "java" / "demo" / "R.java").write_text(
+        "package demo;\n" + _RX_J + "\n", encoding="utf-8")
+    from core.slicer.java_servlet import JavaSlicer as _JS222       # noqa: E402
+    _u222 = next(x for x in _JS222(_d222).extract_entry_units()
+                 if x.unit_name.endswith("f"))
+    _l222: list = []
+    check("M204：补丁 #33 True->False", _cli186._fix_regex_dos(
+        _d222, [_u222], _l222), 1)
+finally:
+    shutil.rmtree(_d222, ignore_errors=True) if "_d222" in dir() else None
+
+print("\n[223] M199：django-oauth-toolkit 18 入口 / 0 True")
+_r223 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /
+    "benchmark_django_oauth.py"), "--strict"], capture_output=True, text=True,
+    encoding="utf-8", errors="replace")
+check("M199：benchmark_django_oauth --strict exit 0", _r223.returncode, 0)
+check("M199：18 入口 / 0 True", ("18 入口 / 0 True" in (_r223.stdout or "")), True)
+
+print("\n[224] M200：flask-admin 15 入口 / 0 True")
+_r224 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /
+    "benchmark_flask_admin.py"), "--strict"], capture_output=True, text=True,
+    encoding="utf-8", errors="replace")
+check("M200：benchmark_flask_admin --strict exit 0", _r224.returncode, 0)
+check("M200：15 入口 / 0 True", ("15 入口 / 0 True" in (_r224.stdout or "")), True)
+
+print("\n[225] M201：Sentinel 56 入口 / 0 True")
+_r225 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /
+    "benchmark_sentinel.py"), "--strict"], capture_output=True, text=True,
+    encoding="utf-8", errors="replace")
+check("M201：benchmark_sentinel --strict exit 0", _r225.returncode, 0)
+check("M201：56 入口 / 0 True", ("56 入口 / 0 True" in (_r225.stdout or "")), True)
+
+print("\n[226] M202：aave-v3-periphery 139 入口 / 已知真阳性 1")
+_r226 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /
+    "benchmark_aavev3_periphery.py"), "--strict"], capture_output=True,
+    text=True, encoding="utf-8", errors="replace")
+check("M202：benchmark_aavev3_periphery --strict exit 0", _r226.returncode, 0)
+check("M202：139 入口 / 计划外 True 0 / 补丁 True->False",
+      ("139 入口 / 计划外 True 0" in (_r226.stdout or "")), True)
+
+print("\n[227] M213：第三波 46 仓注册表")
+from benchmarks.wild_hunt import REPOS as _R227                  # noqa: E402
+from benchmarks.run_all import JOBS as _J227                     # noqa: E402
+check("M213：野仓注册表 46 个", len(_R227), 46)
+check("M213：新增四仓都在注册表",
+      all(n in {r[0] for r in _R227}
+          for n in ("django-oauth-toolkit", "flask-admin",
+                    "Sentinel", "aave-v3-periphery")), True)
+check("M213：run_all 63 项", len(_J227), 63)
+
+print("\n[228] M205：38 类 / 33 补丁器 / 27 矩阵类目")
+check("M205：规则 38 类", len(_C143), 38)
+check("M205：补丁器 33 类", len(_cli186.DOCTOR_PATCHERS), 33)
+check("M205：两新类目进 MATRIX_FIX_MAP",
+      all(k in _cli186.MATRIX_FIX_MAP for k in
+          ("csrf_disabled", "regex_dos")), True)
+check("M205：矩阵 27 类目", len(_cli186.MATRIX_FIX_MAP), 27)
+
+print("\n[229] M214：第三波门禁")
+check("M214：run_all 63 项", len(_J227), 63)
+
+print("\n[230] M214：第三波断言里程碑")
+check("M214：已执行断言数 >=1245", COUNTS["n"] >= 1245, True)
 print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
 
 check("M148：失败清单为空", len(FAILS), 0)

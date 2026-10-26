@@ -1900,6 +1900,9 @@ MATRIX_FIX_MAP: dict[str, tuple[str, ...]] = {
     # M187/M188：第 35、36 类
     "unchecked_erc20_return": ("_fix_solidity_erc20_return",),
     "oracle_stale_price": ("_fix_solidity_oracle_stale",),
+    # M203/M204：第 37、38 类
+    "csrf_disabled": ("_fix_csrf_disabled",),
+    "regex_dos": ("_fix_regex_dos",),
 }
 
 
@@ -2294,6 +2297,8 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         # M171/M172：第 33、34 类
         n += _fix_nosqli(repo, py, report)
         n += _fix_log_injection(repo, py, report)
+        n += _fix_csrf_disabled(repo, py, report)
+        n += _fix_regex_dos(repo, py, report)
     if sol:
         n += _fix_solidity_txorigin(repo, sol, report)
         n += _fix_solidity_reentrancy(repo, sol, report)
@@ -2325,6 +2330,8 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         # M171/M172：第 33、34 类
         n += _fix_nosqli(repo, rest, report)
         n += _fix_log_injection(repo, rest, report)
+        n += _fix_csrf_disabled(repo, rest, report)
+        n += _fix_regex_dos(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
     if n:
         out = Path(out_path)
@@ -4027,6 +4034,8 @@ DOCTOR_PATCHERS = [
     "_fix_nosqli", "_fix_log_injection",
     # M187/M188：第 35、36 类
     "_fix_solidity_erc20_return", "_fix_solidity_oracle_stale",
+    # M203/M204：第 37、38 类
+    "_fix_csrf_disabled", "_fix_regex_dos",
 ]
 
 
@@ -4942,7 +4951,8 @@ def _fix_solidity_erc20_return(repo: Path, targets: list, lines: list) -> int:
                 fh.write(patched)
             from core.slicer.web3_slither import SoliditySlicer
             u2 = next((x for x in SoliditySlicer(repo).extract_entry_units(repo)
-                       if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path).resolve() == f.resolve()), None)
             v2 = rule_verdict("unchecked_erc20_return",
                               u2.source_code) if u2 else None
         finally:
@@ -5010,6 +5020,115 @@ def _fix_solidity_oracle_stale(repo: Path, targets: list, lines: list) -> int:
                       fence + "diff", *diff, fence, "",
                       "> 自检通过：重切片 + 重跑 oracle_stale_price -> False。",
                       "> 阈值 3600 秒需按喂价 heartbeat 调整。", ""]
+    return fixed
+
+
+
+def _fix_csrf_disabled(repo: Path, targets: list, lines: list) -> int:
+    """第 37 类（M203）：移除 CSRF 关闭（Java .csrf().disable() / @csrf_exempt）。"""
+    from core.agents.rule_detectors import verdict as rule_verdict
+    fence = chr(96) * 3
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("csrf_disabled", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        if ".csrf().disable()" in original:
+            patched = original.replace(".csrf().disable()", ".csrf()")
+            check_src = patched
+        elif "@csrf_exempt" in original:
+            patched = re.sub(r"(?m)^[ \t]*@csrf_exempt[ \t]*\n", "", original)
+            check_src = patched
+        else:
+            continue
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            if "@csrf_exempt" in original:
+                from core.slicer.web_treesitter import WebTreeSitterSlicer
+                u2 = next((x for x in WebTreeSitterSlicer(repo).extract_entry_units(repo)
+                           if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+                v2 = rule_verdict("csrf_disabled", u2.source_code) if u2 else None
+            else:
+                v2 = rule_verdict("csrf_disabled", check_src)
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is not True:                 # None = 已无 csrf 关闭语句
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}", tofile=f"b/{f.name}",
+                                        lineterm="")
+            lines += [f"## [csrf_disabled] {u.unit_name}（{f.name}）", fence + "diff",
+                      *diff, fence, "",
+                      "> 自检通过：重跑 csrf_disabled -> False。",
+                      "> 无状态 JWT API 可保留原配置，此项按会话型应用给建议。", ""]
+    return fixed
+
+
+def _fix_regex_dos(repo: Path, targets: list, lines: list) -> int:
+    """第 38 类（M204）：外部模式用 Pattern.quote / re.escape 转义。"""
+    from core.agents.rule_detectors import verdict as rule_verdict, _looks_python
+    fence = chr(96) * 3
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("regex_dos", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        py = _looks_python(src)
+        if py:
+            m = re.search(r"\bre\s*\.\s*(compile|search|match|findall|fullmatch)"
+                          r"\s*\(\s*([^,)]+)", original)
+            if not m:
+                continue
+            arg = m.group(2).strip()
+            if "re.escape(" in arg:
+                continue
+            patched = original[:m.start(2)] + f"re.escape({arg})" + original[m.end(2):]
+        else:
+            m = re.search(r"Pattern\s*\.\s*compile\s*\(\s*([^)]+)\)", original)
+            if not m:
+                continue
+            arg = m.group(1).strip()
+            if "Pattern.quote(" in arg:
+                continue
+            patched = original[:m.start(1)] + f"Pattern.quote({arg})" + original[m.end(1):]
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+            if py:
+                from core.slicer.web_treesitter import WebTreeSitterSlicer
+                u2 = next((x for x in WebTreeSitterSlicer(repo).extract_entry_units(repo)
+                           if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+            else:
+                from core.slicer.java_servlet import JavaSlicer
+                u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                           if x.unit_name == u.unit_name
+                           and Path(x.file_path).resolve() == f.resolve()), None)
+            v2 = rule_verdict("regex_dos", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}", tofile=f"b/{f.name}",
+                                        lineterm="")
+            lines += [f"## [regex_dos] {u.unit_name}（{f.name}）", fence + "diff",
+                      *diff, fence, "",
+                      "> 自检通过：重切片 + 重跑 regex_dos -> False。", ""]
     return fixed
 
 
