@@ -1,7 +1,7 @@
 {
-  "total_root_causes": 204,
-  "cluster_count": 123,
-  "cross_repo_clusters": 14,
+  "total_root_causes": 209,
+  "cluster_count": 127,
+  "cross_repo_clusters": 15,
   "conservation_ok": true,
   "clusters": [
     {
@@ -87,6 +87,17 @@
     {
       "category": "authz",
       "root_kind": "endpoint",
+      "component": "app.py",
+      "repo_count": 2,
+      "root_count": 2,
+      "repos": [
+        "Employee-Management-System",
+        "litestar"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
       "component": "views.py",
       "repo_count": 2,
       "root_count": 6,
@@ -159,6 +170,16 @@
       "repos": [
         "jeecg-boot",
         "xxl-job"
+      ]
+    },
+    {
+      "category": "arbitrary_file_delete",
+      "root_kind": "endpoint",
+      "component": "FileController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "kkFileView"
       ]
     },
     {
@@ -494,11 +515,21 @@
     {
       "category": "authz",
       "root_kind": "endpoint",
-      "component": "app.py",
+      "component": "router.py",
       "repo_count": 1,
       "root_count": 1,
       "repos": [
-        "Employee-Management-System"
+        "sanic"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "sessions.py",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "litestar"
       ]
     },
     {
@@ -899,6 +930,16 @@
       "root_count": 2,
       "repos": [
         "flask-admin"
+      ]
+    },
+    {
+      "category": "redir",
+      "root_kind": "endpoint",
+      "component": "factory.py",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "sanic"
       ]
     },
     {

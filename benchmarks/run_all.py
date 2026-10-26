@@ -45,7 +45,7 @@ SCOREBOARD = ROOT / "benchmarks" / "results" / "SCOREBOARD.md"
 # (名称, 命令, 前置目录检查, 类别, 可并发)
 #   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
 JOBS = [
-    ("冒烟测试 [1]-[230]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
+    ("冒烟测试 [1]-[240]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke", False),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target", True),
@@ -259,6 +259,15 @@ JOBS = [
     ("FastAPI (Python 异步真实模板)",
      ["benchmarks/benchmark_fastapi_wild.py", "--strict"],
      "reference_repos/fastapi-sql-template", "target", True),
+    # ---- M215–M218：第 47–50 野仓（第四波 / 50 仓大满贯） ----
+    ("halo (RouterFunction 函数式路由)", ["benchmarks/benchmark_halo.py", "--strict"],
+     "reference_repos/halo/application/src/main/java", "target", True),
+    ("sanic (异步路由)", ["benchmarks/benchmark_sanic.py", "--strict"],
+     "reference_repos/sanic", "target", True),
+    ("litestar (guards 路由)", ["benchmarks/benchmark_litestar.py", "--strict"],
+     "reference_repos/litestar", "target", True),
+    ("starlette (Route+requires)", ["benchmarks/benchmark_starlette.py", "--strict"],
+     "reference_repos/starlette", "target", True),
     # ---- M199–M202：第 43–46 野仓（第三波） ----
     ("django-oauth-toolkit (OAuth2 授权服务器)",
      ["benchmarks/benchmark_django_oauth.py", "--strict"],

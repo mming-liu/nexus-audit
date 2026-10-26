@@ -1903,6 +1903,9 @@ MATRIX_FIX_MAP: dict[str, tuple[str, ...]] = {
     # M203/M204：第 37、38 类
     "csrf_disabled": ("_fix_csrf_disabled",),
     "regex_dos": ("_fix_regex_dos",),
+    # M219/M220：第 39、40 类
+    "jndi_injection": ("_fix_java_jndi",),
+    "arbitrary_file_delete": ("_fix_file_delete",),
 }
 
 
@@ -2299,6 +2302,7 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_log_injection(repo, py, report)
         n += _fix_csrf_disabled(repo, py, report)
         n += _fix_regex_dos(repo, py, report)
+        n += _fix_file_delete(repo, py, report)
     if sol:
         n += _fix_solidity_txorigin(repo, sol, report)
         n += _fix_solidity_reentrancy(repo, sol, report)
@@ -2332,6 +2336,8 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_log_injection(repo, rest, report)
         n += _fix_csrf_disabled(repo, rest, report)
         n += _fix_regex_dos(repo, rest, report)
+        n += _fix_java_jndi(repo, rest, report)
+        n += _fix_file_delete(repo, rest, report)
         _verify_fixes(repo, rest, out_path)
     if n:
         out = Path(out_path)
@@ -4036,6 +4042,8 @@ DOCTOR_PATCHERS = [
     "_fix_solidity_erc20_return", "_fix_solidity_oracle_stale",
     # M203/M204：第 37、38 类
     "_fix_csrf_disabled", "_fix_regex_dos",
+    # M219/M220：第 39、40 类
+    "_fix_java_jndi", "_fix_file_delete",
 ]
 
 
@@ -5129,6 +5137,119 @@ def _fix_regex_dos(repo: Path, targets: list, lines: list) -> int:
             lines += [f"## [regex_dos] {u.unit_name}（{f.name}）", fence + "diff",
                       *diff, fence, "",
                       "> 自检通过：重切片 + 重跑 regex_dos -> False。", ""]
+    return fixed
+
+
+
+def _fix_java_jndi(repo: Path, targets: list, lines: list) -> int:
+    """第 39 类（M219）：lookup 名前缀限制到 java:comp/env/。"""
+    from core.agents.rule_detectors import verdict as rule_verdict
+    fence = chr(96) * 3
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("jndi_injection", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        m = re.search(r"(?m)^([ \t]*)([^;\n]*\.\s*lookup\s*\(\s*(\w+)\s*\))", original)
+        if not m:
+            continue
+        indent, call, var = m.group(1), m.group(2), m.group(3)
+        guard = (f"{indent}if (!{var}.startsWith(\"java:comp/env/\")) {{ "
+                 f"throw new IllegalArgumentException(\"jndi name\"); }}\n")
+        patched = original[:m.start()] + guard + original[m.start():]
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+            from core.slicer.java_servlet import JavaSlicer
+            u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                       if x.unit_name == u.unit_name
+                       and Path(x.file_path).resolve() == f.resolve()), None)
+            v2 = rule_verdict("jndi_injection", u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}", tofile=f"b/{f.name}",
+                                        lineterm="")
+            lines += [f"## [jndi_injection] {u.unit_name}（{f.name}）",
+                      fence + "diff", *diff, fence, "",
+                      "> 自检通过：重切片 + 重跑 jndi_injection -> False。", ""]
+    return fixed
+
+
+def _fix_file_delete(repo: Path, targets: list, lines: list) -> int:
+    """第 40 类（M220）：删除前做规范化和基准目录校验。"""
+    from core.agents.rule_detectors import verdict as rule_verdict, _looks_python
+    fence = chr(96) * 3
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if rule_verdict("arbitrary_file_delete", src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        py = _looks_python(src)
+        if py:
+            m = re.search(r"(?m)^([ \t]*)(?:os\s*\.\s*(?:remove|unlink)|"
+                          r"shutil\s*\.\s*rmtree)\s*\(\s*([^)]+)", original)
+        else:
+            m = re.search(r"(?m)^([ \t]*)[^;\n]*Files\s*\.\s*delete(?:IfExists)?"
+                          r"\s*\(\s*([^)]+)", original)
+        if not m:
+            continue
+        indent, arg = m.group(1), m.group(2).strip()
+        if py:
+            guard = (f"{indent}if not os.path.realpath({arg}).startswith(BASE_DIR):\n"
+                     f"{indent}    raise ValueError(\"path\")\n")
+        else:
+            guard = (f"{indent}if (!new java.io.File({arg}).getCanonicalPath()"
+                     f".startsWith(BASE_DIR)) {{ "
+                     f"throw new IllegalArgumentException(\"path\"); }}\n")
+        patched = original[:m.start()] + guard + original[m.start():]
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+            if py:
+                from core.slicer.web_treesitter import WebTreeSitterSlicer
+                u2 = next((x for x in WebTreeSitterSlicer(repo).extract_entry_units(repo)
+                           if x.unit_name == u.unit_name
+                           and Path(x.file_path).resolve() == f.resolve()), None)
+            else:
+                from core.slicer.java_servlet import JavaSlicer
+                u2 = next((x for x in JavaSlicer(repo).extract_entry_units()
+                           if x.unit_name == u.unit_name
+                           and Path(x.file_path).resolve() == f.resolve()), None)
+            v2 = rule_verdict("arbitrary_file_delete",
+                              u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+            from core.context.java_impl_resolver import _FILE_CACHE
+            _FILE_CACHE.clear()
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}", tofile=f"b/{f.name}",
+                                        lineterm="")
+            lines += [f"## [arbitrary_file_delete] {u.unit_name}（{f.name}）",
+                      fence + "diff", *diff, fence, "",
+                      "> 自检通过：重切片 + 重跑 arbitrary_file_delete -> False。", ""]
     return fixed
 
 

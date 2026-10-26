@@ -113,6 +113,12 @@ REPOS = [
      ["--strict"]),
     ("aave-v3-periphery", "reference_repos/aave-v3-periphery/contracts",
      "aavev3_periphery", ["--strict"]),
+    # —— M215–M218：第 47–50 号野仓（50 仓大满贯）——
+    ("halo", "reference_repos/halo/application/src/main/java", "halo",
+     ["--strict"]),
+    ("sanic", "reference_repos/sanic", "sanic", ["--strict"]),
+    ("litestar", "reference_repos/litestar", "litestar", ["--strict"]),
+    ("starlette", "reference_repos/starlette", "starlette", ["--strict"]),
 ]
 
 P0_LINE = re.compile(r"^- \*\*\[([a-z_]+)\]\*\* `")

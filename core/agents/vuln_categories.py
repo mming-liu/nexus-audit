@@ -619,6 +619,29 @@ CATEGORIES: dict[str, VulnCategory] = {
             "模式是否为常量，或已用 Pattern.quote / re.escape 转义？"
             "只对输入做长度限制不消除指数回溯，不算防护。"),
     ),
+    # ---------------- M219：第 39 类 —— JNDI 注入（CWE-917） ----------------
+    "jndi_injection": VulnCategory(
+        key="jndi_injection", display="JNDI 注入",
+        cwe="CWE-917", owasp=False, needs_taint=False,
+        sink_question=(
+            "外部可控字符串是否直接传给 InitialContext.lookup / "
+            "JndiTemplate.lookup / ctx.lookup？"),
+        property=(
+            "lookup 名是否为固定的 java:comp/env/... 常量，或先做前缀白名单？"
+            "注意：只过滤 ldap:// 不拦 rmi://、dns://，不算完整防护。"),
+    ),
+
+    # ---------------- M220：第 40 类 —— 任意文件删除（CWE-73） ----------------
+    "arbitrary_file_delete": VulnCategory(
+        key="arbitrary_file_delete", display="任意文件删除",
+        cwe="CWE-73", owasp=False, needs_taint=False,
+        sink_question=(
+            "外部可控路径是否直接传给 Files.delete / File.delete / "
+            "os.remove / shutil.rmtree？"),
+        property=(
+            "删除前是否做规范化和基准目录校验（getCanonicalPath().startsWith / "
+            "realpath().startswith / basename），且拒绝 .. 与绝对路径？"),
+    ),
 }
 
 ALL_KEYS = list(CATEGORIES.keys())

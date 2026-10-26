@@ -1,6 +1,6 @@
 # 披露草稿总目录（nexus-audit `--advisory-dir`）
 
-共 **204** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
+共 **209** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
 带 [Auto-Fix Verified] 的草稿内嵌通过自检的补丁 diff。
 
 | CVSS | 严重级 | CWE | 类目 | 草稿 |
@@ -79,10 +79,12 @@
 | 8.1 | HIGH | CWE-434 | unrestricted_upload | [GHSA-6951-94BB-FA04-unrestricted-upload-blogcontroller-uploadfilebyeditormd.md](GHSA-6951-94BB-FA04-unrestricted-upload-blogcontroller-uploadfilebyeditormd.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-6B16-B41D-457B-authz-admin-delete-user.md](GHSA-6B16-B41D-457B-authz-admin-delete-user.md) |
 | 8.1 | HIGH | CWE-117 | log_injection | [GHSA-7527-8921-EE95-log-injection-introspecttokenview.md](GHSA-7527-8921-EE95-log-injection-introspecttokenview.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-777E-0D72-911C-authz-get-membership-details.md](GHSA-777E-0D72-911C-authz-get-membership-details.md) |
 | 8.1 | HIGH | CWE-117 | log_injection | [GHSA-7850-A906-0581-log-injection-sysdictcontroller-loaddict.md](GHSA-7850-A906-0581-log-injection-sysdictcontroller-loaddict.md) |
 | 8.1 | HIGH | CWE-117 | log_injection | [GHSA-7895-0CF3-BA6D-log-injection-thirdlogincontroller-oauth2logincallback-2.md](GHSA-7895-0CF3-BA6D-log-injection-thirdlogincontroller-oauth2logincallback-2.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-7D61-C193-6D3B-authz-crmfollowuprecordcontroller-getfollowuprecordpag.md](GHSA-7D61-C193-6D3B-authz-crmfollowuprecordcontroller-getfollowuprecordpag.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-7D65-7976-42BA-authz-pointactivitycontroller-getpointactivitylistbyid.md](GHSA-7D65-7976-42BA-authz-pointactivitycontroller-getpointactivitylistbyid.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-811A-0D83-4A90-authz-delete-session-command.md](GHSA-811A-0D83-4A90-authz-delete-session-command.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-854A-FB9C-0767-authz-paychannelcontroller-getenablechannelcodelist.md](GHSA-854A-FB9C-0767-authz-paychannelcontroller-getenablechannelcodelist.md) |
 | 8.1 | HIGH | CWE-117 | log_injection | [GHSA-8653-4140-288D-log-injection-clusterconfigcontroller-apigetclusterstateofapp.md](GHSA-8653-4140-288D-log-injection-clusterconfigcontroller-apigetclusterstateofapp.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-87F3-A575-2838-authz-paydemoordercontroller-getdemoorderpage.md](GHSA-87F3-A575-2838-authz-paydemoordercontroller-getdemoorderpage.md) |
@@ -115,6 +117,7 @@
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-C01B-8029-B6DB-authz-verifycontroller-resetemail.md](GHSA-C01B-8029-B6DB-authz-verifycontroller-resetemail.md) |
 | 8.1 | HIGH | CWE-117 | log_injection | [GHSA-C198-6F7F-612D-log-injection-thirdlogincontroller-loginthird.md](GHSA-C198-6F7F-612D-log-injection-thirdlogincontroller-loginthird.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-C2B4-119F-9076-authz-ai1modelcontroller-getmodelsimplelist.md](GHSA-C2B4-119F-9076-authz-ai1modelcontroller-getmodelsimplelist.md) |
+| 8.1 | HIGH | CWE-285 | authz | [GHSA-C356-227C-2600-authz-find-route-by-view-name.md](GHSA-C356-227C-2600-authz-find-route-by-view-name.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-C690-9D8F-1FA8-authz-aiimagecontroller-getimagepagepublic.md](GHSA-C690-9D8F-1FA8-authz-aiimagecontroller-getimagepagepublic.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-CAE0-DE7C-B1AD-authz-oasupplyitemcontroller-getsupplyitemselectpage.md](GHSA-CAE0-DE7C-B1AD-authz-oasupplyitemcontroller-getsupplyitemselectpage.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-CC22-7E50-D331-authz-generatorcontroller-generatorcode.md](GHSA-CC22-7E50-D331-authz-generatorcontroller-generatorcode.md) |
@@ -136,6 +139,7 @@
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-F58F-2C9F-A07B-authz-verifycontroller-resetpass.md](GHSA-F58F-2C9F-A07B-authz-verifycontroller-resetpass.md) |
 | 8.1 | HIGH | CWE-117 | log_injection | [GHSA-FA2F-26FF-4FB0-log-injection-machineregistrycontroller-receiveheartbeat.md](GHSA-FA2F-26FF-4FB0-log-injection-machineregistrycontroller-receiveheartbeat.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-FEB4-5DB8-873A-authz-appbargainhelpcontroller-getbargainhelplist.md](GHSA-FEB4-5DB8-873A-authz-appbargainhelpcontroller-getbargainhelplist.md) |
+| 8.1 | HIGH | CWE-73 | arbitrary_file_delete | [GHSA-FECB-5821-684E-arbitrary-file-delete-filecontroller-deletefile.md](GHSA-FECB-5821-684E-arbitrary-file-delete-filecontroller-deletefile.md) |
 | 7.5 | HIGH | CWE-190 | arithmetic | [GHSA-2B39-C38C-48A4-arithmetic-transferfrom.md](GHSA-2B39-C38C-48A4-arithmetic-transferfrom.md) |
 | 7.5 | HIGH | CWE-190 | arithmetic | [GHSA-5BD2-2E2D-B948-arithmetic-transfer.md](GHSA-5BD2-2E2D-B948-arithmetic-transfer.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-0C17-B7D9-3D49-cors-alipaycontroller-topayaspc.md](GHSA-0C17-B7D9-3D49-cors-alipaycontroller-topayaspc.md) |
@@ -208,4 +212,5 @@
 | 4.3 | MEDIUM | CWE-601 | redir | [GHSA-99D6-43B8-4E1C-redir-upload.md](GHSA-99D6-43B8-4E1C-redir-upload.md) |
 | 4.3 | MEDIUM | CWE-601 | redir | [GHSA-9F6A-91DA-6747-redir-thirdlogincontroller-oauth2logincallback-2.md](GHSA-9F6A-91DA-6747-redir-thirdlogincontroller-oauth2logincallback-2.md) |
 | 4.3 | MEDIUM | CWE-601 | redir | [GHSA-B00F-D04A-23D9-redir-ordercontroller-saveorder.md](GHSA-B00F-D04A-23D9-redir-ordercontroller-saveorder.md) |
+| 4.3 | MEDIUM | CWE-601 | redir | [GHSA-C122-8082-95BE-redir-page.md](GHSA-C122-8082-95BE-redir-page.md) |
 | 4.3 | MEDIUM | CWE-601 | redir | [GHSA-DFEA-22AC-9EE3-redir-thirdlogincontroller-oauth2logincallback.md](GHSA-DFEA-22AC-9EE3-redir-thirdlogincontroller-oauth2logincallback.md) |

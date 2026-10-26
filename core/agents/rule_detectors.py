@@ -10920,6 +10920,73 @@ def regex_dos_verdict(source: str) -> bool | None:
     return None
 
 
+
+# ================= M219/M220：第 39/40 类规则 =================
+
+_JNDI_LOOKUP_RE = re.compile(r"\.\s*lookup\s*\(\s*([^)]*)\)")
+_JNDI_SAFE_RE = re.compile(
+    r"lookup\s*\(\s*[\"']java:comp/env/|"
+    r"startsWith\s*\(\s*[\"']java:comp/env/")
+_JNDI_ABORT_RE = re.compile(r"\b(?:throw|return|raise)\b")
+
+
+def jndi_injection_verdict(source: str) -> bool | None:
+    """第 39 类（M219）：外部字符串直接进 JNDI lookup。"""
+    body = entry_body(source) or source
+    m = _JNDI_LOOKUP_RE.search(body)
+    if not m:
+        return None
+    arg = m.group(1).strip()
+    if _JNDI_SAFE_RE.search(body) and _JNDI_ABORT_RE.search(body):
+        return False
+    if re.fullmatch(r"\"[^\"]*\"|'[^']*'", arg):
+        return False
+    if re.fullmatch(r"[A-Za-z_]\w*", arg) or "request" in arg:
+        return True
+    return None
+
+
+_FILE_DELETE_JAVA_RE = re.compile(
+    r"\bFiles\s*\.\s*delete(?:IfExists)?\s*\(\s*([^)]*)\)|"
+    r"\bnew\s+File\s*\(\s*([^)]*)\)\s*\.\s*delete\s*\(\s*\)|"
+    r"\b([A-Za-z_]\w*)\s*\.\s*delete\s*\(\s*\)")
+_FILE_DELETE_PY_RE = re.compile(
+    r"\bos\s*\.\s*(?:remove|unlink)\s*\(\s*([^)]*)\)|"
+    r"\bshutil\s*\.\s*rmtree\s*\(\s*([^)]*)\)")
+_FILE_DELETE_SAFE_RE = re.compile(
+    r"getCanonicalPath\s*\([^)]*\)\s*\.\s*startsWith|"
+    r"toRealPath\s*\([^)]*\)\s*\.\s*startsWith|"
+    r"realpath\s*\([^)]*\)\s*\.\s*startswith|"
+    r"os\s*\.\s*path\s*\.\s*basename\s*\(|"
+    r"deleteFileCheck\s*\(|checkResult\s*\.\s*isFailure\s*\(")
+
+
+def arbitrary_file_delete_verdict(source: str) -> bool | None:
+    """第 40 类（M220）：外部路径直接删除，未做规范化目录校验。"""
+    body = entry_body(source) or source
+    py = _looks_python(source)
+    m = (_FILE_DELETE_PY_RE.search(body) if py
+         else _FILE_DELETE_JAVA_RE.search(body))
+    if not m:
+        return None
+    arg = next((g for g in m.groups() if g), "").strip()
+    if (_FILE_DELETE_SAFE_RE.search(body)
+            or (re.search(r"realpath\s*\([^)]*\)", body)
+                and re.search(r"\.startswith\s*\(", body))
+            or (re.search(r"getCanonicalPath\s*\(", body)
+                and re.search(r"\.startsWith\s*\(", body))):
+        return False
+    if not arg:
+        return True
+    if re.fullmatch(r"\"[^\"]*\"|'[^']*'", arg):
+        return False
+    params = set(_bare_params(_entry_signature(source)))
+    if (re.fullmatch(r"[A-Za-z_]\w*", arg) or "request" in arg
+            or any(re.search(rf"\b{re.escape(p)}\b", arg) for p in params)):
+        return True
+    return None
+
+
 def verdict(category: str, source: str) -> bool | None:
     """对配置型类目给出确定性结论：True(有漏洞) / False(安全) / None(证据不足)。"""
     cfg = parse_config_block(source)
@@ -11097,5 +11164,9 @@ def verdict(category: str, source: str) -> bool | None:
         return csrf_disabled_verdict(source)
     if category == "regex_dos":
         return regex_dos_verdict(source)
+    if category == "jndi_injection":
+        return jndi_injection_verdict(source)
+    if category == "arbitrary_file_delete":
+        return arbitrary_file_delete_verdict(source)
 
     return None

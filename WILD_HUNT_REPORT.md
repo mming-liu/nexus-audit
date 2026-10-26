@@ -1,25 +1,25 @@
-# 野战白皮书 —— 46 个真实开源生产仓库（M151–M166 收官）
+# 野战白皮书 —— 50 个真实开源生产仓库（M151–M166 收官）
 
 > 本文所有数字由 `benchmarks/wild_hunt.py` **实跑**产出，唯一事实源是
 > `benchmarks/results/wild_hunt.json`（`cli.py doctor` 第六段会对账，
 > 数字漂了当场 FAIL）。规则层离线可复现，不含模型层数字。
 
-## 一、总量（46 仓 / 204 独立根因 / 零误报）
+## 一、总量（50 仓 / 209 独立根因 / 零误报）
 
 | 项 | 数值 |
 |---|---|
-| 真实仓库 | **46 个**（Java 19 + Python 12 + Solidity 15） |
-| 路由/合约入口 | **15,576 个** |
-| 路由级 P0 命中 | **4,994 条** |
-| 去重后的独立根因 P0 | **204 个** |
-| GHSA 披露草稿 | **204 份**（按独立根因，不按路由） |
+| 真实仓库 | **50 个**（Java 19 + Python 16 + Solidity 15） |
+| 路由/合约入口 | **15,617 个** |
+| 路由级 P0 命中 | **4,999 条** |
+| 去重后的独立根因 P0 | **209 个** |
+| GHSA 披露草稿 | **209 份**（按独立根因，不按路由） |
 | benchmark 层误报 | **0 条** |
 | benchmark 层判反 | **0 条** |
-| benchmark_* --strict | **46/46 exit 0** |
+| benchmark_* --strict | **50/50 exit 0** |
 | 供应链命中已知 advisory 的仓库 | **7 个** |
 | 供应链 × 代码双重实锤 | **5 个** |
 
-一句话：**在 15,576 个真实入口上，规则层没有确认误报；204 个独立根因全部由规则层确定性判据产出，PoC/补丁自检可复核。**
+一句话：**在 15,617 个真实入口上，规则层没有确认误报；209 个独立根因全部由规则层确定性判据产出，PoC/补丁自检可复核。**
 
 ## 二、逐仓数字
 
@@ -46,8 +46,11 @@
 | Employee-Management-System | Python | 4 | 2 | 2 | ✔ | — |
 | django-oauth-toolkit | Python | 18 | 2 | 2 | ✔ | — |
 | django-realworld | Python | 11 | 2 | 2 | ✔ | CVE-2017-12794、CVE-2018-14574、CVE-2020-25626、CVE-2022-29217 |
+| litestar | Python | 25 | 2 | 2 | ✔ | — |
+| sanic | Python | 16 | 2 | 2 | ✔ | — |
 | solmate | Solidity | 144 | 2 | 2 | ✔ | — |
 | Synthetix V3 | Solidity | 1411 | 1 | 1 | ✔ | — |
+| kkFileView | Java | 20 | 1 | 1 | ✔ | — |
 | mall-tiny | Java | 40 | 40 | 1 | ✔ | CVE-2023-24162 |
 | waynboot-mall | Java | 163 | 163 | 1 | ✔ | — |
 | AaveV3 | Solidity | 553 | 0 | 0 | ✔ | — |
@@ -66,9 +69,10 @@
 | flaskr | Python | 8 | 0 | 0 | ✔ | — |
 | flasky | Python | 39 | 0 | 0 | ✔ | CVE-2018-1000656、CVE-2018-18074、CVE-2019-10906、CVE-2019-11324、CVE-2019-14322、CVE-2019-7548 |
 | full-stack-fastapi-template | Python | 23 | 0 | 0 | ✔ | — |
-| kkFileView | Java | 20 | 0 | 0 | ✔ | — |
+| halo | Python | 0 | 0 | 0 | ✔ | — |
 | morpho-blue | Solidity | 71 | 0 | 0 | ✔ | — |
 | solady | Solidity | 2968 | 0 | 0 | ✔ | — |
+| starlette | Python | 0 | 0 | 0 | ✔ | — |
 | sushiswap-zapper | Solidity | 75 | 0 | 0 | ✔ | — |
 | v3-periphery | Solidity | 136 | 0 | 0 | ✔ | — |
 
@@ -351,6 +355,16 @@
 - **[authz]** `ArticleViewSet.update`（endpoint，影响 1 条路由） @ `views.py:87`
 - **[hardcoded_secret]** `[secret-file] settings.py`（file-level，影响 1 条路由） @ `settings.py:1`
 
+### litestar（Python）— 2 个独立根因
+
+- **[authz]** `get_membership_details`（endpoint，影响 1 条路由） @ `app.py:878`
+- **[authz]** `delete_session_command`（endpoint，影响 1 条路由） @ `sessions.py:39`
+
+### sanic（Python）— 2 个独立根因
+
+- **[authz]** `find_route_by_view_name`（endpoint，影响 1 条路由） @ `router.py:167`
+- **[redir]** `page`（endpoint，影响 1 条路由） @ `factory.py:76`
+
 ### solmate（Solidity）— 2 个独立根因
 
 - **[arithmetic]** `transfer`（endpoint，影响 1 条路由） @ `ERC20.sol:76`
@@ -359,6 +373,10 @@
 ### Synthetix V3（Solidity）— 1 个独立根因
 
 - **[unchecked_low_level_calls]** `processCcipReceive`（endpoint，影响 1 条路由） @ `CrossChain.sol:50`
+
+### kkFileView（Java）— 1 个独立根因
+
+- **[arbitrary_file_delete]** `FileController.deleteFile`（endpoint，影响 1 条路由） @ `FileController.java:240`
 
 ### mall-tiny（Java）— 1 个独立根因
 
@@ -413,7 +431,7 @@ python cli.py matrix
 > **反向锚点**（把证据摘掉，判定必须跟着翻），M139–M141 三条的补丁器都要求
 > "重切片后 True → False"，M135/M145 两条是把结论拿去和另一张表对账。
 
-## 七、46 仓供应链组件风险 × 代码入口可达性对照
+## 七、50 仓供应链组件风险 × 代码入口可达性对照
 
 这一节回答一个单看任一表都答不出的问题：**哪些仓既用了已知有漏洞的组件版本，又真有一条代码级 P0？**
 
@@ -450,8 +468,11 @@ python cli.py matrix
 | Employee-Management-System | Python | — | — | 2 | 仅代码（组件版本未命中已知 advisory） |
 | solmate | Solidity | — | — | 2 | 仅代码（组件版本未命中已知 advisory） |
 | django-oauth-toolkit | Python | — | — | 2 | 仅代码（组件版本未命中已知 advisory） |
+| sanic | Python | — | — | 2 | 仅代码（组件版本未命中已知 advisory） |
+| litestar | Python | — | — | 2 | 仅代码（组件版本未命中已知 advisory） |
 | waynboot-mall | Java | — | — | 1 | 仅代码（组件版本未命中已知 advisory） |
 | Synthetix V3 | Solidity | — | — | 1 | 仅代码（组件版本未命中已知 advisory） |
+| kkFileView | Java | — | — | 1 | 仅代码（组件版本未命中已知 advisory） |
 
 **双重实锤仓 5 个**：jeecg-boot、DjanGoat、spring-boot-demo、django-realworld、mall-tiny
 

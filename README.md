@@ -4,16 +4,16 @@
 
 当前覆盖 **Java / Python / Solidity** 三条赛道：规则层先做确定性判定（编译器/VM
 能证明的事实不交给模型），模型只接手规则判不了的部分；**21 个真实外部靶场**全部接
-`--strict` 离线门禁，`pre-push` 与 `run_all.py`（63 项）各有一道（见
+`--strict` 离线门禁，`pre-push` 与 `run_all.py`（67 项）各有一道（见
 [多语言靶场](#多语言靶场21-个仓库全部离线门禁)）。
 
-开工前可跑只读自检：`python cli.py doctor` —— 依赖就位 / 38 类规则注册表
-verdict 路由全覆盖 / 缓存指纹算法稳定 / 33 类补丁器就位 / PoC 合成器三语言自检 /
+开工前可跑只读自检：`python cli.py doctor` —— 依赖就位 / 40 类规则注册表
+verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC 合成器三语言自检 /
 覆盖地板达标 / SCOREBOARD 与现算结果同步 / 正则卫生零死正则 / 交单四件套完备 /
 能力矩阵与补丁注册表双向恒等，十段报告，exit 0 即全部就绪。
 
-> 野战口径（`benchmarks/results/wild_hunt.json`）：**46 个真实开源仓库 /
-> 15,576 个入口 / 204 个独立根因 / 123 个跨仓簇（14 个多仓共现）**。
+> 野战口径（`benchmarks/results/wild_hunt.json`）：**50 个真实开源仓库 /
+> 15,617 个入口 / 209 个独立根因 / 127 个跨仓簇（15 个多仓共现）**。
 
 ## 目录结构
 
@@ -52,8 +52,8 @@ nexus-audit/
 | `core/context/config_resolver.py` | 解析 .properties/.yaml/.json，把代码里引用的配置键回填进切片 |
 | `core/context/java_impl_resolver.py` | MyBatis 注解/XML、接口实现体的跨文件证据（`#{}` vs `${}` 的真值在这里） |
 | `core/context/taint_chain.py` | 跨路由串接：按介质+键名把「写入点」与「读取点」配对，存储型 XSS 靠它判定 |
-| `core/agents/vuln_categories.py` | 38 类漏洞的 Scenario/Property 定义（11 类 OWASP + Java 生态 + Python Web + Solidity 链上 + 凭证/JWT + 上传/签名重放 + NoSQL/日志注入 + ERC20/预言机 + CSRF/正则 DoS） |
-| `core/agents/rule_detectors.py` | 客观事实的确定性判定（38 类判据入口，先于 LLM 执行） |
+| `core/agents/vuln_categories.py` | 40 类漏洞的 Scenario/Property 定义（11 类 OWASP + Java 生态 + Python Web + Solidity 链上 + 凭证/JWT + 上传/签名重放 + NoSQL/日志注入 + ERC20/预言机 + CSRF/正则 DoS + JNDI/文件删除） |
+| `core/agents/rule_detectors.py` | 客观事实的确定性判定（40 类判据入口，先于 LLM 执行） |
 | `benchmarks/benchmark_owasp.py` | OWASP Benchmark 跑分（TPR/FPR/Score，含断点续跑与误差归因） |
 | `benchmarks/benchmark_javaseccode.py` | 真实项目（java-sec-code）评测，真值取自路由命名 + 作者注释 |
 | `benchmarks/benchmark_vulpy.py` | Python Web 靶场（bad/good 成对真值），`--strict` 零退回门禁 |
@@ -176,13 +176,13 @@ python benchmarks/benchmark_vulpy.py --strict
 3. **分母 < 20 只记录不下结论**（TPR/FPR 都是），`Score = TPR − FPR`。
 
 `pre-push` 会依次跑 **21 道快速门禁**（16 段靶场基线 + 冒烟 + 争议登记核对 +
-覆盖地板）；全量 **63 项**由 `benchmarks/run_all.py --offline` 承担
-（含第 63 项跨仓聚类对账）。CI 上没有靶场仓库，因此全量 strict 由本地钩子承担
+覆盖地板）；全量 **67 项**由 `benchmarks/run_all.py --offline` 承担
+（含第 67 项跨仓聚类对账）。CI 上没有靶场仓库，因此全量 strict 由本地钩子承担
 （见 `.githooks/pre-push`）。
 
-规则层现状：**38 类判据入口**（`rule_detectors.verdict()` 统一路由，空源码必须
-退 None）+ **33 类确定性补丁器**（命中→补丁→重切片→规则翻 False→finally 字节级
-还原的自检闭环，`--fix` 触发）。冒烟断言 `[1]`-`[230]`（1,247 项），秒级不调模型。
+规则层现状：**40 类判据入口**（`rule_detectors.verdict()` 统一路由，空源码必须
+退 None）+ **35 类确定性补丁器**（命中→补丁→重切片→规则翻 False→finally 字节级
+还原的自检闭环，`--fix` 触发）。冒烟断言 `[1]`-`[240]`（1,274 项），秒级不调模型。
 
 第四层另有 **PoC Harness 合成器**（`--emit-poc`）：把"规则层已判 True 的那条"
 翻译成离线可跑的验证骨架 —— Solidity Foundry `.t.sol` / Python pytest /
