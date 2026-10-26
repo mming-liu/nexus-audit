@@ -38,6 +38,7 @@ def main() -> int:
     anchor = R.verdict("authz", _ANCHOR)
     print(f"注解入口 {len(units)} / RouterFunction 文件 {router} / True {len(true_rows)} / 锚点 {anchor}")
     bad = []
+    if len(units) < 150: bad.append(f"Router 入口 {len(units)} < 150")
     if router < 3: bad.append(f"RouterFunction 文件 {router} < 3")
     if true_rows: bad.append(f"True: {true_rows[:5]}")
     if anchor is not True: bad.append(f"锚点 {anchor}")
@@ -47,7 +48,7 @@ def main() -> int:
                                "fp": 0, "pass": not bad}, ensure_ascii=False,
                               indent=2), encoding="utf-8")
     if bad: print("STRICT FAIL " + "；".join(bad)); return 1
-    print(f"STRICT PASS ✔（0 注解入口 / RouterFunction {router} 文件 / 0 True / 锚点 True）")
+    print(f"STRICT PASS ✔（{len(units)} Router 入口 / RouterFunction {router} 文件 / 0 True / 锚点 True）")
     return 0
 
 if __name__ == "__main__":

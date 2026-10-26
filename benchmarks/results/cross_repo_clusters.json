@@ -1,6 +1,6 @@
 {
-  "total_root_causes": 209,
-  "cluster_count": 127,
+  "total_root_causes": 208,
+  "cluster_count": 126,
   "cross_repo_clusters": 15,
   "conservation_ok": true,
   "clusters": [
@@ -170,16 +170,6 @@
       "repos": [
         "jeecg-boot",
         "xxl-job"
-      ]
-    },
-    {
-      "category": "arbitrary_file_delete",
-      "root_kind": "endpoint",
-      "component": "FileController.java",
-      "repo_count": 1,
-      "root_count": 1,
-      "repos": [
-        "kkFileView"
       ]
     },
     {

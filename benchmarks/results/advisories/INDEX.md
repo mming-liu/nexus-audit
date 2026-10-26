@@ -1,6 +1,6 @@
 # 披露草稿总目录（nexus-audit `--advisory-dir`）
 
-共 **209** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
+共 **208** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
 带 [Auto-Fix Verified] 的草稿内嵌通过自检的补丁 diff。
 
 | CVSS | 严重级 | CWE | 类目 | 草稿 |
@@ -139,7 +139,6 @@
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-F58F-2C9F-A07B-authz-verifycontroller-resetpass.md](GHSA-F58F-2C9F-A07B-authz-verifycontroller-resetpass.md) |
 | 8.1 | HIGH | CWE-117 | log_injection | [GHSA-FA2F-26FF-4FB0-log-injection-machineregistrycontroller-receiveheartbeat.md](GHSA-FA2F-26FF-4FB0-log-injection-machineregistrycontroller-receiveheartbeat.md) |
 | 8.1 | HIGH | CWE-285 | authz | [GHSA-FEB4-5DB8-873A-authz-appbargainhelpcontroller-getbargainhelplist.md](GHSA-FEB4-5DB8-873A-authz-appbargainhelpcontroller-getbargainhelplist.md) |
-| 8.1 | HIGH | CWE-73 | arbitrary_file_delete | [GHSA-FECB-5821-684E-arbitrary-file-delete-filecontroller-deletefile.md](GHSA-FECB-5821-684E-arbitrary-file-delete-filecontroller-deletefile.md) |
 | 7.5 | HIGH | CWE-190 | arithmetic | [GHSA-2B39-C38C-48A4-arithmetic-transferfrom.md](GHSA-2B39-C38C-48A4-arithmetic-transferfrom.md) |
 | 7.5 | HIGH | CWE-190 | arithmetic | [GHSA-5BD2-2E2D-B948-arithmetic-transfer.md](GHSA-5BD2-2E2D-B948-arithmetic-transfer.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-0C17-B7D9-3D49-cors-alipaycontroller-topayaspc.md](GHSA-0C17-B7D9-3D49-cors-alipaycontroller-topayaspc.md) |

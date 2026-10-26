@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-10-26 10:22:53",
+  "generated_at": "2026-10-26 22:38:52",
   "repos": [
     {
       "name": "newbee-mall",
       "path": "reference_repos/newbee-mall-master",
       "scan_rc": 0,
-      "wall_s": 2.31,
+      "wall_s": 3.4,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-master",
         "total_units": 73,
@@ -175,7 +175,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 11,
-        "elapsed_ms": 875.1
+        "elapsed_ms": 1007.8
       },
       "p0_route_level_hits": 11,
       "p0_unique_root_causes": 11,
@@ -215,7 +215,7 @@
       "name": "newbee-mall-api",
       "path": "reference_repos/newbee-mall-api-master",
       "scan_rc": 0,
-      "wall_s": 2.25,
+      "wall_s": 2.47,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-api-master",
         "total_units": 62,
@@ -363,7 +363,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 70,
-        "elapsed_ms": 781.8
+        "elapsed_ms": 823.2
       },
       "p0_route_level_hits": 70,
       "p0_unique_root_causes": 9,
@@ -399,7 +399,7 @@
       "name": "RuoYi",
       "path": "reference_repos/RuoYi-master",
       "scan_rc": 0,
-      "wall_s": 11.18,
+      "wall_s": 23.39,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\RuoYi-master",
         "total_units": 305,
@@ -465,7 +465,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 3,
-        "elapsed_ms": 1883.4
+        "elapsed_ms": 3535.8
       },
       "p0_route_level_hits": 3,
       "p0_unique_root_causes": 3,
@@ -493,7 +493,7 @@
       "name": "eladmin-mp",
       "path": "reference_repos/eladmin-mp-master",
       "scan_rc": 0,
-      "wall_s": 3.44,
+      "wall_s": 7.95,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\eladmin-mp-master",
         "total_units": 65,
@@ -673,7 +673,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 76,
-        "elapsed_ms": 1135.5
+        "elapsed_ms": 2210.0
       },
       "p0_route_level_hits": 76,
       "p0_unique_root_causes": 12,
@@ -703,7 +703,7 @@
       "name": "mall",
       "path": "reference_repos/mall-main",
       "scan_rc": 0,
-      "wall_s": 9.03,
+      "wall_s": 22.37,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\mall-main",
         "total_units": 246,
@@ -833,7 +833,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 253,
-        "elapsed_ms": 1940.4
+        "elapsed_ms": 3719.4
       },
       "p0_route_level_hits": 253,
       "p0_unique_root_causes": 8,
@@ -860,7 +860,7 @@
       "name": "My-Blog",
       "path": "reference_repos/My-Blog-master",
       "scan_rc": 0,
-      "wall_s": 1.94,
+      "wall_s": 2.61,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\My-Blog-master",
         "total_units": 54,
@@ -966,7 +966,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 6,
-        "elapsed_ms": 693.7
+        "elapsed_ms": 714.3
       },
       "p0_route_level_hits": 6,
       "p0_unique_root_causes": 6,
@@ -1000,7 +1000,7 @@
       "name": "litemall",
       "path": "reference_repos/litemall-master",
       "scan_rc": 0,
-      "wall_s": 17.36,
+      "wall_s": 39.0,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\litemall-master",
         "total_units": 219,
@@ -1098,7 +1098,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 223,
-        "elapsed_ms": 2373.2
+        "elapsed_ms": 5447.9
       },
       "p0_route_level_hits": 223,
       "p0_unique_root_causes": 5,
@@ -1131,7 +1131,7 @@
       "name": "Employee-Management-System",
       "path": "reference_repos/employee-management-system",
       "scan_rc": 0,
-      "wall_s": 0.34,
+      "wall_s": 0.45,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\employee-management-system",
         "total_units": 4,
@@ -1185,7 +1185,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 2,
-        "elapsed_ms": 12.4
+        "elapsed_ms": 21.7
       },
       "p0_route_level_hits": 2,
       "p0_unique_root_causes": 2,
@@ -1213,7 +1213,7 @@
       "name": "DjanGoat",
       "path": "reference_repos/DjanGoat",
       "scan_rc": 0,
-      "wall_s": 0.6,
+      "wall_s": 1.71,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\DjanGoat",
         "total_units": 36,
@@ -1397,7 +1397,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 12,
-        "elapsed_ms": 130.7
+        "elapsed_ms": 217.3
       },
       "p0_route_level_hits": 12,
       "p0_unique_root_causes": 12,
@@ -1466,7 +1466,7 @@
       "name": "Compound",
       "path": "reference_repos/compound-protocol/contracts",
       "scan_rc": 0,
-      "wall_s": 1.34,
+      "wall_s": 2.05,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\compound-protocol\\contracts",
         "total_units": 450,
@@ -1489,7 +1489,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 309.5
+        "elapsed_ms": 316.4
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1508,7 +1508,7 @@
       "name": "Comet",
       "path": "reference_repos/comet/contracts",
       "scan_rc": 0,
-      "wall_s": 1.02,
+      "wall_s": 2.61,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\comet\\contracts",
         "total_units": 357,
@@ -1531,7 +1531,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 173.2
+        "elapsed_ms": 183.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1550,7 +1550,7 @@
       "name": "OpenZeppelin",
       "path": "reference_repos/openzeppelin-contracts/contracts",
       "scan_rc": 0,
-      "wall_s": 2.92,
+      "wall_s": 3.47,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\openzeppelin-contracts\\contracts",
         "total_units": 1989,
@@ -1573,7 +1573,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 616.0
+        "elapsed_ms": 851.6
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1592,7 +1592,7 @@
       "name": "AaveV3",
       "path": "reference_repos/aave-v3-core/contracts",
       "scan_rc": 0,
-      "wall_s": 1.0,
+      "wall_s": 2.52,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\aave-v3-core\\contracts",
         "total_units": 553,
@@ -1615,7 +1615,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 332.2
+        "elapsed_ms": 332.4
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1634,7 +1634,7 @@
       "name": "waynboot-mall",
       "path": "reference_repos/waynboot-mall",
       "scan_rc": 0,
-      "wall_s": 8.07,
+      "wall_s": 21.82,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\waynboot-mall",
         "total_units": 163,
@@ -1678,7 +1678,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 163,
-        "elapsed_ms": 1757.0
+        "elapsed_ms": 3787.8
       },
       "p0_route_level_hits": 163,
       "p0_unique_root_causes": 1,
@@ -1701,7 +1701,7 @@
       "name": "mall4j",
       "path": "reference_repos/mall4j",
       "scan_rc": 0,
-      "wall_s": 3.86,
+      "wall_s": 12.08,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\mall4j",
         "total_units": 139,
@@ -1812,7 +1812,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 143,
-        "elapsed_ms": 1319.2
+        "elapsed_ms": 2571.4
       },
       "p0_route_level_hits": 143,
       "p0_unique_root_causes": 5,
@@ -1842,7 +1842,7 @@
       "name": "flaskr",
       "path": "reference_repos/flaskr",
       "scan_rc": 0,
-      "wall_s": 0.33,
+      "wall_s": 0.42,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flaskr",
         "total_units": 8,
@@ -1865,7 +1865,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 34.6
+        "elapsed_ms": 36.4
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1884,7 +1884,7 @@
       "name": "Synthetix V3",
       "path": "reference_repos/synthetix-v3",
       "scan_rc": 0,
-      "wall_s": 141.12,
+      "wall_s": 258.73,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\synthetix-v3",
         "total_units": 1411,
@@ -1924,7 +1924,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 1,
-        "elapsed_ms": 5269.1
+        "elapsed_ms": 10049.3
       },
       "p0_route_level_hits": 1,
       "p0_unique_root_causes": 1,
@@ -1949,7 +1949,7 @@
       "name": "sushiswap-zapper",
       "path": "reference_repos/sushiswap-zapper",
       "scan_rc": 0,
-      "wall_s": 0.42,
+      "wall_s": 0.57,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\sushiswap-zapper",
         "total_units": 75,
@@ -1972,7 +1972,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 52.3
+        "elapsed_ms": 55.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1991,7 +1991,7 @@
       "name": "jeecg-boot",
       "path": "reference_repos/jeecg-boot",
       "scan_rc": 0,
-      "wall_s": 29.85,
+      "wall_s": 70.66,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot",
         "total_units": 458,
@@ -2367,7 +2367,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 482,
-        "elapsed_ms": 7486.5
+        "elapsed_ms": 14502.1
       },
       "p0_route_level_hits": 482,
       "p0_unique_root_causes": 27,
@@ -2419,7 +2419,7 @@
       "name": "Uniswap V2",
       "path": "reference_repos/uniswap-v2-core",
       "scan_rc": 0,
-      "wall_s": 0.37,
+      "wall_s": 0.57,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\uniswap-v2-core",
         "total_units": 29,
@@ -2442,7 +2442,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 28.8
+        "elapsed_ms": 34.8
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2461,7 +2461,7 @@
       "name": "fastapi-realworld",
       "path": "reference_repos/fastapi-realworld",
       "scan_rc": 0,
-      "wall_s": 0.46,
+      "wall_s": 1.27,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\fastapi-realworld",
         "total_units": 19,
@@ -2484,7 +2484,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 100.8
+        "elapsed_ms": 168.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2503,7 +2503,7 @@
       "name": "django-realworld",
       "path": "reference_repos/django-realworld",
       "scan_rc": 0,
-      "wall_s": 0.41,
+      "wall_s": 0.81,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\django-realworld",
         "total_units": 11,
@@ -2557,7 +2557,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 2,
-        "elapsed_ms": 44.6
+        "elapsed_ms": 54.6
       },
       "p0_route_level_hits": 2,
       "p0_unique_root_causes": 2,
@@ -2619,7 +2619,7 @@
       "name": "eladmin-JPA",
       "path": "reference_repos/eladmin",
       "scan_rc": 0,
-      "wall_s": 4.22,
+      "wall_s": 10.62,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\eladmin",
         "total_units": 66,
@@ -2799,7 +2799,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 77,
-        "elapsed_ms": 1522.2
+        "elapsed_ms": 3303.7
       },
       "p0_route_level_hits": 77,
       "p0_unique_root_causes": 12,
@@ -2829,7 +2829,7 @@
       "name": "UniswapV3",
       "path": "reference_repos/uniswap-v3-core/contracts",
       "scan_rc": 0,
-      "wall_s": 0.49,
+      "wall_s": 1.4,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\uniswap-v3-core\\contracts",
         "total_units": 67,
@@ -2852,7 +2852,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 76.0
+        "elapsed_ms": 95.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2871,7 +2871,7 @@
       "name": "FastAPI",
       "path": "reference_repos/fastapi-sql-template",
       "scan_rc": 0,
-      "wall_s": 0.38,
+      "wall_s": 0.61,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\fastapi-sql-template",
         "total_units": 9,
@@ -2894,7 +2894,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 45.3
+        "elapsed_ms": 57.7
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2913,7 +2913,7 @@
       "name": "MakerDAO dss",
       "path": "reference_repos/dss",
       "scan_rc": 0,
-      "wall_s": 0.54,
+      "wall_s": 1.21,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\dss",
         "total_units": 234,
@@ -2936,7 +2936,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 114.7
+        "elapsed_ms": 142.8
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2955,7 +2955,7 @@
       "name": "flasky",
       "path": "reference_repos/flasky",
       "scan_rc": 0,
-      "wall_s": 0.5,
+      "wall_s": 1.0,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flasky",
         "total_units": 39,
@@ -2978,7 +2978,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 140.5
+        "elapsed_ms": 166.7
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3047,7 +3047,7 @@
       "name": "mall-tiny",
       "path": "reference_repos/mall-tiny",
       "scan_rc": 0,
-      "wall_s": 1.06,
+      "wall_s": 1.96,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\mall-tiny",
         "total_units": 40,
@@ -3091,7 +3091,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 40,
-        "elapsed_ms": 264.4
+        "elapsed_ms": 296.1
       },
       "p0_route_level_hits": 40,
       "p0_unique_root_causes": 1,
@@ -3124,7 +3124,7 @@
       "name": "OZ Upgradeable",
       "path": "reference_repos/openzeppelin-contracts-upgradeable",
       "scan_rc": 0,
-      "wall_s": 2.04,
+      "wall_s": 7.36,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\openzeppelin-contracts-upgradeable",
         "total_units": 1119,
@@ -3147,7 +3147,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 504.5
+        "elapsed_ms": 1231.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3166,7 +3166,7 @@
       "name": "My-Blog-layui",
       "path": "reference_repos/My-Blog-layui",
       "scan_rc": 0,
-      "wall_s": 1.65,
+      "wall_s": 2.86,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\My-Blog-layui",
         "total_units": 64,
@@ -3247,7 +3247,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 3,
-        "elapsed_ms": 495.8
+        "elapsed_ms": 579.9
       },
       "p0_route_level_hits": 3,
       "p0_unique_root_causes": 3,
@@ -3275,35 +3275,18 @@
       "name": "kkFileView",
       "path": "reference_repos/kkFileView",
       "scan_rc": 0,
-      "wall_s": 18.04,
+      "wall_s": 41.19,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\kkFileView",
         "total_units": 20,
         "test_units_skipped": 0,
         "total_pairs_evaluated": 740,
-        "p0_confirmed": 1,
-        "p0_route_level_hits": 1,
-        "p0_unique_root_causes": 1,
-        "p0_route_by_cat": {
-          "arbitrary_file_delete": 1
-        },
-        "p0_unique_by_cat": {
-          "arbitrary_file_delete": 1
-        },
-        "root_causes": [
-          {
-            "category": "arbitrary_file_delete",
-            "kind": "endpoint",
-            "signature": "arbitrary_file_delete:C:\\myFloders\\git\\nexus-audit\\reference_repos\\kkFileView\\server\\src\\main\\java\\cn\\keking\\web\\controller\\FileController.java:240:FileController.deleteFile",
-            "affected_routes": 1,
-            "representative": "FileController.deleteFile",
-            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\kkFileView\\server\\src\\main\\java\\cn\\keking\\web\\controller\\FileController.java",
-            "line": 240,
-            "routes": [
-              "FileController.deleteFile"
-            ]
-          }
-        ],
+        "p0_confirmed": 0,
+        "p0_route_level_hits": 0,
+        "p0_unique_root_causes": 0,
+        "p0_route_by_cat": {},
+        "p0_unique_by_cat": {},
+        "root_causes": [],
         "secret_files_flagged": 0,
         "funnel_filtered_out": 663,
         "funnel_filter_rate": 0.997,
@@ -3329,33 +3312,27 @@
         "baseline": "",
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
-        "new_findings": 1,
-        "elapsed_ms": 1548.4
+        "new_findings": 0,
+        "elapsed_ms": 3527.1
       },
-      "p0_route_level_hits": 1,
-      "p0_unique_root_causes": 1,
-      "p0_route_by_cat": {
-        "arbitrary_file_delete": 1
-      },
-      "p0_unique_by_cat": {
-        "arbitrary_file_delete": 1
-      },
-      "p0_by_cat": {
-        "arbitrary_file_delete": 1
-      },
+      "p0_route_level_hits": 0,
+      "p0_unique_root_causes": 0,
+      "p0_route_by_cat": {},
+      "p0_unique_by_cat": {},
+      "p0_by_cat": {},
       "sca": {
         "components": 4,
         "hits": [],
         "uncovered": 4,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\report.md\n      披露草稿 1 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\kkFileView\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\report.sarif（3 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\report.html（3 条）"
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\kkFileView\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\report.sarif（2 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\report.html（2 条）"
     },
     {
       "name": "full-stack-fastapi-template",
       "path": "reference_repos/full-stack-fastapi-template/backend",
       "scan_rc": 0,
-      "wall_s": 0.44,
+      "wall_s": 0.68,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\full-stack-fastapi-template\\backend",
         "total_units": 23,
@@ -3378,7 +3355,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 106.2
+        "elapsed_ms": 117.7
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3397,7 +3374,7 @@
       "name": "solady",
       "path": "reference_repos/solady/src",
       "scan_rc": 0,
-      "wall_s": 6.72,
+      "wall_s": 8.25,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\solady\\src",
         "total_units": 2968,
@@ -3420,7 +3397,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 2187.5
+        "elapsed_ms": 2428.9
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3439,7 +3416,7 @@
       "name": "apollo",
       "path": "reference_repos/apollo",
       "scan_rc": 0,
-      "wall_s": 7.05,
+      "wall_s": 24.74,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\apollo",
         "total_units": 200,
@@ -3549,7 +3526,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 6,
-        "elapsed_ms": 3079.5
+        "elapsed_ms": 5938.5
       },
       "p0_route_level_hits": 6,
       "p0_unique_root_causes": 6,
@@ -3577,7 +3554,7 @@
       "name": "spring-boot-demo",
       "path": "reference_repos/spring-boot-demo",
       "scan_rc": 0,
-      "wall_s": 3.58,
+      "wall_s": 12.29,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo",
         "total_units": 80,
@@ -3790,7 +3767,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 85,
-        "elapsed_ms": 602.4
+        "elapsed_ms": 1201.9
       },
       "p0_route_level_hits": 85,
       "p0_unique_root_causes": 12,
@@ -3844,7 +3821,7 @@
       "name": "xxl-job",
       "path": "reference_repos/xxl-job",
       "scan_rc": 0,
-      "wall_s": 4.17,
+      "wall_s": 9.93,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job",
         "total_units": 36,
@@ -3934,7 +3911,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 5,
-        "elapsed_ms": 422.6
+        "elapsed_ms": 924.7
       },
       "p0_route_level_hits": 5,
       "p0_unique_root_causes": 5,
@@ -3962,7 +3939,7 @@
       "name": "flask-realworld",
       "path": "reference_repos/flask-realworld",
       "scan_rc": 0,
-      "wall_s": 0.38,
+      "wall_s": 0.76,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flask-realworld",
         "total_units": 26,
@@ -3985,7 +3962,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 53.7
+        "elapsed_ms": 75.0
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -4014,7 +3991,7 @@
       "name": "v3-periphery",
       "path": "reference_repos/v3-periphery/contracts",
       "scan_rc": 0,
-      "wall_s": 0.61,
+      "wall_s": 1.55,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\v3-periphery\\contracts",
         "total_units": 136,
@@ -4037,7 +4014,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 152.5
+        "elapsed_ms": 177.6
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -4056,7 +4033,7 @@
       "name": "morpho-blue",
       "path": "reference_repos/morpho-blue/src",
       "scan_rc": 0,
-      "wall_s": 0.44,
+      "wall_s": 0.76,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\morpho-blue\\src",
         "total_units": 71,
@@ -4079,7 +4056,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 43.1
+        "elapsed_ms": 43.0
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -4098,7 +4075,7 @@
       "name": "flask-jwt-extended",
       "path": "reference_repos/flask-jwt-extended",
       "scan_rc": 0,
-      "wall_s": 0.37,
+      "wall_s": 0.88,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flask-jwt-extended",
         "total_units": 0,
@@ -4121,7 +4098,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 12.9
+        "elapsed_ms": 35.4
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -4140,7 +4117,7 @@
       "name": "ruoyi-vue-pro",
       "path": "reference_repos/ruoyi-vue-pro",
       "scan_rc": 0,
-      "wall_s": 123.83,
+      "wall_s": 327.5,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro",
         "total_units": 3271,
@@ -4773,7 +4750,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 3316,
-        "elapsed_ms": 57377.7
+        "elapsed_ms": 111370.7
       },
       "p0_route_level_hits": 3316,
       "p0_unique_root_causes": 46,
@@ -4806,7 +4783,7 @@
       "name": "solmate",
       "path": "reference_repos/solmate/src",
       "scan_rc": 0,
-      "wall_s": 0.47,
+      "wall_s": 1.15,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\solmate\\src",
         "total_units": 144,
@@ -4858,7 +4835,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 2,
-        "elapsed_ms": 43.8
+        "elapsed_ms": 47.4
       },
       "p0_route_level_hits": 2,
       "p0_unique_root_causes": 2,
@@ -4883,7 +4860,7 @@
       "name": "django-oauth-toolkit",
       "path": "reference_repos/django-oauth-toolkit",
       "scan_rc": 0,
-      "wall_s": 1.76,
+      "wall_s": 6.57,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\django-oauth-toolkit",
         "total_units": 18,
@@ -4937,7 +4914,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 2,
-        "elapsed_ms": 1008.4
+        "elapsed_ms": 2480.1
       },
       "p0_route_level_hits": 2,
       "p0_unique_root_causes": 2,
@@ -4965,7 +4942,7 @@
       "name": "flask-admin",
       "path": "reference_repos/flask-admin",
       "scan_rc": 0,
-      "wall_s": 1.03,
+      "wall_s": 2.81,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flask-admin",
         "total_units": 15,
@@ -5031,7 +5008,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 3,
-        "elapsed_ms": 208.7
+        "elapsed_ms": 336.3
       },
       "p0_route_level_hits": 3,
       "p0_unique_root_causes": 3,
@@ -5059,7 +5036,7 @@
       "name": "Sentinel",
       "path": "reference_repos/Sentinel/sentinel-dashboard",
       "scan_rc": 0,
-      "wall_s": 8.11,
+      "wall_s": 17.35,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\Sentinel\\sentinel-dashboard",
         "total_units": 56,
@@ -5191,7 +5168,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 8,
-        "elapsed_ms": 1340.6
+        "elapsed_ms": 2722.5
       },
       "p0_route_level_hits": 8,
       "p0_unique_root_causes": 8,
@@ -5216,7 +5193,7 @@
       "name": "aave-v3-periphery",
       "path": "reference_repos/aave-v3-periphery/contracts",
       "scan_rc": 0,
-      "wall_s": 0.55,
+      "wall_s": 1.43,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\aave-v3-periphery\\contracts",
         "total_units": 148,
@@ -5239,7 +5216,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 89.9
+        "elapsed_ms": 102.5
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -5258,12 +5235,12 @@
       "name": "halo",
       "path": "reference_repos/halo/application/src/main/java",
       "scan_rc": 0,
-      "wall_s": 1.15,
+      "wall_s": 67.8,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\halo\\application\\src\\main\\java",
-        "total_units": 0,
+        "total_units": 173,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 0,
+        "total_pairs_evaluated": 6401,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -5271,8 +5248,8 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 0,
-        "funnel_filter_rate": 0.0,
+        "funnel_filtered_out": 5712,
+        "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
         "patches_verified": 0,
@@ -5281,7 +5258,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 172.4
+        "elapsed_ms": 455.4
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -5300,7 +5277,7 @@
       "name": "sanic",
       "path": "reference_repos/sanic",
       "scan_rc": 0,
-      "wall_s": 1.15,
+      "wall_s": 4.58,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\sanic",
         "total_units": 16,
@@ -5354,7 +5331,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 2,
-        "elapsed_ms": 350.4
+        "elapsed_ms": 412.9
       },
       "p0_route_level_hits": 2,
       "p0_unique_root_causes": 2,
@@ -5382,12 +5359,12 @@
       "name": "litestar",
       "path": "reference_repos/litestar",
       "scan_rc": 0,
-      "wall_s": 2.12,
+      "wall_s": 13.06,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\litestar",
-        "total_units": 25,
+        "total_units": 29,
         "test_units_skipped": 6,
-        "total_pairs_evaluated": 925,
+        "total_pairs_evaluated": 1073,
         "p0_confirmed": 2,
         "p0_route_level_hits": 2,
         "p0_unique_root_causes": 2,
@@ -5424,7 +5401,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 877,
+        "funnel_filtered_out": 1009,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -5434,7 +5411,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 2,
-        "elapsed_ms": 1066.7
+        "elapsed_ms": 1229.9
       },
       "p0_route_level_hits": 2,
       "p0_unique_root_causes": 2,
@@ -5459,12 +5436,12 @@
       "name": "starlette",
       "path": "reference_repos/starlette",
       "scan_rc": 0,
-      "wall_s": 0.47,
+      "wall_s": 1.79,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\starlette",
-        "total_units": 0,
-        "test_units_skipped": 0,
-        "total_pairs_evaluated": 0,
+        "total_units": 6,
+        "test_units_skipped": 142,
+        "total_pairs_evaluated": 222,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -5472,8 +5449,8 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 0,
-        "funnel_filter_rate": 0.0,
+        "funnel_filtered_out": 198,
+        "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
         "patches_verified": 0,
@@ -5482,7 +5459,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 39.5
+        "elapsed_ms": 52.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -5500,9 +5477,9 @@
   ],
   "totals": {
     "repos": 50,
-    "units": 15617,
-    "p0_route_level_hits": 4999,
-    "unique_root_causes": 209,
+    "units": 15800,
+    "p0_route_level_hits": 4998,
+    "unique_root_causes": 208,
     "repos_with_dependency_cve": 7,
     "dual_confirmed_repos": 5,
     "dependency_cves": [
@@ -5523,7 +5500,7 @@
   },
   "advisories": {
     "dir": "benchmarks\\results\\advisories",
-    "files": 209,
+    "files": 208,
     "repos": 50,
     "index": "benchmarks\\results\\advisories\\INDEX.md"
   }

@@ -34,6 +34,7 @@ def main() -> int:
     anchor = R.verdict("authz", _ANCHOR)
     print(f"装饰器入口 {len(units)} / Route+requires {has_route} / True {len(true_rows)} / 锚点 {anchor}")
     bad = []
+    if len(units) < 100: bad.append(f"Route 入口 {len(units)} < 100")
     if not has_route: bad.append("routing.py 缺少 Route/requires")
     if true_rows: bad.append(f"True: {true_rows[:5]}")
     if anchor is not False: bad.append(f"锚点 {anchor}")
@@ -43,7 +44,7 @@ def main() -> int:
                                "fp": len(true_rows), "pass": not bad},
                               ensure_ascii=False, indent=2), encoding="utf-8")
     if bad: print("STRICT FAIL " + "；".join(bad)); return 1
-    print(f"STRICT PASS ✔（{len(units)} 装饰器入口 / Route+requires 就位 / 0 True）")
+    print(f"STRICT PASS ✔（{len(units)} Route 入口 / Route+requires 就位 / 0 True）")
     return 0
 
 if __name__ == "__main__":

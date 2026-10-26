@@ -9401,15 +9401,15 @@ check("M181：run_all 68 项", len(_J208), 68)
 print("\n[209] M181：40 类 / 31 补丁器保持")
 _wh209 = json.loads((ROOT / "benchmarks" / "results" / "wild_hunt.json")
                     .read_text(encoding="utf-8"))
-check("M181：50 仓 209 个独立根因",
-      _wh209["totals"]["unique_root_causes"], 209)
+check("M181：50 仓 208 个独立根因",
+      _wh209["totals"]["unique_root_causes"], 208)
 check("M181：规则 40 类", len(_C143), 40)
 check("M181：补丁器 35 类", len(_cli186.DOCTOR_PATCHERS), 35)
 
 print("\n[210] M182：第一波断言里程碑")
-check("M182：209 份披露草稿",
+check("M182：208 份披露草稿",
       len(list((ROOT / "benchmarks" / "results" / "advisories")
-               .rglob("GHSA-*.md"))), 209)
+               .rglob("GHSA-*.md"))), 208)
 check("M182：已执行断言数 >=1190", COUNTS["n"] >= 1190, True)
 print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
 
@@ -9761,7 +9761,7 @@ _r235 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /
     "benchmark_litestar.py"), "--strict"], capture_output=True, text=True,
     encoding="utf-8", errors="replace")
 check("M217：benchmark_litestar --strict exit 0", _r235.returncode, 0)
-check("M217：29 入口 / 0 True", ("29 入口 / 0 True" in (_r235.stdout or "")), True)
+check("M217：33 入口 / 0 True", ("33 入口 / 0 True" in (_r235.stdout or "")), True)
 
 print("\n[236] M218：starlette Route+requires / 0 True")
 _r236 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /

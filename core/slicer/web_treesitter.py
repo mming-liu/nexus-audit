@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import List
 
 from core.context.symbol_indexer import IGNORE_DIRS, SymbolIndexer
-from core.models import CodeUnit
+from core.models import CodeUnit, Language
 
 try:  # 可选增强：tree-sitter 就绪时切换精确解析
     import tree_sitter  # noqa: F401
@@ -253,6 +253,49 @@ class WebTreeSitterSlicer:
     def __init__(self, repo_path: str | Path):
         self.repo_path = repo_path
 
+    def _starlette_route_units(self, repo: Path, by_name: dict,
+                               existing: list) -> list:
+        """M252：Starlette 对象式路由表 Route("/path", endpoint)。
+
+        Starlette 没有装饰器：
+            routes = [Route("/", homepage), Route("/users/{id}", user)]
+        主切片器只认装饰器，得到 0 入口。这里解析 Route/Mount，并把
+        endpoint 函数体从 SymbolIndexer 里贴回来；找不到 body 就只留头。
+        """
+        out = []
+        seen = {(u.route_path or "", u.unit_name) for u in existing}
+        for py in repo.rglob("*.py"):
+            if any(part in ("node_modules", ".git", "__pycache__")
+                   for part in py.parts):
+                continue
+            try:
+                text = py.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if "Route(" not in text and "Mount(" not in text:
+                continue
+            for m in re.finditer(
+                    r"\b(Route|Mount)\s*\(\s*[rbuf]?[\"']([^\"']+)[\"']\s*,"
+                    r"\s*(?:endpoint\s*=\s*|app\s*=\s*)?([A-Za-z_]\w*)", text):
+                kind, path, name = m.group(1), m.group(2), m.group(3)
+                if (path, name) in seen:
+                    continue
+                seen.add((path, name))
+                body = ""
+                src_u = by_name.get(name) or by_name.get(f"{py.stem}.{name}")
+                if src_u is not None and src_u.source_code:
+                    body = src_u.source_code
+                line = text[:m.start()].count("\n") + 1
+                src = (f"// Route: {path}\n"
+                       f"// Starlette-{kind}: {name}\n" + body)
+                out.append(CodeUnit(
+                    file_path=str(py), language=Language.PYTHON_WEB,
+                    unit_name=f"Route.{path}", start_line=line,
+                    end_line=line + body.count("\n"),
+                    decorators_or_modifiers=[f"{kind} {path}"],
+                    source_code=src, own_body=body, route_path=path))
+        return out
+
     def extract_entry_units(self, repo_path: str | Path | None = None) -> List[CodeUnit]:
         """提取带路由装饰器的入口函数为 CodeUnit。
 
@@ -285,6 +328,9 @@ class WebTreeSitterSlicer:
         for u in extra:
             self._expand_helpers(indexer, u)
         filtered = filtered + extra
+        # M252：Starlette 对象式路由表（Route/Mount）
+        by_name = {u.unit_name: u for u in units}
+        filtered = filtered + self._starlette_route_units(repo, by_name, filtered)
         # M137：装饰器守卫证据头（flasky 的 `@permission_required` /
         # `@admin_required`）。放在**展开之后**：守卫装饰器不是被调函数，
         # BFS 不会把它的实现体带进来，必须单独贴。

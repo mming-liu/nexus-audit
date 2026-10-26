@@ -828,6 +828,60 @@ class JavaSlicer:
                 continue
             yield p
 
+    def _router_function_units(self, root: Path) -> List[CodeUnit]:
+        """M251：Spring WebFlux RouterFunctions 链式路由。
+
+        Halo 2.x 没有 @RestController；路由写成
+            RouterFunctions.route()
+                .GET("/api/posts", this::listPosts)
+                .POST("/api/posts", this::createPost)
+                .build();
+        注解切片器为 0 入口。这里按 .GET/.POST/...("path", handler) 提取，
+        并把同文件 handler 方法体贴进切片；找不到 body 时只留路由头，
+        让判据退 None 而不是凭空判漏洞。
+        """
+        from core.context.java_impl_resolver import _read_cached
+        out: List[CodeUnit] = []
+        seen: set[tuple[str, str]] = set()
+        for java in root.rglob("*.java"):
+            if any(part in IGNORE_DIRS for part in java.parts):
+                continue
+            text = _read_cached(java)
+            if "RouterFunctions" not in text and "RouterFunction<" not in text:
+                continue
+            for m in re.finditer(
+                    r"\.\s*(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s*\(\s*"
+                    r"\"([^\"]+)\"\s*,\s*([^)]+)\)", text):
+                verb, path, handler = m.group(1), m.group(2), m.group(3).strip()
+                key = (path, verb)
+                if key in seen:
+                    continue
+                seen.add(key)
+                line = text[:m.start()].count("\n") + 1
+                hname = handler.split("::")[-1].strip()
+                body = ""
+                hm = re.search(rf"\b{re.escape(hname)}\s*\([^)]*\)\s*\{{", text)
+                if hm:
+                    depth = 0
+                    for i in range(hm.end() - 1, len(text)):
+                        if text[i] == "{":
+                            depth += 1
+                        elif text[i] == "}":
+                            depth -= 1
+                            if depth == 0:
+                                body = text[hm.start():i + 1]
+                                break
+                src = (f"// Full-Route: {path}\n"
+                       f"// Router-Method: {verb}\n"
+                       f"// Router-Handler: {hname}\n" + body)
+                out.append(CodeUnit(
+                    file_path=str(java), language=Language.JAVA_WEB,
+                    unit_name=f"Router.{path}", start_line=line,
+                    end_line=line + body.count("\n"),
+                    decorators_or_modifiers=[f"{verb} {path}"],
+                    source_code=src, own_body=body, route_path=path))
+        return out
+
     def extract_entry_units(self, repo_path: str | Path | None = None) -> List[CodeUnit]:
         root = Path(repo_path or self.repo_path)
         units: List[CodeUnit] = []
@@ -837,6 +891,7 @@ class JavaSlicer:
             if not text:
                 continue
             units.extend(self._slice_file(java, text))
+        units.extend(self._router_function_units(root))
         self._attach_chains(units)
         self._mark_global_authz(root, units)
         self._mark_param_validated(root, units)
