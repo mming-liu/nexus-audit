@@ -1,6 +1,6 @@
 {
-  "total_root_causes": 143,
-  "cluster_count": 76,
+  "total_root_causes": 191,
+  "cluster_count": 115,
   "cross_repo_clusters": 13,
   "conservation_ok": true,
   "clusters": [
@@ -151,6 +151,176 @@
       ]
     },
     {
+      "category": "arithmetic",
+      "root_kind": "endpoint",
+      "component": "ERC20.sol",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "solmate"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "Ai1AgentController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "Ai1ModelController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "AiImageController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "AiModelController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "AppBargainHelpController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "AppBrokerageUserController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "AppPayChannelController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "AppPayTransferController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "BpmProcessDefinitionController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "CombinationActivityController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "CrmBusinessController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "CrmBusinessStatusController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "CrmContactController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "CrmContractController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "CrmFollowUpRecordController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "CrmReceivableController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
       "category": "authz",
       "root_kind": "endpoint",
       "component": "DeliveryController.java",
@@ -173,11 +343,141 @@
     {
       "category": "authz",
       "root_kind": "endpoint",
+      "component": "ImChannelMaterialController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "ImChannelMaterialManagerController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "IotStatisticsController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "MesWmWarehouseAreaController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "MesWmWarehouseLocationController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "MpOpenController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "OaSupplyItemController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
       "component": "OrderController.java",
       "repo_count": 1,
       "root_count": 1,
       "repos": [
         "newbee-mall"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "PayChannelController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "PayDemoOrderController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "PayDemoWithdrawController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "PayWalletRechargeController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "PointActivityController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "authz",
+      "root_kind": "endpoint",
+      "component": "SeckillActivityController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
       ]
     },
     {
@@ -198,6 +498,16 @@
       "root_count": 1,
       "repos": [
         "DjanGoat"
+      ]
+    },
+    {
+      "category": "cors",
+      "root_kind": "global-config",
+      "component": "cors:11f7f1497cc2",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
       ]
     },
     {
@@ -318,6 +628,16 @@
       "root_count": 1,
       "repos": [
         "DjanGoat"
+      ]
+    },
+    {
+      "category": "hardcoded_secret",
+      "root_kind": "file-level",
+      "component": "ImProperties.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
       ]
     },
     {
@@ -663,6 +983,46 @@
     {
       "category": "xss",
       "root_kind": "endpoint",
+      "component": "AppArticleController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "AppCartController.java",
+      "repo_count": 1,
+      "root_count": 3,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "AppFavoriteController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "AppFileController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
       "component": "AppNamespaceController.java",
       "repo_count": 1,
       "root_count": 1,
@@ -713,6 +1073,16 @@
     {
       "category": "xss",
       "root_kind": "endpoint",
+      "component": "FileController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
       "component": "IndexController.java",
       "repo_count": 1,
       "root_count": 1,
@@ -758,6 +1128,26 @@
       "root_count": 1,
       "repos": [
         "newbee-mall"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "PmsKnowledgeDocumentController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "PmsKnowledgeFolderController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "ruoyi-vue-pro"
       ]
     },
     {

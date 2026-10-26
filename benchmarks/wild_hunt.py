@@ -96,6 +96,14 @@ REPOS = [
      ["--strict"]),
     ("v3-periphery", "reference_repos/v3-periphery/contracts",
      "v3_periphery", ["--strict"]),
+    # —— M183–M186：第 39–42 号野仓（42 仓里程碑）——
+    ("morpho-blue", "reference_repos/morpho-blue/src", "morpho_blue",
+     ["--strict"]),
+    ("flask-jwt-extended", "reference_repos/flask-jwt-extended",
+     "flask_jwt_extended", ["--strict"]),
+    ("ruoyi-vue-pro", "reference_repos/ruoyi-vue-pro", "ruoyi_vue_pro",
+     ["--strict"]),
+    ("solmate", "reference_repos/solmate/src", "solmate", ["--strict"]),
 ]
 
 P0_LINE = re.compile(r"^- \*\*\[([a-z_]+)\]\*\* `")

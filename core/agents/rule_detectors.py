@@ -5590,6 +5590,10 @@ def authz_verdict(source: str) -> bool | None:
     #     与登录入口同语义，不做授权判定，退 None。
     if "@AnonymousAccess" in source:
         return None
+    # M185：RuoYi-Vue-Pro 的 @PermitAll 与 @AnonymousAccess 同义 ——
+    # 作者显式声明匿名可达，不按"缺鉴权"判 True。
+    if "@PermitAll" in source:
+        return None
 
     # 1a) FastAPI `Depends(require_superuser)` / `Depends(get_current_user)`
     #     是框架级认证/权限依赖（M80 实测）。依赖名必须是认证语义；
@@ -5624,6 +5628,11 @@ def authz_verdict(source: str) -> bool | None:
     #    注解不在 entry_body 里，必须扫整份切片 —— 但只在**入口方法自身**
     #    的注解范围内找，避免把同文件别的方法的注解算到当前路由头上。
     if _AUTHZ_ROLE_RE.search(source):
+        return False
+    # M185：RuoYi-Vue-Pro 的自定义 Spring EL：
+    #   @PreAuthorize("@ss.hasPermission('system:user:query')")
+    # 是声明式权限校验，与 hasRole 同一语义（不是"知道是谁"）。
+    if re.search(r"@PreAuthorize\s*\(\s*[\"']@\w+\.\w+\(", source):
         return False
 
     # 1a-2) 认证由**部署 profile** 决定的仓库（M156 Apollo）：
@@ -5661,6 +5670,13 @@ def authz_verdict(source: str) -> bool | None:
     ann_params = parse_subject_params(source)
     subject_vars = set(_AUTHZ_SUBJECT_VAR_RE.findall(body)) | set(ann_params.values())
     has_any_subject = has_subject or bool(ann_params)
+
+    # M185：yudao（RuoYi-Vue-Pro）App 端自助接口 —— getLoginUserId() 直接
+    # 作为 Service 实参、且没有 URL 资源主键（@PathVariable）。操作对象
+    # 就是"当前登录用户"，不存在他人资源键；判 False。
+    if (re.search(r"getLoginUserId\s*\(\s*\)", body)
+            and "@PathVariable" not in source):
+        return False
 
     # 2b) 主体标识被当作**资源定位条件** —— 校验下沉到 Service/Mapper 的
     #     `where user_id = ?` 里，控制器侧没有 if/throw：
@@ -6370,7 +6386,8 @@ def python_cmdi_verdict(source: str) -> bool | None:
 _PY_SUBJECT_RE = re.compile(
     r"Depends\s*\(\s*get_current_user\s*\)|@login_required|@jwt_required|"
     r"\bcurrent_user\b|\bg\s*\.\s*user\b|\bg\s*\.\s*current_user\b|"
-    r"\brequest\s*\.\s*user\b|get_jwt_identity\s*\(|@requires_auth", re.I)
+    r"\brequest\s*\.\s*user\b|get_jwt_identity\s*\(|@requires_auth"
+    r"|getLoginUserId\s*\(|getLoginUser\s*\(", re.I)
 # Module 37：JWT 主体链第二形态（VAmPI）。Connexion/OpenAPI 无装饰器，
 # 主体经 `User.decode_auth_token(token)` 解出 claim 再取 `resp['sub']`
 # 作查询键 —— 机制与 get_jwt_identity 完全同类（"是谁"由 token 决定）。
@@ -6462,6 +6479,10 @@ def python_authz_verdict(source: str) -> bool | None:
     # 那类仍走下面的主体/归属判据（`g.current_user != post.author` 等）。
     _guards = re.findall(r"//\s*Auth-Guard:\s*(\w+)", source)
     if "admin_required" in _guards:
+        return False
+    # M184：Flask-JWT-Extended 的装饰器证据头（切片器把无括号装饰器
+    # 归一成 // Auth-Guard: jwt_required）。
+    if any(g in ("jwt_required", "fresh_jwt_required") for g in _guards):
         return False
     # M154：M80 只认了 body 里的 Depends(...) —— FastAPI 模板把权限声明写在
     # 路由装饰器上（dependencies=[Depends(get_current_active_superuser)]），
@@ -8079,7 +8100,10 @@ def solidity_access_verdict(source: str) -> bool | None:
                      # 混进无关合约的函数，所以这个范围是安全的。
                      or _sol_predicate_authz_check(source)
                      or _sol_inverted_identity_guard(func_src)
-                     or _sol_negated_identity_call(func_src))
+                     or _sol_negated_identity_call(func_src)
+                     # M186：solmate 的 requiresAuth 修饰符（实现体
+                     # require(isAuthorized(msg.sender, msg.sig))）
+                     or bool(re.search(r"\brequiresAuth\b", sig)))
     if not protected and _sol_identity_alias_check(func_src):
         protected = True
     # M115：**库函数式守卫**。synthetix/DeFi 把权限检查封进库，调用点只有
@@ -10743,6 +10767,81 @@ def log_injection_verdict(source: str) -> bool | None:
     return None
 
 
+
+# ================= M187/M188：第 35/36 类 DeFi 规则 =================
+
+_ERC20_CALL_RE = re.compile(r"\b([A-Za-z_]\w*)\s*\.\s*(transfer|transferFrom)\s*\(")
+_ORACLE_CALL_RE = re.compile(r"\b\w*(?:latestRoundData|latestAnswer)\s*\(")
+_ORACLE_PRICE_GUARD_RE = re.compile(
+    r"\b(?:price|answer|oraclePrice)\s*>\s*0|"
+    r"require\s*\([^)]*\b(?:price|answer)\s*>\s*0")
+_ORACLE_FRESH_GUARD_RE = re.compile(
+    r"updatedAt[^;\n]{0,120}(?:block\.timestamp|now)|"
+    r"(?:block\.timestamp|now)[^;\n]{0,120}updatedAt|"
+    r"answeredInRound\s*>=?\s*roundId|"
+    r"stalePrice|staleRound|MAX_DELAY|heartbeat")
+
+
+def _solidity_args(body: str, pos: int) -> str:
+    depth = 0
+    for i in range(pos, len(body)):
+        ch = body[i]
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return body[pos + 1:i]
+    return ""
+
+
+def unchecked_erc20_return_verdict(source: str) -> bool | None:
+    """第 35 类（M187，SWC-104）：裸调 ERC20 transfer/transferFrom 不查返回值。
+
+    False 的确定性证据：调用出现在 require/if/return/赋值给 bool 的上下文，
+    或合约显式使用 SafeERC20 的 safeTransfer/safeTransferFrom。
+    单参 .transfer(amount) 是原生 ETH，不是 ERC20，跳过。
+    """
+    body = entry_body(source)
+    if not body:
+        return None
+    found = False
+    for m in _ERC20_CALL_RE.finditer(body):
+        args = _solidity_args(body, m.end() - 1)
+        n = len([a for a in args.split(",") if a.strip()])
+        if m.group(2) == "transfer" and n < 2:
+            continue                    # 原生 ETH transfer(amount)
+        if m.group(2) == "transferFrom" and n < 3:
+            continue
+        found = True
+        pre = body[max(0, m.start() - 60):m.start()]
+        if re.search(r"require\s*\($|if\s*\($|\breturn\s+$|"
+                     r"bool\s+\w+\s*=\s*$", pre):
+            continue
+        line_start = body.rfind("\n", 0, m.start()) + 1
+        stmt = body[line_start:m.start()]
+        if "safeTransfer" in stmt or "safeTransferFrom" in stmt:
+            continue
+        return True
+    if not found:
+        return False if re.search(r"safeTransfer\w*\s*\(", body) else None
+    return False
+
+
+def oracle_stale_price_verdict(source: str) -> bool | None:
+    """第 36 类（M188）：Chainlink 价格未同时校验零价与 updatedAt 新鲜度。"""
+    body = entry_body(source)
+    if not body:
+        return None
+    if not _ORACLE_CALL_RE.search(body):
+        return None
+    has_price = _ORACLE_PRICE_GUARD_RE.search(body) is not None
+    has_fresh = _ORACLE_FRESH_GUARD_RE.search(body) is not None
+    if has_price and has_fresh:
+        return False
+    return True
+
+
 def verdict(category: str, source: str) -> bool | None:
     """对配置型类目给出确定性结论：True(有漏洞) / False(安全) / None(证据不足)。"""
     cfg = parse_config_block(source)
@@ -10912,5 +11011,9 @@ def verdict(category: str, source: str) -> bool | None:
         return nosqli_verdict(source)
     if category == "log_injection":
         return log_injection_verdict(source)
+    if category == "unchecked_erc20_return":
+        return unchecked_erc20_return_verdict(source)
+    if category == "oracle_stale_price":
+        return oracle_stale_price_verdict(source)
 
     return None

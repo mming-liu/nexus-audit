@@ -1,30 +1,31 @@
-# 野战白皮书 —— 38 个真实开源生产仓库（M151–M166 收官）
+# 野战白皮书 —— 42 个真实开源生产仓库（M151–M166 收官）
 
 > 本文所有数字由 `benchmarks/wild_hunt.py` **实跑**产出，唯一事实源是
 > `benchmarks/results/wild_hunt.json`（`cli.py doctor` 第六段会对账，
 > 数字漂了当场 FAIL）。规则层离线可复现，不含模型层数字。
 
-## 一、总量（38 仓 / 143 独立根因 / 零误报）
+## 一、总量（42 仓 / 191 独立根因 / 零误报）
 
 | 项 | 数值 |
 |---|---|
-| 真实仓库 | **38 个**（Java 17 + Python 9 + Solidity 12） |
-| 路由/合约入口 | **11,853 个** |
-| 路由级 P0 命中 | **1,663 条** |
-| 去重后的独立根因 P0 | **143 个** |
-| GHSA 披露草稿 | **143 份**（按独立根因，不按路由） |
+| 真实仓库 | **42 个**（Java 18 + Python 10 + Solidity 14） |
+| 路由/合约入口 | **15,339 个** |
+| 路由级 P0 命中 | **4,981 条** |
+| 去重后的独立根因 P0 | **191 个** |
+| GHSA 披露草稿 | **191 份**（按独立根因，不按路由） |
 | benchmark 层误报 | **0 条** |
 | benchmark 层判反 | **0 条** |
-| benchmark_* --strict | **38/38 exit 0** |
+| benchmark_* --strict | **42/42 exit 0** |
 | 供应链命中已知 advisory 的仓库 | **7 个** |
 | 供应链 × 代码双重实锤 | **5 个** |
 
-一句话：**在 11,853 个真实入口上，规则层没有确认误报；143 个独立根因全部由规则层确定性判据产出，PoC/补丁自检可复核。**
+一句话：**在 15,339 个真实入口上，规则层没有确认误报；191 个独立根因全部由规则层确定性判据产出，PoC/补丁自检可复核。**
 
 ## 二、逐仓数字
 
 | 仓库 | 语言 | 入口 | 路由级 P0 | 独立根因 | benchmark | 组件 CVE |
 |---|---|---|---|---|---|---|
+| ruoyi-vue-pro | Java | 3271 | 3316 | 46 | ✔ | — |
 | jeecg-boot | Java | 458 | 482 | 27 | ✔ | CVE-2022-21363 |
 | DjanGoat | Python | 36 | 12 | 12 | ✔ | CVE-2013-7459、CVE-2017-12794、CVE-2018-14574 |
 | eladmin-JPA | Java | 66 | 77 | 12 | ✔ | — |
@@ -42,6 +43,7 @@
 | RuoYi | Java | 305 | 3 | 3 | ✔ | — |
 | Employee-Management-System | Python | 4 | 2 | 2 | ✔ | — |
 | django-realworld | Python | 11 | 2 | 2 | ✔ | CVE-2017-12794、CVE-2018-14574、CVE-2020-25626、CVE-2022-29217 |
+| solmate | Solidity | 144 | 2 | 2 | ✔ | — |
 | Synthetix V3 | Solidity | 1411 | 1 | 1 | ✔ | — |
 | mall-tiny | Java | 40 | 40 | 1 | ✔ | CVE-2023-24162 |
 | waynboot-mall | Java | 163 | 163 | 1 | ✔ | — |
@@ -55,11 +57,13 @@
 | Uniswap V2 | Solidity | 29 | 0 | 0 | ✔ | — |
 | UniswapV3 | Solidity | 67 | 0 | 0 | ✔ | — |
 | fastapi-realworld | Python | 19 | 0 | 0 | ✔ | — |
+| flask-jwt-extended | Python | 0 | 0 | 0 | ✔ | — |
 | flask-realworld | Python | 26 | 0 | 0 | ✔ | CVE-2019-7548 |
 | flaskr | Python | 8 | 0 | 0 | ✔ | — |
 | flasky | Python | 39 | 0 | 0 | ✔ | CVE-2018-1000656、CVE-2018-18074、CVE-2019-10906、CVE-2019-11324、CVE-2019-14322、CVE-2019-7548 |
 | full-stack-fastapi-template | Python | 23 | 0 | 0 | ✔ | — |
 | kkFileView | Java | 20 | 0 | 0 | ✔ | — |
+| morpho-blue | Solidity | 71 | 0 | 0 | ✔ | — |
 | solady | Solidity | 2968 | 0 | 0 | ✔ | — |
 | sushiswap-zapper | Solidity | 75 | 0 | 0 | ✔ | — |
 | v3-periphery | Solidity | 136 | 0 | 0 | ✔ | — |
@@ -80,6 +84,55 @@
 | M98 | `SecurityUtils.getUser()` 主体链 + 归属比对裸变量形态 | mall4j | 24 → **10** 个根因；C 端五控制器 authz **零 True** |
 
 ## 四、逐仓独立根因（规则层确定性判定）
+
+### ruoyi-vue-pro（Java）— 46 个独立根因
+
+- **[cors]** `DefaultController.bpm404`（global-config，影响 3271 条路由） @ `DefaultController.java:24`
+- **[xss]** `PmsKnowledgeDocumentController.getDocument`（endpoint，影响 1 条路由） @ `PmsKnowledgeDocumentController.java:111`
+- **[xss]** `PmsKnowledgeFolderController.getFolder`（endpoint，影响 1 条路由） @ `PmsKnowledgeFolderController.java:96`
+- **[authz]** `AppPayChannelController.getEnableChannelCodeList`（endpoint，影响 1 条路由） @ `AppPayChannelController.java:31`
+- **[authz]** `AppPayTransferController.syncTransfer`（endpoint，影响 1 条路由） @ `AppPayTransferController.java:29`
+- **[authz]** `PayChannelController.getEnableChannelCodeList`（endpoint，影响 1 条路由） @ `PayChannelController.java:83`
+- **[authz]** `PayDemoOrderController.getDemoOrderPage`（endpoint，影响 1 条路由） @ `PayDemoOrderController.java:42`
+- **[authz]** `PayDemoOrderController.refundDemoOrder`（endpoint，影响 1 条路由） @ `PayDemoOrderController.java:58`
+- **[authz]** `PayDemoWithdrawController.createDemoWithdraw`（endpoint，影响 1 条路由） @ `PayDemoWithdrawController.java:34`
+- **[authz]** `PayDemoWithdrawController.getDemoWithdrawPage`（endpoint，影响 1 条路由） @ `PayDemoWithdrawController.java:49`
+- **[authz]** `PayWalletRechargeController.refundWalletRecharge`（endpoint，影响 1 条路由） @ `PayWalletRechargeController.java:40`
+- **[authz]** `OaSupplyItemController.getSupplyItemSelectPage`（endpoint，影响 1 条路由） @ `OaSupplyItemController.java:91`
+- **[authz]** `MpOpenController.handleMessage`（endpoint，影响 1 条路由） @ `MpOpenController.java:44`
+- **[authz]** `MesWmWarehouseAreaController.getWarehouseAreaSimpleList`（endpoint，影响 1 条路由） @ `MesWmWarehouseAreaController.java:90`
+- **[authz]** `MesWmWarehouseLocationController.getWarehouseLocationSimpleList`（endpoint，影响 1 条路由） @ `MesWmWarehouseLocationController.java:89`
+- **[authz]** `AppBrokerageUserController.getBrokerageUserRankPageByUserCount`（endpoint，影响 1 条路由） @ `AppBrokerageUserController.java:99`
+- **[authz]** `AppBrokerageUserController.getBrokerageUserChildSummaryPageByPrice`（endpoint，影响 1 条路由） @ `AppBrokerageUserController.java:109`
+- **[xss]** `AppCartController.addCart`（endpoint，影响 1 条路由） @ `AppCartController.java:32`
+- **[xss]** `AppCartController.updateCartCount`（endpoint，影响 1 条路由） @ `AppCartController.java:38`
+- **[xss]** `AppCartController.updateCartSelected`（endpoint，影响 1 条路由） @ `AppCartController.java:45`
+- **[xss]** `AppArticleController.addBrowseCount`（endpoint，影响 1 条路由） @ `AppArticleController.java:71`
+- **[authz]** `AppBargainHelpController.getBargainHelpList`（endpoint，影响 1 条路由） @ `AppBargainHelpController.java:46`
+- **[authz]** `CombinationActivityController.getCombinationActivityListByIds`（endpoint，影响 1 条路由） @ `CombinationActivityController.java:93`
+- **[authz]** `PointActivityController.getPointActivityListByIds`（endpoint，影响 1 条路由） @ `PointActivityController.java:108`
+- **[authz]** `SeckillActivityController.getSeckillActivityListByIds`（endpoint，影响 1 条路由） @ `SeckillActivityController.java:102`
+- **[xss]** `AppFavoriteController.createFavorite`（endpoint，影响 1 条路由） @ `AppFavoriteController.java:36`
+- **[authz]** `IotStatisticsController.getDeviceMessageSummaryByDate`（endpoint，影响 1 条路由） @ `IotStatisticsController.java:70`
+- **[xss]** `AppFileController.createFile`（endpoint，影响 1 条路由） @ `AppFileController.java:56`
+- **[xss]** `FileController.createFile`（endpoint，影响 1 条路由） @ `FileController.java:69`
+- **[authz]** `ImChannelMaterialController.getMaterial`（endpoint，影响 1 条路由） @ `ImChannelMaterialController.java:30`
+- **[authz]** `ImChannelMaterialManagerController.getSimpleMaterialList`（endpoint，影响 1 条路由） @ `ImChannelMaterialManagerController.java:91`
+- **[authz]** `CrmBusinessController.getBusinessPageByCustomer`（endpoint，影响 1 条路由） @ `CrmBusinessController.java:169`
+- **[authz]** `CrmBusinessStatusController.getBusinessStatusSimpleList`（endpoint，影响 1 条路由） @ `CrmBusinessStatusController.java:118`
+- **[authz]** `CrmContactController.getContactPageByCustomer`（endpoint，影响 1 条路由） @ `CrmContactController.java:136`
+- **[authz]** `CrmContactController.getContactPageByBusiness`（endpoint，影响 1 条路由） @ `CrmContactController.java:144`
+- **[authz]** `CrmContractController.getContractPageByCustomer`（endpoint，影响 1 条路由） @ `CrmContractController.java:138`
+- **[authz]** `CrmContractController.getContractPageByBusiness`（endpoint，影响 1 条路由） @ `CrmContractController.java:146`
+- **[authz]** `CrmFollowUpRecordController.createFollowUpRecord`（endpoint，影响 1 条路由） @ `CrmFollowUpRecordController.java:60`
+- **[authz]** `CrmFollowUpRecordController.getFollowUpRecordPage`（endpoint，影响 1 条路由） @ `CrmFollowUpRecordController.java:89`
+- **[authz]** `CrmReceivableController.getReceivablePageByCustomer`（endpoint，影响 1 条路由） @ `CrmReceivableController.java:116`
+- **[authz]** `BpmProcessDefinitionController.getProcessDefinition`（endpoint，影响 1 条路由） @ `BpmProcessDefinitionController.java:115`
+- **[authz]** `Ai1AgentController.getAgentSimpleList`（endpoint，影响 1 条路由） @ `Ai1AgentController.java:98`
+- **[authz]** `Ai1ModelController.getModelSimpleList`（endpoint，影响 1 条路由） @ `Ai1ModelController.java:85`
+- **[authz]** `AiImageController.getImagePagePublic`（endpoint，影响 1 条路由） @ `AiImageController.java:46`
+- **[authz]** `AiModelController.getModelSimpleList`（endpoint，影响 1 条路由） @ `AiModelController.java:76`
+- **[hardcoded_secret]** `[secret-file] ImProperties.java`（file-level，影响 1 条路由） @ `ImProperties.java:1`
 
 ### jeecg-boot（Java）— 27 个独立根因
 
@@ -272,6 +325,11 @@
 - **[authz]** `ArticleViewSet.update`（endpoint，影响 1 条路由） @ `views.py:87`
 - **[hardcoded_secret]** `[secret-file] settings.py`（file-level，影响 1 条路由） @ `settings.py:1`
 
+### solmate（Solidity）— 2 个独立根因
+
+- **[arithmetic]** `transfer`（endpoint，影响 1 条路由） @ `ERC20.sol:76`
+- **[arithmetic]** `transferFrom`（endpoint，影响 1 条路由） @ `ERC20.sol:90`
+
 ### Synthetix V3（Solidity）— 1 个独立根因
 
 - **[unchecked_low_level_calls]** `processCcipReceive`（endpoint，影响 1 条路由） @ `CrossChain.sol:50`
@@ -329,7 +387,7 @@ python cli.py matrix
 > **反向锚点**（把证据摘掉，判定必须跟着翻），M139–M141 三条的补丁器都要求
 > "重切片后 True → False"，M135/M145 两条是把结论拿去和另一张表对账。
 
-## 七、38 仓供应链组件风险 × 代码入口可达性对照
+## 七、42 仓供应链组件风险 × 代码入口可达性对照
 
 这一节回答一个单看任一表都答不出的问题：**哪些仓既用了已知有漏洞的组件版本，又真有一条代码级 P0？**
 
@@ -337,7 +395,7 @@ python cli.py matrix
 - CVE 对照表是**人工维护的保守清单**（每条都带修复版本与编号），未收录的组件不计命中、也不算安全 —— 报告里如实标成「未收录」。
 - 「代码级 P0」列取同仓的**独立根因数**（去重后），与 `wild_hunt.json` 同一口径。
 
-扫描组件 96 个，命中已知 advisory 的仓库 **7 个**，涉及 CVE：CVE-2013-7459、CVE-2017-12794、CVE-2018-1000656、CVE-2018-14574、CVE-2018-18074、CVE-2019-10906、CVE-2019-11324、CVE-2019-14322、CVE-2019-7548、CVE-2020-25626、CVE-2022-21363、CVE-2022-29217、CVE-2023-24162。
+扫描组件 104 个，命中已知 advisory 的仓库 **7 个**，涉及 CVE：CVE-2013-7459、CVE-2017-12794、CVE-2018-1000656、CVE-2018-14574、CVE-2018-18074、CVE-2019-10906、CVE-2019-11324、CVE-2019-14322、CVE-2019-7548、CVE-2020-25626、CVE-2022-21363、CVE-2022-29217、CVE-2023-24162。
 
 | 仓库 | 语言 | 组件（版本） | CVE | 代码级 P0 根因 | 交叉结论 |
 |---|---|---|---|---|---|
@@ -348,6 +406,7 @@ python cli.py matrix
 | mall-tiny | Java | `hutool-all` 5.8.9 | CVE-2023-24162 | 1 | **双重实锤**（1 个组件 / 1 条 advisory + 1 个代码根因） |
 | flask-realworld | Python | `sqlalchemy` 1.1.9 | CVE-2019-7548 | 0 | 仅组件（代码侧未发现 P0） |
 | flasky | Python | `flask` 0.12.2、`jinja2` 2.9.6、`requests` 2.18.2 …+3 | CVE-2018-1000656、CVE-2018-18074、CVE-2019-10906、CVE-2019-11324、CVE-2019-14322、CVE-2019-7548 | 0 | 仅组件（代码侧未发现 P0） |
+| ruoyi-vue-pro | Java | — | — | 46 | 仅代码（组件版本未命中已知 advisory） |
 | eladmin-mp | Java | — | — | 12 | 仅代码（组件版本未命中已知 advisory） |
 | eladmin-JPA | Java | — | — | 12 | 仅代码（组件版本未命中已知 advisory） |
 | newbee-mall | Java | — | — | 11 | 仅代码（组件版本未命中已知 advisory） |
@@ -361,6 +420,7 @@ python cli.py matrix
 | RuoYi | Java | — | — | 3 | 仅代码（组件版本未命中已知 advisory） |
 | My-Blog-layui | Java | — | — | 3 | 仅代码（组件版本未命中已知 advisory） |
 | Employee-Management-System | Python | — | — | 2 | 仅代码（组件版本未命中已知 advisory） |
+| solmate | Solidity | — | — | 2 | 仅代码（组件版本未命中已知 advisory） |
 | waynboot-mall | Java | — | — | 1 | 仅代码（组件版本未命中已知 advisory） |
 | Synthetix V3 | Solidity | — | — | 1 | 仅代码（组件版本未命中已知 advisory） |
 

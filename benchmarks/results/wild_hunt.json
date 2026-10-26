@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-10-26 07:39:27",
+  "generated_at": "2026-10-26 08:46:29",
   "repos": [
     {
       "name": "newbee-mall",
       "path": "reference_repos/newbee-mall-master",
       "scan_rc": 0,
-      "wall_s": 2.52,
+      "wall_s": 2.44,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-master",
         "total_units": 73,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 2263,
+        "total_pairs_evaluated": 2409,
         "p0_confirmed": 11,
         "p0_route_level_hits": 11,
         "p0_unique_root_causes": 11,
@@ -165,7 +165,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1914,
+        "funnel_filtered_out": 2060,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -175,7 +175,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 11,
-        "elapsed_ms": 846.7
+        "elapsed_ms": 835.5
       },
       "p0_route_level_hits": 11,
       "p0_unique_root_causes": 11,
@@ -215,12 +215,12 @@
       "name": "newbee-mall-api",
       "path": "reference_repos/newbee-mall-api-master",
       "scan_rc": 0,
-      "wall_s": 2.29,
+      "wall_s": 2.24,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-api-master",
         "total_units": 62,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1922,
+        "total_pairs_evaluated": 2046,
         "p0_confirmed": 70,
         "p0_route_level_hits": 70,
         "p0_unique_root_causes": 9,
@@ -353,7 +353,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1563,
+        "funnel_filtered_out": 1687,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -363,7 +363,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 70,
-        "elapsed_ms": 755.1
+        "elapsed_ms": 767.5
       },
       "p0_route_level_hits": 70,
       "p0_unique_root_causes": 9,
@@ -399,12 +399,12 @@
       "name": "RuoYi",
       "path": "reference_repos/RuoYi-master",
       "scan_rc": 0,
-      "wall_s": 11.53,
+      "wall_s": 11.26,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\RuoYi-master",
         "total_units": 305,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 9455,
+        "total_pairs_evaluated": 10065,
         "p0_confirmed": 3,
         "p0_route_level_hits": 3,
         "p0_unique_root_causes": 3,
@@ -455,7 +455,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 8036,
+        "funnel_filtered_out": 8646,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -465,7 +465,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 3,
-        "elapsed_ms": 1919.2
+        "elapsed_ms": 1876.1
       },
       "p0_route_level_hits": 3,
       "p0_unique_root_causes": 3,
@@ -493,12 +493,12 @@
       "name": "eladmin-mp",
       "path": "reference_repos/eladmin-mp-master",
       "scan_rc": 0,
-      "wall_s": 3.46,
+      "wall_s": 3.39,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\eladmin-mp-master",
         "total_units": 65,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 2015,
+        "total_pairs_evaluated": 2145,
         "p0_confirmed": 76,
         "p0_route_level_hits": 76,
         "p0_unique_root_causes": 12,
@@ -663,7 +663,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1602,
+        "funnel_filtered_out": 1732,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -673,7 +673,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 76,
-        "elapsed_ms": 1141.3
+        "elapsed_ms": 1135.9
       },
       "p0_route_level_hits": 76,
       "p0_unique_root_causes": 12,
@@ -703,12 +703,12 @@
       "name": "mall",
       "path": "reference_repos/mall-main",
       "scan_rc": 0,
-      "wall_s": 9.37,
+      "wall_s": 9.06,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\mall-main",
         "total_units": 246,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 7626,
+        "total_pairs_evaluated": 8118,
         "p0_confirmed": 253,
         "p0_route_level_hits": 253,
         "p0_unique_root_causes": 8,
@@ -823,7 +823,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 6309,
+        "funnel_filtered_out": 6801,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -833,7 +833,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 253,
-        "elapsed_ms": 2039.7
+        "elapsed_ms": 1876.0
       },
       "p0_route_level_hits": 253,
       "p0_unique_root_causes": 8,
@@ -865,7 +865,7 @@
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\My-Blog-master",
         "total_units": 54,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1674,
+        "total_pairs_evaluated": 1782,
         "p0_confirmed": 6,
         "p0_route_level_hits": 6,
         "p0_unique_root_causes": 6,
@@ -956,7 +956,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1428,
+        "funnel_filtered_out": 1536,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -966,7 +966,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 6,
-        "elapsed_ms": 640.9
+        "elapsed_ms": 647.8
       },
       "p0_route_level_hits": 6,
       "p0_unique_root_causes": 6,
@@ -1000,12 +1000,12 @@
       "name": "litemall",
       "path": "reference_repos/litemall-master",
       "scan_rc": 0,
-      "wall_s": 17.66,
+      "wall_s": 17.34,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\litemall-master",
         "total_units": 219,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 6789,
+        "total_pairs_evaluated": 7227,
         "p0_confirmed": 223,
         "p0_route_level_hits": 223,
         "p0_unique_root_causes": 5,
@@ -1088,7 +1088,7 @@
           }
         ],
         "secret_files_flagged": 1,
-        "funnel_filtered_out": 5658,
+        "funnel_filtered_out": 6096,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1098,7 +1098,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 223,
-        "elapsed_ms": 2301.6
+        "elapsed_ms": 2305.5
       },
       "p0_route_level_hits": 223,
       "p0_unique_root_causes": 5,
@@ -1131,12 +1131,12 @@
       "name": "Employee-Management-System",
       "path": "reference_repos/employee-management-system",
       "scan_rc": 0,
-      "wall_s": 0.34,
+      "wall_s": 0.33,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\employee-management-system",
         "total_units": 4,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 124,
+        "total_pairs_evaluated": 132,
         "p0_confirmed": 2,
         "p0_route_level_hits": 2,
         "p0_unique_root_causes": 2,
@@ -1175,7 +1175,7 @@
           }
         ],
         "secret_files_flagged": 1,
-        "funnel_filtered_out": 107,
+        "funnel_filtered_out": 115,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1185,7 +1185,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 2,
-        "elapsed_ms": 11.3
+        "elapsed_ms": 11.9
       },
       "p0_route_level_hits": 2,
       "p0_unique_root_causes": 2,
@@ -1213,12 +1213,12 @@
       "name": "DjanGoat",
       "path": "reference_repos/DjanGoat",
       "scan_rc": 0,
-      "wall_s": 0.62,
+      "wall_s": 0.57,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\DjanGoat",
         "total_units": 36,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1116,
+        "total_pairs_evaluated": 1188,
         "p0_confirmed": 12,
         "p0_route_level_hits": 12,
         "p0_unique_root_causes": 12,
@@ -1387,7 +1387,7 @@
           }
         ],
         "secret_files_flagged": 1,
-        "funnel_filtered_out": 995,
+        "funnel_filtered_out": 1067,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1397,7 +1397,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 12,
-        "elapsed_ms": 123.4
+        "elapsed_ms": 125.3
       },
       "p0_route_level_hits": 12,
       "p0_unique_root_causes": 12,
@@ -1466,7 +1466,7 @@
       "name": "Compound",
       "path": "reference_repos/compound-protocol/contracts",
       "scan_rc": 0,
-      "wall_s": 1.35,
+      "wall_s": 1.38,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\compound-protocol\\contracts",
         "total_units": 450,
@@ -1489,7 +1489,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 317.7
+        "elapsed_ms": 309.3
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1508,7 +1508,7 @@
       "name": "Comet",
       "path": "reference_repos/comet/contracts",
       "scan_rc": 0,
-      "wall_s": 0.99,
+      "wall_s": 0.97,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\comet\\contracts",
         "total_units": 357,
@@ -1531,7 +1531,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 170.5
+        "elapsed_ms": 169.4
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1550,7 +1550,7 @@
       "name": "OpenZeppelin",
       "path": "reference_repos/openzeppelin-contracts/contracts",
       "scan_rc": 0,
-      "wall_s": 3.0,
+      "wall_s": 2.9,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\openzeppelin-contracts\\contracts",
         "total_units": 1989,
@@ -1573,7 +1573,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 644.7
+        "elapsed_ms": 613.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1592,12 +1592,12 @@
       "name": "AaveV3",
       "path": "reference_repos/aave-v3-core/contracts",
       "scan_rc": 0,
-      "wall_s": 1.01,
+      "wall_s": 1.0,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\aave-v3-core\\contracts",
         "total_units": 553,
         "test_units_skipped": 119,
-        "total_pairs_evaluated": 2239,
+        "total_pairs_evaluated": 2241,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -1605,7 +1605,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 876,
+        "funnel_filtered_out": 878,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1615,7 +1615,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 330.5
+        "elapsed_ms": 326.8
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1634,12 +1634,12 @@
       "name": "waynboot-mall",
       "path": "reference_repos/waynboot-mall",
       "scan_rc": 0,
-      "wall_s": 8.17,
+      "wall_s": 8.09,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\waynboot-mall",
         "total_units": 163,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 5053,
+        "total_pairs_evaluated": 5379,
         "p0_confirmed": 163,
         "p0_route_level_hits": 163,
         "p0_unique_root_causes": 1,
@@ -1668,7 +1668,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 4201,
+        "funnel_filtered_out": 4527,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1678,7 +1678,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 163,
-        "elapsed_ms": 1706.6
+        "elapsed_ms": 1715.5
       },
       "p0_route_level_hits": 163,
       "p0_unique_root_causes": 1,
@@ -1701,12 +1701,12 @@
       "name": "mall4j",
       "path": "reference_repos/mall4j",
       "scan_rc": 0,
-      "wall_s": 3.98,
+      "wall_s": 3.85,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\mall4j",
         "total_units": 139,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 4309,
+        "total_pairs_evaluated": 4587,
         "p0_confirmed": 143,
         "p0_route_level_hits": 143,
         "p0_unique_root_causes": 5,
@@ -1787,8 +1787,8 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 3366,
-        "funnel_filter_rate": 0.9994,
+        "funnel_filtered_out": 3644,
+        "funnel_filter_rate": 0.9995,
         "llm_dispatched": 2,
         "model_candidates": [
           {
@@ -1812,7 +1812,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 143,
-        "elapsed_ms": 1346.5
+        "elapsed_ms": 1276.0
       },
       "p0_route_level_hits": 143,
       "p0_unique_root_causes": 5,
@@ -1842,12 +1842,12 @@
       "name": "flaskr",
       "path": "reference_repos/flaskr",
       "scan_rc": 0,
-      "wall_s": 0.32,
+      "wall_s": 0.37,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flaskr",
         "total_units": 8,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 248,
+        "total_pairs_evaluated": 264,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -1855,7 +1855,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 211,
+        "funnel_filtered_out": 227,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1865,7 +1865,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 30.2
+        "elapsed_ms": 34.0
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1884,7 +1884,7 @@
       "name": "Synthetix V3",
       "path": "reference_repos/synthetix-v3",
       "scan_rc": 0,
-      "wall_s": 142.26,
+      "wall_s": 141.2,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\synthetix-v3",
         "total_units": 1411,
@@ -1924,7 +1924,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 1,
-        "elapsed_ms": 5268.0
+        "elapsed_ms": 5294.8
       },
       "p0_route_level_hits": 1,
       "p0_unique_root_causes": 1,
@@ -1949,7 +1949,7 @@
       "name": "sushiswap-zapper",
       "path": "reference_repos/sushiswap-zapper",
       "scan_rc": 0,
-      "wall_s": 0.44,
+      "wall_s": 0.43,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\sushiswap-zapper",
         "total_units": 75,
@@ -1972,7 +1972,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 51.4
+        "elapsed_ms": 51.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1991,12 +1991,12 @@
       "name": "jeecg-boot",
       "path": "reference_repos/jeecg-boot",
       "scan_rc": 0,
-      "wall_s": 29.4,
+      "wall_s": 29.45,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot",
         "total_units": 458,
         "test_units_skipped": 29,
-        "total_pairs_evaluated": 14198,
+        "total_pairs_evaluated": 15114,
         "p0_confirmed": 482,
         "p0_route_level_hits": 482,
         "p0_unique_root_causes": 27,
@@ -2349,7 +2349,7 @@
           }
         ],
         "secret_files_flagged": 1,
-        "funnel_filtered_out": 11611,
+        "funnel_filtered_out": 12527,
         "funnel_filter_rate": 0.9999,
         "llm_dispatched": 1,
         "model_candidates": [
@@ -2367,7 +2367,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 482,
-        "elapsed_ms": 7058.6
+        "elapsed_ms": 7149.8
       },
       "p0_route_level_hits": 482,
       "p0_unique_root_causes": 27,
@@ -2442,7 +2442,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 29.6
+        "elapsed_ms": 29.7
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2461,12 +2461,12 @@
       "name": "fastapi-realworld",
       "path": "reference_repos/fastapi-realworld",
       "scan_rc": 0,
-      "wall_s": 0.46,
+      "wall_s": 0.45,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\fastapi-realworld",
         "total_units": 19,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 589,
+        "total_pairs_evaluated": 627,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -2474,7 +2474,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 550,
+        "funnel_filtered_out": 588,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -2484,7 +2484,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 94.1
+        "elapsed_ms": 95.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2508,7 +2508,7 @@
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\django-realworld",
         "total_units": 11,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 341,
+        "total_pairs_evaluated": 363,
         "p0_confirmed": 2,
         "p0_route_level_hits": 2,
         "p0_unique_root_causes": 2,
@@ -2547,7 +2547,7 @@
           }
         ],
         "secret_files_flagged": 1,
-        "funnel_filtered_out": 298,
+        "funnel_filtered_out": 320,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -2557,7 +2557,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 2,
-        "elapsed_ms": 41.1
+        "elapsed_ms": 42.3
       },
       "p0_route_level_hits": 2,
       "p0_unique_root_causes": 2,
@@ -2619,12 +2619,12 @@
       "name": "eladmin-JPA",
       "path": "reference_repos/eladmin",
       "scan_rc": 0,
-      "wall_s": 4.28,
+      "wall_s": 4.19,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\eladmin",
         "total_units": 66,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 2046,
+        "total_pairs_evaluated": 2178,
         "p0_confirmed": 77,
         "p0_route_level_hits": 77,
         "p0_unique_root_causes": 12,
@@ -2789,7 +2789,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1638,
+        "funnel_filtered_out": 1770,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -2799,7 +2799,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 77,
-        "elapsed_ms": 1483.9
+        "elapsed_ms": 1514.2
       },
       "p0_route_level_hits": 77,
       "p0_unique_root_causes": 12,
@@ -2829,7 +2829,7 @@
       "name": "UniswapV3",
       "path": "reference_repos/uniswap-v3-core/contracts",
       "scan_rc": 0,
-      "wall_s": 0.52,
+      "wall_s": 0.5,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\uniswap-v3-core\\contracts",
         "total_units": 67,
@@ -2852,7 +2852,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 74.9
+        "elapsed_ms": 75.7
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2876,7 +2876,7 @@
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\fastapi-sql-template",
         "total_units": 9,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 279,
+        "total_pairs_evaluated": 297,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -2884,7 +2884,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 250,
+        "funnel_filtered_out": 268,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -2894,7 +2894,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 44.0
+        "elapsed_ms": 43.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2913,7 +2913,7 @@
       "name": "MakerDAO dss",
       "path": "reference_repos/dss",
       "scan_rc": 0,
-      "wall_s": 0.55,
+      "wall_s": 0.53,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\dss",
         "total_units": 234,
@@ -2936,7 +2936,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 115.1
+        "elapsed_ms": 113.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2955,12 +2955,12 @@
       "name": "flasky",
       "path": "reference_repos/flasky",
       "scan_rc": 0,
-      "wall_s": 0.49,
+      "wall_s": 0.52,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flasky",
         "total_units": 39,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1209,
+        "total_pairs_evaluated": 1287,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -2968,7 +2968,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1021,
+        "funnel_filtered_out": 1099,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -2978,7 +2978,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 123.8
+        "elapsed_ms": 129.0
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3047,12 +3047,12 @@
       "name": "mall-tiny",
       "path": "reference_repos/mall-tiny",
       "scan_rc": 0,
-      "wall_s": 1.05,
+      "wall_s": 1.02,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\mall-tiny",
         "total_units": 40,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1240,
+        "total_pairs_evaluated": 1320,
         "p0_confirmed": 40,
         "p0_route_level_hits": 40,
         "p0_unique_root_causes": 1,
@@ -3081,7 +3081,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1033,
+        "funnel_filtered_out": 1113,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -3091,7 +3091,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 40,
-        "elapsed_ms": 246.5
+        "elapsed_ms": 252.7
       },
       "p0_route_level_hits": 40,
       "p0_unique_root_causes": 1,
@@ -3124,7 +3124,7 @@
       "name": "OZ Upgradeable",
       "path": "reference_repos/openzeppelin-contracts-upgradeable",
       "scan_rc": 0,
-      "wall_s": 2.12,
+      "wall_s": 1.98,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\openzeppelin-contracts-upgradeable",
         "total_units": 1119,
@@ -3147,7 +3147,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 526.3
+        "elapsed_ms": 514.7
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3166,12 +3166,12 @@
       "name": "My-Blog-layui",
       "path": "reference_repos/My-Blog-layui",
       "scan_rc": 0,
-      "wall_s": 1.69,
+      "wall_s": 1.63,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\My-Blog-layui",
         "total_units": 64,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1984,
+        "total_pairs_evaluated": 2112,
         "p0_confirmed": 3,
         "p0_route_level_hits": 3,
         "p0_unique_root_causes": 3,
@@ -3222,8 +3222,8 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1688,
-        "funnel_filter_rate": 0.9988,
+        "funnel_filtered_out": 1816,
+        "funnel_filter_rate": 0.9989,
         "llm_dispatched": 2,
         "model_candidates": [
           {
@@ -3247,7 +3247,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 3,
-        "elapsed_ms": 461.6
+        "elapsed_ms": 470.6
       },
       "p0_route_level_hits": 3,
       "p0_unique_root_causes": 3,
@@ -3275,12 +3275,12 @@
       "name": "kkFileView",
       "path": "reference_repos/kkFileView",
       "scan_rc": 0,
-      "wall_s": 18.29,
+      "wall_s": 17.9,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\kkFileView",
         "total_units": 20,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 620,
+        "total_pairs_evaluated": 660,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -3288,8 +3288,8 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 544,
-        "funnel_filter_rate": 0.9963,
+        "funnel_filtered_out": 584,
+        "funnel_filter_rate": 0.9966,
         "llm_dispatched": 2,
         "model_candidates": [
           {
@@ -3313,7 +3313,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 1478.9
+        "elapsed_ms": 1469.4
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3337,7 +3337,7 @@
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\full-stack-fastapi-template\\backend",
         "total_units": 23,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 713,
+        "total_pairs_evaluated": 759,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -3345,7 +3345,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 623,
+        "funnel_filtered_out": 669,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -3355,7 +3355,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 97.3
+        "elapsed_ms": 100.1
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3374,12 +3374,12 @@
       "name": "solady",
       "path": "reference_repos/solady/src",
       "scan_rc": 0,
-      "wall_s": 6.76,
+      "wall_s": 6.72,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\solady\\src",
         "total_units": 2968,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 15571,
+        "total_pairs_evaluated": 15845,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -3387,7 +3387,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 6734,
+        "funnel_filtered_out": 7008,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -3397,7 +3397,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 2181.2
+        "elapsed_ms": 2216.4
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3416,12 +3416,12 @@
       "name": "apollo",
       "path": "reference_repos/apollo",
       "scan_rc": 0,
-      "wall_s": 7.09,
+      "wall_s": 6.84,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\apollo",
         "total_units": 200,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 6200,
+        "total_pairs_evaluated": 6600,
         "p0_confirmed": 6,
         "p0_route_level_hits": 6,
         "p0_unique_root_causes": 6,
@@ -3508,7 +3508,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 5330,
+        "funnel_filtered_out": 5730,
         "funnel_filter_rate": 0.9998,
         "llm_dispatched": 1,
         "model_candidates": [
@@ -3526,7 +3526,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 6,
-        "elapsed_ms": 3030.9
+        "elapsed_ms": 2933.5
       },
       "p0_route_level_hits": 6,
       "p0_unique_root_causes": 6,
@@ -3554,12 +3554,12 @@
       "name": "spring-boot-demo",
       "path": "reference_repos/spring-boot-demo",
       "scan_rc": 0,
-      "wall_s": 3.56,
+      "wall_s": 3.42,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo",
         "total_units": 80,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 2480,
+        "total_pairs_evaluated": 2640,
         "p0_confirmed": 85,
         "p0_route_level_hits": 85,
         "p0_unique_root_causes": 12,
@@ -3728,8 +3728,8 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 2114,
-        "funnel_filter_rate": 0.9981,
+        "funnel_filtered_out": 2274,
+        "funnel_filter_rate": 0.9982,
         "llm_dispatched": 4,
         "model_candidates": [
           {
@@ -3767,7 +3767,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 85,
-        "elapsed_ms": 553.3
+        "elapsed_ms": 573.6
       },
       "p0_route_level_hits": 85,
       "p0_unique_root_causes": 12,
@@ -3821,12 +3821,12 @@
       "name": "xxl-job",
       "path": "reference_repos/xxl-job",
       "scan_rc": 0,
-      "wall_s": 4.12,
+      "wall_s": 4.0,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job",
         "total_units": 36,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1116,
+        "total_pairs_evaluated": 1188,
         "p0_confirmed": 5,
         "p0_route_level_hits": 5,
         "p0_unique_root_causes": 5,
@@ -3901,7 +3901,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 930,
+        "funnel_filtered_out": 1002,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -3911,7 +3911,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 5,
-        "elapsed_ms": 390.2
+        "elapsed_ms": 396.2
       },
       "p0_route_level_hits": 5,
       "p0_unique_root_causes": 5,
@@ -3939,12 +3939,12 @@
       "name": "flask-realworld",
       "path": "reference_repos/flask-realworld",
       "scan_rc": 0,
-      "wall_s": 0.38,
+      "wall_s": 0.37,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flask-realworld",
         "total_units": 26,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 806,
+        "total_pairs_evaluated": 858,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -3952,7 +3952,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 723,
+        "funnel_filtered_out": 775,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -3962,7 +3962,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 51.3
+        "elapsed_ms": 51.6
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -4014,7 +4014,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 146.4
+        "elapsed_ms": 143.9
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -4028,13 +4028,840 @@
         "cves": []
       },
       "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\v3-periphery\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\v3-periphery\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\v3-periphery\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\v3-periphery\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\v3-periphery\\report.html（0 条）"
+    },
+    {
+      "name": "morpho-blue",
+      "path": "reference_repos/morpho-blue/src",
+      "scan_rc": 0,
+      "wall_s": 0.38,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\morpho-blue\\src",
+        "total_units": 71,
+        "test_units_skipped": 9,
+        "total_pairs_evaluated": 284,
+        "p0_confirmed": 0,
+        "p0_route_level_hits": 0,
+        "p0_unique_root_causes": 0,
+        "p0_route_by_cat": {},
+        "p0_unique_by_cat": {},
+        "root_causes": [],
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 92,
+        "funnel_filter_rate": 1.0,
+        "llm_dispatched": 0,
+        "model_candidates": [],
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "baseline": "",
+        "suppressed_by_baseline": 0,
+        "suppressed_root_causes": 0,
+        "new_findings": 0,
+        "elapsed_ms": 39.5
+      },
+      "p0_route_level_hits": 0,
+      "p0_unique_root_causes": 0,
+      "p0_route_by_cat": {},
+      "p0_unique_by_cat": {},
+      "p0_by_cat": {},
+      "sca": {
+        "components": 0,
+        "hits": [],
+        "uncovered": 0,
+        "cves": []
+      },
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\morpho-blue\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\morpho-blue\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\morpho-blue\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\morpho-blue\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\morpho-blue\\report.html（0 条）"
+    },
+    {
+      "name": "flask-jwt-extended",
+      "path": "reference_repos/flask-jwt-extended",
+      "scan_rc": 0,
+      "wall_s": 0.38,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flask-jwt-extended",
+        "total_units": 0,
+        "test_units_skipped": 0,
+        "total_pairs_evaluated": 0,
+        "p0_confirmed": 0,
+        "p0_route_level_hits": 0,
+        "p0_unique_root_causes": 0,
+        "p0_route_by_cat": {},
+        "p0_unique_by_cat": {},
+        "root_causes": [],
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 0,
+        "funnel_filter_rate": 0.0,
+        "llm_dispatched": 0,
+        "model_candidates": [],
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "baseline": "",
+        "suppressed_by_baseline": 0,
+        "suppressed_root_causes": 0,
+        "new_findings": 0,
+        "elapsed_ms": 15.9
+      },
+      "p0_route_level_hits": 0,
+      "p0_unique_root_causes": 0,
+      "p0_route_by_cat": {},
+      "p0_unique_by_cat": {},
+      "p0_by_cat": {},
+      "sca": {
+        "components": 6,
+        "hits": [],
+        "uncovered": 4,
+        "cves": []
+      },
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flask-jwt-extended\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\flask-jwt-extended\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flask-jwt-extended\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flask-jwt-extended\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flask-jwt-extended\\report.html（0 条）"
+    },
+    {
+      "name": "ruoyi-vue-pro",
+      "path": "reference_repos/ruoyi-vue-pro",
+      "scan_rc": 0,
+      "wall_s": 123.79,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro",
+        "total_units": 3271,
+        "test_units_skipped": 0,
+        "total_pairs_evaluated": 107943,
+        "p0_confirmed": 3316,
+        "p0_route_level_hits": 3316,
+        "p0_unique_root_causes": 46,
+        "p0_route_by_cat": {
+          "cors": 3271,
+          "xss": 9,
+          "authz": 35,
+          "hardcoded_secret": 1
+        },
+        "p0_unique_by_cat": {
+          "cors": 1,
+          "xss": 9,
+          "authz": 35,
+          "hardcoded_secret": 1
+        },
+        "root_causes": [
+          {
+            "category": "cors",
+            "kind": "global-config",
+            "signature": "cors:11f7f1497cc2",
+            "affected_routes": 3271,
+            "representative": "DefaultController.bpm404",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-server\\src\\main\\java\\cn\\iocoder\\yudao\\server\\controller\\DefaultController.java",
+            "line": 24,
+            "routes": [
+              "DefaultController.bpm404",
+              "DefaultController.pay404",
+              "DefaultController.report404",
+              "DefaultController.mp404",
+              "DefaultController.erp404"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pms\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pms\\controller\\admin\\kb\\content\\PmsKnowledgeDocumentController.java:111:PmsKnowledgeDocumentController.getDocument",
+            "affected_routes": 1,
+            "representative": "PmsKnowledgeDocumentController.getDocument",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pms\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pms\\controller\\admin\\kb\\content\\PmsKnowledgeDocumentController.java",
+            "line": 111,
+            "routes": [
+              "PmsKnowledgeDocumentController.getDocument"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pms\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pms\\controller\\admin\\kb\\content\\PmsKnowledgeFolderController.java:96:PmsKnowledgeFolderController.getFolder",
+            "affected_routes": 1,
+            "representative": "PmsKnowledgeFolderController.getFolder",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pms\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pms\\controller\\admin\\kb\\content\\PmsKnowledgeFolderController.java",
+            "line": 96,
+            "routes": [
+              "PmsKnowledgeFolderController.getFolder"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\app\\channel\\AppPayChannelController.java:31:AppPayChannelController.getEnableChannelCodeList",
+            "affected_routes": 1,
+            "representative": "AppPayChannelController.getEnableChannelCodeList",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\app\\channel\\AppPayChannelController.java",
+            "line": 31,
+            "routes": [
+              "AppPayChannelController.getEnableChannelCodeList"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\app\\transfer\\AppPayTransferController.java:29:AppPayTransferController.syncTransfer",
+            "affected_routes": 1,
+            "representative": "AppPayTransferController.syncTransfer",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\app\\transfer\\AppPayTransferController.java",
+            "line": 29,
+            "routes": [
+              "AppPayTransferController.syncTransfer"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\admin\\channel\\PayChannelController.java:83:PayChannelController.getEnableChannelCodeList",
+            "affected_routes": 1,
+            "representative": "PayChannelController.getEnableChannelCodeList",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\admin\\channel\\PayChannelController.java",
+            "line": 83,
+            "routes": [
+              "PayChannelController.getEnableChannelCodeList"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\admin\\demo\\PayDemoOrderController.java:42:PayDemoOrderController.getDemoOrderPage",
+            "affected_routes": 1,
+            "representative": "PayDemoOrderController.getDemoOrderPage",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\admin\\demo\\PayDemoOrderController.java",
+            "line": 42,
+            "routes": [
+              "PayDemoOrderController.getDemoOrderPage"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\admin\\demo\\PayDemoOrderController.java:58:PayDemoOrderController.refundDemoOrder",
+            "affected_routes": 1,
+            "representative": "PayDemoOrderController.refundDemoOrder",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\admin\\demo\\PayDemoOrderController.java",
+            "line": 58,
+            "routes": [
+              "PayDemoOrderController.refundDemoOrder"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\admin\\demo\\PayDemoWithdrawController.java:34:PayDemoWithdrawController.createDemoWithdraw",
+            "affected_routes": 1,
+            "representative": "PayDemoWithdrawController.createDemoWithdraw",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\admin\\demo\\PayDemoWithdrawController.java",
+            "line": 34,
+            "routes": [
+              "PayDemoWithdrawController.createDemoWithdraw"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\admin\\demo\\PayDemoWithdrawController.java:49:PayDemoWithdrawController.getDemoWithdrawPage",
+            "affected_routes": 1,
+            "representative": "PayDemoWithdrawController.getDemoWithdrawPage",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\admin\\demo\\PayDemoWithdrawController.java",
+            "line": 49,
+            "routes": [
+              "PayDemoWithdrawController.getDemoWithdrawPage"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\admin\\wallet\\PayWalletRechargeController.java:40:PayWalletRechargeController.refundWalletRecharge",
+            "affected_routes": 1,
+            "representative": "PayWalletRechargeController.refundWalletRecharge",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-pay\\src\\main\\java\\cn\\iocoder\\yudao\\module\\pay\\controller\\admin\\wallet\\PayWalletRechargeController.java",
+            "line": 40,
+            "routes": [
+              "PayWalletRechargeController.refundWalletRecharge"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-oa\\src\\main\\java\\cn\\iocoder\\yudao\\module\\oa\\controller\\admin\\supply\\OaSupplyItemController.java:91:OaSupplyItemController.getSupplyItemSelectPage",
+            "affected_routes": 1,
+            "representative": "OaSupplyItemController.getSupplyItemSelectPage",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-oa\\src\\main\\java\\cn\\iocoder\\yudao\\module\\oa\\controller\\admin\\supply\\OaSupplyItemController.java",
+            "line": 91,
+            "routes": [
+              "OaSupplyItemController.getSupplyItemSelectPage"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mp\\src\\main\\java\\cn\\iocoder\\yudao\\module\\mp\\controller\\admin\\open\\MpOpenController.java:44:MpOpenController.handleMessage",
+            "affected_routes": 1,
+            "representative": "MpOpenController.handleMessage",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mp\\src\\main\\java\\cn\\iocoder\\yudao\\module\\mp\\controller\\admin\\open\\MpOpenController.java",
+            "line": 44,
+            "routes": [
+              "MpOpenController.handleMessage"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mes\\src\\main\\java\\cn\\iocoder\\yudao\\module\\mes\\controller\\admin\\wm\\warehouse\\MesWmWarehouseAreaController.java:90:MesWmWarehouseAreaController.getWarehouseAreaSimpleList",
+            "affected_routes": 1,
+            "representative": "MesWmWarehouseAreaController.getWarehouseAreaSimpleList",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mes\\src\\main\\java\\cn\\iocoder\\yudao\\module\\mes\\controller\\admin\\wm\\warehouse\\MesWmWarehouseAreaController.java",
+            "line": 90,
+            "routes": [
+              "MesWmWarehouseAreaController.getWarehouseAreaSimpleList"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mes\\src\\main\\java\\cn\\iocoder\\yudao\\module\\mes\\controller\\admin\\wm\\warehouse\\MesWmWarehouseLocationController.java:89:MesWmWarehouseLocationController.getWarehouseLocationSimpleList",
+            "affected_routes": 1,
+            "representative": "MesWmWarehouseLocationController.getWarehouseLocationSimpleList",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mes\\src\\main\\java\\cn\\iocoder\\yudao\\module\\mes\\controller\\admin\\wm\\warehouse\\MesWmWarehouseLocationController.java",
+            "line": 89,
+            "routes": [
+              "MesWmWarehouseLocationController.getWarehouseLocationSimpleList"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-trade\\src\\main\\java\\cn\\iocoder\\yudao\\module\\trade\\controller\\app\\brokerage\\AppBrokerageUserController.java:99:AppBrokerageUserController.getBrokerageUserRankPageByUserCount",
+            "affected_routes": 1,
+            "representative": "AppBrokerageUserController.getBrokerageUserRankPageByUserCount",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-trade\\src\\main\\java\\cn\\iocoder\\yudao\\module\\trade\\controller\\app\\brokerage\\AppBrokerageUserController.java",
+            "line": 99,
+            "routes": [
+              "AppBrokerageUserController.getBrokerageUserRankPageByUserCount"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-trade\\src\\main\\java\\cn\\iocoder\\yudao\\module\\trade\\controller\\app\\brokerage\\AppBrokerageUserController.java:109:AppBrokerageUserController.getBrokerageUserChildSummaryPageByPrice",
+            "affected_routes": 1,
+            "representative": "AppBrokerageUserController.getBrokerageUserChildSummaryPageByPrice",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-trade\\src\\main\\java\\cn\\iocoder\\yudao\\module\\trade\\controller\\app\\brokerage\\AppBrokerageUserController.java",
+            "line": 109,
+            "routes": [
+              "AppBrokerageUserController.getBrokerageUserChildSummaryPageByPrice"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-trade\\src\\main\\java\\cn\\iocoder\\yudao\\module\\trade\\controller\\app\\cart\\AppCartController.java:32:AppCartController.addCart",
+            "affected_routes": 1,
+            "representative": "AppCartController.addCart",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-trade\\src\\main\\java\\cn\\iocoder\\yudao\\module\\trade\\controller\\app\\cart\\AppCartController.java",
+            "line": 32,
+            "routes": [
+              "AppCartController.addCart"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-trade\\src\\main\\java\\cn\\iocoder\\yudao\\module\\trade\\controller\\app\\cart\\AppCartController.java:38:AppCartController.updateCartCount",
+            "affected_routes": 1,
+            "representative": "AppCartController.updateCartCount",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-trade\\src\\main\\java\\cn\\iocoder\\yudao\\module\\trade\\controller\\app\\cart\\AppCartController.java",
+            "line": 38,
+            "routes": [
+              "AppCartController.updateCartCount"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-trade\\src\\main\\java\\cn\\iocoder\\yudao\\module\\trade\\controller\\app\\cart\\AppCartController.java:45:AppCartController.updateCartSelected",
+            "affected_routes": 1,
+            "representative": "AppCartController.updateCartSelected",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-trade\\src\\main\\java\\cn\\iocoder\\yudao\\module\\trade\\controller\\app\\cart\\AppCartController.java",
+            "line": 45,
+            "routes": [
+              "AppCartController.updateCartSelected"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-promotion\\src\\main\\java\\cn\\iocoder\\yudao\\module\\promotion\\controller\\app\\article\\AppArticleController.java:71:AppArticleController.addBrowseCount",
+            "affected_routes": 1,
+            "representative": "AppArticleController.addBrowseCount",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-promotion\\src\\main\\java\\cn\\iocoder\\yudao\\module\\promotion\\controller\\app\\article\\AppArticleController.java",
+            "line": 71,
+            "routes": [
+              "AppArticleController.addBrowseCount"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-promotion\\src\\main\\java\\cn\\iocoder\\yudao\\module\\promotion\\controller\\app\\bargain\\AppBargainHelpController.java:46:AppBargainHelpController.getBargainHelpList",
+            "affected_routes": 1,
+            "representative": "AppBargainHelpController.getBargainHelpList",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-promotion\\src\\main\\java\\cn\\iocoder\\yudao\\module\\promotion\\controller\\app\\bargain\\AppBargainHelpController.java",
+            "line": 46,
+            "routes": [
+              "AppBargainHelpController.getBargainHelpList"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-promotion\\src\\main\\java\\cn\\iocoder\\yudao\\module\\promotion\\controller\\admin\\combination\\CombinationActivityController.java:93:CombinationActivityController.getCombinationActivityListByIds",
+            "affected_routes": 1,
+            "representative": "CombinationActivityController.getCombinationActivityListByIds",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-promotion\\src\\main\\java\\cn\\iocoder\\yudao\\module\\promotion\\controller\\admin\\combination\\CombinationActivityController.java",
+            "line": 93,
+            "routes": [
+              "CombinationActivityController.getCombinationActivityListByIds"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-promotion\\src\\main\\java\\cn\\iocoder\\yudao\\module\\promotion\\controller\\admin\\point\\PointActivityController.java:108:PointActivityController.getPointActivityListByIds",
+            "affected_routes": 1,
+            "representative": "PointActivityController.getPointActivityListByIds",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-promotion\\src\\main\\java\\cn\\iocoder\\yudao\\module\\promotion\\controller\\admin\\point\\PointActivityController.java",
+            "line": 108,
+            "routes": [
+              "PointActivityController.getPointActivityListByIds"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-promotion\\src\\main\\java\\cn\\iocoder\\yudao\\module\\promotion\\controller\\admin\\seckill\\SeckillActivityController.java:102:SeckillActivityController.getSeckillActivityListByIds",
+            "affected_routes": 1,
+            "representative": "SeckillActivityController.getSeckillActivityListByIds",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-promotion\\src\\main\\java\\cn\\iocoder\\yudao\\module\\promotion\\controller\\admin\\seckill\\SeckillActivityController.java",
+            "line": 102,
+            "routes": [
+              "SeckillActivityController.getSeckillActivityListByIds"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-product\\src\\main\\java\\cn\\iocoder\\yudao\\module\\product\\controller\\app\\favorite\\AppFavoriteController.java:36:AppFavoriteController.createFavorite",
+            "affected_routes": 1,
+            "representative": "AppFavoriteController.createFavorite",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-product\\src\\main\\java\\cn\\iocoder\\yudao\\module\\product\\controller\\app\\favorite\\AppFavoriteController.java",
+            "line": 36,
+            "routes": [
+              "AppFavoriteController.createFavorite"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-iot\\yudao-module-iot-biz\\src\\main\\java\\cn\\iocoder\\yudao\\module\\iot\\controller\\admin\\statistics\\IotStatisticsController.java:70:IotStatisticsController.getDeviceMessageSummaryByDate",
+            "affected_routes": 1,
+            "representative": "IotStatisticsController.getDeviceMessageSummaryByDate",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-iot\\yudao-module-iot-biz\\src\\main\\java\\cn\\iocoder\\yudao\\module\\iot\\controller\\admin\\statistics\\IotStatisticsController.java",
+            "line": 70,
+            "routes": [
+              "IotStatisticsController.getDeviceMessageSummaryByDate"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-infra\\src\\main\\java\\cn\\iocoder\\yudao\\module\\infra\\controller\\app\\file\\AppFileController.java:56:AppFileController.createFile",
+            "affected_routes": 1,
+            "representative": "AppFileController.createFile",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-infra\\src\\main\\java\\cn\\iocoder\\yudao\\module\\infra\\controller\\app\\file\\AppFileController.java",
+            "line": 56,
+            "routes": [
+              "AppFileController.createFile"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-infra\\src\\main\\java\\cn\\iocoder\\yudao\\module\\infra\\controller\\admin\\file\\FileController.java:69:FileController.createFile",
+            "affected_routes": 1,
+            "representative": "FileController.createFile",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-infra\\src\\main\\java\\cn\\iocoder\\yudao\\module\\infra\\controller\\admin\\file\\FileController.java",
+            "line": 69,
+            "routes": [
+              "FileController.createFile"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-im\\src\\main\\java\\cn\\iocoder\\yudao\\module\\im\\controller\\admin\\channel\\ImChannelMaterialController.java:30:ImChannelMaterialController.getMaterial",
+            "affected_routes": 1,
+            "representative": "ImChannelMaterialController.getMaterial",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-im\\src\\main\\java\\cn\\iocoder\\yudao\\module\\im\\controller\\admin\\channel\\ImChannelMaterialController.java",
+            "line": 30,
+            "routes": [
+              "ImChannelMaterialController.getMaterial"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-im\\src\\main\\java\\cn\\iocoder\\yudao\\module\\im\\controller\\admin\\manager\\channel\\ImChannelMaterialManagerController.java:91:ImChannelMaterialManagerController.getSimpleMaterialList",
+            "affected_routes": 1,
+            "representative": "ImChannelMaterialManagerController.getSimpleMaterialList",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-im\\src\\main\\java\\cn\\iocoder\\yudao\\module\\im\\controller\\admin\\manager\\channel\\ImChannelMaterialManagerController.java",
+            "line": 91,
+            "routes": [
+              "ImChannelMaterialManagerController.getSimpleMaterialList"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\business\\CrmBusinessController.java:169:CrmBusinessController.getBusinessPageByCustomer",
+            "affected_routes": 1,
+            "representative": "CrmBusinessController.getBusinessPageByCustomer",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\business\\CrmBusinessController.java",
+            "line": 169,
+            "routes": [
+              "CrmBusinessController.getBusinessPageByCustomer"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\business\\CrmBusinessStatusController.java:118:CrmBusinessStatusController.getBusinessStatusSimpleList",
+            "affected_routes": 1,
+            "representative": "CrmBusinessStatusController.getBusinessStatusSimpleList",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\business\\CrmBusinessStatusController.java",
+            "line": 118,
+            "routes": [
+              "CrmBusinessStatusController.getBusinessStatusSimpleList"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\contact\\CrmContactController.java:136:CrmContactController.getContactPageByCustomer",
+            "affected_routes": 1,
+            "representative": "CrmContactController.getContactPageByCustomer",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\contact\\CrmContactController.java",
+            "line": 136,
+            "routes": [
+              "CrmContactController.getContactPageByCustomer"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\contact\\CrmContactController.java:144:CrmContactController.getContactPageByBusiness",
+            "affected_routes": 1,
+            "representative": "CrmContactController.getContactPageByBusiness",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\contact\\CrmContactController.java",
+            "line": 144,
+            "routes": [
+              "CrmContactController.getContactPageByBusiness"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\contract\\CrmContractController.java:138:CrmContractController.getContractPageByCustomer",
+            "affected_routes": 1,
+            "representative": "CrmContractController.getContractPageByCustomer",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\contract\\CrmContractController.java",
+            "line": 138,
+            "routes": [
+              "CrmContractController.getContractPageByCustomer"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\contract\\CrmContractController.java:146:CrmContractController.getContractPageByBusiness",
+            "affected_routes": 1,
+            "representative": "CrmContractController.getContractPageByBusiness",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\contract\\CrmContractController.java",
+            "line": 146,
+            "routes": [
+              "CrmContractController.getContractPageByBusiness"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\followup\\CrmFollowUpRecordController.java:60:CrmFollowUpRecordController.createFollowUpRecord",
+            "affected_routes": 1,
+            "representative": "CrmFollowUpRecordController.createFollowUpRecord",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\followup\\CrmFollowUpRecordController.java",
+            "line": 60,
+            "routes": [
+              "CrmFollowUpRecordController.createFollowUpRecord"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\followup\\CrmFollowUpRecordController.java:89:CrmFollowUpRecordController.getFollowUpRecordPage",
+            "affected_routes": 1,
+            "representative": "CrmFollowUpRecordController.getFollowUpRecordPage",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\followup\\CrmFollowUpRecordController.java",
+            "line": 89,
+            "routes": [
+              "CrmFollowUpRecordController.getFollowUpRecordPage"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\receivable\\CrmReceivableController.java:116:CrmReceivableController.getReceivablePageByCustomer",
+            "affected_routes": 1,
+            "representative": "CrmReceivableController.getReceivablePageByCustomer",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-crm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\crm\\controller\\admin\\receivable\\CrmReceivableController.java",
+            "line": 116,
+            "routes": [
+              "CrmReceivableController.getReceivablePageByCustomer"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-bpm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\bpm\\controller\\admin\\definition\\BpmProcessDefinitionController.java:115:BpmProcessDefinitionController.getProcessDefinition",
+            "affected_routes": 1,
+            "representative": "BpmProcessDefinitionController.getProcessDefinition",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-bpm\\src\\main\\java\\cn\\iocoder\\yudao\\module\\bpm\\controller\\admin\\definition\\BpmProcessDefinitionController.java",
+            "line": 115,
+            "routes": [
+              "BpmProcessDefinitionController.getProcessDefinition"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-ai1-springai\\src\\main\\java\\cn\\iocoder\\yudao\\module\\ai1\\controller\\admin\\agent\\Ai1AgentController.java:98:Ai1AgentController.getAgentSimpleList",
+            "affected_routes": 1,
+            "representative": "Ai1AgentController.getAgentSimpleList",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-ai1-springai\\src\\main\\java\\cn\\iocoder\\yudao\\module\\ai1\\controller\\admin\\agent\\Ai1AgentController.java",
+            "line": 98,
+            "routes": [
+              "Ai1AgentController.getAgentSimpleList"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-ai1-springai\\src\\main\\java\\cn\\iocoder\\yudao\\module\\ai1\\controller\\admin\\model\\Ai1ModelController.java:85:Ai1ModelController.getModelSimpleList",
+            "affected_routes": 1,
+            "representative": "Ai1ModelController.getModelSimpleList",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-ai1-springai\\src\\main\\java\\cn\\iocoder\\yudao\\module\\ai1\\controller\\admin\\model\\Ai1ModelController.java",
+            "line": 85,
+            "routes": [
+              "Ai1ModelController.getModelSimpleList"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-ai\\src\\main\\java\\cn\\iocoder\\yudao\\module\\ai\\controller\\admin\\image\\AiImageController.java:46:AiImageController.getImagePagePublic",
+            "affected_routes": 1,
+            "representative": "AiImageController.getImagePagePublic",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-ai\\src\\main\\java\\cn\\iocoder\\yudao\\module\\ai\\controller\\admin\\image\\AiImageController.java",
+            "line": 46,
+            "routes": [
+              "AiImageController.getImagePagePublic"
+            ]
+          },
+          {
+            "category": "authz",
+            "kind": "endpoint",
+            "signature": "authz:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-ai\\src\\main\\java\\cn\\iocoder\\yudao\\module\\ai\\controller\\admin\\model\\AiModelController.java:76:AiModelController.getModelSimpleList",
+            "affected_routes": 1,
+            "representative": "AiModelController.getModelSimpleList",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-ai\\src\\main\\java\\cn\\iocoder\\yudao\\module\\ai\\controller\\admin\\model\\AiModelController.java",
+            "line": 76,
+            "routes": [
+              "AiModelController.getModelSimpleList"
+            ]
+          },
+          {
+            "category": "hardcoded_secret",
+            "kind": "file-level",
+            "signature": "hardcoded_secret:file:C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-im\\src\\main\\java\\cn\\iocoder\\yudao\\module\\im\\framework\\config\\ImProperties.java",
+            "affected_routes": 1,
+            "representative": "[secret-file] ImProperties.java",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-im\\src\\main\\java\\cn\\iocoder\\yudao\\module\\im\\framework\\config\\ImProperties.java",
+            "line": 1,
+            "routes": [
+              "[secret-file] ImProperties.java"
+            ]
+          }
+        ],
+        "secret_files_flagged": 1,
+        "funnel_filtered_out": 89861,
+        "funnel_filter_rate": 0.9999,
+        "llm_dispatched": 6,
+        "model_candidates": [
+          {
+            "unit": "MpOpenController.handleMessage",
+            "category": "sqli",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mp\\src\\main\\java\\cn\\iocoder\\yudao\\module\\mp\\controller\\admin\\open\\MpOpenController.java",
+            "line": 44,
+            "diagnostic": "// [静态前筛已核实事实] 候选输入行: L4, L6, L7, L8, L9, L12 | 候选敏感操作行: L16（僅供双引证定位参考，请独立判断中间流转与防护是否有效）"
+          },
+          {
+            "unit": "MesWmSnController.exportSnExcel",
+            "category": "xss",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mes\\src\\main\\java\\cn\\iocoder\\yudao\\module\\mes\\controller\\admin\\wm\\sn\\MesWmSnController.java",
+            "line": 103,
+            "diagnostic": "// [静态前筛已核实事实] 候选输入行: L8 | 候选敏感操作行: L11（僅供双引证定位参考，请独立判断中间流转与防护是否有效）"
+          },
+          {
+            "unit": "AppSeckillActivityController.getSeckillActivity",
+            "category": "xxe",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-mall\\yudao-module-promotion\\src\\main\\java\\cn\\iocoder\\yudao\\module\\promotion\\controller\\app\\seckill\\AppSeckillActivityController.java",
+            "line": 116,
+            "diagnostic": "// [静态前筛已核实事实] 候选输入行: L5, L7, L9 | 候选敏感操作行: L36, L37（僅供双引证定位参考，请独立判断中间流转与防护是否有效）"
+          },
+          {
+            "unit": "ImRtcLiveKitController.webhook",
+            "category": "deserial",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-im\\src\\main\\java\\cn\\iocoder\\yudao\\module\\im\\controller\\admin\\rtc\\ImRtcLiveKitController.java",
+            "line": 49,
+            "diagnostic": "// [静态前筛已核实事实] 候选输入行: L7, L9, L11, L15, L26 | 候选敏感操作行: L15（僅供双引证定位参考，请独立判断中间流转与防护是否有效）"
+          },
+          {
+            "unit": "AiWriteController.deleteWrite",
+            "category": "xss",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-ai\\src\\main\\java\\cn\\iocoder\\yudao\\module\\ai\\controller\\admin\\write\\AiWriteController.java",
+            "line": 40,
+            "diagnostic": "// [静态前筛已核实事实] 候选输入行: L7 | 候选敏感操作行: L8（僅供双引证定位参考，请独立判断中间流转与防护是否有效）"
+          },
+          {
+            "unit": "AiWriteController.getWrite",
+            "category": "xss",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\ruoyi-vue-pro\\yudao-module-ai\\src\\main\\java\\cn\\iocoder\\yudao\\module\\ai\\controller\\admin\\write\\AiWriteController.java",
+            "line": 49,
+            "diagnostic": "// [静态前筛已核实事实] 候选输入行: L7 | 候选敏感操作行: L8（僅供双引证定位参考，请独立判断中间流转与防护是否有效）"
+          }
+        ],
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "baseline": "",
+        "suppressed_by_baseline": 0,
+        "suppressed_root_causes": 0,
+        "new_findings": 3316,
+        "elapsed_ms": 57854.7
+      },
+      "p0_route_level_hits": 3316,
+      "p0_unique_root_causes": 46,
+      "p0_route_by_cat": {
+        "cors": 3271,
+        "xss": 9,
+        "authz": 35,
+        "hardcoded_secret": 1
+      },
+      "p0_unique_by_cat": {
+        "cors": 1,
+        "xss": 9,
+        "authz": 35,
+        "hardcoded_secret": 1
+      },
+      "p0_by_cat": {
+        "xss": 9,
+        "authz": 35,
+        "hardcoded_secret": 1
+      },
+      "sca": {
+        "components": 2,
+        "hits": [],
+        "uncovered": 0,
+        "cves": []
+      },
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\ruoyi-vue-pro\\report.md\n      披露草稿 46 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\ruoyi-vue-pro\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\ruoyi-vue-pro\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\ruoyi-vue-pro\\report.sarif（52 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\ruoyi-vue-pro\\report.html（52 条）"
+    },
+    {
+      "name": "solmate",
+      "path": "reference_repos/solmate/src",
+      "scan_rc": 0,
+      "wall_s": 0.46,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\solmate\\src",
+        "total_units": 144,
+        "test_units_skipped": 60,
+        "total_pairs_evaluated": 576,
+        "p0_confirmed": 2,
+        "p0_route_level_hits": 2,
+        "p0_unique_root_causes": 2,
+        "p0_route_by_cat": {
+          "arithmetic": 2
+        },
+        "p0_unique_by_cat": {
+          "arithmetic": 2
+        },
+        "root_causes": [
+          {
+            "category": "arithmetic",
+            "kind": "endpoint",
+            "signature": "arithmetic:C:\\myFloders\\git\\nexus-audit\\reference_repos\\solmate\\src\\tokens\\ERC20.sol:76:transfer",
+            "affected_routes": 1,
+            "representative": "transfer",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\solmate\\src\\tokens\\ERC20.sol",
+            "line": 76,
+            "routes": [
+              "transfer"
+            ]
+          },
+          {
+            "category": "arithmetic",
+            "kind": "endpoint",
+            "signature": "arithmetic:C:\\myFloders\\git\\nexus-audit\\reference_repos\\solmate\\src\\tokens\\ERC20.sol:90:transferFrom",
+            "affected_routes": 1,
+            "representative": "transferFrom",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\solmate\\src\\tokens\\ERC20.sol",
+            "line": 90,
+            "routes": [
+              "transferFrom"
+            ]
+          }
+        ],
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 192,
+        "funnel_filter_rate": 1.0,
+        "llm_dispatched": 0,
+        "model_candidates": [],
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "baseline": "",
+        "suppressed_by_baseline": 0,
+        "suppressed_root_causes": 0,
+        "new_findings": 2,
+        "elapsed_ms": 43.9
+      },
+      "p0_route_level_hits": 2,
+      "p0_unique_root_causes": 2,
+      "p0_route_by_cat": {
+        "arithmetic": 2
+      },
+      "p0_unique_by_cat": {
+        "arithmetic": 2
+      },
+      "p0_by_cat": {
+        "arithmetic": 2
+      },
+      "sca": {
+        "components": 0,
+        "hits": [],
+        "uncovered": 0,
+        "cves": []
+      },
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\solmate\\report.md\n      披露草稿 2 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\solmate\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\solmate\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\solmate\\report.sarif（2 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\solmate\\report.html（2 条）"
     }
   ],
   "totals": {
-    "repos": 38,
-    "units": 11853,
-    "p0_route_level_hits": 1663,
-    "unique_root_causes": 143,
+    "repos": 42,
+    "units": 15339,
+    "p0_route_level_hits": 4981,
+    "unique_root_causes": 191,
     "repos_with_dependency_cve": 7,
     "dual_confirmed_repos": 5,
     "dependency_cves": [
@@ -4055,8 +4882,8 @@
   },
   "advisories": {
     "dir": "benchmarks\\results\\advisories",
-    "files": 143,
-    "repos": 38,
+    "files": 191,
+    "repos": 42,
     "index": "benchmarks\\results\\advisories\\INDEX.md"
   }
 }

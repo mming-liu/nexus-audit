@@ -569,6 +569,32 @@ CATEGORIES: dict[str, VulnCategory] = {
             "或用 escapeJava / 结构化参数化日志？"
             "注意：只做 HTML 转义不处理换行，仍可伪造日志行。"),
     ),
+    # ---------------- M187：第 35 类 —— ERC20 返回值未检查（SWC-104） ----------------
+    "unchecked_erc20_return": VulnCategory(
+        key="unchecked_erc20_return", display="ERC20 返回值未检查",
+        cwe="CWE-252", owasp=False, needs_taint=False,
+        sink_question=(
+            "函数是否裸调用 ERC20 的 transfer(to,amount) / "
+            "transferFrom(from,to,amount)，既不 require 返回值、也不用 "
+            "SafeERC20？"),
+        property=(
+            "是否检查了返回值（require/if/return）或改用 safeTransfer/"
+            "SafeERC20？注意：单参原生 ETH transfer(amount) 不在此类目；"
+            "只包 try/catch 而不看 bool 返回值不算防护。"),
+    ),
+
+    # ---------------- M188：第 36 类 —— 预言机价格过期 ----------------
+    "oracle_stale_price": VulnCategory(
+        key="oracle_stale_price", display="预言机价格过期/零价",
+        cwe="CWE-345", owasp=False, needs_taint=False,
+        sink_question=(
+            "函数是否调用 Chainlink latestRoundData() 并把 price/answer "
+            "直接用于清算、铸币或兑换？"),
+        property=(
+            "是否同时校验 price > 0 与 updatedAt 的新鲜度（"
+            "block.timestamp - updatedAt <= 阈值，或 answeredInRound 检查）？"
+            "只判 price > 0 不判 updatedAt 仍可被过期价格攻击。"),
+    ),
 }
 
 ALL_KEYS = list(CATEGORIES.keys())

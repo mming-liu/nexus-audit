@@ -1,0 +1,12 @@
+{
+  "library_verify": true,
+  "library_fresh": true,
+  "routes": 3,
+  "authz": {
+    "me": false,
+    "fresh": false,
+    "admin": false
+  },
+  "fp": 0,
+  "pass": true
+}

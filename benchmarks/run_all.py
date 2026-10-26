@@ -45,7 +45,7 @@ SCOREBOARD = ROOT / "benchmarks" / "results" / "SCOREBOARD.md"
 # (名称, 命令, 前置目录检查, 类别, 可并发)
 #   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
 JOBS = [
-    ("冒烟测试 [1]-[210]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
+    ("冒烟测试 [1]-[220]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke", False),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target", True),
@@ -259,6 +259,15 @@ JOBS = [
     ("FastAPI (Python 异步真实模板)",
      ["benchmarks/benchmark_fastapi_wild.py", "--strict"],
      "reference_repos/fastapi-sql-template", "target", True),
+    # ---- M183–M186：第 39–42 野仓（第二波） ----
+    ("morpho-blue (极简借贷核心)", ["benchmarks/benchmark_morpho_blue.py", "--strict"],
+     "reference_repos/morpho-blue/src", "target", True),
+    ("flask-jwt-extended (装饰器语义)", ["benchmarks/benchmark_flask_jwt_extended.py", "--strict"],
+     "reference_repos/flask-jwt-extended", "target", True),
+    ("ruoyi-vue-pro (基础模块 RBAC)", ["benchmarks/benchmark_ruoyi_vue_pro.py", "--strict"],
+     "reference_repos/ruoyi-vue-pro", "target", True),
+    ("solmate (requiresAuth 权限门)", ["benchmarks/benchmark_solmate.py", "--strict"],
+     "reference_repos/solmate/src", "target", True),
     # ---- M167–M170：第 35–38 野仓（第一波） ----
     ("spring-boot-demo (SecurityConfig 全量认证 + RBAC EL)",
      ["benchmarks/benchmark_springboot_demo.py", "--strict"],

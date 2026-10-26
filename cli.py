@@ -254,6 +254,8 @@ _SECRET_FILE_EXTS = {
 _SECRET_FILE_SKIP = {
     ".git", "__pycache__", "node_modules", "target", "build", "dist",
     "vendor", "tests", "test",
+    # M184：示例/文档里的 JWT_SECRET_KEY 是教学占位，不是生产凭证。
+    "examples", "example", "docs", "doc",
 }
 
 
@@ -1895,6 +1897,9 @@ MATRIX_FIX_MAP: dict[str, tuple[str, ...]] = {
     # M171/M172：第 33、34 类
     "nosqli": ("_fix_nosqli",),
     "log_injection": ("_fix_log_injection",),
+    # M187/M188：第 35、36 类
+    "unchecked_erc20_return": ("_fix_solidity_erc20_return",),
+    "oracle_stale_price": ("_fix_solidity_oracle_stale",),
 }
 
 
@@ -2300,6 +2305,9 @@ def _verify_fixes_any(repo: Path, units: list, out_path: str | Path = "fix_repor
         n += _fix_solidity_delegatecall(repo, sol, report)
         # M158：第 32 类 —— ecrecover 零地址校验 + nonce 消费
         n += _fix_solidity_ecrecover(repo, sol, report)
+        # M187/M188：第 35、36 类
+        n += _fix_solidity_erc20_return(repo, sol, report)
+        n += _fix_solidity_oracle_stale(repo, sol, report)
     if rest:
         n += _fix_cors_config(repo, rest, report)
         n += _fix_hardcoded_secret(repo, rest, report)
@@ -4017,6 +4025,8 @@ DOCTOR_PATCHERS = [
     "_fix_unrestricted_upload", "_fix_solidity_ecrecover",
     # M171/M172：第 33、34 类
     "_fix_nosqli", "_fix_log_injection",
+    # M187/M188：第 35、36 类
+    "_fix_solidity_erc20_return", "_fix_solidity_oracle_stale",
 ]
 
 
@@ -4898,6 +4908,108 @@ def _fix_log_injection(repo: Path, targets: list, lines: list) -> int:
         else:
             lines += [f"## [log_injection] {u.unit_name}（{f.name}）",
                       f"- 补丁后规则仍报 {v2!r}，**不推荐**该补丁", ""]
+    return fixed
+
+
+
+def _fix_solidity_erc20_return(repo: Path, targets: list, lines: list) -> int:
+    """第 35 类（M187）：裸 ERC20 调用包 require，检查 bool 返回值。"""
+    from core.agents.rule_detectors import (
+        verdict as rule_verdict, unchecked_erc20_return_verdict)
+    fence = chr(96) * 3
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if unchecked_erc20_return_verdict(src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        m = re.search(r"(?m)^([ \t]*)([^;\n]*\.\s*(?:transfer|transferFrom)\s*"
+                      r"\([^;\n]*\))\s*;", original)
+        if not m:
+            continue
+        indent, call = m.group(1), m.group(2)
+        if re.search(r"require\s*\(|if\s*\(|\breturn\b", original[m.start():m.start() + 40]):
+            continue
+        patched = original[:m.start()] + indent + \
+            f"require({call}, \"ERC20 transfer failed\");" + \
+            original[m.end():]
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.slicer.web3_slither import SoliditySlicer
+            u2 = next((x for x in SoliditySlicer(repo).extract_entry_units(repo)
+                       if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+            v2 = rule_verdict("unchecked_erc20_return",
+                              u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}", tofile=f"b/{f.name}",
+                                        lineterm="")
+            lines += [f"## [unchecked_erc20_return] {u.unit_name}（{f.name}）",
+                      fence + "diff", *diff, fence, "",
+                      "> 自检通过：重切片 + 重跑 unchecked_erc20_return -> False。",
+                      "> 生产建议直接改用 SafeERC20.safeTransfer。", ""]
+    return fixed
+
+
+def _fix_solidity_oracle_stale(repo: Path, targets: list, lines: list) -> int:
+    """第 36 类（M188）：latestRoundData 后补零价与 updatedAt 新鲜度校验。"""
+    from core.agents.rule_detectors import (
+        verdict as rule_verdict, oracle_stale_price_verdict)
+    fence = chr(96) * 3
+    fixed = 0
+    for u in targets:
+        src = u.source_code or ""
+        if oracle_stale_price_verdict(src) is not True:
+            continue
+        f = Path(u.file_path)
+        if not f.is_file():
+            continue
+        with open(f, encoding="utf-8", newline="") as fh:
+            original = fh.read()
+        m = re.search(r"(?m)^([ \t]*)([^=\n]*\([^)]*\))\s*=\s*[^;\n]*"
+                      r"latestRoundData\s*\([^;\n]*\)\s*;", original)
+        if not m:
+            continue
+        indent, lhs = m.group(1), m.group(2)
+        pm = re.search(r"\b(?:int256|uint256)\s+(\w+)", lhs)
+        um = re.search(r"uint256\s+(\w+)\s*,\s*\)?\s*$", lhs)
+        price_var = pm.group(1) if pm else "answer"
+        upd_var = um.group(1) if um else "updatedAt"
+        guard = (f"{indent}require({price_var} > 0, \"stale price\");\n"
+                 f"{indent}require(block.timestamp - {upd_var} <= 3600, "
+                 f"\"stale round\");\n")
+        at = original.find("\n", m.end())
+        at = len(original) if at < 0 else at + 1
+        patched = original[:at] + guard + original[at:]
+        try:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(patched)
+            from core.slicer.web3_slither import SoliditySlicer
+            u2 = next((x for x in SoliditySlicer(repo).extract_entry_units(repo)
+                       if x.unit_name == u.unit_name and Path(x.file_path) == f), None)
+            v2 = rule_verdict("oracle_stale_price",
+                              u2.source_code) if u2 else None
+        finally:
+            with open(f, "w", encoding="utf-8", newline="") as fh:
+                fh.write(original)
+        if v2 is False:
+            fixed += 1
+            diff = difflib.unified_diff(original.splitlines(), patched.splitlines(),
+                                        fromfile=f"a/{f.name}", tofile=f"b/{f.name}",
+                                        lineterm="")
+            lines += [f"## [oracle_stale_price] {u.unit_name}（{f.name}）",
+                      fence + "diff", *diff, fence, "",
+                      "> 自检通过：重切片 + 重跑 oracle_stale_price -> False。",
+                      "> 阈值 3600 秒需按喂价 heartbeat 调整。", ""]
     return fixed
 
 

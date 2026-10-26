@@ -309,7 +309,8 @@ class WebTreeSitterSlicer:
     # 找不到实现体时只写头部 —— 判据看到"只有名字"会退 None，不判安全。
     _GUARD_NAMES = frozenset({
         "permission_required", "admin_required", "login_required",
-        "jwt_required", "requires_auth", "auth_required", "token_required",
+        "jwt_required", "fresh_jwt_required", "requires_auth",
+        "auth_required", "token_required",
         "roles_required", "roles_accepted", "permission_classes",
     })
 
