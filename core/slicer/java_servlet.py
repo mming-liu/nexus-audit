@@ -887,6 +887,25 @@ class JavaSlicer:
                         if src and self._GLOBAL_AUTHZ_MARK not in src:
                             u.source_code = self._GLOBAL_AUTHZ_MARK + "\n" + src
                     return
+            # ①a-2 Spring Security 全量认证 + 自定义 RBAC EL（M167
+            # spring-boot-demo）：anyRequest().authenticated() 之后再
+            # anyRequest().access("@rbacAuthorityService.hasPermission(...)")。
+            # 认证与逐 URL 权限都在 SecurityFilterChain 里，controller 方法体
+            # 看不到 —— 与 addFilterBefore 同口径打全局标记，authz 退 None。
+            for java in root.rglob("*.java"):
+                try:
+                    text = java.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                if (re.search(r"anyRequest\s*\(\s*\)\s*\.\s*authenticated",
+                              text)
+                        and re.search(r"\.access\s*\(\s*[\"']@", text)):
+                    for u in units:
+                        src = u.source_code or ""
+                        if src and self._GLOBAL_AUTHZ_MARK not in src:
+                            u.source_code = self._GLOBAL_AUTHZ_MARK + "\n" + src
+                    return
+
             # ①b Spring Security profile 门（M156 Apollo）：anyRequest()
             # 的 hasAnyRole 只在 auth/ldap/oidc profile 生效，默认配置
             # 直接放行。整库打"依赖 profile"标记，authz 判据退 None。

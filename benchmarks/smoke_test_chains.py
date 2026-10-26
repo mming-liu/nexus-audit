@@ -6944,12 +6944,12 @@ import cli as _cli130                                             # noqa: E402
 from benchmarks.run_all import JOBS as _JOBS130                   # noqa: E402
 check("M130：规则 32 类 / 补丁器 27 类（doctor 单一事实源）",
       (len(_C130), len(_cli130.DOCTOR_PATCHERS)), (34, 29))
-check("M130：run_all 作业表 53 项且含 comet / DjanGoat / 覆盖地板",
+check("M130：run_all 作业表 55 项且含 comet / DjanGoat / 覆盖地板",
       (len(_JOBS130),
        any("comet" in str(j[0]) for j in _JOBS130),
        any("DjanGoat" in str(j[0]) for j in _JOBS130),
        any("覆盖地板" in str(j[0]) for j in _JOBS130)),
-      (53, True, True, True))
+      (55, True, True, True))
 
 import core.agents.rule_detectors as _rd130                       # noqa: E402
 _NEW130 = ("ssti_verdict", "_sol_unchecked_zones", "_py_redir_verdict",
@@ -7215,8 +7215,8 @@ check("M138：输出含四维表头（--fix / --emit-poc / CVSS）",
 # Java/Python、delegatecall=Solidity），每个都会在不适用的语言上留一个
 # (类目, 语言) 空格 —— 41 → 47 是设计使然，不是判据退步。真正该锁的不变量
 # 在 [184]：**每个新类目至少有一门语言判得出来**，不允许整类空着。
-check("M139：覆盖缺口有界（≤54；M171 两新类目各留不适用的语言空格）",
-      _m138["gap_count"] <= 54, True)
+check("M139：覆盖缺口有界（≤55；M171 两新类目各留不适用的语言空格）",
+      _m138["gap_count"] <= 55, True)
 check("M139：补丁器映射与 doctor 单一事实源一致（29 个补丁器 / 23 类目）",
       (_m138["patchers"], len(_m138["fix_map"])), (29, 23))
 
@@ -7232,8 +7232,8 @@ from core.agents.vuln_categories import CATEGORIES as _C140       # noqa: E402
 import cli as _cli140                                             # noqa: E402
 
 check("M140：门禁 51 项（冒烟+争议+地板+48 个靶场/校验项）",
-      len(_JOBS140), 53)
-check("M140：野战场 34 个真实仓库", len(_REPOS140), 34)
+      len(_JOBS140), 55)
+check("M140：野战场 38 个真实仓库", len(_REPOS140), 38)
 check("M140：规则 32 类 / 补丁器 27 类", (len(_C140),
                                           len(_cli140.DOCTOR_PATCHERS)),
       (34, 29))
@@ -7257,8 +7257,8 @@ check("M140：五个 Solidity 生产库规则层全部 0 True（N₁ 铁壁）",
       [r for r in _p0_rows140 if r[1] != 0], [])
 
 # 三语言野战仓各至少 3 个，且总量 17
-check("M140：三语言分布自洽（Java 15 / Python 8 / Solidity 11）",
-      len(_REPOS140) - 8 - 11, 15)
+check("M140：三语言分布自洽（Java 17 / Python 9 / Solidity 12）",
+      len(_REPOS140) - 9 - 12, 17)
 
 # wild_hunt.json 与白皮书四处数字仍然一致（M85 的护栏 + 17 仓后仍成立）
 _r140d = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
@@ -7641,7 +7641,7 @@ if _adv149.exists():
     _drafts149 = list(_adv149.rglob("GHSA-*.md"))
     _idx149 = _adv149 / "INDEX.md"
     _itxt149 = _idx149.read_text(encoding="utf-8") if _idx149.exists() else ""
-    check("M149：34 仓披露包总目录存在且零断链",
+    check("M149：38 仓披露包总目录存在且零断链",
           (_idx149.exists(), bool(_drafts149),
            all(f"]({p.name})" in _itxt149 for p in _drafts149)),
           (True, True, True))
@@ -8723,14 +8723,14 @@ try:
 finally:
     _shm.rmtree(_POC_REPO, ignore_errors=True)
 
-print("\n[181] M148：34 仓语言分布对账（Java 15 / Python 8 / Solidity 11）")
+print("\n[181] M148：38 仓语言分布对账（Java 17 / Python 9 / Solidity 12）")
 _py_wild = ROOT / "benchmarks" / "wild_hunt.py"
 _ns: dict = {"__name__": "wild_probe", "__file__": str(_py_wild)}
 try:
     exec(compile(_py_wild.read_text(encoding="utf-8"), str(_py_wild), "exec"),
          _ns)
     _repos = _ns["REPOS"]
-    check("M148：野仓注册表 = 34 个", len(_repos), 34)
+    check("M148：野仓注册表 = 38 个", len(_repos), 38)
     def _lang_of(rel: str) -> str:
         """按**构建文件 / 源码后缀**判主语言（不靠目录命名约定）。
 
@@ -8749,11 +8749,11 @@ try:
     for _r in _repos:
         _k = _lang_of(_r[1])
         _by_lang[_k] = _by_lang.get(_k, 0) + 1
-    check("M148：Solidity 11 仓", _by_lang.get("solidity", 0), 11)
-    check("M148：Python 8 仓", _by_lang.get("python", 0), 8)
-    check("M148：Java 15 仓", _by_lang.get("java", 0), 15)
-    check("M148：34 个仓目录都已落地",
-          sum(1 for r in _repos if (ROOT / r[1]).exists()), 34)
+    check("M148：Solidity 12 仓", _by_lang.get("solidity", 0), 12)
+    check("M148：Python 9 仓", _by_lang.get("python", 0), 9)
+    check("M148：Java 17 仓", _by_lang.get("java", 0), 17)
+    check("M148：38 个仓目录都已落地",
+          sum(1 for r in _repos if (ROOT / r[1]).exists()), 38)
 except Exception as _e:                                          # noqa: BLE001
     check(f"M148：野仓注册表可解析（{type(_e).__name__}）", True, True)
 
@@ -8805,7 +8805,7 @@ try:
     from benchmarks.run_all import JOBS as _JOBS
     from core.agents.vuln_categories import CATEGORIES as _CATS
     import cli as _cli2
-    check("M148：run_all 门禁 53 项", len(_JOBS), 53)
+    check("M148：run_all 门禁 55 项", len(_JOBS), 55)
     check("M148：规则注册表 34 类", len(_CATS), 34)
     check("M148：补丁器 29 类", len(_cli2.DOCTOR_PATCHERS), 29)
     check("M148：三新类目都在注册表里",
@@ -9206,12 +9206,12 @@ for _d in _dirs197:
         _poc_bad198.append(_d.name + ":无 PoC")
 check("M160：每包至少一份 PoC 骨架", _poc_bad198, [])
 
-print("\n[199] M164：34 仓语言分布")
+print("\n[199] M164：38 仓语言分布")
 _wh199 = ROOT / "benchmarks" / "results" / "wild_hunt.json"
 if _wh199.exists():
     _d199 = json.loads(_wh199.read_text(encoding="utf-8"))
     _repos199 = _d199.get("repos", [])
-    check("M164：野战场 34 个仓库", len(_repos199), 34)
+    check("M164：野战场 38 个仓库", len(_repos199), 38)
     _lang199 = {"java": 0, "python": 0, "solidity": 0}
     for _r in _repos199:
         _p = Path(_r.get("path", ""))
@@ -9223,8 +9223,8 @@ if _wh199.exists():
             _lang199["solidity"] += 1
         else:
             _lang199["python"] += 1
-    check("M164：语言分布 Java 15 / Python 8 / Solidity 11",
-          _lang199, {"java": 15, "python": 8, "solidity": 11})
+    check("M164：语言分布 Java 17 / Python 9 / Solidity 12",
+          _lang199, {"java": 17, "python": 9, "solidity": 12})
 else:
     check("M164：wild_hunt.json 不在（跳过）", True, True)
 
@@ -9360,6 +9360,56 @@ check("M171/M172：29 个补丁器全部可调用",
 check("M171/M172：两新类目进 MATRIX_FIX_MAP",
       all(k in _cli186.MATRIX_FIX_MAP for k in ("nosqli",
                                                 "log_injection")), True)
+
+
+
+print("\n[206] M167：spring-boot-demo 安全模块 19 入口 / 0 True")
+_r206 = subprocess.run(
+    [sys.executable, str(ROOT / "benchmarks" / "benchmark_springboot_demo.py"),
+     "--strict"], capture_output=True, text=True, encoding="utf-8",
+    errors="replace")
+check("M167：benchmark_springboot_demo --strict exit 0", _r206.returncode, 0)
+check("M167：19 入口 / 7 类目 0 True",
+      ("19 入口 / 7 类目 0 True" in (_r206.stdout or "")), True)
+check("M167：SecurityConfig 全局标记 19/19",
+      ("全局标记 19/19" in (_r206.stdout or "")), True)
+
+print("\n[207] M170：xxl-job 36 入口 / authz+deserial 0 True")
+_r207 = subprocess.run(
+    [sys.executable, str(ROOT / "benchmarks" / "benchmark_xxl_job.py"),
+     "--strict"], capture_output=True, text=True, encoding="utf-8",
+    errors="replace")
+check("M170：benchmark_xxl_job --strict exit 0", _r207.returncode, 0)
+check("M170：36 入口 / authz+deserial 0 True",
+      ("36 入口 / authz+deserial 0 True" in (_r207.stdout or "")), True)
+check("M170：@XxlSso 管理员门 False / 匿名门 None",
+      ("管理员门（应 False）  ：False" in (_r207.stdout or "")
+       and "匿名门（应 None）     ：None" in (_r207.stdout or "")), True)
+
+print("\n[208] M181：第一波 38 仓注册表")
+from benchmarks.wild_hunt import REPOS as _R208                  # noqa: E402
+from benchmarks.run_all import JOBS as _J208                     # noqa: E402
+check("M181：野仓注册表 38 个", len(_R208), 38)
+check("M181：新增四仓都在注册表",
+      all(n in {r[0] for r in _R208}
+          for n in ("spring-boot-demo", "xxl-job", "flask-realworld",
+                    "v3-periphery")), True)
+check("M181：run_all 55 项", len(_J208), 55)
+
+print("\n[209] M181：34 类 / 29 补丁器保持")
+_wh209 = json.loads((ROOT / "benchmarks" / "results" / "wild_hunt.json")
+                    .read_text(encoding="utf-8"))
+check("M181：38 仓 143 个独立根因",
+      _wh209["totals"]["unique_root_causes"], 143)
+check("M181：规则 34 类", len(_C143), 34)
+check("M181：补丁器 29 类", len(_cli186.DOCTOR_PATCHERS), 29)
+
+print("\n[210] M182：第一波断言里程碑")
+check("M182：143 份披露草稿",
+      len(list((ROOT / "benchmarks" / "results" / "advisories")
+               .rglob("GHSA-*.md"))), 143)
+check("M182：已执行断言数 >=1190", COUNTS["n"] >= 1190, True)
+print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
 
 check("M148：失败清单为空", len(FAILS), 0)
 

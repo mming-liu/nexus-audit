@@ -1,7 +1,7 @@
 {
-  "total_root_causes": 119,
-  "cluster_count": 65,
-  "cross_repo_clusters": 12,
+  "total_root_causes": 143,
+  "cluster_count": 76,
+  "cross_repo_clusters": 13,
   "conservation_ok": true,
   "clusters": [
     {
@@ -14,6 +14,30 @@
         "My-Blog",
         "My-Blog-layui",
         "newbee-mall"
+      ]
+    },
+    {
+      "category": "unrestricted_upload",
+      "root_kind": "endpoint",
+      "component": "UploadController.java",
+      "repo_count": 3,
+      "root_count": 5,
+      "repos": [
+        "My-Blog",
+        "newbee-mall",
+        "spring-boot-demo"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "UploadController.java",
+      "repo_count": 3,
+      "root_count": 4,
+      "repos": [
+        "My-Blog",
+        "newbee-mall",
+        "spring-boot-demo"
       ]
     },
     {
@@ -105,17 +129,6 @@
       ]
     },
     {
-      "category": "unrestricted_upload",
-      "root_kind": "endpoint",
-      "component": "UploadController.java",
-      "repo_count": 2,
-      "root_count": 3,
-      "repos": [
-        "My-Blog",
-        "newbee-mall"
-      ]
-    },
-    {
       "category": "weakrand",
       "root_kind": "endpoint",
       "component": "UploadController.java",
@@ -129,12 +142,12 @@
     {
       "category": "xss",
       "root_kind": "endpoint",
-      "component": "UploadController.java",
+      "component": "JobInfoController.java",
       "repo_count": 2,
-      "root_count": 3,
+      "root_count": 4,
       "repos": [
-        "My-Blog",
-        "newbee-mall"
+        "jeecg-boot",
+        "xxl-job"
       ]
     },
     {
@@ -185,6 +198,16 @@
       "root_count": 1,
       "repos": [
         "DjanGoat"
+      ]
+    },
+    {
+      "category": "cors",
+      "root_kind": "global-config",
+      "component": "cors:487e406206b9",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "spring-boot-demo"
       ]
     },
     {
@@ -280,36 +303,6 @@
     {
       "category": "deserial",
       "root_kind": "endpoint",
-      "component": "AppController.java",
-      "repo_count": 1,
-      "root_count": 2,
-      "repos": [
-        "apollo"
-      ]
-    },
-    {
-      "category": "deserial",
-      "root_kind": "endpoint",
-      "component": "JobGroupController.java",
-      "repo_count": 1,
-      "root_count": 1,
-      "repos": [
-        "jeecg-boot"
-      ]
-    },
-    {
-      "category": "deserial",
-      "root_kind": "endpoint",
-      "component": "JobLogController.java",
-      "repo_count": 1,
-      "root_count": 3,
-      "repos": [
-        "jeecg-boot"
-      ]
-    },
-    {
-      "category": "deserial",
-      "root_kind": "endpoint",
       "component": "WxMsgController.java",
       "repo_count": 1,
       "root_count": 1,
@@ -395,6 +388,106 @@
       "root_count": 1,
       "repos": [
         "jeecg-boot"
+      ]
+    },
+    {
+      "category": "log_injection",
+      "root_kind": "endpoint",
+      "component": "DlMockController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "log_injection",
+      "root_kind": "endpoint",
+      "component": "DuplicateCheckController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "log_injection",
+      "root_kind": "endpoint",
+      "component": "OnlCgformDemoController.java",
+      "repo_count": 1,
+      "root_count": 2,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "log_injection",
+      "root_kind": "endpoint",
+      "component": "ParamFlowRuleController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "log_injection",
+      "root_kind": "endpoint",
+      "component": "SysAnnouncementController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "log_injection",
+      "root_kind": "endpoint",
+      "component": "SysDictController.java",
+      "repo_count": 1,
+      "root_count": 3,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "log_injection",
+      "root_kind": "endpoint",
+      "component": "SysRoleController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "log_injection",
+      "root_kind": "endpoint",
+      "component": "ThirdLoginController.java",
+      "repo_count": 1,
+      "root_count": 3,
+      "repos": [
+        "jeecg-boot"
+      ]
+    },
+    {
+      "category": "redir",
+      "root_kind": "endpoint",
+      "component": "LoginController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "xxl-job"
+      ]
+    },
+    {
+      "category": "redir",
+      "root_kind": "endpoint",
+      "component": "OauthController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "spring-boot-demo"
       ]
     },
     {
@@ -485,6 +578,16 @@
       "root_count": 1,
       "repos": [
         "DjanGoat"
+      ]
+    },
+    {
+      "category": "ssrf",
+      "root_kind": "endpoint",
+      "component": "ManualOperateController.java",
+      "repo_count": 1,
+      "root_count": 7,
+      "repos": [
+        "spring-boot-demo"
       ]
     },
     {
@@ -610,11 +713,21 @@
     {
       "category": "xss",
       "root_kind": "endpoint",
-      "component": "JobInfoController.java",
+      "component": "IndexController.java",
       "repo_count": 1,
-      "root_count": 2,
+      "root_count": 1,
       "repos": [
-        "jeecg-boot"
+        "xxl-job"
+      ]
+    },
+    {
+      "category": "xss",
+      "root_kind": "endpoint",
+      "component": "LoginController.java",
+      "repo_count": 1,
+      "root_count": 1,
+      "repos": [
+        "xxl-job"
       ]
     },
     {

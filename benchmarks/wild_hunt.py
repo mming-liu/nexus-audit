@@ -88,6 +88,14 @@ REPOS = [
      "fastapi_fullstack", ["--strict"]),
     ("solady", "reference_repos/solady/src", "solady", ["--strict"]),
     ("apollo", "reference_repos/apollo", "apollo", ["--strict"]),
+    # —— M167–M170：第 35–38 号野仓（38 仓里程碑）——
+    ("spring-boot-demo", "reference_repos/spring-boot-demo",
+     "springboot_demo", ["--strict"]),
+    ("xxl-job", "reference_repos/xxl-job", "xxl_job", ["--strict"]),
+    ("flask-realworld", "reference_repos/flask-realworld", "flask_rw",
+     ["--strict"]),
+    ("v3-periphery", "reference_repos/v3-periphery/contracts",
+     "v3_periphery", ["--strict"]),
 ]
 
 P0_LINE = re.compile(r"^- \*\*\[([a-z_]+)\]\*\* `")

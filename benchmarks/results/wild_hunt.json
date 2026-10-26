@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-10-25 22:56:35",
+  "generated_at": "2026-10-26 07:39:27",
   "repos": [
     {
       "name": "newbee-mall",
       "path": "reference_repos/newbee-mall-master",
       "scan_rc": 0,
-      "wall_s": 2.37,
+      "wall_s": 2.52,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-master",
         "total_units": 73,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 2117,
+        "total_pairs_evaluated": 2263,
         "p0_confirmed": 11,
         "p0_route_level_hits": 11,
         "p0_unique_root_causes": 11,
@@ -165,7 +165,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1768,
+        "funnel_filtered_out": 1914,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -175,7 +175,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 11,
-        "elapsed_ms": 837.6
+        "elapsed_ms": 846.7
       },
       "p0_route_level_hits": 11,
       "p0_unique_root_causes": 11,
@@ -209,26 +209,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall\\report.md\n      披露草稿 11 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\newbee-mall\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall\\report.sarif（11 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall\\report.html（11 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 1.94,
-        "tail": "   cmdi           0 /    0 /   73\n   ssrf           0 /    0 /   73\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\newbeemall.json",
-        "decided": null,
-        "fp": 0,
-        "total_units": null
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall\\report.md\n      披露草稿 11 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\newbee-mall\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall\\report.sarif（11 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall\\report.html（11 条）"
     },
     {
       "name": "newbee-mall-api",
       "path": "reference_repos/newbee-mall-api-master",
       "scan_rc": 0,
-      "wall_s": 2.26,
+      "wall_s": 2.29,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-api-master",
         "total_units": 62,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1798,
+        "total_pairs_evaluated": 1922,
         "p0_confirmed": 70,
         "p0_route_level_hits": 70,
         "p0_unique_root_causes": 9,
@@ -361,7 +353,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1439,
+        "funnel_filtered_out": 1563,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -371,7 +363,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 70,
-        "elapsed_ms": 729.7
+        "elapsed_ms": 755.1
       },
       "p0_route_level_hits": 70,
       "p0_unique_root_causes": 9,
@@ -401,26 +393,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall-api\\report.md\n      披露草稿 9 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\newbee-mall-api\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall-api\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall-api\\report.sarif（9 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall-api\\report.html（9 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 2.03,
-        "tail": "   ssrf           0 /    0 /   62\n   deserial       0 /    0 /   62\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\newbeemallapi.json",
-        "decided": null,
-        "fp": 0,
-        "total_units": null
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall-api\\report.md\n      披露草稿 9 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\newbee-mall-api\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall-api\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall-api\\report.sarif（9 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\newbee-mall-api\\report.html（9 条）"
     },
     {
       "name": "RuoYi",
       "path": "reference_repos/RuoYi-master",
       "scan_rc": 0,
-      "wall_s": 18.47,
+      "wall_s": 11.53,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\RuoYi-master",
         "total_units": 305,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 8845,
+        "total_pairs_evaluated": 9455,
         "p0_confirmed": 3,
         "p0_route_level_hits": 3,
         "p0_unique_root_causes": 3,
@@ -471,7 +455,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 7426,
+        "funnel_filtered_out": 8036,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -481,7 +465,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 3,
-        "elapsed_ms": 3254.6
+        "elapsed_ms": 1919.2
       },
       "p0_route_level_hits": 3,
       "p0_unique_root_causes": 3,
@@ -503,26 +487,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\RuoYi\\report.md\n      披露草稿 3 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\RuoYi\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\RuoYi\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\RuoYi\\report.sarif（3 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\RuoYi\\report.html（3 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.3,
-        "tail": "authz 注解行 159 条中被直接判 False 159 条\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\ruoyi.json\nSTRICT PASS ✔ （零误报 / 零判反 / 跨模块穿透在线 / 注解语义在线）",
-        "decided": 159,
-        "fp": 0,
-        "total_units": 305
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\RuoYi\\report.md\n      披露草稿 3 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\RuoYi\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\RuoYi\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\RuoYi\\report.sarif（3 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\RuoYi\\report.html（3 条）"
     },
     {
       "name": "eladmin-mp",
       "path": "reference_repos/eladmin-mp-master",
       "scan_rc": 0,
-      "wall_s": 3.97,
+      "wall_s": 3.46,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\eladmin-mp-master",
         "total_units": 65,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1885,
+        "total_pairs_evaluated": 2015,
         "p0_confirmed": 76,
         "p0_route_level_hits": 76,
         "p0_unique_root_causes": 12,
@@ -687,7 +663,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1472,
+        "funnel_filtered_out": 1602,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -697,7 +673,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 76,
-        "elapsed_ms": 1520.7
+        "elapsed_ms": 1141.3
       },
       "p0_route_level_hits": 76,
       "p0_unique_root_causes": 12,
@@ -721,26 +697,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-mp\\report.md\n      披露草稿 12 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\eladmin-mp\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-mp\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-mp\\report.sarif（12 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-mp\\report.html（12 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 2.09,
-        "tail": "    GeneratorController.java:GeneratorController.generatorCode\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\eladminmp.json\nSTRICT PASS ✔ （零误报 / 零判反 / @el.check 注解语义在线）",
-        "decided": 53,
-        "fp": 0,
-        "total_units": 65
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-mp\\report.md\n      披露草稿 12 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\eladmin-mp\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-mp\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-mp\\report.sarif（12 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-mp\\report.html（12 条）"
     },
     {
       "name": "mall",
       "path": "reference_repos/mall-main",
       "scan_rc": 0,
-      "wall_s": 15.09,
+      "wall_s": 9.37,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\mall-main",
         "total_units": 246,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 7134,
+        "total_pairs_evaluated": 7626,
         "p0_confirmed": 253,
         "p0_route_level_hits": 253,
         "p0_unique_root_causes": 8,
@@ -855,7 +823,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 5817,
+        "funnel_filtered_out": 6309,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -865,7 +833,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 253,
-        "elapsed_ms": 3439.1
+        "elapsed_ms": 2039.7
       },
       "p0_route_level_hits": 253,
       "p0_unique_root_causes": 8,
@@ -886,26 +854,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall\\report.md\n      披露草稿 8 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\mall\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall\\report.sarif（8 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall\\report.html（8 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.68,
-        "tail": "  全库 True（安全项目应恒为 0）：0\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\mall.json\nSTRICT 门禁：通过 ✔（登记全判对 / 全库零 True / 零退回）",
-        "decided": 16,
-        "fp": 0,
-        "total_units": 246
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall\\report.md\n      披露草稿 8 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\mall\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall\\report.sarif（8 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall\\report.html（8 条）"
     },
     {
       "name": "My-Blog",
       "path": "reference_repos/My-Blog-master",
       "scan_rc": 0,
-      "wall_s": 2.28,
+      "wall_s": 1.94,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\My-Blog-master",
         "total_units": 54,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1566,
+        "total_pairs_evaluated": 1674,
         "p0_confirmed": 6,
         "p0_route_level_hits": 6,
         "p0_unique_root_causes": 6,
@@ -996,7 +956,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1320,
+        "funnel_filtered_out": 1428,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1006,7 +966,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 6,
-        "elapsed_ms": 740.9
+        "elapsed_ms": 640.9
       },
       "p0_route_level_hits": 6,
       "p0_unique_root_causes": 6,
@@ -1034,26 +994,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog\\report.md\n      披露草稿 6 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\My-Blog\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog\\report.sarif（6 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog\\report.html（6 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.81,
-        "tail": "    UploadController.java:UploadController.upload [xss] truth=truth=weakrand got=True\nSTRICT 门禁：通过 ✔（零误报 / 真值全命中）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\myblog.json",
-        "decided": 202,
-        "fp": 0,
-        "total_units": null
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog\\report.md\n      披露草稿 6 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\My-Blog\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog\\report.sarif（6 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog\\report.html（6 条）"
     },
     {
       "name": "litemall",
       "path": "reference_repos/litemall-master",
       "scan_rc": 0,
-      "wall_s": 25.6,
+      "wall_s": 17.66,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\litemall-master",
         "total_units": 219,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 6351,
+        "total_pairs_evaluated": 6789,
         "p0_confirmed": 223,
         "p0_route_level_hits": 223,
         "p0_unique_root_causes": 5,
@@ -1136,7 +1088,7 @@
           }
         ],
         "secret_files_flagged": 1,
-        "funnel_filtered_out": 5220,
+        "funnel_filtered_out": 5658,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1146,7 +1098,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 223,
-        "elapsed_ms": 3224.9
+        "elapsed_ms": 2301.6
       },
       "p0_route_level_hits": 223,
       "p0_unique_root_causes": 5,
@@ -1173,26 +1125,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\litemall\\report.md\n      披露草稿 5 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\litemall\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\litemall\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\litemall\\report.sarif（5 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\litemall\\report.html（5 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 1.02,
-        "tail": "  漏报                  ：0\nSTRICT 门禁：通过 ✔（零误报 / 真值全命中）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\litemall.json",
-        "decided": 912,
-        "fp": 0,
-        "total_units": null
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\litemall\\report.md\n      披露草稿 5 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\litemall\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\litemall\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\litemall\\report.sarif（5 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\litemall\\report.html（5 条）"
     },
     {
       "name": "Employee-Management-System",
       "path": "reference_repos/employee-management-system",
       "scan_rc": 0,
-      "wall_s": 0.36,
+      "wall_s": 0.34,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\employee-management-system",
         "total_units": 4,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 116,
+        "total_pairs_evaluated": 124,
         "p0_confirmed": 2,
         "p0_route_level_hits": 2,
         "p0_unique_root_causes": 2,
@@ -1231,7 +1175,7 @@
           }
         ],
         "secret_files_flagged": 1,
-        "funnel_filtered_out": 99,
+        "funnel_filtered_out": 107,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1241,7 +1185,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 2,
-        "elapsed_ms": 11.2
+        "elapsed_ms": 11.3
       },
       "p0_route_level_hits": 2,
       "p0_unique_root_causes": 2,
@@ -1263,26 +1207,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Employee-Management-System\\report.md\n      披露草稿 2 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\Employee-Management-System\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Employee-Management-System\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Employee-Management-System\\report.sarif（2 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Employee-Management-System\\report.html（2 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.14,
-        "tail": "  人工复核面（不进真值）：insert / update 缺少登录与权限控制\nSTRICT 门禁：通过 ✔（零误报 / 真值 2/2 / 密钥命中）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\flaskcrud.json",
-        "decided": 17,
-        "fp": 0,
-        "total_units": null
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Employee-Management-System\\report.md\n      披露草稿 2 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\Employee-Management-System\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Employee-Management-System\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Employee-Management-System\\report.sarif（2 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Employee-Management-System\\report.html（2 条）"
     },
     {
       "name": "DjanGoat",
       "path": "reference_repos/DjanGoat",
       "scan_rc": 0,
-      "wall_s": 0.64,
+      "wall_s": 0.62,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\DjanGoat",
         "total_units": 36,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1044,
+        "total_pairs_evaluated": 1116,
         "p0_confirmed": 12,
         "p0_route_level_hits": 12,
         "p0_unique_root_causes": 12,
@@ -1451,7 +1387,7 @@
           }
         ],
         "secret_files_flagged": 1,
-        "funnel_filtered_out": 923,
+        "funnel_filtered_out": 995,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1461,7 +1397,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 12,
-        "elapsed_ms": 116.7
+        "elapsed_ms": 123.4
       },
       "p0_route_level_hits": 12,
       "p0_unique_root_causes": 12,
@@ -1524,21 +1460,13 @@
           "CVE-2018-14574"
         ]
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\DjanGoat\\report.md\n      披露草稿 12 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\DjanGoat\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\DjanGoat\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\DjanGoat\\report.sarif（12 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\DjanGoat\\report.html（12 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.31,
-        "tail": "  文件级硬编码密钥      ：True\nSTRICT PASS ✔（Django 路由通道在线 / 零误报 / 真值 12/12）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\djangoat.json",
-        "decided": 12,
-        "fp": 0,
-        "total_units": 36
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\DjanGoat\\report.md\n      披露草稿 12 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\DjanGoat\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\DjanGoat\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\DjanGoat\\report.sarif（12 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\DjanGoat\\report.html（12 条）"
     },
     {
       "name": "Compound",
       "path": "reference_repos/compound-protocol/contracts",
       "scan_rc": 0,
-      "wall_s": 1.38,
+      "wall_s": 1.35,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\compound-protocol\\contracts",
         "total_units": 450,
@@ -1561,7 +1489,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 317.4
+        "elapsed_ms": 317.7
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1574,21 +1502,13 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Compound\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\Compound\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Compound\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Compound\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Compound\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 1.16,
-        "tail": "    ExponentialNoError.sol:mul_ScalarTruncate [arithmetic          ] -> False\nSTRICT PASS ✔（生产协议 0 True / 锚点全 False）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\compound.json",
-        "decided": 445,
-        "fp": 0,
-        "total_units": 450
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Compound\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\Compound\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Compound\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Compound\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Compound\\report.html（0 条）"
     },
     {
       "name": "Comet",
       "path": "reference_repos/comet/contracts",
       "scan_rc": 0,
-      "wall_s": 1.03,
+      "wall_s": 0.99,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\comet\\contracts",
         "total_units": 357,
@@ -1611,7 +1531,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 175.1
+        "elapsed_ms": 170.5
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1624,21 +1544,13 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Comet\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\Comet\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Comet\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Comet\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Comet\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.78,
-        "tail": "    BaseBulker.sol:invoke                                    [unchecked_low_level_calls ] -> False\nSTRICT PASS ✔（0.8.x 生产合约 0 True / 锚点全 False）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\comet.json",
-        "decided": 432,
-        "fp": 0,
-        "total_units": 435
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Comet\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\Comet\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Comet\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Comet\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Comet\\report.html（0 条）"
     },
     {
       "name": "OpenZeppelin",
       "path": "reference_repos/openzeppelin-contracts/contracts",
       "scan_rc": 0,
-      "wall_s": 3.05,
+      "wall_s": 3.0,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\openzeppelin-contracts\\contracts",
         "total_units": 1989,
@@ -1661,7 +1573,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 661.6
+        "elapsed_ms": 644.7
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1674,26 +1586,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OpenZeppelin\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\OpenZeppelin\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OpenZeppelin\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OpenZeppelin\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OpenZeppelin\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 3.0,
-        "tail": "    OK governance/TimelockController.sol:_execute                 [unchecked_low_level_calls ] 期望 not_true  实际 None\nSTRICT PASS ✔（576 入口 / 0 True / 锚点达标）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\openzeppelin.json",
-        "decided": 576,
-        "fp": 0,
-        "total_units": 576
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OpenZeppelin\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\OpenZeppelin\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OpenZeppelin\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OpenZeppelin\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OpenZeppelin\\report.html（0 条）"
     },
     {
       "name": "AaveV3",
       "path": "reference_repos/aave-v3-core/contracts",
       "scan_rc": 0,
-      "wall_s": 1.04,
+      "wall_s": 1.01,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\aave-v3-core\\contracts",
         "total_units": 553,
         "test_units_skipped": 119,
-        "total_pairs_evaluated": 2237,
+        "total_pairs_evaluated": 2239,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -1701,7 +1605,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 874,
+        "funnel_filtered_out": 876,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1711,7 +1615,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 334.0
+        "elapsed_ms": 330.5
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1724,26 +1628,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\AaveV3\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\AaveV3\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\AaveV3\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\AaveV3\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\AaveV3\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 1.22,
-        "tail": "    OK mocks/helpers/SelfDestructTransfer.sol:destroyAndTransfer [access_control  ] 期望 True 实际 True\nSTRICT PASS ✔（275 入口 / 0 True / 锚点双向达标）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\aavev3.json",
-        "decided": 275,
-        "fp": 0,
-        "total_units": 275
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\AaveV3\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\AaveV3\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\AaveV3\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\AaveV3\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\AaveV3\\report.html（0 条）"
     },
     {
       "name": "waynboot-mall",
       "path": "reference_repos/waynboot-mall",
       "scan_rc": 0,
-      "wall_s": 12.85,
+      "wall_s": 8.17,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\waynboot-mall",
         "total_units": 163,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 4727,
+        "total_pairs_evaluated": 5053,
         "p0_confirmed": 163,
         "p0_route_level_hits": 163,
         "p0_unique_root_causes": 1,
@@ -1772,7 +1668,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 3875,
+        "funnel_filtered_out": 4201,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1782,7 +1678,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 163,
-        "elapsed_ms": 3130.1
+        "elapsed_ms": 1706.6
       },
       "p0_route_level_hits": 163,
       "p0_unique_root_causes": 1,
@@ -1799,26 +1695,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\waynboot-mall\\report.md\n      披露草稿 1 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\waynboot-mall\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\waynboot-mall\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\waynboot-mall\\report.sarif（1 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\waynboot-mall\\report.html（1 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 10.91,
-        "tail": "结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\waynboot.json\nC:\\myFloders\\git\\nexus-audit\\benchmarks\\benchmark_waynboot.py:21: SyntaxWarning: \"\\w\" is an invalid escape sequence. Such sequences will not work in the future. Did you mean \"\\\\w\"? A raw string is also an option.\n  | 1 条 `hardcoded_secret`（`WxController.jsSdkInit`） | 正则跨语句拼出\"幽灵赋值\"：`appSecret;` 的下一行 `resultJsonStr = \"https://…\"` 被拼成 `secret = \"…\"` | `SECRET_ASSIGN_RE` 三处收紧：名字前 `(?<![\\w$])`、`[:=]` 两侧禁跨行、值禁跨行 |",
-        "decided": 163,
-        "fp": 0,
-        "total_units": 163
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\waynboot-mall\\report.md\n      披露草稿 1 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\waynboot-mall\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\waynboot-mall\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\waynboot-mall\\report.sarif（1 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\waynboot-mall\\report.html（1 条）"
     },
     {
       "name": "mall4j",
       "path": "reference_repos/mall4j",
       "scan_rc": 0,
-      "wall_s": 4.59,
+      "wall_s": 3.98,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\mall4j",
         "total_units": 139,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 4031,
+        "total_pairs_evaluated": 4309,
         "p0_confirmed": 143,
         "p0_route_level_hits": 143,
         "p0_unique_root_causes": 5,
@@ -1899,7 +1787,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 3088,
+        "funnel_filtered_out": 3366,
         "funnel_filter_rate": 0.9994,
         "llm_dispatched": 2,
         "model_candidates": [
@@ -1924,7 +1812,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 143,
-        "elapsed_ms": 1927.6
+        "elapsed_ms": 1346.5
       },
       "p0_route_level_hits": 143,
       "p0_unique_root_causes": 5,
@@ -1948,26 +1836,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall4j\\report.md\n      披露草稿 5 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\mall4j\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall4j\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall4j\\report.sarif（7 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall4j\\report.html（7 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 3.11,
-        "tail": "      [?] FileController.java:FileController.uploadTinymceEditorImages [authz]\nSTRICT PASS ✔（139 入口 / 主体链零 True / CORS 折叠成 1）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\mall4j.json",
-        "decided": 139,
-        "fp": 0,
-        "total_units": 139
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall4j\\report.md\n      披露草稿 5 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\mall4j\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall4j\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall4j\\report.sarif（7 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall4j\\report.html（7 条）"
     },
     {
       "name": "flaskr",
       "path": "reference_repos/flaskr",
       "scan_rc": 0,
-      "wall_s": 0.37,
+      "wall_s": 0.32,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flaskr",
         "total_units": 8,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 232,
+        "total_pairs_evaluated": 248,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -1975,7 +1855,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 195,
+        "funnel_filtered_out": 211,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -1985,7 +1865,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 30.0
+        "elapsed_ms": 30.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -1998,21 +1878,13 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flaskr\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\flaskr\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flaskr\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flaskr\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flaskr\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.15,
-        "tail": "  check_author 机制在切片内：✔\nSTRICT PASS ✔（8 入口 / 0 True / 跨函数归属校验判 False）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\flaskr.json",
-        "decided": 8,
-        "fp": 0,
-        "total_units": 8
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flaskr\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\flaskr\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flaskr\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flaskr\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flaskr\\report.html（0 条）"
     },
     {
       "name": "Synthetix V3",
       "path": "reference_repos/synthetix-v3",
       "scan_rc": 0,
-      "wall_s": 271.22,
+      "wall_s": 142.26,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\synthetix-v3",
         "total_units": 1411,
@@ -2052,7 +1924,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 1,
-        "elapsed_ms": 9621.0
+        "elapsed_ms": 5268.0
       },
       "p0_route_level_hits": 1,
       "p0_unique_root_causes": 1,
@@ -2071,21 +1943,13 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Synthetix V3\\report.md\n      披露草稿 1 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\Synthetix V3\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Synthetix V3\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Synthetix V3\\report.sarif（1 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Synthetix V3\\report.html（1 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 153.96,
-        "tail": "  规则层 True 总数      ：0\nSTRICT PASS ✔（1264 生产入口 / 四类 0 True）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\synthetixv3.json",
-        "decided": 1264,
-        "fp": 0,
-        "total_units": 1264
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Synthetix V3\\report.md\n      披露草稿 1 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\Synthetix V3\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Synthetix V3\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Synthetix V3\\report.sarif（1 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Synthetix V3\\report.html（1 条）"
     },
     {
       "name": "sushiswap-zapper",
       "path": "reference_repos/sushiswap-zapper",
       "scan_rc": 0,
-      "wall_s": 0.48,
+      "wall_s": 0.44,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\sushiswap-zapper",
         "total_units": 75,
@@ -2108,7 +1972,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 58.8
+        "elapsed_ms": 51.4
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2121,33 +1985,25 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\sushiswap-zapper\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\sushiswap-zapper\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\sushiswap-zapper\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\sushiswap-zapper\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\sushiswap-zapper\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.25,
-        "tail": "    Sushiswap_ZapOut_General_V1.sol        False\nSTRICT PASS ✔（75 入口 / 0 True / 谓词式 Ownable 判 False）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\sushizapper.json",
-        "decided": 75,
-        "fp": 0,
-        "total_units": 75
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\sushiswap-zapper\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\sushiswap-zapper\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\sushiswap-zapper\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\sushiswap-zapper\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\sushiswap-zapper\\report.html（0 条）"
     },
     {
       "name": "jeecg-boot",
       "path": "reference_repos/jeecg-boot",
       "scan_rc": 0,
-      "wall_s": 31.27,
+      "wall_s": 29.4,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot",
         "total_units": 458,
         "test_units_skipped": 29,
-        "total_pairs_evaluated": 13282,
-        "p0_confirmed": 473,
-        "p0_route_level_hits": 473,
-        "p0_unique_root_causes": 18,
+        "total_pairs_evaluated": 14198,
+        "p0_confirmed": 482,
+        "p0_route_level_hits": 482,
+        "p0_unique_root_causes": 27,
         "p0_route_by_cat": {
           "cors": 456,
-          "deserial": 4,
           "xss": 2,
+          "log_injection": 13,
           "hash": 4,
           "sqli": 3,
           "redir": 3,
@@ -2155,8 +2011,8 @@
         },
         "p0_unique_by_cat": {
           "cors": 1,
-          "deserial": 4,
           "xss": 2,
+          "log_injection": 13,
           "hash": 4,
           "sqli": 3,
           "redir": 3,
@@ -2177,18 +2033,6 @@
               "IndexController.loginDo",
               "IndexController.logout",
               "IndexController.help"
-            ]
-          },
-          {
-            "category": "deserial",
-            "kind": "endpoint",
-            "signature": "deserial:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-server-cloud\\jeecg-visual\\jeecg-cloud-xxljob\\src\\main\\java\\com\\xxl\\job\\admin\\controller\\JobGroupController.java:174:JobGroupController.loadById",
-            "affected_routes": 1,
-            "representative": "JobGroupController.loadById",
-            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-server-cloud\\jeecg-visual\\jeecg-cloud-xxljob\\src\\main\\java\\com\\xxl\\job\\admin\\controller\\JobGroupController.java",
-            "line": 174,
-            "routes": [
-              "JobGroupController.loadById"
             ]
           },
           {
@@ -2216,39 +2060,27 @@
             ]
           },
           {
-            "category": "deserial",
+            "category": "log_injection",
             "kind": "endpoint",
-            "signature": "deserial:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-server-cloud\\jeecg-visual\\jeecg-cloud-xxljob\\src\\main\\java\\com\\xxl\\job\\admin\\controller\\JobLogController.java:119:JobLogController.logDetailPage",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-server-cloud\\jeecg-visual\\jeecg-cloud-sentinel\\src\\main\\java\\com\\alibaba\\csp\\sentinel\\dashboard\\controller\\ParamFlowRuleController.java:172:ParamFlowRuleController.apiUpdateParamFlowRule",
             "affected_routes": 1,
-            "representative": "JobLogController.logDetailPage",
-            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-server-cloud\\jeecg-visual\\jeecg-cloud-xxljob\\src\\main\\java\\com\\xxl\\job\\admin\\controller\\JobLogController.java",
-            "line": 119,
+            "representative": "ParamFlowRuleController.apiUpdateParamFlowRule",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-server-cloud\\jeecg-visual\\jeecg-cloud-sentinel\\src\\main\\java\\com\\alibaba\\csp\\sentinel\\dashboard\\controller\\ParamFlowRuleController.java",
+            "line": 172,
             "routes": [
-              "JobLogController.logDetailPage"
+              "ParamFlowRuleController.apiUpdateParamFlowRule"
             ]
           },
           {
-            "category": "deserial",
+            "category": "log_injection",
             "kind": "endpoint",
-            "signature": "deserial:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-server-cloud\\jeecg-visual\\jeecg-cloud-xxljob\\src\\main\\java\\com\\xxl\\job\\admin\\controller\\JobLogController.java:137:JobLogController.logDetailCat",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\DuplicateCheckController.java:45:DuplicateCheckController.doDuplicateCheck",
             "affected_routes": 1,
-            "representative": "JobLogController.logDetailCat",
-            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-server-cloud\\jeecg-visual\\jeecg-cloud-xxljob\\src\\main\\java\\com\\xxl\\job\\admin\\controller\\JobLogController.java",
-            "line": 137,
+            "representative": "DuplicateCheckController.doDuplicateCheck",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\DuplicateCheckController.java",
+            "line": 45,
             "routes": [
-              "JobLogController.logDetailCat"
-            ]
-          },
-          {
-            "category": "deserial",
-            "kind": "endpoint",
-            "signature": "deserial:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-server-cloud\\jeecg-visual\\jeecg-cloud-xxljob\\src\\main\\java\\com\\xxl\\job\\admin\\controller\\JobLogController.java:159:JobLogController.logKill",
-            "affected_routes": 1,
-            "representative": "JobLogController.logKill",
-            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-server-cloud\\jeecg-visual\\jeecg-cloud-xxljob\\src\\main\\java\\com\\xxl\\job\\admin\\controller\\JobLogController.java",
-            "line": 159,
-            "routes": [
-              "JobLogController.logKill"
+              "DuplicateCheckController.doDuplicateCheck"
             ]
           },
           {
@@ -2288,6 +2120,18 @@
             ]
           },
           {
+            "category": "log_injection",
+            "kind": "endpoint",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\SysAnnouncementController.java:324:SysAnnouncementController.listByUser",
+            "affected_routes": 1,
+            "representative": "SysAnnouncementController.listByUser",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\SysAnnouncementController.java",
+            "line": 324,
+            "routes": [
+              "SysAnnouncementController.listByUser"
+            ]
+          },
+          {
             "category": "sqli",
             "kind": "endpoint",
             "signature": "sqli:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\SysAnnouncementSendController.java:197:SysAnnouncementSendController.editById",
@@ -2312,6 +2156,54 @@
             ]
           },
           {
+            "category": "log_injection",
+            "kind": "endpoint",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\SysDictController.java:135:SysDictController.getDictText",
+            "affected_routes": 1,
+            "representative": "SysDictController.getDictText",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\SysDictController.java",
+            "line": 135,
+            "routes": [
+              "SysDictController.getDictText"
+            ]
+          },
+          {
+            "category": "log_injection",
+            "kind": "endpoint",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\SysDictController.java:159:SysDictController.getDictItems",
+            "affected_routes": 1,
+            "representative": "SysDictController.getDictItems",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\SysDictController.java",
+            "line": 159,
+            "routes": [
+              "SysDictController.getDictItems"
+            ]
+          },
+          {
+            "category": "log_injection",
+            "kind": "endpoint",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\SysDictController.java:192:SysDictController.loadDict",
+            "affected_routes": 1,
+            "representative": "SysDictController.loadDict",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\SysDictController.java",
+            "line": 192,
+            "routes": [
+              "SysDictController.loadDict"
+            ]
+          },
+          {
+            "category": "log_injection",
+            "kind": "endpoint",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\SysRoleController.java:214:SysRoleController.checkUsername",
+            "affected_routes": 1,
+            "representative": "SysRoleController.checkUsername",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\SysRoleController.java",
+            "line": 214,
+            "routes": [
+              "SysRoleController.checkUsername"
+            ]
+          },
+          {
             "category": "sqli",
             "kind": "endpoint",
             "signature": "sqli:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\SysUserController.java:253:SysUserController.frozenBatch",
@@ -2321,6 +2213,18 @@
             "line": 253,
             "routes": [
               "SysUserController.frozenBatch"
+            ]
+          },
+          {
+            "category": "log_injection",
+            "kind": "endpoint",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\ThirdLoginController.java:67:ThirdLoginController.render",
+            "affected_routes": 1,
+            "representative": "ThirdLoginController.render",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\ThirdLoginController.java",
+            "line": 67,
+            "routes": [
+              "ThirdLoginController.render"
             ]
           },
           {
@@ -2336,6 +2240,18 @@
             ]
           },
           {
+            "category": "log_injection",
+            "kind": "endpoint",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\ThirdLoginController.java:76:ThirdLoginController.loginThird",
+            "affected_routes": 1,
+            "representative": "ThirdLoginController.loginThird",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\ThirdLoginController.java",
+            "line": 76,
+            "routes": [
+              "ThirdLoginController.loginThird"
+            ]
+          },
+          {
             "category": "redir",
             "kind": "endpoint",
             "signature": "redir:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\ThirdLoginController.java:294:ThirdLoginController.oauth2LoginCallback",
@@ -2345,6 +2261,18 @@
             "line": 294,
             "routes": [
               "ThirdLoginController.oauth2LoginCallback"
+            ]
+          },
+          {
+            "category": "log_injection",
+            "kind": "endpoint",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\ThirdLoginController.java:358:ThirdLoginController.oauth2LoginCallback#2",
+            "affected_routes": 1,
+            "representative": "ThirdLoginController.oauth2LoginCallback#2",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-system\\jeecg-system-biz\\src\\main\\java\\org\\jeecg\\modules\\system\\controller\\ThirdLoginController.java",
+            "line": 358,
+            "routes": [
+              "ThirdLoginController.oauth2LoginCallback#2"
             ]
           },
           {
@@ -2372,6 +2300,42 @@
             ]
           },
           {
+            "category": "log_injection",
+            "kind": "endpoint",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-demo\\src\\main\\java\\org\\jeecg\\modules\\dlglong\\controller\\DlMockController.java:209:DlMockController.getMockDdjhData",
+            "affected_routes": 1,
+            "representative": "DlMockController.getMockDdjhData",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-demo\\src\\main\\java\\org\\jeecg\\modules\\dlglong\\controller\\DlMockController.java",
+            "line": 209,
+            "routes": [
+              "DlMockController.getMockDdjhData"
+            ]
+          },
+          {
+            "category": "log_injection",
+            "kind": "endpoint",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-demo\\src\\main\\java\\org\\jeecg\\modules\\demo\\online\\OnlCgformDemoController.java:33:OnlCgformDemoController.enhanceJavaListHttp",
+            "affected_routes": 1,
+            "representative": "OnlCgformDemoController.enhanceJavaListHttp",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-demo\\src\\main\\java\\org\\jeecg\\modules\\demo\\online\\OnlCgformDemoController.java",
+            "line": 33,
+            "routes": [
+              "OnlCgformDemoController.enhanceJavaListHttp"
+            ]
+          },
+          {
+            "category": "log_injection",
+            "kind": "endpoint",
+            "signature": "log_injection:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-demo\\src\\main\\java\\org\\jeecg\\modules\\demo\\online\\OnlCgformDemoController.java:75:OnlCgformDemoController.enhanceJavaHttp",
+            "affected_routes": 1,
+            "representative": "OnlCgformDemoController.enhanceJavaHttp",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-module-demo\\src\\main\\java\\org\\jeecg\\modules\\demo\\online\\OnlCgformDemoController.java",
+            "line": 75,
+            "routes": [
+              "OnlCgformDemoController.enhanceJavaHttp"
+            ]
+          },
+          {
             "category": "hardcoded_secret",
             "kind": "file-level",
             "signature": "hardcoded_secret:file:C:\\myFloders\\git\\nexus-audit\\reference_repos\\jeecg-boot\\jeecg-boot-base-core\\src\\main\\java\\org\\jeecg\\config\\JeecgBaseConfig.java",
@@ -2385,7 +2349,7 @@
           }
         ],
         "secret_files_flagged": 1,
-        "funnel_filtered_out": 10704,
+        "funnel_filtered_out": 11611,
         "funnel_filter_rate": 0.9999,
         "llm_dispatched": 1,
         "model_candidates": [
@@ -2402,15 +2366,15 @@
         "baseline": "",
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
-        "new_findings": 473,
-        "elapsed_ms": 7233.2
+        "new_findings": 482,
+        "elapsed_ms": 7058.6
       },
-      "p0_route_level_hits": 473,
-      "p0_unique_root_causes": 18,
+      "p0_route_level_hits": 482,
+      "p0_unique_root_causes": 27,
       "p0_route_by_cat": {
         "cors": 456,
-        "deserial": 4,
         "xss": 2,
+        "log_injection": 13,
         "hash": 4,
         "sqli": 3,
         "redir": 3,
@@ -2418,16 +2382,16 @@
       },
       "p0_unique_by_cat": {
         "cors": 1,
-        "deserial": 4,
         "xss": 2,
+        "log_injection": 13,
         "hash": 4,
         "sqli": 3,
         "redir": 3,
         "hardcoded_secret": 1
       },
       "p0_by_cat": {
-        "deserial": 4,
         "xss": 2,
+        "log_injection": 13,
         "hash": 4,
         "sqli": 3,
         "redir": 3,
@@ -2449,21 +2413,13 @@
           "CVE-2022-21363"
         ]
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\jeecg-boot\\report.md\n      披露草稿 18 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\jeecg-boot\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\jeecg-boot\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\jeecg-boot\\report.sarif（19 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\jeecg-boot\\report.html（19 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 28.09,
-        "tail": "  文件级密钥（JeecgBaseConfig.java）：✔ 命中\nSTRICT PASS ✔（487 入口 / authz 零 True / 17 个已知根因冻结 + 1 文件级密钥）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\jeecg.json",
-        "decided": 487,
-        "fp": 0,
-        "total_units": 487
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\jeecg-boot\\report.md\n      披露草稿 27 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\jeecg-boot\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\jeecg-boot\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\jeecg-boot\\report.sarif（28 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\jeecg-boot\\report.html（28 条）"
     },
     {
       "name": "Uniswap V2",
       "path": "reference_repos/uniswap-v2-core",
       "scan_rc": 0,
-      "wall_s": 0.43,
+      "wall_s": 0.36,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\uniswap-v2-core",
         "total_units": 29,
@@ -2486,7 +2442,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 34.3
+        "elapsed_ms": 29.6
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2499,26 +2455,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Uniswap V2\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\Uniswap V2\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Uniswap V2\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Uniswap V2\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Uniswap V2\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.19,
-        "tail": "    burn     with=False without=None（改写生效=True）\nSTRICT PASS ✔（29 入口 / 四类 0 True / 整数锁反向锚点成立）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\uniswapv2.json",
-        "decided": 29,
-        "fp": 0,
-        "total_units": 29
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Uniswap V2\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\Uniswap V2\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Uniswap V2\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Uniswap V2\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\Uniswap V2\\report.html（0 条）"
     },
     {
       "name": "fastapi-realworld",
       "path": "reference_repos/fastapi-realworld",
       "scan_rc": 0,
-      "wall_s": 0.51,
+      "wall_s": 0.46,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\fastapi-realworld",
         "total_units": 19,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 551,
+        "total_pairs_evaluated": 589,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -2526,7 +2474,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 512,
+        "funnel_filtered_out": 550,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -2536,7 +2484,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 98.4
+        "elapsed_ms": 94.1
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2549,26 +2497,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\fastapi-realworld\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\fastapi-realworld\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\fastapi-realworld\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\fastapi-realworld\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\fastapi-realworld\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.22,
-        "tail": "  `$1`/`:name` 参数化 repository 的 sqli 判定：False\nSTRICT PASS ✔（19 入口 / 全类目 0 True / 参数化 SQL 判 False）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\fastapi_rw.json",
-        "decided": 19,
-        "fp": 0,
-        "total_units": 19
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\fastapi-realworld\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\fastapi-realworld\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\fastapi-realworld\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\fastapi-realworld\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\fastapi-realworld\\report.html（0 条）"
     },
     {
       "name": "django-realworld",
       "path": "reference_repos/django-realworld",
       "scan_rc": 0,
-      "wall_s": 0.46,
+      "wall_s": 0.4,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\django-realworld",
         "total_units": 11,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 319,
+        "total_pairs_evaluated": 341,
         "p0_confirmed": 2,
         "p0_route_level_hits": 2,
         "p0_unique_root_causes": 2,
@@ -2607,7 +2547,7 @@
           }
         ],
         "secret_files_flagged": 1,
-        "funnel_filtered_out": 276,
+        "funnel_filtered_out": 298,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -2617,7 +2557,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 2,
-        "elapsed_ms": 44.4
+        "elapsed_ms": 41.1
       },
       "p0_route_level_hits": 2,
       "p0_unique_root_causes": 2,
@@ -2673,26 +2613,18 @@
           "CVE-2022-29217"
         ]
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\django-realworld\\report.md\n      披露草稿 2 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\django-realworld\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\django-realworld\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\django-realworld\\report.sarif（2 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\django-realworld\\report.html（2 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.19,
-        "tail": "    ArticleViewSet.retrieve      False\nSTRICT PASS ✔（10 个 DRF 动作 / 1 条真 BOLA / 公开读判 False）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\django_rw.json",
-        "decided": 11,
-        "fp": 0,
-        "total_units": 11
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\django-realworld\\report.md\n      披露草稿 2 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\django-realworld\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\django-realworld\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\django-realworld\\report.sarif（2 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\django-realworld\\report.html（2 条）"
     },
     {
       "name": "eladmin-JPA",
       "path": "reference_repos/eladmin",
       "scan_rc": 0,
-      "wall_s": 4.78,
+      "wall_s": 4.28,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\eladmin",
         "total_units": 66,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1914,
+        "total_pairs_evaluated": 2046,
         "p0_confirmed": 77,
         "p0_route_level_hits": 77,
         "p0_unique_root_causes": 12,
@@ -2857,7 +2789,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1506,
+        "funnel_filtered_out": 1638,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -2867,7 +2799,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 77,
-        "elapsed_ms": 1640.8
+        "elapsed_ms": 1483.9
       },
       "p0_route_level_hits": 77,
       "p0_unique_root_causes": 12,
@@ -2891,21 +2823,13 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-JPA\\report.md\n      披露草稿 12 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\eladmin-JPA\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-JPA\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-JPA\\report.sarif（12 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-JPA\\report.html（12 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 4.13,
-        "tail": "  ('crypto',) 零 True 检查：{'crypto': 0}\nSTRICT PASS ✔（66 入口 / crypto 零 True / 13 个根因冻结）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\eladmin_jpa.json",
-        "decided": 66,
-        "fp": 0,
-        "total_units": 66
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-JPA\\report.md\n      披露草稿 12 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\eladmin-JPA\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-JPA\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-JPA\\report.sarif（12 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\eladmin-JPA\\report.html（12 条）"
     },
     {
       "name": "UniswapV3",
       "path": "reference_repos/uniswap-v3-core/contracts",
       "scan_rc": 0,
-      "wall_s": 0.61,
+      "wall_s": 0.52,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\uniswap-v3-core\\contracts",
         "total_units": 67,
@@ -2928,7 +2852,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 85.7
+        "elapsed_ms": 74.9
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2941,26 +2865,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\UniswapV3\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\UniswapV3\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\UniswapV3\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\UniswapV3\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\UniswapV3\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.34,
-        "tail": "  锁保护函数 reentrancy ：{'mint': False, 'burn': False, 'swap': False, 'flash': False, 'collect': False}\nSTRICT PASS ✔（生产 0 True / lock 函数全 False）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\uniswapv3.json",
-        "decided": 66,
-        "fp": 0,
-        "total_units": 67
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\UniswapV3\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\UniswapV3\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\UniswapV3\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\UniswapV3\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\UniswapV3\\report.html（0 条）"
     },
     {
       "name": "FastAPI",
       "path": "reference_repos/fastapi-sql-template",
       "scan_rc": 0,
-      "wall_s": 0.47,
+      "wall_s": 0.39,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\fastapi-sql-template",
         "total_units": 9,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 261,
+        "total_pairs_evaluated": 279,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -2968,7 +2884,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 232,
+        "funnel_filtered_out": 250,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -2978,7 +2894,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 46.3
+        "elapsed_ms": 44.0
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -2991,21 +2907,13 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\FastAPI\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\FastAPI\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\FastAPI\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\FastAPI\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\FastAPI\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.19,
-        "tail": "  users sqli            ：{'list_users_endpoint': False, 'get_user_endpoint': False, 'create_user_endpoint': False, 'update_user_endpoint': False, 'delete_user_endpoint': None}\nSTRICT PASS ✔（async 9 入口 / 0 True / Depends 授权在线）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\fastapi_wild.json",
-        "decided": 9,
-        "fp": 0,
-        "total_units": 9
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\FastAPI\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\FastAPI\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\FastAPI\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\FastAPI\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\FastAPI\\report.html（0 条）"
     },
     {
       "name": "MakerDAO dss",
       "path": "reference_repos/dss",
       "scan_rc": 0,
-      "wall_s": 0.64,
+      "wall_s": 0.55,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\dss",
         "total_units": 234,
@@ -3028,7 +2936,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 129.2
+        "elapsed_ms": 115.1
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3041,26 +2949,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\MakerDAO dss\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\MakerDAO dss\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\MakerDAO dss\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\MakerDAO dss\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\MakerDAO dss\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.39,
-        "tail": "    _sub     = False\nSTRICT PASS ✔（234 入口 / 五类 0 True / auth 与算术封装正反锚点成立）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\makerdao_dss.json",
-        "decided": 234,
-        "fp": 0,
-        "total_units": 234
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\MakerDAO dss\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\MakerDAO dss\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\MakerDAO dss\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\MakerDAO dss\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\MakerDAO dss\\report.html（0 条）"
     },
     {
       "name": "flasky",
       "path": "reference_repos/flasky",
       "scan_rc": 0,
-      "wall_s": 0.61,
+      "wall_s": 0.49,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flasky",
         "total_units": 39,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1131,
+        "total_pairs_evaluated": 1209,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -3068,7 +2968,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 944,
+        "funnel_filtered_out": 1021,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -3078,7 +2978,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 136.9
+        "elapsed_ms": 123.8
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3141,26 +3041,18 @@
           "CVE-2019-7548"
         ]
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flasky\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\flasky\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flasky\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flasky\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flasky\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.29,
-        "tail": "  反向锚点 edit_profile_admin：with=False without=True（改写生效=True）\nSTRICT PASS ✔（39 入口 / 0 True / 8 个 Auth-Guard 证据头 / 反向锚点成立）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\flasky.json",
-        "decided": 39,
-        "fp": 0,
-        "total_units": 39
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flasky\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\flasky\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flasky\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flasky\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flasky\\report.html（0 条）"
     },
     {
       "name": "mall-tiny",
       "path": "reference_repos/mall-tiny",
       "scan_rc": 0,
-      "wall_s": 1.41,
+      "wall_s": 1.05,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\mall-tiny",
         "total_units": 40,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1160,
+        "total_pairs_evaluated": 1240,
         "p0_confirmed": 40,
         "p0_route_level_hits": 40,
         "p0_unique_root_causes": 1,
@@ -3189,7 +3081,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 953,
+        "funnel_filtered_out": 1033,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -3199,7 +3091,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 40,
-        "elapsed_ms": 299.2
+        "elapsed_ms": 246.5
       },
       "p0_route_level_hits": 40,
       "p0_unique_root_causes": 1,
@@ -3226,21 +3118,13 @@
           "CVE-2023-24162"
         ]
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall-tiny\\report.md\n      披露草稿 1 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\mall-tiny\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall-tiny\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall-tiny\\report.sarif（1 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall-tiny\\report.html（1 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.95,
-        "tail": "  反向锚点：通配=True 显式白名单=False 无装配证据=None（改写生效=True）\nSTRICT PASS ✔（40 入口 / cors 外 0 True / 全局 CORS 折叠为 1 个根因 / 反向锚点成立）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\mall_tiny.json",
-        "decided": 40,
-        "fp": 0,
-        "total_units": 40
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall-tiny\\report.md\n      披露草稿 1 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\mall-tiny\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall-tiny\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall-tiny\\report.sarif（1 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\mall-tiny\\report.html（1 条）"
     },
     {
       "name": "OZ Upgradeable",
       "path": "reference_repos/openzeppelin-contracts-upgradeable",
       "scan_rc": 0,
-      "wall_s": 2.44,
+      "wall_s": 2.12,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\openzeppelin-contracts-upgradeable",
         "total_units": 1119,
@@ -3263,7 +3147,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 564.4
+        "elapsed_ms": 526.3
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3276,26 +3160,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OZ Upgradeable\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\OZ Upgradeable\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OZ Upgradeable\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OZ Upgradeable\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OZ Upgradeable\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 4.02,
-        "tail": "  机制锚点：ERC-1967 槽=False / 形参目标=True\nSTRICT PASS ✔（2017 入口 / 五类 0 True / modifier 证据地板达标 / 机制锚点成立）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\openzeppelin_upgradeable.json",
-        "decided": 2017,
-        "fp": 0,
-        "total_units": 2017
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OZ Upgradeable\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\OZ Upgradeable\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OZ Upgradeable\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OZ Upgradeable\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\OZ Upgradeable\\report.html（0 条）"
     },
     {
       "name": "My-Blog-layui",
       "path": "reference_repos/My-Blog-layui",
       "scan_rc": 0,
-      "wall_s": 1.74,
+      "wall_s": 1.69,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\My-Blog-layui",
         "total_units": 64,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 1856,
+        "total_pairs_evaluated": 1984,
         "p0_confirmed": 3,
         "p0_route_level_hits": 3,
         "p0_unique_root_causes": 3,
@@ -3346,8 +3222,8 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 1560,
-        "funnel_filter_rate": 0.9987,
+        "funnel_filtered_out": 1688,
+        "funnel_filter_rate": 0.9988,
         "llm_dispatched": 2,
         "model_candidates": [
           {
@@ -3371,7 +3247,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 3,
-        "elapsed_ms": 491.7
+        "elapsed_ms": 461.6
       },
       "p0_route_level_hits": 3,
       "p0_unique_root_causes": 3,
@@ -3393,26 +3269,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog-layui\\report.md\n      披露草稿 3 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\My-Blog-layui\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog-layui\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog-layui\\report.sarif（5 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog-layui\\report.html（5 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 1.3,
-        "tail": "  xss 锚点：有 model=True 无 model=None（改写生效=True）\nSTRICT PASS ✔（64 入口 / 真值 3 条全中 / 计划外 0 / 双锚点成立）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\my_blog_layui.json",
-        "decided": 64,
-        "fp": 0,
-        "total_units": 64
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog-layui\\report.md\n      披露草稿 3 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\My-Blog-layui\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog-layui\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog-layui\\report.sarif（5 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\My-Blog-layui\\report.html（5 条）"
     },
     {
       "name": "kkFileView",
       "path": "reference_repos/kkFileView",
       "scan_rc": 0,
-      "wall_s": 30.92,
+      "wall_s": 18.29,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\kkFileView",
         "total_units": 20,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 580,
+        "total_pairs_evaluated": 620,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -3420,8 +3288,8 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 504,
-        "funnel_filter_rate": 0.996,
+        "funnel_filtered_out": 544,
+        "funnel_filter_rate": 0.9963,
         "llm_dispatched": 2,
         "model_candidates": [
           {
@@ -3445,7 +3313,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 3044.5
+        "elapsed_ms": 1478.9
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3458,15 +3326,7 @@
         "uncovered": 4,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\kkFileView\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\report.sarif（2 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\report.html（2 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 14.5,
-        "tail": "  守卫文本逐字就位        ：True\nSTRICT PASS ✔（15 入口 / 32 类 0 True / zip_slip 真实解压路径 False / 反向锚点 True）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\kkfileview.json",
-        "decided": 65,
-        "fp": 0,
-        "total_units": 15
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\kkFileView\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\report.sarif（2 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\kkFileView\\report.html（2 条）"
     },
     {
       "name": "full-stack-fastapi-template",
@@ -3477,7 +3337,7 @@
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\full-stack-fastapi-template\\backend",
         "total_units": 23,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 667,
+        "total_pairs_evaluated": 713,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -3485,7 +3345,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 577,
+        "funnel_filtered_out": 623,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -3495,7 +3355,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 92.2
+        "elapsed_ms": 97.3
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3508,26 +3368,18 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\full-stack-fastapi-template\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\full-stack-fastapi-template\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\full-stack-fastapi-template\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\full-stack-fastapi-template\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\full-stack-fastapi-template\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 0.22,
-        "tail": "  反向锚点（剥证据后）    ：True\nSTRICT PASS ✔（23 入口 / 32 类 0 True / superuser+CurrentUser 全 False / 反向锚点 True）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\fastapi_fullstack.json",
-        "decided": 90,
-        "fp": 0,
-        "total_units": 23
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\full-stack-fastapi-template\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\full-stack-fastapi-template\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\full-stack-fastapi-template\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\full-stack-fastapi-template\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\full-stack-fastapi-template\\report.html（0 条）"
     },
     {
       "name": "solady",
       "path": "reference_repos/solady/src",
       "scan_rc": 0,
-      "wall_s": 10.05,
+      "wall_s": 6.76,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\solady\\src",
         "total_units": 2968,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 15297,
+        "total_pairs_evaluated": 15571,
         "p0_confirmed": 0,
         "p0_route_level_hits": 0,
         "p0_unique_root_causes": 0,
@@ -3535,7 +3387,7 @@
         "p0_unique_by_cat": {},
         "root_causes": [],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 6460,
+        "funnel_filtered_out": 6734,
         "funnel_filter_rate": 1.0,
         "llm_dispatched": 0,
         "model_candidates": [],
@@ -3545,7 +3397,7 @@
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
         "new_findings": 0,
-        "elapsed_ms": 4045.5
+        "elapsed_ms": 2181.2
       },
       "p0_route_level_hits": 0,
       "p0_unique_root_causes": 0,
@@ -3558,64 +3410,30 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\solady\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\solady\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\solady\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\solady\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\solady\\report.html（0 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 7.44,
-        "tail": "  机制锚点                ：无守卫=True / 有守卫=False\nSTRICT PASS ✔（2968 单元 / 五类 0 True / Yul 权限门全 False / SafeTransferLib 0 True / 机制锚点成立）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\solady.json",
-        "decided": 14840,
-        "fp": 0,
-        "total_units": 2968
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\solady\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\solady\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\solady\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\solady\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\solady\\report.html（0 条）"
     },
     {
       "name": "apollo",
       "path": "reference_repos/apollo",
       "scan_rc": 0,
-      "wall_s": 10.95,
+      "wall_s": 7.09,
       "summary": {
         "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\apollo",
         "total_units": 200,
         "test_units_skipped": 0,
-        "total_pairs_evaluated": 5800,
-        "p0_confirmed": 8,
-        "p0_route_level_hits": 8,
-        "p0_unique_root_causes": 8,
+        "total_pairs_evaluated": 6200,
+        "p0_confirmed": 6,
+        "p0_route_level_hits": 6,
+        "p0_unique_root_causes": 6,
         "p0_route_by_cat": {
-          "deserial": 2,
           "xss": 5,
           "sqli": 1
         },
         "p0_unique_by_cat": {
-          "deserial": 2,
           "xss": 5,
           "sqli": 1
         },
         "root_causes": [
-          {
-            "category": "deserial",
-            "kind": "endpoint",
-            "signature": "deserial:C:\\myFloders\\git\\nexus-audit\\reference_repos\\apollo\\apollo-portal\\src\\main\\java\\com\\ctrip\\framework\\apollo\\portal\\controller\\AppController.java:181:AppController.load",
-            "affected_routes": 1,
-            "representative": "AppController.load",
-            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\apollo\\apollo-portal\\src\\main\\java\\com\\ctrip\\framework\\apollo\\portal\\controller\\AppController.java",
-            "line": 181,
-            "routes": [
-              "AppController.load"
-            ]
-          },
-          {
-            "category": "deserial",
-            "kind": "endpoint",
-            "signature": "deserial:C:\\myFloders\\git\\nexus-audit\\reference_repos\\apollo\\apollo-portal\\src\\main\\java\\com\\ctrip\\framework\\apollo\\portal\\controller\\AppController.java:200:AppController.findMissEnvs",
-            "affected_routes": 1,
-            "representative": "AppController.findMissEnvs",
-            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\apollo\\apollo-portal\\src\\main\\java\\com\\ctrip\\framework\\apollo\\portal\\controller\\AppController.java",
-            "line": 200,
-            "routes": [
-              "AppController.findMissEnvs"
-            ]
-          },
           {
             "category": "xss",
             "kind": "endpoint",
@@ -3690,7 +3508,7 @@
           }
         ],
         "secret_files_flagged": 0,
-        "funnel_filtered_out": 4928,
+        "funnel_filtered_out": 5330,
         "funnel_filter_rate": 0.9998,
         "llm_dispatched": 1,
         "model_candidates": [
@@ -3707,23 +3525,20 @@
         "baseline": "",
         "suppressed_by_baseline": 0,
         "suppressed_root_causes": 0,
-        "new_findings": 8,
-        "elapsed_ms": 5420.2
+        "new_findings": 6,
+        "elapsed_ms": 3030.9
       },
-      "p0_route_level_hits": 8,
-      "p0_unique_root_causes": 8,
+      "p0_route_level_hits": 6,
+      "p0_unique_root_causes": 6,
       "p0_route_by_cat": {
-        "deserial": 2,
         "xss": 5,
         "sqli": 1
       },
       "p0_unique_by_cat": {
-        "deserial": 2,
         "xss": 5,
         "sqli": 1
       },
       "p0_by_cat": {
-        "deserial": 2,
         "xss": 5,
         "sqli": 1
       },
@@ -3733,24 +3548,495 @@
         "uncovered": 0,
         "cves": []
       },
-      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\apollo\\report.md\n      披露草稿 8 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\apollo\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\apollo\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\apollo\\report.sarif（9 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\apollo\\report.html（9 条）",
-      "benchmark": {
-        "rc": 0,
-        "wall_s": 9.25,
-        "tail": "  反向锚点（剥注解/标记） ：True\nSTRICT PASS ✔（200 入口 / authz 0 True / 59 个 @PreAuthorize 全 False / 三种自定义 EL 覆盖 / 反向锚点 True）\n结果写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\apollo.json",
-        "decided": null,
-        "fp": 0,
-        "total_units": 200
-      }
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\apollo\\report.md\n      披露草稿 6 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\apollo\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\apollo\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\apollo\\report.sarif（7 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\apollo\\report.html（7 条）"
+    },
+    {
+      "name": "spring-boot-demo",
+      "path": "reference_repos/spring-boot-demo",
+      "scan_rc": 0,
+      "wall_s": 3.56,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo",
+        "total_units": 80,
+        "test_units_skipped": 0,
+        "total_pairs_evaluated": 2480,
+        "p0_confirmed": 85,
+        "p0_route_level_hits": 85,
+        "p0_unique_root_causes": 12,
+        "p0_route_by_cat": {
+          "cors": 74,
+          "unrestricted_upload": 2,
+          "xss": 1,
+          "ssrf": 7,
+          "redir": 1
+        },
+        "p0_unique_by_cat": {
+          "cors": 1,
+          "unrestricted_upload": 2,
+          "xss": 1,
+          "ssrf": 7,
+          "redir": 1
+        },
+        "root_causes": [
+          {
+            "category": "cors",
+            "kind": "global-config",
+            "signature": "cors:487e406206b9",
+            "affected_routes": 74,
+            "representative": "MessageController.broadcast",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-websocket-socketio\\src\\main\\java\\com\\xkcoding\\websocket\\socketio\\controller\\MessageController.java",
+            "line": 32,
+            "routes": [
+              "MessageController.broadcast",
+              "UploadController.local",
+              "UploadController.yun",
+              "UserController.login",
+              "UserController.login#2"
+            ]
+          },
+          {
+            "category": "unrestricted_upload",
+            "kind": "endpoint",
+            "signature": "unrestricted_upload:C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-upload\\src\\main\\java\\com\\xkcoding\\upload\\controller\\UploadController.java:49:UploadController.local",
+            "affected_routes": 1,
+            "representative": "UploadController.local",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-upload\\src\\main\\java\\com\\xkcoding\\upload\\controller\\UploadController.java",
+            "line": 49,
+            "routes": [
+              "UploadController.local"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-upload\\src\\main\\java\\com\\xkcoding\\upload\\controller\\UploadController.java:49:UploadController.local",
+            "affected_routes": 1,
+            "representative": "UploadController.local",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-upload\\src\\main\\java\\com\\xkcoding\\upload\\controller\\UploadController.java",
+            "line": 49,
+            "routes": [
+              "UploadController.local"
+            ]
+          },
+          {
+            "category": "unrestricted_upload",
+            "kind": "endpoint",
+            "signature": "unrestricted_upload:C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-upload\\src\\main\\java\\com\\xkcoding\\upload\\controller\\UploadController.java:69:UploadController.yun",
+            "affected_routes": 1,
+            "representative": "UploadController.yun",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-upload\\src\\main\\java\\com\\xkcoding\\upload\\controller\\UploadController.java",
+            "line": 69,
+            "routes": [
+              "UploadController.yun"
+            ]
+          },
+          {
+            "category": "ssrf",
+            "kind": "endpoint",
+            "signature": "ssrf:C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java:38:ManualOperateController.xxlJobGroup",
+            "affected_routes": 1,
+            "representative": "ManualOperateController.xxlJobGroup",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java",
+            "line": 38,
+            "routes": [
+              "ManualOperateController.xxlJobGroup"
+            ]
+          },
+          {
+            "category": "ssrf",
+            "kind": "endpoint",
+            "signature": "ssrf:C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java:52:ManualOperateController.xxlJobList",
+            "affected_routes": 1,
+            "representative": "ManualOperateController.xxlJobList",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java",
+            "line": 52,
+            "routes": [
+              "ManualOperateController.xxlJobList"
+            ]
+          },
+          {
+            "category": "ssrf",
+            "kind": "endpoint",
+            "signature": "ssrf:C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java:68:ManualOperateController.xxlJobAdd",
+            "affected_routes": 1,
+            "representative": "ManualOperateController.xxlJobAdd",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java",
+            "line": 68,
+            "routes": [
+              "ManualOperateController.xxlJobAdd"
+            ]
+          },
+          {
+            "category": "ssrf",
+            "kind": "endpoint",
+            "signature": "ssrf:C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java:89:ManualOperateController.xxlJobTrigger",
+            "affected_routes": 1,
+            "representative": "ManualOperateController.xxlJobTrigger",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java",
+            "line": 89,
+            "routes": [
+              "ManualOperateController.xxlJobTrigger"
+            ]
+          },
+          {
+            "category": "ssrf",
+            "kind": "endpoint",
+            "signature": "ssrf:C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java:103:ManualOperateController.xxlJobRemove",
+            "affected_routes": 1,
+            "representative": "ManualOperateController.xxlJobRemove",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java",
+            "line": 103,
+            "routes": [
+              "ManualOperateController.xxlJobRemove"
+            ]
+          },
+          {
+            "category": "ssrf",
+            "kind": "endpoint",
+            "signature": "ssrf:C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java:116:ManualOperateController.xxlJobStop",
+            "affected_routes": 1,
+            "representative": "ManualOperateController.xxlJobStop",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java",
+            "line": 116,
+            "routes": [
+              "ManualOperateController.xxlJobStop"
+            ]
+          },
+          {
+            "category": "ssrf",
+            "kind": "endpoint",
+            "signature": "ssrf:C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java:129:ManualOperateController.xxlJobStart",
+            "affected_routes": 1,
+            "representative": "ManualOperateController.xxlJobStart",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java",
+            "line": 129,
+            "routes": [
+              "ManualOperateController.xxlJobStart"
+            ]
+          },
+          {
+            "category": "redir",
+            "kind": "endpoint",
+            "signature": "redir:C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-social\\src\\main\\java\\com\\xkcoding\\social\\controller\\OauthController.java:56:OauthController.renderAuth",
+            "affected_routes": 1,
+            "representative": "OauthController.renderAuth",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-social\\src\\main\\java\\com\\xkcoding\\social\\controller\\OauthController.java",
+            "line": 56,
+            "routes": [
+              "OauthController.renderAuth"
+            ]
+          }
+        ],
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 2114,
+        "funnel_filter_rate": 0.9981,
+        "llm_dispatched": 4,
+        "model_candidates": [
+          {
+            "unit": "UploadController.local",
+            "category": "pathtraver",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-upload\\src\\main\\java\\com\\xkcoding\\upload\\controller\\UploadController.java",
+            "line": 49,
+            "diagnostic": "// [静态前筛已核实事实] 候选输入行: L5, L6, L9, L14 | 候选敏感操作行: L14（僅供双引证定位参考，请独立判断中间流转与防护是否有效）"
+          },
+          {
+            "unit": "UploadController.yun",
+            "category": "pathtraver",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-upload\\src\\main\\java\\com\\xkcoding\\upload\\controller\\UploadController.java",
+            "line": 69,
+            "diagnostic": "// [静态前筛已核实事实] 候选输入行: L5, L6, L9, L14 | 候选敏感操作行: L14, L15, L22, L28（僅供双引证定位参考，请独立判断中间流转与防护是否有效）"
+          },
+          {
+            "unit": "ManualOperateController.xxlJobList",
+            "category": "sqli",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-task-xxl-job\\src\\main\\java\\com\\xkcoding\\task\\xxl\\job\\controller\\ManualOperateController.java",
+            "line": 52,
+            "diagnostic": "// [静态前筛已核实事实] 候选输入行: L5, L7, L8 | 候选敏感操作行: L12（僅供双引证定位参考，请独立判断中间流转与防护是否有效）"
+          },
+          {
+            "unit": "CodeGenController.generatorCode",
+            "category": "xss",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo\\demo-codegen\\src\\main\\java\\com\\xkcoding\\codegen\\controller\\CodeGenController.java",
+            "line": 43,
+            "diagnostic": "// [静态前筛已核实事实] 候选输入行: L6, L7, L10 | 候选敏感操作行: L14（僅供双引证定位参考，请独立判断中间流转与防护是否有效）"
+          }
+        ],
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "baseline": "",
+        "suppressed_by_baseline": 0,
+        "suppressed_root_causes": 0,
+        "new_findings": 85,
+        "elapsed_ms": 553.3
+      },
+      "p0_route_level_hits": 85,
+      "p0_unique_root_causes": 12,
+      "p0_route_by_cat": {
+        "cors": 74,
+        "unrestricted_upload": 2,
+        "xss": 1,
+        "ssrf": 7,
+        "redir": 1
+      },
+      "p0_unique_by_cat": {
+        "cors": 1,
+        "unrestricted_upload": 2,
+        "xss": 1,
+        "ssrf": 7,
+        "redir": 1
+      },
+      "p0_by_cat": {
+        "unrestricted_upload": 2,
+        "xss": 1,
+        "ssrf": 7,
+        "redir": 1
+      },
+      "sca": {
+        "components": 2,
+        "hits": [
+          {
+            "component": "hutool-all",
+            "version": "5.4.5",
+            "cve": "CVE-2023-24162",
+            "title": "Hutool 反序列化/表达式处理风险（5.8.11 修复）",
+            "fixed_in": "5.8.11"
+          },
+          {
+            "component": "mysql-connector-java",
+            "version": "8.0.21",
+            "cve": "CVE-2022-21363",
+            "title": "MySQL Connector/J 输入校验缺陷（8.0.28 修复）",
+            "fixed_in": "8.0.28"
+          }
+        ],
+        "uncovered": 0,
+        "cves": [
+          "CVE-2022-21363",
+          "CVE-2023-24162"
+        ]
+      },
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\spring-boot-demo\\report.md\n      披露草稿 12 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\spring-boot-demo\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\spring-boot-demo\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\spring-boot-demo\\report.sarif（16 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\spring-boot-demo\\report.html（16 条）"
+    },
+    {
+      "name": "xxl-job",
+      "path": "reference_repos/xxl-job",
+      "scan_rc": 0,
+      "wall_s": 4.12,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job",
+        "total_units": 36,
+        "test_units_skipped": 0,
+        "total_pairs_evaluated": 1116,
+        "p0_confirmed": 5,
+        "p0_route_level_hits": 5,
+        "p0_unique_root_causes": 5,
+        "p0_route_by_cat": {
+          "xss": 4,
+          "redir": 1
+        },
+        "p0_unique_by_cat": {
+          "xss": 4,
+          "redir": 1
+        },
+        "root_causes": [
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job\\xxl-job-admin\\src\\main\\java\\com\\xxl\\job\\admin\\framework\\controller\\IndexController.java:109:IndexController.errorPage",
+            "affected_routes": 1,
+            "representative": "IndexController.errorPage",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job\\xxl-job-admin\\src\\main\\java\\com\\xxl\\job\\admin\\framework\\controller\\IndexController.java",
+            "line": 109,
+            "routes": [
+              "IndexController.errorPage"
+            ]
+          },
+          {
+            "category": "redir",
+            "kind": "endpoint",
+            "signature": "redir:C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job\\xxl-job-admin\\src\\main\\java\\com\\xxl\\job\\admin\\framework\\controller\\LoginController.java:35:LoginController.login",
+            "affected_routes": 1,
+            "representative": "LoginController.login",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job\\xxl-job-admin\\src\\main\\java\\com\\xxl\\job\\admin\\framework\\controller\\LoginController.java",
+            "line": 35,
+            "routes": [
+              "LoginController.login"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job\\xxl-job-admin\\src\\main\\java\\com\\xxl\\job\\admin\\framework\\controller\\LoginController.java:35:LoginController.login",
+            "affected_routes": 1,
+            "representative": "LoginController.login",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job\\xxl-job-admin\\src\\main\\java\\com\\xxl\\job\\admin\\framework\\controller\\LoginController.java",
+            "line": 35,
+            "routes": [
+              "LoginController.login"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job\\xxl-job-admin\\src\\main\\java\\com\\xxl\\job\\admin\\business\\controller\\JobInfoController.java:99:JobInfoController.add",
+            "affected_routes": 1,
+            "representative": "JobInfoController.add",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job\\xxl-job-admin\\src\\main\\java\\com\\xxl\\job\\admin\\business\\controller\\JobInfoController.java",
+            "line": 99,
+            "routes": [
+              "JobInfoController.add"
+            ]
+          },
+          {
+            "category": "xss",
+            "kind": "endpoint",
+            "signature": "xss:C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job\\xxl-job-admin\\src\\main\\java\\com\\xxl\\job\\admin\\business\\controller\\JobInfoController.java:109:JobInfoController.update",
+            "affected_routes": 1,
+            "representative": "JobInfoController.update",
+            "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job\\xxl-job-admin\\src\\main\\java\\com\\xxl\\job\\admin\\business\\controller\\JobInfoController.java",
+            "line": 109,
+            "routes": [
+              "JobInfoController.update"
+            ]
+          }
+        ],
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 930,
+        "funnel_filter_rate": 1.0,
+        "llm_dispatched": 0,
+        "model_candidates": [],
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "baseline": "",
+        "suppressed_by_baseline": 0,
+        "suppressed_root_causes": 0,
+        "new_findings": 5,
+        "elapsed_ms": 390.2
+      },
+      "p0_route_level_hits": 5,
+      "p0_unique_root_causes": 5,
+      "p0_route_by_cat": {
+        "xss": 4,
+        "redir": 1
+      },
+      "p0_unique_by_cat": {
+        "xss": 4,
+        "redir": 1
+      },
+      "p0_by_cat": {
+        "xss": 4,
+        "redir": 1
+      },
+      "sca": {
+        "components": 0,
+        "hits": [],
+        "uncovered": 0,
+        "cves": []
+      },
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\xxl-job\\report.md\n      披露草稿 5 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\xxl-job\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\xxl-job\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\xxl-job\\report.sarif（5 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\xxl-job\\report.html（5 条）"
+    },
+    {
+      "name": "flask-realworld",
+      "path": "reference_repos/flask-realworld",
+      "scan_rc": 0,
+      "wall_s": 0.38,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flask-realworld",
+        "total_units": 26,
+        "test_units_skipped": 0,
+        "total_pairs_evaluated": 806,
+        "p0_confirmed": 0,
+        "p0_route_level_hits": 0,
+        "p0_unique_root_causes": 0,
+        "p0_route_by_cat": {},
+        "p0_unique_by_cat": {},
+        "root_causes": [],
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 723,
+        "funnel_filter_rate": 1.0,
+        "llm_dispatched": 0,
+        "model_candidates": [],
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "baseline": "",
+        "suppressed_by_baseline": 0,
+        "suppressed_root_causes": 0,
+        "new_findings": 0,
+        "elapsed_ms": 51.3
+      },
+      "p0_route_level_hits": 0,
+      "p0_unique_root_causes": 0,
+      "p0_route_by_cat": {},
+      "p0_unique_by_cat": {},
+      "p0_by_cat": {},
+      "sca": {
+        "components": 2,
+        "hits": [
+          {
+            "component": "sqlalchemy",
+            "version": "1.1.9",
+            "cve": "CVE-2019-7548",
+            "title": "order_by/group_by 拼接用户输入 → SQL 注入",
+            "fixed_in": "1.3.0"
+          }
+        ],
+        "uncovered": 1,
+        "cves": [
+          "CVE-2019-7548"
+        ]
+      },
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flask-realworld\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\flask-realworld\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flask-realworld\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flask-realworld\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\flask-realworld\\report.html（0 条）"
+    },
+    {
+      "name": "v3-periphery",
+      "path": "reference_repos/v3-periphery/contracts",
+      "scan_rc": 0,
+      "wall_s": 0.59,
+      "summary": {
+        "repo": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\v3-periphery\\contracts",
+        "total_units": 136,
+        "test_units_skipped": 70,
+        "total_pairs_evaluated": 544,
+        "p0_confirmed": 0,
+        "p0_route_level_hits": 0,
+        "p0_unique_root_causes": 0,
+        "p0_route_by_cat": {},
+        "p0_unique_by_cat": {},
+        "root_causes": [],
+        "secret_files_flagged": 0,
+        "funnel_filtered_out": 322,
+        "funnel_filter_rate": 1.0,
+        "llm_dispatched": 0,
+        "model_candidates": [],
+        "patches_verified": 0,
+        "pocs_generated": 0,
+        "baseline": "",
+        "suppressed_by_baseline": 0,
+        "suppressed_root_causes": 0,
+        "new_findings": 0,
+        "elapsed_ms": 146.4
+      },
+      "p0_route_level_hits": 0,
+      "p0_unique_root_causes": 0,
+      "p0_route_by_cat": {},
+      "p0_unique_by_cat": {},
+      "p0_by_cat": {},
+      "sca": {
+        "components": 0,
+        "hits": [],
+        "uncovered": 0,
+        "cves": []
+      },
+      "scan_tail": "\n完成：野战报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\v3-periphery\\report.md\n      披露草稿 0 份（按独立根因，不按路由）-> benchmarks\\results\\advisories\\v3-periphery\n      狩猎简报已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\v3-periphery\\summary.json\n      SARIF 已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\v3-periphery\\report.sarif（0 条 results）\n      HTML 报告已写入 C:\\myFloders\\git\\nexus-audit\\benchmarks\\results\\wild_hunt\\v3-periphery\\report.html（0 条）"
     }
   ],
   "totals": {
-    "repos": 34,
-    "units": 11575,
-    "p0_route_level_hits": 1566,
-    "unique_root_causes": 119,
-    "repos_with_dependency_cve": 5,
-    "dual_confirmed_repos": 4,
+    "repos": 38,
+    "units": 11853,
+    "p0_route_level_hits": 1663,
+    "unique_root_causes": 143,
+    "repos_with_dependency_cve": 7,
+    "dual_confirmed_repos": 5,
     "dependency_cves": [
       "CVE-2013-7459",
       "CVE-2017-12794",
@@ -3769,8 +4055,8 @@
   },
   "advisories": {
     "dir": "benchmarks\\results\\advisories",
-    "files": 119,
-    "repos": 34,
+    "files": 143,
+    "repos": 38,
     "index": "benchmarks\\results\\advisories\\INDEX.md"
   }
 }

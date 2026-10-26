@@ -17,16 +17,6 @@
   "authz_true": [],
   "residual": [
     {
-      "file": "AppController.java",
-      "unit": "AppController.load",
-      "category": "deserial"
-    },
-    {
-      "file": "AppController.java",
-      "unit": "AppController.findMissEnvs",
-      "category": "deserial"
-    },
-    {
       "file": "ConsumerController.java",
       "unit": "ConsumerController.create",
       "category": "xss"

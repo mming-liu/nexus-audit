@@ -1,18 +1,27 @@
 # 披露草稿总目录（nexus-audit `--advisory-dir`）
 
-共 **18** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
+共 **27** 份 GHSA 草稿，按 CVSS v3.1 分值降序。
 带 [Auto-Fix Verified] 的草稿内嵌通过自检的补丁 diff。
 
 | CVSS | 严重级 | CWE | 类目 | 草稿 |
 |---|---|---|---|---|
-| 9.8 | CRITICAL | CWE-502 | deserial | [GHSA-027D-A8E1-52CE-deserial-jobgroupcontroller-loadbyid.md](GHSA-027D-A8E1-52CE-deserial-jobgroupcontroller-loadbyid.md) |
 | 9.8 | CRITICAL | CWE-89 | sqli | [GHSA-11B8-C1D3-3D97-sqli-sysannouncementsendcontroller-editbyid.md](GHSA-11B8-C1D3-3D97-sqli-sysannouncementsendcontroller-editbyid.md) |
 | 9.8 | CRITICAL | CWE-89 | sqli | [GHSA-5B2E-CF0B-7B6C-sqli-sysusercontroller-frozenbatch.md](GHSA-5B2E-CF0B-7B6C-sqli-sysusercontroller-frozenbatch.md) |
-| 9.8 | CRITICAL | CWE-502 | deserial | [GHSA-97F3-1606-46AA-deserial-joblogcontroller-logdetailpage.md](GHSA-97F3-1606-46AA-deserial-joblogcontroller-logdetailpage.md) |
-| 9.8 | CRITICAL | CWE-502 | deserial | [GHSA-B94E-8DB2-454F-deserial-joblogcontroller-logkill.md](GHSA-B94E-8DB2-454F-deserial-joblogcontroller-logkill.md) |
-| 9.8 | CRITICAL | CWE-502 | deserial | [GHSA-B9DF-A8EC-384A-deserial-joblogcontroller-logdetailcat.md](GHSA-B9DF-A8EC-384A-deserial-joblogcontroller-logdetailcat.md) |
 | 9.8 | CRITICAL | CWE-798 | hardcoded_secret | [GHSA-BA26-8F7B-6331-hardcoded-secret-secret-file-jeecgbaseconfig-java.md](GHSA-BA26-8F7B-6331-hardcoded-secret-secret-file-jeecgbaseconfig-java.md) |
 | 9.8 | CRITICAL | CWE-89 | sqli | [GHSA-C13B-DD4D-336C-sqli-sysannouncementsendcontroller-readall.md](GHSA-C13B-DD4D-336C-sqli-sysannouncementsendcontroller-readall.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-1F40-0C21-6B85-log-injection-dlmockcontroller-getmockddjhdata.md](GHSA-1F40-0C21-6B85-log-injection-dlmockcontroller-getmockddjhdata.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-4425-1A92-7993-log-injection-sysdictcontroller-getdictitems.md](GHSA-4425-1A92-7993-log-injection-sysdictcontroller-getdictitems.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-5E68-A847-26CD-log-injection-onlcgformdemocontroller-enhancejavalisthttp.md](GHSA-5E68-A847-26CD-log-injection-onlcgformdemocontroller-enhancejavalisthttp.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-650B-64D7-42FB-log-injection-onlcgformdemocontroller-enhancejavahttp.md](GHSA-650B-64D7-42FB-log-injection-onlcgformdemocontroller-enhancejavahttp.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-7850-A906-0581-log-injection-sysdictcontroller-loaddict.md](GHSA-7850-A906-0581-log-injection-sysdictcontroller-loaddict.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-7895-0CF3-BA6D-log-injection-thirdlogincontroller-oauth2logincallback-2.md](GHSA-7895-0CF3-BA6D-log-injection-thirdlogincontroller-oauth2logincallback-2.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-918A-95F8-25BA-log-injection-sysdictcontroller-getdicttext.md](GHSA-918A-95F8-25BA-log-injection-sysdictcontroller-getdicttext.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-9580-715D-5BC2-log-injection-thirdlogincontroller-render.md](GHSA-9580-715D-5BC2-log-injection-thirdlogincontroller-render.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-9A62-924A-6BAA-log-injection-duplicatecheckcontroller-doduplicatecheck.md](GHSA-9A62-924A-6BAA-log-injection-duplicatecheckcontroller-doduplicatecheck.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-B1DF-499A-6CBA-log-injection-paramflowrulecontroller-apiupdateparamflowrule.md](GHSA-B1DF-499A-6CBA-log-injection-paramflowrulecontroller-apiupdateparamflowrule.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-C198-6F7F-612D-log-injection-thirdlogincontroller-loginthird.md](GHSA-C198-6F7F-612D-log-injection-thirdlogincontroller-loginthird.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-D432-B25B-2761-log-injection-sysannouncementcontroller-listbyuser.md](GHSA-D432-B25B-2761-log-injection-sysannouncementcontroller-listbyuser.md) |
+| 8.1 | HIGH | CWE-117 | log_injection | [GHSA-D73D-CCA5-CEED-log-injection-sysrolecontroller-checkusername.md](GHSA-D73D-CCA5-CEED-log-injection-sysrolecontroller-checkusername.md) |
 | 6.5 | MEDIUM | CWE-942 | cors | [GHSA-EA41-287E-036C-cors-indexcontroller-chartinfo.md](GHSA-EA41-287E-036C-cors-indexcontroller-chartinfo.md) |
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-2F43-8D59-99C9-xss-jobinfocontroller-update.md](GHSA-2F43-8D59-99C9-xss-jobinfocontroller-update.md) |
 | 6.1 | MEDIUM | CWE-79 | xss | [GHSA-5805-0E45-068A-xss-jobinfocontroller-add.md](GHSA-5805-0E45-068A-xss-jobinfocontroller-add.md) |

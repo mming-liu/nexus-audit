@@ -67,8 +67,10 @@ MIN_UNITS = 450
 # M156 修正：原表 cmdi=4 / sqli=4 / xss=3 里混进了 4 条 cmdi 假阳
 # （裸 .load( 把 appService.load(appId) 当成 Runtime.load）。判据收窄后
 # 逐条复核：cmdi 归零，sqli 3，xss 2。冻结表按**真实证据**重记。
+# M170 再修正：原 deserial=4 全部是 MyBatis mapper 的 .load(id)，
+# 被通用反序列化判据误收；收窄到 ObjectInputStream/Yaml/XStream 后归零。
 FROZEN_NON_AUTHZ = {
-    "deserial": 4, "hash": 4, "sqli": 3, "xss": 2,
+    "hash": 4, "sqli": 3, "xss": 2,
     "redir": 3, "cors": 1,
 }
 # 文件级密钥：路径片段 + 必须出现的字面量证据
@@ -154,7 +156,7 @@ def main() -> int:
     if not secret_hit:
         bad.append("文件级密钥文件未被判出（JeecgBaseConfig 默认密钥）")
     ok = not bad
-    print(f"\n{'STRICT PASS ✔（487 入口 / authz 零 True / 17 个已知根因冻结 + 1 文件级密钥）' if ok else 'STRICT FAIL ✘ ' + '；'.join(bad)}")
+    print(f"\n{'STRICT PASS ✔（487 入口 / authz 零 True / 13 个已知根因冻结 + 1 文件级密钥）' if ok else 'STRICT FAIL ✘ ' + '；'.join(bad)}")
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)

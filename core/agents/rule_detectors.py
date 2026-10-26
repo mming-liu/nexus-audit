@@ -526,7 +526,7 @@ DESERIAL_SINK_RE = re.compile(
     r"\.readObject\s*\(|\.readUnshared\s*\(|"
     r"new\s+(?:[A-Za-z_][\w.]*\.)?(?:ObjectInputStream|XStream)\b|"
     r"\.fromXML\s*\(|enableDefaultTyping|readValue\s*\(|"
-    r"new\s+(?:[A-Za-z_][\w.]*\.)?Yaml\s*\(|\.load\s*\(", re.I)
+    r"new\s+(?:[A-Za-z_][\w.]*\.)?Yaml\s*\(", re.I)
 # 白名单式防护
 DESERIAL_SAFE_RE = re.compile(
     r"SafeConstructor|safeMode|setAllowedClasses|ObjectInputFilter|"
@@ -10722,6 +10722,8 @@ def log_injection_verdict(source: str) -> bool | None:
         # logger.info("...{}", x) 与 Python 的 logging.info("...%s", x)
         # 是参数化日志（占位符由日志框架填充），不属本类目的拼接面；
         # 否则 kkFileView 这类正常参数化日志会整片假阳。
+        if not py and "+" not in call:
+            continue                    # 直传 getter 不是字符串拼接
         if not py and "{}" in call and "+" not in call:
             continue
         # String.format(常量, 参数) 是格式化，不是字符串拼接；本类目只收

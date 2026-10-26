@@ -45,7 +45,7 @@ SCOREBOARD = ROOT / "benchmarks" / "results" / "SCOREBOARD.md"
 # (名称, 命令, 前置目录检查, 类别, 可并发)
 #   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
 JOBS = [
-    ("冒烟测试 [1]-[205]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
+    ("冒烟测试 [1]-[210]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke", False),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target", True),
@@ -260,6 +260,12 @@ JOBS = [
      ["benchmarks/benchmark_fastapi_wild.py", "--strict"],
      "reference_repos/fastapi-sql-template", "target", True),
     # ---- M167–M170：第 35–38 野仓（第一波） ----
+    ("spring-boot-demo (SecurityConfig 全量认证 + RBAC EL)",
+     ["benchmarks/benchmark_springboot_demo.py", "--strict"],
+     "reference_repos/spring-boot-demo", "target", True),
+    ("xxl-job (@XxlSso 角色门 + 资源组权限)",
+     ["benchmarks/benchmark_xxl_job.py", "--strict"],
+     "reference_repos/xxl-job", "target", True),
     ("flask-realworld (Flask-JWT-Extended 主体链)",
      ["benchmarks/benchmark_flask_rw.py", "--strict"],
      "reference_repos/flask-realworld", "target", True),

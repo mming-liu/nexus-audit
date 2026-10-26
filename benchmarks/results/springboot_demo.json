@@ -1,0 +1,18 @@
+{
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\spring-boot-demo",
+  "scope": [
+    "demo-rbac-security",
+    "demo-rbac-shiro",
+    "demo-swagger",
+    "demo-oauth",
+    "demo-actuator"
+  ],
+  "total_units": 19,
+  "decided": 37,
+  "true": 0,
+  "global_authz_marked": 19,
+  "anchor": true,
+  "fp": 0,
+  "reverse_fn": 0,
+  "pass": true
+}
