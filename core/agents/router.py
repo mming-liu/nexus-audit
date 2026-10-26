@@ -74,7 +74,7 @@ class OpenAICompatClient:
         self.extra_headers = extra_headers or {
             "x-opencode-session": os.getenv("LLM_SESSION_ID", "nexus-audit-fixed-session"),
             "User-Agent": os.getenv("LLM_USER_AGENT", "nexus-audit/1.0"),
-        } if os.getenv("LLM_BASE_URL", "").endswith("/go/v1") or "opencode" in os.getenv("LLM_BASE_URL", "") else (extra_headers or {})
+        } if (self.base_url.endswith("/go/v1") or "opencode" in self.base_url) else (extra_headers or {})
 
     async def chat(self, messages: list[dict[str, str]], temperature: float = 0.0) -> str:
         if httpx is None:
@@ -167,8 +167,15 @@ def extract_json(text: str) -> Any:
         raise ValueError(f"无法从模型输出提取 JSON：{text[:200]!r}")
 
 
+OPENCODE_GO_BASE = os.getenv(
+    "LLM_OPENCODE_BASE_URL",
+    os.getenv("LLM_BASE_URL", "https://opencode.ai/zen/go/v1")).rstrip("/")
+# Tier-1 免费模型；Tier-2 付费模型（用户指定：glm-5.3-flash 优先）
+TIER1_FREE_MODEL = os.getenv("LLM_TIER1_MODEL", "beam-free")
+TIER2_PAID_MODEL = os.getenv("LLM_TIER2_MODEL", "glm-5.3-flash")
+
 class TwoTierRouter:
-    """两级模型漏斗路由器。
+    """两级模型漏斗路由器（OpenCode Go：Tier-1 免费 / Tier-2 付费）。
 
     用法：
         router = TwoTierRouter(tier1=OpenAICompatClient(...), tier2=OpenAICompatClient(...))
@@ -176,16 +183,23 @@ class TwoTierRouter:
     """
 
     def __init__(self, tier1: LLMClient | None = None, tier2: LLMClient | None = None):
-        self.tier1 = tier1 or OpenAICompatClient()  # 初筛：本地 Qwen3-Coder
-        self.tier2 = tier2                          # 复核：DeepSeek-R1（懒加载）
+        # Tier-1：OpenCode Go 免费模型；Tier-2：OpenCode Go 付费 flash 模型。
+        # 两者都允许注入 mock（单测/离线），也允许 env 覆盖。
+        self.tier1 = tier1 or OpenAICompatClient(
+            base_url=os.getenv("LLM_TIER1_BASE_URL") or OPENCODE_GO_BASE,
+            model=os.getenv("LLM_TIER1_MODEL") or TIER1_FREE_MODEL,
+            api_key=(os.getenv("LLM_TIER1_API_KEY")
+                     or os.getenv("LLM_API_KEY", "")),
+        )
+        self.tier2 = tier2 or OpenAICompatClient(
+            base_url=os.getenv("LLM_TIER2_BASE_URL") or OPENCODE_GO_BASE,
+            model=os.getenv("LLM_TIER2_MODEL") or TIER2_PAID_MODEL,
+            api_key=(os.getenv("LLM_TIER2_API_KEY")
+                     or os.getenv("LLM_API_KEY", "")),
+        )
 
     def _deepseek(self) -> LLMClient:
-        if self.tier2 is None:
-            self.tier2 = OpenAICompatClient(
-                base_url=os.getenv("LLM_TIER2_BASE_URL", "https://api.deepseek.com/v1"),
-                model=os.getenv("LLM_TIER2_MODEL", "deepseek-reasoner"),
-                api_key=os.getenv("LLM_TIER2_API_KEY", ""),
-            )
+        # 保留旧方法名：Skeptic 等调用方不需要改；实际已是 OpenCode Go Tier-2。
         return self.tier2
 
     async def screen(self, messages: list[dict[str, str]]) -> str:

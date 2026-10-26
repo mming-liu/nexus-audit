@@ -212,9 +212,10 @@ python benchmarks/check_stability.py
 
 ```bash
 pip install -r requirements.txt
-export LLM_API_KEY="your-api-key"
-export LLM_BASE_URL="https://api.deepseek.com/v1"
-export LLM_MODEL="deepseek-reasoner"
+export LLM_API_KEY="your-opencode-go-key"
+export LLM_BASE_URL="https://opencode.ai/zen/go/v1"
+export LLM_MODEL="beam-free"                   # Tier-1 免费模型
+export LLM_TIER2_MODEL="glm-5.3-flash"        # Tier-2 付费 flash（可换 deepseek-v4.1-flash）
 python cli.py --help
 ```
 

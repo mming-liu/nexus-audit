@@ -1,16 +1,16 @@
-# nexus-audit 配置：两级模型漏斗路由
-# Tier-1 初筛：高吞吐、低成本（Qwen3-Coder / 本地 vLLM）
+# nexus-audit 配置：OpenCode Go 两级模型漏斗
+# Tier-1 初筛：免费模型（longcat-2.5-preview-free / beam-free）
 tier1:
-  base_url: ${LLM_TIER1_BASE_URL}   # 默认本地 vLLM，如 http://localhost:8000/v1
-  model: qwen3-coder
+  base_url: ${LLM_TIER1_BASE_URL}   # https://opencode.ai/zen/go/v1
+  model: beam-free
   api_key: ${LLM_TIER1_API_KEY}
   max_concurrency: 8
   temperature: 0.0
 
-# Tier-2 深度复核：推理模型（DeepSeek-R1）
+# Tier-2 深度复核：付费 flash（glm-5.3-flash 优先，deepseek-v4.1-flash 兜底）
 tier2:
-  base_url: ${LLM_TIER2_BASE_URL}   # 如 https://api.deepseek.com/v1
-  model: deepseek-reasoner
+  base_url: ${LLM_TIER2_BASE_URL}   # https://opencode.ai/zen/go/v1
+  model: glm-5.3-flash
   api_key: ${LLM_TIER2_API_KEY}
   max_concurrency: 2
   temperature: 0.2

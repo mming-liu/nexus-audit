@@ -1,7 +1,7 @@
 """OpenCode Go 套餐模型选择器 + 额度监控。
 
 策略（用户要求）：
-  1. 免费模型优先：探测 FREE_CANDIDATES（longcat-2.5-preview-free / beam-free），
+  1. 免费模型优先：探测 FREE_CANDIDATES（beam-free 置顶；longcat 已 HTTP 410 兜底），
      第一个可用的直接用
   2. 免费模型全不可用时按 PAID_FALLBACK 链依次降级（glm-5.3-flash → deepseek-v4.1-flash）
   3. 额度监控：GET /zen/go/v1/usage 返回 rolling/weekly/monthly 三窗口百分比，
@@ -21,9 +21,11 @@ except ImportError:
 BASE_URL = os.getenv("LLM_BASE_URL", "https://opencode.ai/zen/go/v1").rstrip("/")
 
 # 免费候选（按优先级）；付费降级链
-FREE_CANDIDATES = ["longcat-2.5-preview-free", "beam-free"]
+# longcat 已 HTTP 410（下线）；beam-free 实测可用，置顶。
+FREE_CANDIDATES = ["beam-free", "longcat-2.5-preview-free"]
 TIER1_PAID_FALLBACK = ["glm-5.3-flash", "deepseek-v4.1-flash"]
-TIER2_PAID_FALLBACK = ["deepseek-v4-pro", "glm-5.3"]
+# 用户指定：Tier-2 用 OpenCode Go 付费 flash；先 glm-5.3-flash，缺货再 deepseek flash。
+TIER2_PAID_FALLBACK = ["glm-5.3-flash", "deepseek-v4.1-flash"]
 
 PROBE_MESSAGES = [{"role": "user", "content": "reply with exactly: ok"}]
 
@@ -62,7 +64,7 @@ def probe_model(model: str, timeout: float = 60.0, attempts: int = 3) -> bool:
                                       "max_tokens": 2000})
                 if r.status_code == 200:
                     return bool(r.json().get("choices"))
-                if r.status_code in (400, 401, 403, 404):
+                if r.status_code in (400, 401, 403, 404, 410):
                     # 确定性失败，重试没有意义。
                     # 400 也归这一类：探测用的请求体是固定的、对其他模型都返回 200，
                     # 所以 400 只可能是模型名/参数不被接受。实测不存在的模型名
@@ -118,11 +120,11 @@ def auto_select_and_print(tier: int = 1) -> str:
         for m in FREE_CANDIDATES:
             print(f"      探测免费模型 {m} ...", flush=True)
             if probe_model(m):
-                print(f"      ✔ 使用免费模型：{m}")
+                print(f"      [OK] 使用免费模型：{m}")
                 return m
         print("      免费模型不可用，降级付费链 ...")
     chosen = pick_model(tier, force_paid=True)
-    print(f"      ✔ 使用付费模型：{chosen}")
+    print(f"      [OK] 使用付费模型：{chosen}")
     return chosen
 
 
