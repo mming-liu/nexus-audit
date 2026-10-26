@@ -46,9 +46,8 @@ OUT = ROOT / "benchmarks" / "results" / "first_blood_packs"
 WILD = ROOT / "benchmarks" / "results" / "wild_hunt.json"
 
 TARGETS = [
-    # 2026-10-25 最终口径：jeecg 的 sqli 根因在 M156 cmdi/sqli 归属修正后
-    # 不再是 queryIdTree（冻结表也同步从 24 收到 17），原包失效。改用
-    # My-Blog 的新规则 #31 命中，保证"每包补丁都实测 True→False"。
+    # M234：Top-10 跨语言交单包。全部来自 50 仓 wild_hunt 的规则层根因，
+    # 且补丁自检 True -> False 实测通过。
     ("My-Blog", "unrestricted_upload",
      "BlogController.uploadFileByEditormd", "ZHENFENG13/My-Blog",
      "编辑器 Markdown 图片上传：原始文件名直接落盘，无后缀白名单"),
@@ -58,6 +57,27 @@ TARGETS = [
     ("RuoYi", "sqli", "GenController.create",
      "yangzongzhuan/RuoYi",
      "代码生成器表名/注释拼接进 SQL（管理员面，但仍是确定性注入）"),
+    ("newbee-mall", "unrestricted_upload", "UploadController.upload",
+     "newbee-ltd/newbee-mall",
+     "上传接口原始文件名直接落盘；与 weakrand 同一入口两个独立缺陷"),
+    ("newbee-mall-api", "unrestricted_upload", "NewBeeAdminUploadAPI.upload",
+     "newbee-ltd/newbee-mall-api",
+     "后台 API 上传原始文件名落盘，无后缀白名单"),
+    ("newbee-mall-api", "weakrand", "NewBeeAdminUploadAPI.upload",
+     "newbee-ltd/newbee-mall-api",
+     "上传文件名 Random 生成，可预测"),
+    ("My-Blog", "weakrand", "BlogController.uploadFileByEditormd",
+     "ZHENFENG13/My-Blog",
+     "Markdown 上传文件名弱随机，可与 unrestricted_upload 组合利用"),
+    ("My-Blog", "unrestricted_upload", "UploadController.upload",
+     "ZHENFENG13/My-Blog",
+     "通用上传接口原始文件名落盘"),
+    ("My-Blog", "weakrand", "UploadController.upload",
+     "ZHENFENG13/My-Blog",
+     "通用上传接口弱随机文件名"),
+    ("spring-boot-demo", "unrestricted_upload", "UploadController.local",
+     "xkcoding/spring-boot-demo",
+     "示例上传接口原始文件名落盘；演示代码，仍按规则层登记"),
 ]
 
 REQUIRED = ("ADVISORY.md", "fix.patch", "SUBMISSION_CHECKLIST.md")

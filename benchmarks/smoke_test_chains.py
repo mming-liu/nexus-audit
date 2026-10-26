@@ -4441,10 +4441,10 @@ _sp86 = subprocess.run(
                   errors="replace")
 check("M42：doctor exit 0（依赖/规则表/指纹/补丁器全就绪）",
       _sp86.returncode, 0)
-check("M42：doctor 输出含十段自检 + PASS 尾标（M151 扩到十段）",
+check("M42：doctor 输出含十二段自检 + PASS 尾标（M151 扩到十二段）",
       all(s in _sp86.stdout for s in
-          ("[1/10]", "[2/10]", "[3/10]", "[4/10]", "[5/10]", "[6/10]",
-           "[7/10]", "[8/10]", "[9/10]", "[10/10]", "PASS")), True)
+          ("[1/12]", "[2/12]", "[3/12]", "[4/12]", "[5/12]", "[6/12]",
+           "[7/12]", "[8/12]", "[9/12]", "[10/12]", "PASS")), True)
 check(f"M42：doctor 规则注册表 {len(_CATS)} 类全 OK（从 CATEGORIES 派生，免手工改数）",
       _sp86.stdout.count("  [OK]") >= len(_CATS)
       and f"共 {len(_CATS)} 类" in _sp86.stdout, True)
@@ -4797,9 +4797,9 @@ _sp93 = subprocess.run(
     capture_output=True, text=True, encoding="utf-8",
                   errors="replace")
 _out93 = _sp93.stdout
-check("M93：doctor 退出码 0 且十段标题齐全",
+check("M93：doctor 退出码 0 且十二段标题齐全",
       (_sp93.returncode == 0
-       and all(f"[{i}/10]" in _out93 for i in range(1, 11))), True)
+       and all(f"[{i}/12]" in _out93 for i in range(1, 11))), True)
 from cli import DOCTOR_PATCHERS as _DP93                            # noqa: E402
 check("M93：doctor 补丁器清单从 DOCTOR_PATCHERS 派生且全绿",
       (_out93.count("[OK] _fix_") == len(_DP93)
@@ -6183,7 +6183,7 @@ _r122 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                        capture_output=True, text=True, encoding="utf-8",
                   errors="replace")
 check("M122：doctor 第六段存在且整体 exit 0",
-      (_r122.returncode == 0 and "[6/10]" in (_r122.stdout or "")), True)
+      (_r122.returncode == 0 and "[6/12]" in (_r122.stdout or "")), True)
 check("M122：wild_hunt.json ↔ WILD_HUNT_REPORT 四处核心数字一致",
       ("仓库数 / 入口总数 / 独立根因数 / 零误报 四处一致"
        in (_r122.stdout or "")), True)
@@ -6949,7 +6949,7 @@ check("M130：run_all 作业表 63 项且含 comet / DjanGoat / 覆盖地板",
        any("comet" in str(j[0]) for j in _JOBS130),
        any("DjanGoat" in str(j[0]) for j in _JOBS130),
        any("覆盖地板" in str(j[0]) for j in _JOBS130)),
-      (67, True, True, True))
+      (68, True, True, True))
 
 import core.agents.rule_detectors as _rd130                       # noqa: E402
 _NEW130 = ("ssti_verdict", "_sol_unchecked_zones", "_py_redir_verdict",
@@ -6978,9 +6978,9 @@ _r130d = _sp130.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                     capture_output=True, text=True, encoding="utf-8",
                   errors="replace")
 _out130 = _r130d.stdout or ""
-check("M130：doctor exit 0 且 32 类 / 27 类 / 十段齐全",
+check("M130：doctor exit 0 且 32 类 / 27 类 / 十二段齐全",
       (_r130d.returncode, "共 40 类" in _out130, "（35 类）" in _out130,
-       "[10/10]" in _out130), (0, True, True, True))
+       "[10/12]" in _out130), (0, True, True, True))
 check("M130：doctor 覆盖 M87–M93 的四项新自检",
       ("SARIF 2.1.0 合规校验" in _out130
        and "PoC 合成器" in _out130
@@ -7231,8 +7231,8 @@ from benchmarks.wild_hunt import REPOS as _REPOS140               # noqa: E402
 from core.agents.vuln_categories import CATEGORIES as _C140       # noqa: E402
 import cli as _cli140                                             # noqa: E402
 
-check("M140：门禁 67 项（冒烟+争议+地板+64 个靶场/校验项）",
-      len(_JOBS140), 67)
+check("M140：门禁 68 项（冒烟+争议+地板+64 个靶场/校验项）",
+      len(_JOBS140), 68)
 check("M140：野战场 50 个真实仓库", len(_REPOS140), 50)
 check("M140：规则 40 类 / 补丁器 35 类", (len(_C140),
                                           len(_cli140.DOCTOR_PATCHERS)),
@@ -7814,11 +7814,11 @@ _r155 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                        capture_output=True, text=True, encoding="utf-8",
                   errors="replace")
 _o155 = _r155.stdout or ""
-check("M155：doctor 十段齐全且 exit 0",
-      (_r155.returncode, all(f"[{i}/10]" in _o155 for i in range(1, 11))),
+check("M155：doctor 十二段齐全且 exit 0",
+      (_r155.returncode, all(f"[{i}/12]" in _o155 for i in range(1, 11))),
       (0, True))
 check("M155：第七段核对草稿数 == 根因总数",
-      "[7/10] 披露包完整性" in _o155 and "草稿数 == 根因总数" in _o155, True)
+      "[7/12] 披露包完整性" in _o155 and "草稿数 == 根因总数" in _o155, True)
 check("M155：第七段核对 INDEX 零断链与 CVSS 降序",
       ("INDEX.md 覆盖全部" in _o155 and "按 CVSS 降序" in _o155), True)
 check("M155：40 类规则 / 35 类补丁器都在 doctor 输出里",
@@ -8219,8 +8219,8 @@ _r169 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
                        capture_output=True, text=True, encoding="utf-8",
                   errors="replace")
 _o169 = _r169.stdout or ""
-check("M169：doctor 十段齐全且 exit 0",
-      (_r169.returncode, all(f"[{i}/10]" in _o169 for i in range(1, 11))),
+check("M169：doctor 十二段齐全且 exit 0",
+      (_r169.returncode, all(f"[{i}/12]" in _o169 for i in range(1, 11))),
       (0, True))
 check("M169：第八段核对两个导出器（SARIF + GitLab）",
       ("sarif_validator 就位" in _o169
@@ -8806,7 +8806,7 @@ try:
     from benchmarks.run_all import JOBS as _JOBS
     from core.agents.vuln_categories import CATEGORIES as _CATS
     import cli as _cli2
-    check("M148：run_all 门禁 67 项", len(_JOBS), 67)
+    check("M148：run_all 门禁 68 项", len(_JOBS), 68)
     check("M148：规则注册表 40 类", len(_CATS), 40)
     check("M148：补丁器 35 类", len(_cli2.DOCTOR_PATCHERS), 35)
     check("M148：三新类目都在注册表里",
@@ -8818,7 +8818,7 @@ try:
                                            "OZ Upgradeable", "My-Blog-layui"))),
           5)
     check("M148：doctor 段数已改为 /10",
-          "== [10/10]" in (ROOT / "cli.py").read_text(encoding="utf-8"), True)
+          "== [10/12]" in (ROOT / "cli.py").read_text(encoding="utf-8"), True)
     # 三个新类目**各自至少一门语言**判得出来：缺口只许落在不适用的语言上，
     # 不允许出现"整类一条判据都跑不出来"的假覆盖。
     _mj148 = json.loads((ROOT / ".tmp" / "matrix_smoke.json")
@@ -8866,7 +8866,7 @@ try:
           all(k in _C143 or k == "unchecked_low_level_calls"
               for k in _cli186.MATRIX_FIX_MAP), True)
     check("M151：doctor 第 10 段双向恒等",
-          "[10/10]" in _o155 and "双向恒等" in _o155, True)
+          "[10/12]" in _o155 and "双向恒等" in _o155, True)
     _empty_bad186 = []
     for _cat186 in sorted(_C143):
         if verdict(_cat186, "") is not None:
@@ -9185,7 +9185,7 @@ finally:
 print("\n[197] M160：Top-3 交单四件套")
 _packs197 = ROOT / "benchmarks" / "results" / "first_blood_packs"
 _dirs197 = [d for d in _packs197.iterdir() if d.is_dir()] if _packs197.exists() else []
-check("M160：交单包 3 个", len(_dirs197), 3)
+check("M160：交单包 10 个", len(_dirs197), 10)
 _bad197 = []
 for _d in _dirs197:
     if not {"ADVISORY.md", "fix.patch", "SUBMISSION_CHECKLIST.md"} <= {
@@ -9396,7 +9396,7 @@ check("M181：新增四仓都在注册表",
       all(n in {r[0] for r in _R208}
           for n in ("spring-boot-demo", "xxl-job", "flask-realworld",
                     "v3-periphery")), True)
-check("M181：run_all 67 项", len(_J208), 67)
+check("M181：run_all 68 项", len(_J208), 68)
 
 print("\n[209] M181：40 类 / 31 补丁器保持")
 _wh209 = json.loads((ROOT / "benchmarks" / "results" / "wild_hunt.json")
@@ -9527,7 +9527,7 @@ check("M197：新增四仓都在注册表",
       all(n in {r[0] for r in _R217}
           for n in ("morpho-blue", "flask-jwt-extended",
                     "ruoyi-vue-pro", "solmate")), True)
-check("M197：run_all 67 项", len(_J217), 67)
+check("M197：run_all 68 项", len(_J217), 68)
 
 print("\n[218] M189：40 类 / 31 补丁器 / 25 矩阵类目")
 check("M189：规则 40 类", len(_C143), 40)
@@ -9538,7 +9538,7 @@ check("M189：两新类目进 MATRIX_FIX_MAP",
 check("M189：矩阵 29 类目", len(_cli186.MATRIX_FIX_MAP), 29)
 
 print("\n[219] M198：第二波门禁")
-check("M198：run_all 67 项", len(_J217), 67)
+check("M198：run_all 68 项", len(_J217), 68)
 
 print("\n[220] M198：第二波断言里程碑")
 check("M198：已执行断言数 >=1215", COUNTS["n"] >= 1215, True)
@@ -9662,7 +9662,7 @@ check("M213：新增四仓都在注册表",
       all(n in {r[0] for r in _R227}
           for n in ("django-oauth-toolkit", "flask-admin",
                     "Sentinel", "aave-v3-periphery")), True)
-check("M213：run_all 67 项", len(_J227), 67)
+check("M213：run_all 68 项", len(_J227), 68)
 
 print("\n[228] M205：40 类 / 33 补丁器 / 27 矩阵类目")
 check("M205：规则 40 类", len(_C143), 40)
@@ -9673,7 +9673,7 @@ check("M205：两新类目进 MATRIX_FIX_MAP",
 check("M205：矩阵 29 类目", len(_cli186.MATRIX_FIX_MAP), 29)
 
 print("\n[229] M214：第三波门禁")
-check("M214：run_all 67 项", len(_J227), 67)
+check("M214：run_all 68 项", len(_J227), 68)
 
 print("\n[230] M214：第三波断言里程碑")
 check("M214：已执行断言数 >=1245", COUNTS["n"] >= 1245, True)
@@ -9778,7 +9778,7 @@ check("M231：野仓注册表 50 个", len(_R237), 50)
 check("M231：新增四仓都在注册表",
       all(n in {r[0] for r in _R237}
           for n in ("halo", "sanic", "litestar", "starlette")), True)
-check("M231：run_all 67 项", len(_J237), 67)
+check("M231：run_all 68 项", len(_J237), 68)
 check("M231：语言分布 Java 20 / Python 15 / Solidity 15",
       (sum(1 for r in _R237 if (any((ROOT / r[1]).rglob("pom.xml")) or any((ROOT / r[1]).rglob("build.gradle")) or any((ROOT / r[1]).rglob("*.java")))),
        sum(1 for r in _R237 if any((ROOT / r[1]).rglob("*.sol")))), (20, 15))
@@ -9792,10 +9792,95 @@ check("M221：两新类目进 MATRIX_FIX_MAP",
 check("M221：矩阵 29 类目", len(_cli186.MATRIX_FIX_MAP), 29)
 
 print("\n[239] M232：第四波门禁")
-check("M232：run_all 67 项", len(_J237), 67)
+check("M232：run_all 68 项", len(_J237), 68)
 
 print("\n[240] M232：第四波断言里程碑")
 check("M232：已执行断言数 >=1200", COUNTS["n"] >= 1270, True)
+print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
+
+
+
+print("\n[241] M233：matrix --check 40 类 CWE + CVSS")
+_r241 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "matrix",
+                        "--check"], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+check("M233：matrix --check exit 0", _r241.returncode, 0)
+from core.agents.vuln_categories import CATEGORIES as _C241       # noqa: E402
+from core.context.cvss import compute_cvss31 as _cv241           # noqa: E402
+for _cat241 in sorted(_C241):
+    _meta241 = _C241[_cat241]
+    check(f"M233：{_cat241} 有 CWE", bool(_meta241.cwe), True)
+    check(f"M233：{_cat241} 有 CVSS 3.1",
+          str(_cv241(_cat241, "x", False).get("vector", "")).startswith(
+              "CVSS:3.1/"), True)
+
+print("\n[242] M233：35 个补丁器全部可调用")
+for _fn242 in _cli186.DOCTOR_PATCHERS:
+    check(f"M233：{_fn242} 可调用", callable(getattr(_cli186, _fn242, None)), True)
+
+print("\n[243] M234：Top-10 交单包四件套")
+_packs243 = sorted(d for d in (ROOT / "benchmarks" / "results" /
+                               "first_blood_packs").iterdir() if d.is_dir())
+check("M234：交单包 10 个", len(_packs243), 10)
+for _p243 in _packs243:
+    _files243 = {p.name for p in _p243.iterdir()}
+    check(f"M234：{_p243.name} ADVISORY", "ADVISORY.md" in _files243, True)
+    check(f"M234：{_p243.name} fix.patch 非空",
+          (_p243 / "fix.patch").is_file()
+          and (_p243 / "fix.patch").stat().st_size > 0, True)
+    check(f"M234：{_p243.name} checklist",
+          "SUBMISSION_CHECKLIST.md" in _files243, True)
+    check(f"M234：{_p243.name} Auto-Fix",
+          "[Auto-Fix Verified]" in (_p243 / "ADVISORY.md").read_text(
+              encoding="utf-8"), True)
+    check(f"M234：{_p243.name} manifest", "manifest.json" in _files243, True)
+
+print("\n[244] M236：50 仓目录与结果")
+for _r244 in _R237:
+    check(f"M236：{_r244[0]} 目录存在", (ROOT / _r244[1]).exists(), True)
+
+print("\n[245] M235：ci-init 三目标")
+_ci245 = ROOT / ".tmp" / "ci-final"
+_r245 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "ci-init",
+                        "--out", str(_ci245)], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+check("M235：ci-init exit 0", _r245.returncode, 0)
+check("M235：GitHub workflow",
+      (_ci245 / ".github" / "workflows" / "nexus-audit.yml").is_file(), True)
+check("M235：GitLab CI", (_ci245 / ".gitlab-ci.yml").is_file(), True)
+check("M235：Watchtower cron", (_ci245 / "watchtower.cron").is_file(), True)
+
+print("\n[246] M234：export-packs INDEX")
+_r246 = subprocess.run([sys.executable, str(ROOT / "cli.py"),
+                        "export-packs", "--check"], capture_output=True,
+                       text=True, encoding="utf-8", errors="replace")
+check("M234：export-packs exit 0", _r246.returncode, 0)
+_idx246 = (ROOT / "benchmarks" / "results" / "first_blood_packs" / "INDEX.md")
+check("M234：INDEX.md 存在且含 10 行",
+      _idx246.is_file() and _idx246.read_text(encoding="utf-8").count("|") >= 30,
+      True)
+
+print("\n[247] M236：verify_reproducibility --check")
+_r247 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /
+                        "verify_reproducibility.py"), "--check"],
+                       capture_output=True, text=True, encoding="utf-8",
+                       errors="replace")
+check("M236：重现门禁 exit 0", _r247.returncode, 0)
+check("M236：sha256 守恒", ("REPRO CHECK PASS" in (_r247.stdout or "")), True)
+
+print("\n[248] M249：doctor 12 段")
+_r248 = subprocess.run([sys.executable, str(ROOT / "cli.py"), "doctor"],
+                       capture_output=True, text=True, encoding="utf-8",
+                       errors="replace")
+check("M249：doctor exit 0", _r248.returncode, 0)
+check("M249：doctor 含 [12/12]", "[12/12]" in (_r248.stdout or ""), True)
+
+print("\n[249] M249：run_all 68 项")
+from benchmarks.run_all import JOBS as _J249                     # noqa: E402
+check("M249：run_all 68 项", len(_J249), 68)
+
+print("\n[250] M250：v1.0.0 1,500 项断言里程碑")
+check("M250：已执行断言数 >=1500", COUNTS["n"] >= 1500, True)
 print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
 
 check("M148：失败清单为空", len(FAILS), 0)

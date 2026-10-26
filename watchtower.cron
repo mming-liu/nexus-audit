@@ -1,0 +1,2 @@
+# M235：每日 02:00 增量首杀（只报新引入的规则层 P0）
+0 2 * * * cd /path/to/nexus-audit && python cli.py watch /path/to/target-repo --bundle-dir watch_bundles --state-file .watch_state.json

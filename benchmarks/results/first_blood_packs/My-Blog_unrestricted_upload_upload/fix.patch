@@ -1,0 +1,12 @@
+--- a/UploadController.java
++++ b/UploadController.java
+@@ -36,6 +36,9 @@
+     @ResponseBody
+     public Result upload(HttpServletRequest httpServletRequest, @RequestParam("file") MultipartFile file) throws URISyntaxException {
+         String fileName = file.getOriginalFilename();
++        java.util.Set<String> ALLOWED_EXT = java.util.Set.of("jpg", "jpeg", "png", "gif", "pdf");
++        String _ext = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
++        if (!ALLOWED_EXT.contains(_ext)) { throw new IllegalArgumentException("unsupported file type"); }
+         String suffixName = fileName.substring(fileName.lastIndexOf("."));
+         //生成文件名称通用方法
+         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");

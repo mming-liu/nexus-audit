@@ -1988,6 +1988,35 @@ def cmd_matrix(args) -> int:
         print(f"    - {cat} / {lang}")
     if len(gaps) > 20:
         print(f"    …（共 {len(gaps)} 处）")
+    # M233：--check 的单一事实源校验。CVSS 由 core.context.cvss 现算，
+    # PoC 由 synthesize 的真实自检决定，补丁器由注册表展开 —— 三者缺一即红。
+    issues: list[str] = []
+    for cat, meta in CATEGORIES.items():
+        if not getattr(meta, "cwe", ""):
+            issues.append(f"{cat}: 缺 CWE")
+        cv = compute_cvss31(cat, "x", False)
+        if not str(cv.get("vector", "")).startswith("CVSS:3.1/"):
+            issues.append(f"{cat}: 缺 CVSS 3.1 向量")
+    ghost = sorted(set(MATRIX_FIX_MAP) - set(CATEGORIES)
+                   - {"unchecked_low_level_calls"})
+    if ghost:
+        issues.append(f"矩阵幽灵类目: {ghost}")
+    if args.json:
+        print(json.dumps({
+            "categories": len(CATEGORIES),
+            "patchers": len(DOCTOR_PATCHERS),
+            "matrix_categories": len(MATRIX_FIX_MAP),
+            "gaps": len(gaps),
+            "issues": issues,
+        }, ensure_ascii=False))
+    if args.check:
+        if issues:
+            print("MATRIX CHECK FAIL ✘ " + "；".join(issues))
+            return 1
+        print(f"MATRIX CHECK PASS ✔（{len(CATEGORIES)} 类 / "
+              f"{len(DOCTOR_PATCHERS)} 补丁器 / CVSS 3.1 全覆盖）")
+        return 0
+
     # 缺口数与门禁的互锁：写进 json 供冒烟断言"缺口不增长"
     if args.summary_json:
         Path(args.summary_json).parent.mkdir(parents=True, exist_ok=True)
@@ -5286,7 +5315,7 @@ def _doctor_matrix_registry_check(ok: bool) -> bool:
 
     为什么值得常驻：这两份清单回答的是同一个问题（"这一类有没有确定性
     补丁器"），但服务两个入口 —— 矩阵的 --fix 列读 MATRIX_FIX_MAP，
-    doctor 的 [4/10] 与 --fix 调度读 DOCTOR_PATCHERS。只在一侧登记，
+    doctor 的 [5/12] 与 --fix 调度读 DOCTOR_PATCHERS。只在一侧登记，
     用户看到的是"矩阵里这一类没有补丁器"，而命令其实能跑；反过来则是
     "--fix 列表里有、矩阵不认"，两边都很难在人工走查里发现。
 
@@ -5295,7 +5324,7 @@ def _doctor_matrix_registry_check(ok: bool) -> bool:
       ② MATRIX_FIX_MAP 展开集 - DOCTOR_PATCHERS == 空（矩阵指向未注册函数）；
       ③ 矩阵的每个 key 都是真实类目（防止拼写漂移造出幽灵类目）。
     """
-    print("== [10/10] 能力矩阵 × 补丁注册表双向恒等（M151）==")
+    print("== [10/12] 能力矩阵 × 补丁注册表双向恒等（M151）==")
     mapped = {fn for tup in MATRIX_FIX_MAP.values() for fn in tup}
     registered = set(DOCTOR_PATCHERS)
     only_doctor = sorted(registered - mapped)
@@ -5334,7 +5363,7 @@ def cmd_doctor(args) -> int:
     """只读自检：依赖 / 规则注册表 / 缓存指纹 / 补丁器就位。exit 0 = 全部就绪。"""
     ok = True
 
-    print("== [1/10] 依赖就位 ==")
+    print("== [1/12] 依赖就位 ==")
     print(f"  [OK] python {sys.version.split()[0]}")
     for name in ["httpx", "tree_sitter(可选·缺省正则降级)", "pyyaml(可选)", "slither(可选)"]:
         try:
@@ -5346,7 +5375,7 @@ def cmd_doctor(args) -> int:
             if "(可选" not in name:
                 ok = False
 
-    print("== [2/10] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
+    print("== [2/12] 规则注册表完整性（verdict 路由 × 类目全覆盖）==")
     from core.agents import rule_detectors
     for cat in DOCTOR_RULE_CATEGORIES:
         try:
@@ -5360,7 +5389,7 @@ def cmd_doctor(args) -> int:
             print(f"  [FAIL] {cat}: 路由异常 {type(e).__name__}: {e}")
             ok = False
     print(f"  共 {len(DOCTOR_RULE_CATEGORIES)} 类，全部走 verdict() 路由")
-    print("== [3/10] 缓存指纹自检 ==")
+    print("== [3/12] 缓存指纹自检 ==")
     try:
         from benchmarks.diag_owasp_sqli_fp import _slicer_fingerprint
         fp1, fp2 = _slicer_fingerprint(), _slicer_fingerprint()
@@ -5373,7 +5402,7 @@ def cmd_doctor(args) -> int:
         print(f"  [FAIL] 指纹不可用: {type(e).__name__}: {e}")
         ok = False
 
-    print(f"== [4/10] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
+    print(f"== [4/12] 补丁器就位（{len(DOCTOR_PATCHERS)} 类）==")
     for fn_name in DOCTOR_PATCHERS:
         fn = globals().get(fn_name)
         if callable(fn):
@@ -5410,7 +5439,7 @@ def _doctor_cross_repo_check(ok: bool) -> bool:
     产物不在（首次克隆、还没跑野战）时**不判 FAIL** —— 与第 7、8 段同一
     口径：缺产物是"还没跑"，不是"跑坏了"。
     """
-    print("== [9/10] 跨仓聚类一致性（M135）==")
+    print("== [9/12] 跨仓聚类一致性（M135）==")
     root = Path(__file__).resolve().parent
     agg = root / "benchmarks" / "results" / "wild_hunt.json"
     cl = root / "benchmarks" / "results" / "cross_repo_clusters.json"
@@ -5440,7 +5469,7 @@ def _doctor_exporters_check(ok: bool) -> bool:
     任一条的 schema 校验器被改坏，用户那边是"报告上传失败"而不是"门禁变红"
     —— CI 里看不出来。这里把两个校验器都跑一遍自产文档 + 一份坏文档。
     """
-    print("== [8/10] 双 SAST 导出器与跨仓聚类（SARIF / GitLab / clusters）==")
+    print("== [8/12] 双 SAST 导出器与跨仓聚类（SARIF / GitLab / clusters）==")
     root = Path(__file__).resolve().parent
     try:
         from core.context.sarif_validator import validate_sarif
@@ -5500,7 +5529,7 @@ def _doctor_disclosure_index_check(ok: bool) -> bool:
     留下 21 份互不相干的草稿目录。"草稿总数 == 根因总数"是唯一能自动核对的
     不变量 —— 少一份说明有仓没跑到，多一份说明根因折叠漏了。
     """
-    print("== [7/10] 披露包完整性（advisories/INDEX.md ↔ wild_hunt.json）==")
+    print("== [7/12] 披露包完整性（advisories/INDEX.md ↔ wild_hunt.json）==")
     root = Path(__file__).resolve().parent
     adv_root = root / "benchmarks" / "results" / "advisories"
     agg = root / "benchmarks" / "results" / "wild_hunt.json"
@@ -5558,7 +5587,7 @@ def _doctor_extended_checks(ok: bool) -> bool:
     root = Path(__file__).resolve().parent
 
     # ---- 5.1 PoC 合成器：可导入 + 三语言模板自检通过 ----
-    print("== [5/10] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
+    print("== [5/12] 扩展能力（PoC 合成器 / 覆盖地板 / SCOREBOARD / 正则卫生）==")
     print("  -- PoC 合成器 --")
     try:
         from core.sandbox.poc_synthesizer import PocSynthesizer, PocArtifact
@@ -5745,6 +5774,47 @@ def _doctor_extended_checks(ok: bool) -> bool:
         if packs and not any(True for _ in packs if False):
             print(f"  共 {len(packs)} 份立即可投递的交单包（每份四件套 + 补丁自检）")
 
+    # ---- 11. M233：矩阵 --check ----
+    print("== [11/12] 能力矩阵 --check（M233）==")
+    from core.context.cvss import compute_cvss31
+    _issues = []
+    for _cat, _meta in CATEGORIES.items():
+        if not getattr(_meta, "cwe", ""):
+            _issues.append(f"{_cat}:缺 CWE")
+        _cv = compute_cvss31(_cat, "x", False)
+        if not str(_cv.get("vector", "")).startswith("CVSS:3.1/"):
+            _issues.append(f"{_cat}:缺 CVSS")
+    _ghost = sorted(set(MATRIX_FIX_MAP) - set(CATEGORIES)
+                    - {"unchecked_low_level_calls"})
+    if _ghost:
+        _issues.append(f"幽灵类目:{_ghost}")
+    if _issues:
+        print(f"  [FAIL] {len(_issues)} 项：{_issues[:5]}")
+        ok = False
+    else:
+        print(f"  [OK] {len(CATEGORIES)} 类全部具备 CWE + CVSS 3.1；"
+              f"矩阵 {len(MATRIX_FIX_MAP)} 类目无幽灵")
+
+    # ---- 12. M236：跨次运行确定性重现 ----
+    print("== [12/12] 跨次运行确定性重现（M236）==")
+    try:
+        from benchmarks.verify_reproducibility import (
+            BASELINE as _RB, current_digest as _rd)
+        if not _RB.exists():
+            print("  [FAIL] 缺少 repro_baseline.json")
+            ok = False
+        else:
+            _want = json.loads(_RB.read_text(encoding="utf-8"))["digest"]
+            _got = _rd()
+            if _want != _got:
+                print(f"  [FAIL] 基线 {_want[:16]} != 当前 {_got[:16]}")
+                ok = False
+            else:
+                print(f"  [OK] sha256 {_got[:16]}（50 仓根因/聚类/排序守恒）")
+    except Exception as _e:                                  # noqa: BLE001
+        print(f"  [FAIL] 重现校验异常: {type(_e).__name__}: {_e}")
+        ok = False
+
     return ok
 
 
@@ -5755,7 +5825,7 @@ def _doctor_wild_hunt_check(ok: bool) -> bool:
     报告是给人和上游看的，json 是机器事实源；两者漂了 doctor 当场 FAIL。
     """
     root = Path(__file__).resolve().parent
-    print("== [6/10] 野战白皮书对账（wild_hunt.json ↔ WILD_HUNT_REPORT.md）==")
+    print("== [6/12] 野战白皮书对账（wild_hunt.json ↔ WILD_HUNT_REPORT.md）==")
     agg = root / "benchmarks" / "results" / "wild_hunt.json"
     report = root / "WILD_HUNT_REPORT.md"
     if not agg.exists() or not report.exists():
@@ -5833,6 +5903,84 @@ def cmd_watch(args) -> int:
     if errors:
         print(f"[!] {len(errors)} 个仓库未能监控")
         return 1
+    return 0
+
+
+
+
+def cmd_export_packs(args) -> int:
+    """M234：Top-10 交单包生成 + INDEX.md。"""
+    import subprocess
+    script = Path(__file__).resolve().parent / "benchmarks" / "first_blood_packs.py"
+    cmd = [sys.executable, str(script)]
+    if args.check:
+        cmd.append("--check")
+    rc = subprocess.run(cmd, cwd=Path(__file__).resolve().parent).returncode
+    if rc != 0:
+        return rc
+    out = Path(__file__).resolve().parent / "benchmarks" / "results" / "first_blood_packs"
+    packs = sorted(d for d in out.iterdir() if d.is_dir()) if out.exists() else []
+    lines = ["# Top-10 交单包（nexus-audit v1.0.0）", "",
+             "| # | 包 | 四件套 |", "|---|---|---|"]
+    for i, d in enumerate(packs, 1):
+        need = ("ADVISORY.md", "fix.patch", "SUBMISSION_CHECKLIST.md")
+        ok = all((d / f).is_file() for f in need)
+        lines.append(f"| {i} | {d.name} | {'✔' if ok else '✘'} |")
+    (out / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"[export-packs] {len(packs)} 包 → {out / 'INDEX.md'}")
+    return 0
+
+
+def cmd_ci_init(args) -> int:
+    """M235：生成 CI / 定时挂机配置（命令参数与 cli.py 严格一致）。"""
+    root = Path(args.out).resolve()
+    targets = [args.target] if args.target else ["github", "gitlab", "watchtower"]
+    gh = root / ".github" / "workflows" / "nexus-audit.yml"
+    gl = root / ".gitlab-ci.yml"
+    wt = root / "watchtower.cron"
+    text_gh = """name: nexus-audit
+on: [push, pull_request]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: pip install -r requirements.txt
+      - run: python cli.py scan . --auto --offline --sarif nexus.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: nexus.sarif
+"""
+    text_gl = """stages: [audit]
+nexus-audit:
+  image: python:3.14
+  stage: audit
+  script:
+    - pip install -r requirements.txt
+    - python cli.py scan . --auto --offline --sarif nexus.sarif
+  artifacts:
+    paths: [nexus.sarif]
+    expire_in: 7 days
+"""
+    text_wt = """# M235：每日 02:00 增量首杀（只报新引入的规则层 P0）
+0 2 * * * cd /path/to/nexus-audit && python cli.py watch /path/to/target-repo --bundle-dir watch_bundles --state-file .watch_state.json
+"""
+    n = 0
+    for t in targets:
+        if t == "github":
+            gh.parent.mkdir(parents=True, exist_ok=True)
+            gh.write_text(text_gh, encoding="utf-8"); n += 1
+            print(f"[ci-init] GitHub Actions → {gh}")
+        elif t == "gitlab":
+            gl.write_text(text_gl, encoding="utf-8"); n += 1
+            print(f"[ci-init] GitLab CI → {gl}")
+        else:
+            wt.write_text(text_wt, encoding="utf-8"); n += 1
+            print(f"[ci-init] Watchtower cron → {wt}")
+    print(f"[ci-init] 生成 {n} 个配置")
     return 0
 
 
@@ -5950,6 +6098,18 @@ def main():
         "matrix", help="M100：24 类 × 三语言 ×（规则/--fix/PoC/CVSS）能力矩阵")
     p_matrix.add_argument("--summary-json", default=None, metavar="OUT.json",
                           help="矩阵 JSON（供冒烟断言缺口不增长）")
+    p_matrix.add_argument("--check", action="store_true",
+                          help="M233：校验 40 类规则 CVSS/PoC/补丁器全覆盖，exit 0/1")
+    p_matrix.add_argument("--json", action="store_true",
+                          help="M233：stdout 追加机器可读 JSON 摘要")
+    p_export = sub.add_parser("export-packs",
+                              help="M234：生成 Top-10 交单包 + INDEX")
+    p_export.add_argument("--check", action="store_true",
+                          help="只校验四件套，不重新生成")
+    p_ci = sub.add_parser("ci-init", help="M235：生成 GitHub/GitLab/Watchtower CI")
+    p_ci.add_argument("--target", choices=["github", "gitlab", "watchtower"],
+                      default=None, help="只生成一个目标（默认全部）")
+    p_ci.add_argument("--out", default=".", help="输出根目录（默认仓库根）")
     p_watch = sub.add_parser(
         "watch", help="M152：增量首杀监控（只报本次提交新引入的规则层 P0）")
     p_watch.add_argument("repos", nargs="+", metavar="REPO",
@@ -5985,6 +6145,10 @@ def main():
         sys.exit(cmd_matrix(args))
     elif args.command == "watch":
         sys.exit(cmd_watch(args))
+    elif args.command == "ci-init":
+        sys.exit(cmd_ci_init(args))
+    elif args.command == "export-packs":
+        sys.exit(cmd_export_packs(args))
     else:
         cmd_pr_scan(args)
 

@@ -1,0 +1,10 @@
+stages: [audit]
+nexus-audit:
+  image: python:3.14
+  stage: audit
+  script:
+    - pip install -r requirements.txt
+    - python cli.py scan . --auto --offline --sarif nexus.sarif
+  artifacts:
+    paths: [nexus.sarif]
+    expire_in: 7 days

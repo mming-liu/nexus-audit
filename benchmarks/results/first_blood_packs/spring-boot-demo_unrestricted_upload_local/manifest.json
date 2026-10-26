@@ -1,0 +1,12 @@
+{
+  "repo": "spring-boot-demo",
+  "github": "xkcoding/spring-boot-demo",
+  "category": "unrestricted_upload",
+  "unit": "UploadController.local",
+  "file": "UploadController.java",
+  "line": 49,
+  "affected_routes": 1,
+  "patch_verified": true,
+  "poc_ok": true,
+  "component_cve": ""
+}

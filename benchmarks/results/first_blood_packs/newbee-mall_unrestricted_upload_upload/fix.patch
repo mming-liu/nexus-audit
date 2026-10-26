@@ -1,0 +1,12 @@
+--- a/UploadController.java
++++ b/UploadController.java
+@@ -50,6 +50,9 @@
+     @ResponseBody
+     public Result upload(HttpServletRequest httpServletRequest, @RequestParam("file") MultipartFile file) throws URISyntaxException, IOException {
+         String fileName = file.getOriginalFilename();
++        java.util.Set<String> ALLOWED_EXT = java.util.Set.of("jpg", "jpeg", "png", "gif", "pdf");
++        String _ext = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
++        if (!ALLOWED_EXT.contains(_ext)) { throw new IllegalArgumentException("unsupported file type"); }
+         BufferedImage bufferedImage = ImageIO.read(file.getInputStream());
+         if (bufferedImage == null) {
+             return ResultGenerator.genFailResult("请上传图片类型的文件");

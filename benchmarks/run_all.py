@@ -45,7 +45,7 @@ SCOREBOARD = ROOT / "benchmarks" / "results" / "SCOREBOARD.md"
 # (名称, 命令, 前置目录检查, 类别, 可并发)
 #   可并发=False 的是冒烟/核对（快，且是语义前置），保持串行。
 JOBS = [
-    ("冒烟测试 [1]-[240]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
+    ("冒烟测试 [1]-[250]", ["benchmarks/smoke_test_chains.py"], None, "smoke", False),
     ("争议登记核对", ["benchmarks/export_disputes.py", "--check"], None, "smoke", False),
     ("OWASP 全量", ["benchmarks/regress_owasp_rules.py"],
      "reference_repos/BenchmarkJava-master", "target", True),
@@ -316,6 +316,9 @@ JOBS = [
     # Apollo：自定义 Spring EL @PreAuthorize + profile 化认证。
     ("apollo (自定义 Spring EL)", ["benchmarks/benchmark_apollo.py", "--strict"],
      "reference_repos/apollo", "target", True),
+    # 第 68 项（M236）：跨次运行确定性重现（根因/聚类/排序字节级守恒）。
+    ("确定性重现（--check）",
+     ["benchmarks/verify_reproducibility.py", "--check"], None, "smoke", False),
     # 第 47 项（M135）：跨仓聚类一致性。它不跑靶场，只对账：
     #   · 各簇根因数之和 == wild_hunt.json 的独立根因总数（计数守恒）；
     #   · 多仓共现簇 >= 8（低于就退化成一仓一簇，"跨仓同源"不成立）。
