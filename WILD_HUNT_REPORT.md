@@ -4,22 +4,22 @@
 > `benchmarks/results/wild_hunt.json`（`cli.py doctor` 第六段会对账，
 > 数字漂了当场 FAIL）。规则层离线可复现，不含模型层数字。
 
-## 一、总量（50 仓 / 209 独立根因 / 零误报）
+## 一、总量（50 仓 / 208 独立根因 / 零误报）
 
 | 项 | 数值 |
 |---|---|
 | 真实仓库 | **50 个**（Java 19 + Python 16 + Solidity 15） |
-| 路由/合约入口 | **15,617 个** |
-| 路由级 P0 命中 | **4,999 条** |
-| 去重后的独立根因 P0 | **209 个** |
-| GHSA 披露草稿 | **209 份**（按独立根因，不按路由） |
+| 路由/合约入口 | **15,800 个** |
+| 路由级 P0 命中 | **4,998 条** |
+| 去重后的独立根因 P0 | **208 个** |
+| GHSA 披露草稿 | **208 份**（按独立根因，不按路由） |
 | benchmark 层误报 | **0 条** |
 | benchmark 层判反 | **0 条** |
 | benchmark_* --strict | **50/50 exit 0** |
 | 供应链命中已知 advisory 的仓库 | **7 个** |
 | 供应链 × 代码双重实锤 | **5 个** |
 
-一句话：**在 15,617 个真实入口上，规则层没有确认误报；209 个独立根因全部由规则层确定性判据产出，PoC/补丁自检可复核。**
+一句话：**在 15,800 个真实入口上，规则层没有确认误报；208 个独立根因全部由规则层确定性判据产出，PoC/补丁自检可复核。**
 
 ## 二、逐仓数字
 
@@ -46,11 +46,10 @@
 | Employee-Management-System | Python | 4 | 2 | 2 | ✔ | — |
 | django-oauth-toolkit | Python | 18 | 2 | 2 | ✔ | — |
 | django-realworld | Python | 11 | 2 | 2 | ✔ | CVE-2017-12794、CVE-2018-14574、CVE-2020-25626、CVE-2022-29217 |
-| litestar | Python | 25 | 2 | 2 | ✔ | — |
+| litestar | Python | 29 | 2 | 2 | ✔ | — |
 | sanic | Python | 16 | 2 | 2 | ✔ | — |
 | solmate | Solidity | 144 | 2 | 2 | ✔ | — |
 | Synthetix V3 | Solidity | 1411 | 1 | 1 | ✔ | — |
-| kkFileView | Java | 20 | 1 | 1 | ✔ | — |
 | mall-tiny | Java | 40 | 40 | 1 | ✔ | CVE-2023-24162 |
 | waynboot-mall | Java | 163 | 163 | 1 | ✔ | — |
 | AaveV3 | Solidity | 553 | 0 | 0 | ✔ | — |
@@ -69,10 +68,11 @@
 | flaskr | Python | 8 | 0 | 0 | ✔ | — |
 | flasky | Python | 39 | 0 | 0 | ✔ | CVE-2018-1000656、CVE-2018-18074、CVE-2019-10906、CVE-2019-11324、CVE-2019-14322、CVE-2019-7548 |
 | full-stack-fastapi-template | Python | 23 | 0 | 0 | ✔ | — |
-| halo | Python | 0 | 0 | 0 | ✔ | — |
+| halo | Python | 173 | 0 | 0 | ✔ | — |
+| kkFileView | Java | 20 | 0 | 0 | ✔ | — |
 | morpho-blue | Solidity | 71 | 0 | 0 | ✔ | — |
 | solady | Solidity | 2968 | 0 | 0 | ✔ | — |
-| starlette | Python | 0 | 0 | 0 | ✔ | — |
+| starlette | Python | 6 | 0 | 0 | ✔ | — |
 | sushiswap-zapper | Solidity | 75 | 0 | 0 | ✔ | — |
 | v3-periphery | Solidity | 136 | 0 | 0 | ✔ | — |
 
@@ -374,10 +374,6 @@
 
 - **[unchecked_low_level_calls]** `processCcipReceive`（endpoint，影响 1 条路由） @ `CrossChain.sol:50`
 
-### kkFileView（Java）— 1 个独立根因
-
-- **[arbitrary_file_delete]** `FileController.deleteFile`（endpoint，影响 1 条路由） @ `FileController.java:240`
-
 ### mall-tiny（Java）— 1 个独立根因
 
 - **[cors]** `UmsAdminController.register`（global-config，影响 40 条路由） @ `UmsAdminController.java:48`
@@ -472,8 +468,91 @@ python cli.py matrix
 | litestar | Python | — | — | 2 | 仅代码（组件版本未命中已知 advisory） |
 | waynboot-mall | Java | — | — | 1 | 仅代码（组件版本未命中已知 advisory） |
 | Synthetix V3 | Solidity | — | — | 1 | 仅代码（组件版本未命中已知 advisory） |
-| kkFileView | Java | — | — | 1 | 仅代码（组件版本未命中已知 advisory） |
 
 **双重实锤仓 5 个**：jeecg-boot、DjanGoat、spring-boot-demo、django-realworld、mall-tiny
 
 > 口径说明：「仅组件」不等于「有漏洞可利用」—— 组件是否存在可达的危险入口要看同一行的代码列；「仅代码」也不是「组件没问题」，只是版本没落进维护清单里。两类都如实列出，不做合并。
+
+## 八、生产 / 库 / 教学分账（M257）与零空跑门禁（M253）
+
+| repo_role | 仓数 | 仓库 |
+|---|---|---|
+| production | 44 | 其余 44 仓（含 OpenZeppelin 这类被生产合约继承的基座库） |
+| library | 3 | `flask-jwt-extended`（0 入口）、`solmate`（144）、`solady`（2968） |
+| educational_demo | 3 | DjanGoat（36）、Employee-Management-System（4）、spring-boot-demo（80） |
+
+**M253 零空跑门禁**：production 且 `web_app=true` 的 **31** 个仓
+`total_units` 全部 > 0（最小 6，starlette）。`flask-jwt-extended` 作为纯
+SDK 库仓豁免 —— 0 入口是事实，不是切片器失败。`wild_hunt.py --check-roles`
+与 `cli.py doctor` 第六段使用同一判据；M257 的三账字段直接写进
+`wild_hunt.json` 的 `repo_role` / `web_app` / `totals.repos_by_role`。
+
+> 口径说明：本节 production=44，与执行者给的 44 仓一致。OpenZeppelin 虽是
+> 「库」，但被大量生产合约继承，按生产依赖计；若按「可独立部署」严格口径，
+> production 会降到 42、library 升到 5。M253 门禁只作用于 Web 应用仓，
+> 不因这条归类差异改变结论。
+
+## 九、LLM 两级复核（M258，非人工核验）
+
+Tier-1 `beam-free`（免费初筛）+ Tier-2 `glm-5.3-flash`（主）/
+`deepseek-v4.1-flash`（备，运行期故障切换），对第 31–50 仓的 **88** 条根因
+逐条做反方挑刺。**88 不是 111**：当前 `wild_hunt.json` 第 31–50 仓实际
+88 条根因（208 总量 − 前 30 仓 120 条）；111 是旧快照的口径，不能拿来做
+「已复核」的分母。
+
+| 结论 | 条数 | 含义 |
+|---|---|---|
+| CONFIRMED_TP | 27 | 两级都未推翻；**仍不是人工核验** |
+| LIKELY_FP_GUARDED | 56 | 反方找到框架守卫 / 无 sink / 无用户可控输入 |
+| NEEDS_HUMAN | 5 | Tier-1 限流（按计费边界未降级付费）或证据不足 |
+
+系统性误报模式（下一轮规则淬火清单，本轮不直接改判据）：
+
+1. **XSS × @RestController JSON（17 条）**：apollo / xxl-job / ruoyi-vue-pro
+   的控制器返回 DTO，Jackson 序列化为 `application/json`，不存在 HTML
+   sink。建议判据增加「非 String / 非 `produces=text/html` 的
+   @RestController 返回对象 → 非 XSS」。
+2. **SSRF × 固定 baseUri（7 条）**：spring-boot-demo 的 xxl-job 代理 URL
+   由部署期 `baseUri` + 常量路径拼接，请求参数只进 form body。建议要求
+   用户输入真正到达 URL 的 host/path 才判 SSRF。
+3. **redir × 常量目标（5 条）**：xxl-job / spring-boot-demo 的
+   `RedirectView("/")` 或固定 OAuth URL。建议常量目标直接 False。
+4. **authz（19 条 FP，典型是 simple-list）**：ruoyi-vue-pro 的下拉精简列表只要求
+   登录、不要求功能权限，属框架惯例；是否算缺陷需人工定政策。
+5. **CORS × 未配置（1 条）**：spring-boot-demo 的 WebSocket 控制器没有
+   `allowedOrigins=*`，规则把「缺少配置」当成「宽松配置」；建议要求显式
+   通配符。
+
+> 本轮不直接改规则判据：任何判据变更都会改变 208 条根因、15,800 入口的
+> repro 基线、126 簇聚类与 68 项 `run_all`，必须整仓重扫 + 全量冒烟后才能
+> 落地。误报模式已登记为下一轮淬火清单；对外交单包先用 LLM 复核做降噪
+> 过滤（M259），且 `human_verified` 一律为 `false`。逐条台账见
+> `benchmarks/results/llm_root_triage.md`。
+
+## 十、v1.1 Top-10 候选交单包（M259：9 条通过补丁自检）
+
+`python cli.py export-packs` 现算的选择结果（完整清单与四件套见
+`benchmarks/results/first_blood_packs/INDEX.md`）：
+
+| # | 仓库 | 类目 | 根因 | CVSS | LLM 复核 |
+|---|---|---|---|---|---|
+| 1 | Sentinel | log_injection | AuthController.login | 8.1 | CONFIRMED_TP |
+| 2 | Sentinel | log_injection | ClusterAssignController.apiAssignAllClusterServersOfApp | 8.1 | CONFIRMED_TP |
+| 3 | RuoYi | sqli | GenController.create | 9.8 | 未复核（第 3 仓，不在本轮 31–50 范围） |
+| 4 | django-realworld | hardcoded_secret | [secret-file] settings.py | 9.8 | 未复核（第 22 仓） |
+| 5 | litemall | hardcoded_secret | [secret-file] JwtHelper.java | 9.8 | 未复核（第 7 仓） |
+| 6 | My-Blog | unrestricted_upload | BlogController.uploadFileByEditormd | 8.1 | 未复核（第 6 仓） |
+| 7 | My-Blog | unrestricted_upload | UploadController.upload | 8.1 | 未复核（第 6 仓） |
+| 8 | newbee-mall | unrestricted_upload | UploadController.upload | 8.1 | 未复核（第 1 仓） |
+| 9 | newbee-mall-api | unrestricted_upload | NewBeeAdminUploadAPI.upload | 8.1 | 未复核（第 2 仓） |
+
+口径：7 个仓、每仓 ≤2 条、零教学仓、零纯 CORS；同一函数的 weakrand/xss
+多规则命中已合并到 unrestricted_upload 一条。**目标 Top-10，实测 9 条**
+——第 10 条候选（solmate arithmetic）被 Tier-1/Tier-2 一致判为
+`LIKELY_FP_GUARDED`：Solidity 0.8 checked 减法 + `unchecked` 加法受
+`totalSupply` 不变量保护；其余更高危候选（jeecg sqli、xxl-job xss、
+eladmin 上传、Synthetix unchecked 等）补丁自检均未通过。按「不拿未验证
+补丁凑数」原则，本轮只交 9 条，不伪造第 10 条。
+
+> Sentinel 两条是 LLM CONFIRMED_TP；其余 7 条在本轮复核范围外，仍需人工
+> 逐条读源码后才能对外披露。`human_verified` 一律为 `false`。

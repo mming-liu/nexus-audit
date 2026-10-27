@@ -3,7 +3,9 @@
 策略（用户要求）：
   1. 免费模型优先：探测 FREE_CANDIDATES（beam-free 置顶；longcat 已 HTTP 410 兜底），
      第一个可用的直接用
-  2. 免费模型全不可用时按 PAID_FALLBACK 链依次降级（glm-5.3-flash → deepseek-v4.1-flash）
+  2. 免费模型全不可用时按 PAID_FALLBACK 链依次降级（glm-5.3-flash → deepseek-v4.1-flash），
+     但 **Tier-1 的付费穿透默认关闭**：仅当 LLM_ALLOW_PAID_FALLBACK=1 时才允许。
+     大仓扫描遇到 429/抖动时默认停在待复核队列，绝不静默烧付费额度。
   3. 额度监控：GET /zen/go/v1/usage 返回 rolling/weekly/monthly 三窗口百分比，
      401 = key 失效（对齐上午的静默下线故障教训），>=80% 告警
 """
@@ -80,12 +82,36 @@ def probe_model(model: str, timeout: float = 60.0, attempts: int = 3) -> bool:
     return False
 
 
+class PaidFallbackBlocked(RuntimeError):
+    """Tier-1 免费候选全灭，且未显式允许付费降级。
+
+    计费边界：Tier-1 是高吞吐初筛层，跑上千入口的大仓时一次 429 或
+    上游抖动就静默切到付费池，会把账单放大到不可控。默认必须停在
+    待复核队列；只有 LLM_ALLOW_PAID_FALLBACK=1 才允许付费兜底。
+    """
+
+
+def paid_fallback_allowed() -> bool:
+    """Tier-1 是否允许在免费候选全灭后穿透到付费池（默认否）。"""
+    return os.getenv("LLM_ALLOW_PAID_FALLBACK", "0").strip().lower() in {
+        "1", "true", "yes", "on"}
+
+
 def pick_model(tier: int = 1, force_paid: bool = False) -> str:
-    """免费优先选型；force_paid=True 跳过免费直接走付费链。"""
+    """免费优先选型；force_paid=True 跳过免费直接走付费链。
+
+    Tier-1 的付费穿透受 LLM_ALLOW_PAID_FALLBACK 门控（默认关闭）：
+    免费候选全部不可用时抛 PaidFallbackBlocked，调用方据此保留待复核
+    队列，而不是静默消耗付费额度。Tier-2 本身就是付费复核层，不受此门控。
+    """
     if not force_paid:
         for m in FREE_CANDIDATES:
             if probe_model(m):
                 return m
+        if tier == 1 and not paid_fallback_allowed():
+            raise PaidFallbackBlocked(
+                "Tier-1 免费候选全部不可用；LLM_ALLOW_PAID_FALLBACK 未开启，"
+                "拒绝静默降级到付费模型（根因保留在待复核队列）")
     chain = TIER1_PAID_FALLBACK if tier == 1 else TIER2_PAID_FALLBACK
     for m in chain:
         if probe_model(m):
@@ -115,14 +141,29 @@ def check_quota(api_key: str | None = None) -> dict:
 
 
 def auto_select_and_print(tier: int = 1) -> str:
-    """CLI 辅助：打印选型过程并返回选中模型。"""
+    """CLI 辅助：打印选型过程并返回选中模型。
+
+    Tier-1 免费全灭时**不自动付费**：除非 LLM_ALLOW_PAID_FALLBACK=1，
+    否则抛 PaidFallbackBlocked，让上层把样本留在待复核队列。显式
+    LLM_DISABLE_FREE=1 也一样受门控 —— 关闭免费通道不等于允许产生账单。
+    """
     if not force_free_disabled():
         for m in FREE_CANDIDATES:
             print(f"      探测免费模型 {m} ...", flush=True)
             if probe_model(m):
                 print(f"      [OK] 使用免费模型：{m}")
                 return m
+        if tier == 1 and not paid_fallback_allowed():
+            msg = ("      免费模型不可用；LLM_ALLOW_PAID_FALLBACK=0，"
+                   "保持待复核队列（不静默降级付费）")
+            print(msg, flush=True)
+            raise PaidFallbackBlocked(msg)
         print("      免费模型不可用，降级付费链 ...")
+    elif tier == 1 and not paid_fallback_allowed():
+        msg = ("      免费模型已禁用（LLM_DISABLE_FREE=1）；"
+               "LLM_ALLOW_PAID_FALLBACK=0，拒绝付费降级")
+        print(msg, flush=True)
+        raise PaidFallbackBlocked(msg)
     chosen = pick_model(tier, force_paid=True)
     print(f"      [OK] 使用付费模型：{chosen}")
     return chosen

@@ -1,17 +1,17 @@
-# 交单流程单（newbee-mall-api / weakrand / NewBeeAdminUploadAPI.upload）
+# 交单流程单（Sentinel / log_injection / ClusterAssignController.apiAssignAllClusterServersOfApp）
 
 ## 0. 事实核对
 
-- 仓库：https://github.com/newbee-ltd/newbee-mall-api
-- 根因：weakrand（CWE）
-- 位置：NewBeeAdminUploadAPI.java:49
+- 仓库：https://github.com/alibaba/Sentinel
+- 根因：log_injection（CWE-117）
+- 位置：ClusterAssignController.java:50
 - 受影响路由：1 条（同一独立根因）
 - 补丁：已验证 True -> False，见 fix.patch
 
 ## 1. 私密报告（不要先开公开 issue）
 
-- [ ] 打开 https://github.com/newbee-ltd/newbee-mall-api/security/advisories/new
-- [ ] 标题：CWE in NewBeeAdminUploadAPI.upload
+- [ ] 打开 https://github.com/alibaba/Sentinel/security/advisories/new
+- [ ] 标题：CWE-117 in ClusterAssignController.apiAssignAllClusterServersOfApp
 - [ ] 正文粘贴 ADVISORY.md（删掉本流程单）
 - [ ] 附上 poc_test.* 与 fix.patch
 - [ ] 受影响版本：以当前默认分支 HEAD 为准，再用 git tag --contains 确认区间

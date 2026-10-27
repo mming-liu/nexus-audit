@@ -1,12 +1,18 @@
 {
   "repo": "My-Blog",
+  "repo_role": "production",
   "github": "ZHENFENG13/My-Blog",
   "category": "unrestricted_upload",
   "unit": "BlogController.uploadFileByEditormd",
   "file": "BlogController.java",
   "line": 185,
   "affected_routes": 1,
+  "cvss": 8.1,
+  "triage": "",
+  "merged_categories": [
+    "unrestricted_upload",
+    "weakrand"
+  ],
   "patch_verified": true,
-  "poc_ok": true,
-  "component_cve": ""
+  "poc_ok": true
 }

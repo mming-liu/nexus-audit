@@ -1,0 +1,10 @@
+--- a/AuthController.java
++++ b/AuthController.java
+@@ -66,6 +66,7 @@
+          */
+         if (StringUtils.isNotBlank(authUsername) && !authUsername.equals(username)
+                 || StringUtils.isNotBlank(authPassword) && !authPassword.equals(password)) {
++            username = String.valueOf(username).replace("\r", "").replace("\n", "");
+             LOGGER.error("Login failed: Invalid username or password, username=" + username);
+             return Result.ofFail(-1, "Invalid username or password");
+         }

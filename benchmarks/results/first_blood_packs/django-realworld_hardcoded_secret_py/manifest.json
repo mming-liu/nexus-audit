@@ -1,0 +1,17 @@
+{
+  "repo": "django-realworld",
+  "repo_role": "production",
+  "github": "gothinkster/django-realworld-example-app",
+  "category": "hardcoded_secret",
+  "unit": "[secret-file] settings.py",
+  "file": "settings.py",
+  "line": 1,
+  "affected_routes": 1,
+  "cvss": 9.8,
+  "triage": "",
+  "merged_categories": [
+    "hardcoded_secret"
+  ],
+  "patch_verified": true,
+  "poc_ok": true
+}

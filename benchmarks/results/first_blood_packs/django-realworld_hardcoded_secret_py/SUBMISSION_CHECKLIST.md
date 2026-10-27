@@ -1,17 +1,17 @@
-# 交单流程单（newbee-mall / weakrand / UploadController.upload）
+# 交单流程单（django-realworld / hardcoded_secret / [secret-file] settings.py）
 
 ## 0. 事实核对
 
-- 仓库：https://github.com/newbee-ltd/newbee-mall
-- 根因：weakrand（CWE）
-- 位置：UploadController.java:49
+- 仓库：https://github.com/gothinkster/django-realworld-example-app
+- 根因：hardcoded_secret（CWE-798）
+- 位置：settings.py:1
 - 受影响路由：1 条（同一独立根因）
 - 补丁：已验证 True -> False，见 fix.patch
 
 ## 1. 私密报告（不要先开公开 issue）
 
-- [ ] 打开 https://github.com/newbee-ltd/newbee-mall/security/advisories/new
-- [ ] 标题：CWE in UploadController.upload
+- [ ] 打开 https://github.com/gothinkster/django-realworld-example-app/security/advisories/new
+- [ ] 标题：CWE-798 in [secret-file] settings.py
 - [ ] 正文粘贴 ADVISORY.md（删掉本流程单）
 - [ ] 附上 poc_test.* 与 fix.patch
 - [ ] 受影响版本：以当前默认分支 HEAD 为准，再用 git tag --contains 确认区间

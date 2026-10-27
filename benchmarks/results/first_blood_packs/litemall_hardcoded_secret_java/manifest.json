@@ -1,0 +1,17 @@
+{
+  "repo": "litemall",
+  "repo_role": "production",
+  "github": "linlinjava/litemall",
+  "category": "hardcoded_secret",
+  "unit": "[secret-file] JwtHelper.java",
+  "file": "JwtHelper.java",
+  "line": 1,
+  "affected_routes": 1,
+  "cvss": 9.8,
+  "triage": "",
+  "merged_categories": [
+    "hardcoded_secret"
+  ],
+  "patch_verified": true,
+  "poc_ok": true
+}

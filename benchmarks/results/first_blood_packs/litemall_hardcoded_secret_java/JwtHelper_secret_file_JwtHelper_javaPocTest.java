@@ -1,6 +1,6 @@
 // 自动生成的 PoC 骨架（M45 PoC 合成器）
-// 规则层判定：weakrand = True
-// 目标位置：BlogController.java:185
+// 规则层判定：hardcoded_secret = True
+// 目标位置：JwtHelper.java:1
 package poc;
 
 import org.junit.jupiter.api.Test;
@@ -15,15 +15,19 @@ import static org.hamcrest.Matchers.not;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-public class Blogcontroller_uploadfilebyeditormdPocTest {
+public class Secret_file_jwthelper_javaPocTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
-    void otherAccountResourceDenied() throws Exception {
-        mockMvc.perform(get("/admin/blogs/md/uploadfile").param("id", "9999")
-                .header("Authorization", "Bearer attacker-token"))
+    void forgedAdminTokenWithHardcodedSecret() throws Exception {
+        String forged = io.jsonwebtoken.Jwts.builder()
+            .setSubject("admin").claim("role", "admin")
+            .signWith(io.jsonwebtoken.SignatureAlgorithm.HS256, "X-Litemall-Token")
+            .compact();
+        mockMvc.perform(get("/[secret-file] JwtHelper.java")
+                .header("Authorization", "Bearer " + forged))
             .andExpect(status().is4xxClientError());
     }
 }

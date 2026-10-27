@@ -32,3 +32,6 @@ benchmarks/results/wild_hunt/
 
 # M59 LLM 响应磁盘缓存（本地派生数据）
 .cache/
+
+# M258 LLM 复核断点续跑日志（完整结果在 llm_root_triage.json，含 raw）
+benchmarks/results/llm_root_triage.jsonl

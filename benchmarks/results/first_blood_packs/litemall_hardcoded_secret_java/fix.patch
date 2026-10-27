@@ -1,0 +1,11 @@
+--- a/JwtHelper.java
++++ b/JwtHelper.java
+@@ -16,7 +16,7 @@
+ 
+ public class JwtHelper {
+ 	// 秘钥
+-	static final String SECRET = "X-Litemall-Token";
++	static final String SECRET = System.getenv("SECRET");
+ 	// 签名是有谁生成
+ 	static final String ISSUSER = "LITEMALL";
+ 	// 签名的主题

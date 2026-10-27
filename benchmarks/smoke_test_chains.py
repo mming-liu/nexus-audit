@@ -9185,7 +9185,8 @@ finally:
 print("\n[197] M160：Top-3 交单四件套")
 _packs197 = ROOT / "benchmarks" / "results" / "first_blood_packs"
 _dirs197 = [d for d in _packs197.iterdir() if d.is_dir()] if _packs197.exists() else []
-check("M160：交单包 10 个", len(_dirs197), 10)
+check("M160：交单包 9–10 个（Top-10 目标，补丁自检不足不凑数）",
+      9 <= len(_dirs197) <= 10, True)
 _bad197 = []
 for _d in _dirs197:
     if not {"ADVISORY.md", "fix.patch", "SUBMISSION_CHECKLIST.md"} <= {
@@ -9821,7 +9822,8 @@ for _fn242 in _cli186.DOCTOR_PATCHERS:
 print("\n[243] M234：Top-10 交单包四件套")
 _packs243 = sorted(d for d in (ROOT / "benchmarks" / "results" /
                                "first_blood_packs").iterdir() if d.is_dir())
-check("M234：交单包 10 个", len(_packs243), 10)
+check("M234：交单包 9–10 个（Top-10 目标）",
+      9 <= len(_packs243) <= 10, True)
 for _p243 in _packs243:
     _files243 = {p.name for p in _p243.iterdir()}
     check(f"M234：{_p243.name} ADVISORY", "ADVISORY.md" in _files243, True)
@@ -9880,7 +9882,166 @@ from benchmarks.run_all import JOBS as _J249                     # noqa: E402
 check("M249：run_all 68 项", len(_J249), 68)
 
 print("\n[250] M250：v1.0.0 1,500 项断言里程碑")
+_w250 = json.loads((ROOT / "benchmarks" / "results" / "wild_hunt.json")
+                   .read_text(encoding="utf-8"))
+check("M250：50 仓守恒", len(_w250["repos"]), 50)
+check("M250：208 独立根因守恒",
+      sum(int(r["summary"].get("p0_unique_root_causes") or 0)
+          for r in _w250["repos"]), 208)
+check("M250：15,800 入口守恒",
+      sum(int(r["summary"].get("total_units") or 0)
+          for r in _w250["repos"]), 15800)
+check("M250：0 条 benchmark 误报",
+      sum(int((r.get("benchmark") or {}).get("fp") or 0)
+          for r in _w250["repos"]), 0)
 check("M250：已执行断言数 >=1500", COUNTS["n"] >= 1500, True)
+print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
+
+print("\n[251] M251：halo WebFlux RouterFunctions 链式路由")
+_w253 = json.loads((ROOT / "benchmarks" / "results" / "wild_hunt.json")
+                   .read_text(encoding="utf-8"))
+_halo251 = next(r for r in _w253["repos"] if r["name"] == "halo")
+check("M251：halo 全仓 173 入口", _halo251["summary"]["total_units"], 173)
+check("M251：halo 0 根因", _halo251["summary"]["p0_unique_root_causes"], 0)
+check("M251：halo 扫描 rc=0", _halo251["scan_rc"], 0)
+
+print("\n[252] M252：starlette Route 对象式路由")
+_star252 = json.loads((ROOT / "benchmarks" / "results" / "starlette.json")
+                      .read_text(encoding="utf-8"))
+_star_scan252 = next(r for r in _w253["repos"] if r["name"] == "starlette")
+check("M252：starlette benchmark 148 Route 入口",
+      _star252["total_units"], 148)
+check("M252：starlette scan 包内 6 入口",
+      _star_scan252["summary"]["total_units"], 6)
+check("M252：starlette 0 误报", _star252.get("fp", 0), 0)
+
+print("\n[253] M253：生产 Web 应用零空跑（repo_role 分账）")
+_r253 = subprocess.run(
+    [sys.executable, str(ROOT / "benchmarks" / "wild_hunt.py"), "--check-roles"],
+    capture_output=True, text=True, encoding="utf-8", errors="replace")
+check("M253：--check-roles exit 0", _r253.returncode, 0)
+check("M253：输出 PASS", "[M253] 生产 Web 应用零空跑：PASS" in _r253.stdout, True)
+check("M253：50 仓全部有 repo_role",
+      all(r.get("repo_role") for r in _w253["repos"]), True)
+check("M253：production Web 应用无零空跑",
+      all(int(r.get("summary", {}).get("total_units") or 0) > 0
+          for r in _w253["repos"]
+          if r.get("repo_role") == "production" and r.get("web_app")), True)
+_fj253 = next(r for r in _w253["repos"] if r["name"] == "flask-jwt-extended")
+check("M253：纯 SDK 库仓豁免（library + 0 入口）",
+      (_fj253["repo_role"], _fj253["summary"]["total_units"]),
+      ("library", 0))
+
+# 计费边界：免费全灭时默认必须拦住 Tier-1 付费穿透；显式开关才放行到付费探测。
+import core.agents.model_selector as _ms253                   # noqa: E402
+_orig_probe253 = _ms253.probe_model
+_ms253.probe_model = lambda *a, **k: False
+_os.environ.pop("LLM_ALLOW_PAID_FALLBACK", None)
+_blocked253 = False
+try:
+    _ms253.pick_model(1)
+except _ms253.PaidFallbackBlocked:
+    _blocked253 = True
+finally:
+    _ms253.probe_model = _orig_probe253
+check("M253：LLM_ALLOW_PAID_FALLBACK 默认拦截 Tier-1 付费降级",
+      _blocked253, True)
+_ms253.probe_model = lambda *a, **k: False
+_os.environ["LLM_ALLOW_PAID_FALLBACK"] = "1"
+_blocked253b = True
+try:
+    _ms253.pick_model(1)
+except _ms253.PaidFallbackBlocked:
+    _blocked253b = True
+except RuntimeError:
+    _blocked253b = False
+finally:
+    _ms253.probe_model = _orig_probe253
+    _os.environ.pop("LLM_ALLOW_PAID_FALLBACK", None)
+check("M253：显式开关允许 Tier-1 走到付费探测", _blocked253b, False)
+
+print("\n[254] M254：ruoyi-vue-pro 46 根因进入复核队列")
+_ry254 = next(r for r in _w253["repos"] if r["name"] == "ruoyi-vue-pro")
+check("M254：ruoyi-vue-pro 3271 入口",
+      _ry254["summary"]["total_units"], 3271)
+check("M254：ruoyi-vue-pro 46 根因",
+      _ry254["summary"]["p0_unique_root_causes"], 46)
+check("M254：ruoyi-vue-pro 标 production", _ry254["repo_role"], "production")
+
+print("\n[255] M255：apollo / xxl-job / Sentinel 口径对齐")
+for _n255, _roots255 in (("apollo", 6), ("xxl-job", 5), ("Sentinel", 8)):
+    _r255 = next(r for r in _w253["repos"] if r["name"] == _n255)
+    check(f"M255：{_n255} 根因数", _r255["summary"]["p0_unique_root_causes"],
+          _roots255)
+    check(f"M255：{_n255} 标 production", _r255["repo_role"], "production")
+
+print("\n[256] M256：kkFileView 全仓 20 入口 / 0 根因")
+_kk256 = next(r for r in _w253["repos"] if r["name"] == "kkFileView")
+check("M256：kkFileView 20 入口", _kk256["summary"]["total_units"], 20)
+check("M256：kkFileView 0 根因",
+      _kk256["summary"]["p0_unique_root_causes"], 0)
+
+print("\n[257] M257：生产 / 库 / 教学三账")
+_by257 = _w253["totals"]["repos_by_role"]
+check("M257：三账合计 50", sum(_by257.values()), 50)
+check("M257：production 44", _by257["production"], 44)
+check("M257：library 3", _by257["library"], 3)
+check("M257：educational_demo 3", _by257["educational_demo"], 3)
+check("M257：教学仓名单",
+      {r["name"] for r in _w253["repos"]
+       if r["repo_role"] == "educational_demo"},
+      {"DjanGoat", "Employee-Management-System", "spring-boot-demo"})
+_spring257 = next(r for r in _w253["repos"]
+                  if r["name"] == "spring-boot-demo")
+check("M257：spring-boot-demo 已标教学仓",
+      _spring257["repo_role"], "educational_demo")
+
+print("\n[258] M258：LLM 两级复核台账（非人工核验）")
+_r258 = subprocess.run(
+    [sys.executable, str(ROOT / "benchmarks" / "llm_triage_roots.py"), "--check"],
+    capture_output=True, text=True, encoding="utf-8", errors="replace")
+check("M258：--check exit 0", _r258.returncode, 0)
+check("M258：台账完整性 OK", "[llm-triage][OK]" in _r258.stdout, True)
+_t258 = json.loads((ROOT / "benchmarks" / "results" / "llm_root_triage.json")
+                   .read_text(encoding="utf-8"))
+_roots258 = _t258["roots"]
+_expected258 = sum(len(r.get("summary", {}).get("root_causes") or [])
+                   for r in _w253["repos"][30:50])
+check("M258：覆盖第 31-50 仓全部根因", len(_roots258), _expected258)
+check("M258：human_verified 全为 false",
+      all(r.get("human_verified") is False for r in _roots258), True)
+check("M258：summary 计数与逐条一致",
+      sum(_t258["summary"].values()), len(_roots258))
+check("M258：两级模型名",
+      (_t258["models"]["tier1"], _t258["models"]["tier2_primary"]),
+      ("beam-free", "glm-5.3-flash"))
+check("M258：没有伪造 status=verified",
+      all(r.get("status") != "verified" for r in _roots258), True)
+
+print("\n[259] M259：Top-10 纯生产仓交单包")
+_sel259 = json.loads((ROOT / "benchmarks" / "results" / "first_blood_packs" /
+                      "SELECTION.json").read_text(encoding="utf-8"))
+_t259 = _sel259["targets"]
+check("M259：9–10 个可交单包（Top-10 目标）", 9 <= len(_t259) <= 10, True)
+check("M259：无教学仓", all(t["repo_role"] != "educational_demo"
+                            for t in _t259), True)
+check("M259：无纯 CORS", all(t["category"] != "cors" for t in _t259), True)
+check("M259：spring-boot-demo 已清出",
+      all(t["repo"] != "spring-boot-demo" for t in _t259), True)
+from collections import Counter as _C259                         # noqa: E402
+check("M259：每仓最多 2 条", max(_C259(t["repo"] for t in _t259).values()), 2)
+check("M259：同函数多规则已合并",
+      all(t.get("merged_categories") for t in _t259), True)
+for _t259i in _t259:
+    _pack259 = (ROOT / "benchmarks" / "results" / "first_blood_packs" /
+                _t259i["pack"])
+    check(f"M259：{_t259i['pack']} 四件套",
+          all((_pack259 / f).is_file()
+              for f in ("ADVISORY.md", "fix.patch",
+                        "SUBMISSION_CHECKLIST.md")), True)
+
+print("\n[260] M260：v1.1.0 断言里程碑")
+check("M260：已执行断言数 >=1550", COUNTS["n"] >= 1550, True)
 print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
 
 check("M148：失败清单为空", len(FAILS), 0)

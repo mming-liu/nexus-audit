@@ -5,7 +5,7 @@
 
 ## Affected Component
 
-- Repository: `reference_repos\My-Blog-master`
+- Repository: https://github.com/ZHENFENG13/My-Blog
 - File: `src/main/java/com/site/blog/my/core/controller/admin/BlogController.java:185`
 - Representative entry: `BlogController.uploadFileByEditormd`
 - Affected routes: **1**（同一独立根因）

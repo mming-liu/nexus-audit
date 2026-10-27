@@ -1,17 +1,17 @@
-# 交单流程单（spring-boot-demo / unrestricted_upload / UploadController.local）
+# 交单流程单（Sentinel / log_injection / AuthController.login）
 
 ## 0. 事实核对
 
-- 仓库：https://github.com/xkcoding/spring-boot-demo
-- 根因：unrestricted_upload（CWE）
-- 位置：UploadController.java:49
+- 仓库：https://github.com/alibaba/Sentinel
+- 根因：log_injection（CWE-117）
+- 位置：AuthController.java:52
 - 受影响路由：1 条（同一独立根因）
 - 补丁：已验证 True -> False，见 fix.patch
 
 ## 1. 私密报告（不要先开公开 issue）
 
-- [ ] 打开 https://github.com/xkcoding/spring-boot-demo/security/advisories/new
-- [ ] 标题：CWE in UploadController.local
+- [ ] 打开 https://github.com/alibaba/Sentinel/security/advisories/new
+- [ ] 标题：CWE-117 in AuthController.login
 - [ ] 正文粘贴 ADVISORY.md（删掉本流程单）
 - [ ] 附上 poc_test.* 与 fix.patch
 - [ ] 受影响版本：以当前默认分支 HEAD 为准，再用 git tag --contains 确认区间

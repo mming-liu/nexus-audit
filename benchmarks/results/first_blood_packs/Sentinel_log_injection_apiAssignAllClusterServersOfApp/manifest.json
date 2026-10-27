@@ -1,0 +1,17 @@
+{
+  "repo": "Sentinel",
+  "repo_role": "production",
+  "github": "alibaba/Sentinel",
+  "category": "log_injection",
+  "unit": "ClusterAssignController.apiAssignAllClusterServersOfApp",
+  "file": "ClusterAssignController.java",
+  "line": 50,
+  "affected_routes": 1,
+  "cvss": 8.1,
+  "triage": "CONFIRMED_TP",
+  "merged_categories": [
+    "log_injection"
+  ],
+  "patch_verified": true,
+  "poc_ok": true
+}

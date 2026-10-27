@@ -1,6 +1,6 @@
 // 自动生成的 PoC 骨架（M45 PoC 合成器）
-// 规则层判定：unrestricted_upload = True
-// 目标位置：UploadController.java:49
+// 规则层判定：log_injection = True
+// 目标位置：ClusterAssignController.java:50
 package poc;
 
 import org.junit.jupiter.api.Test;
@@ -15,14 +15,14 @@ import static org.hamcrest.Matchers.not;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-public class Uploadcontroller_localPocTest {
+public class Clusterassigncontroller_apiassignallclusterserversofappPocTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
     void otherAccountResourceDenied() throws Exception {
-        mockMvc.perform(get("/upload/local").param("id", "9999")
+        mockMvc.perform(get("/cluster/assign/all_server/{app}").param("id", "9999")
                 .header("Authorization", "Bearer attacker-token"))
             .andExpect(status().is4xxClientError());
     }

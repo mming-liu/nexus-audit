@@ -69,6 +69,10 @@ class SkepticReviewer:
                  llm: Callable[[str], str] | None = None):
         self.router = router
         self._llm = llm
+        # 审计用：保留最近一次模型的原始输出（triages/报告要能回放）。
+        self.last_raw = ""
+        self.last_prompt = ""
+        self.last_verdict: dict = {}
 
     async def review(self, h: VulnHypothesis) -> VulnHypothesis:
         lang = h.unit.language
@@ -96,6 +100,7 @@ class SkepticReviewer:
             code=code,
             lang=_LANG_FENCE.get(lang, "text"),
             checklist=_SKEPTIC_CHECKLIST.get(lang, _SKEPTIC_CHECKLIST[Language.PYTHON_WEB]))
+        self.last_prompt = prompt
         if self._llm is not None:
             raw = self._llm(prompt)
         else:
@@ -104,8 +109,10 @@ class SkepticReviewer:
             raw = await self.router.deep_review(
                 [{"role": "system", "content": "You are a strict code reviewer."},
                  {"role": "user", "content": prompt}])
+        self.last_raw = raw
         from core.agents.router import extract_json
         verdict = extract_json(raw)
+        self.last_verdict = verdict if isinstance(verdict, dict) else {}
         h.skeptic_rejected = bool(verdict.get("rejected"))
         h.reasoning_summary = f"{h.reasoning_summary} | skeptic: {verdict.get('reason', '')}"
         return h

@@ -123,6 +123,68 @@ REPOS = [
 
 P0_LINE = re.compile(r"^- \*\*\[([a-z_]+)\]\*\* `")
 
+# ---- M257：生产仓 / 库仓 / 教学仓分账 ----
+#
+# 分账口径（写进 wild_hunt.json，doctor 第六段与 export-packs 都读它）：
+#   production       可部署的 Web 应用/服务，或作为生产依赖被继承部署的
+#                    链上代码（OpenZeppelin 属于后者：它本身不是 App，
+#                    但被大量生产合约继承，故按生产依赖计，保持 44 仓口径）
+#   library          不承载业务路由的纯 SDK/算法库（M253 对其豁免零空跑）
+#   educational_demo 教学演示仓（M259 交单包一律剔除）
+REPO_ROLE_OVERRIDES = {
+    "flask-jwt-extended": "library",
+    "solmate": "library",
+    "solady": "library",
+    "DjanGoat": "educational_demo",
+    "Employee-Management-System": "educational_demo",
+    "spring-boot-demo": "educational_demo",
+}
+VALID_ROLES = ("production", "library", "educational_demo")
+
+# 纯合约仓：不参与「Web 应用仓零空跑」门禁（它们没有 HTTP 路由）。
+SOLIDITY_REPOS = {
+    "Compound", "Comet", "OpenZeppelin", "AaveV3", "Synthetix V3",
+    "sushiswap-zapper", "Uniswap V2", "UniswapV3", "MakerDAO dss",
+    "OZ Upgradeable", "solady", "v3-periphery", "morpho-blue", "solmate",
+    "aave-v3-periphery",
+}
+
+
+def repo_role(name: str) -> str:
+    return REPO_ROLE_OVERRIDES.get(name, "production")
+
+
+def apply_repo_roles(agg: dict) -> dict:
+    """给聚合结果逐仓打上 repo_role / web_app（加性字段，幂等）。"""
+    counts = {role: 0 for role in VALID_ROLES}
+    for rec in agg.get("repos", []):
+        name = rec.get("name", "")
+        role = repo_role(name)
+        rec["repo_role"] = role
+        rec["web_app"] = role == "production" and name not in SOLIDITY_REPOS
+        counts[role] = counts.get(role, 0) + 1
+    agg.setdefault("totals", {})["repos_by_role"] = counts
+    return agg
+
+
+def role_violations(records: list[dict]) -> list[str]:
+    """M253 零空跑门禁：production 的 Web 应用仓必须有入口。
+
+    纯 SDK 库仓（flask-jwt-extended）与教学仓豁免 —— 前者没有路由是
+    事实而不是切片器失败；后者本就不进入对外交单口径。
+    """
+    bad: list[str] = []
+    for rec in records:
+        name = rec.get("name", "")
+        role = rec.get("repo_role")
+        if role not in VALID_ROLES:
+            bad.append(f"{name}: 未标注合法 repo_role（{role!r}）")
+            continue
+        units = int(rec.get("summary", {}).get("total_units") or 0)
+        if role == "production" and name not in SOLIDITY_REPOS and units <= 0:
+            bad.append(f"{name}: production Web 应用仓 total_units=0（零空跑）")
+    return bad
+
 
 def _run(cmd: list[str], timeout: int = 900) -> tuple[int, str, float]:
     t0 = time.monotonic()
@@ -329,7 +391,32 @@ def main() -> int:
                     help="M145：把第七节（供应链 × 代码入口）写回该报告")
     ap.add_argument("--no-report", action="store_true",
                     help="只产 json，不改报告（试跑/冒烟用）")
+    ap.add_argument("--roles-only", action="store_true",
+                    help="M257：不重扫，给现有 wild_hunt.json 补 repo_role 并过 M253 门禁")
+    ap.add_argument("--check-roles", action="store_true",
+                    help="M253：只校验现有 wild_hunt.json 的角色分账与零空跑门禁")
     args = ap.parse_args()
+
+    if args.roles_only or args.check_roles:
+        if not AGG.exists():
+            print(f"[FAIL] 缺少 {AGG}")
+            return 2
+        agg = json.loads(AGG.read_text(encoding="utf-8"))
+        apply_repo_roles(agg)
+        bad = role_violations(agg.get("repos", []))
+        counts = agg.get("totals", {}).get("repos_by_role", {})
+        print(f"[M257] 角色分账：production={counts.get('production', 0)} / "
+              f"library={counts.get('library', 0)} / "
+              f"educational_demo={counts.get('educational_demo', 0)}")
+        print(f"[M253] 生产 Web 应用零空跑："
+              f"{'PASS' if not bad else f'FAIL（{len(bad)} 项）'}")
+        for b in bad:
+            print(f"  [FAIL] {b}")
+        if args.roles_only:
+            AGG.write_text(json.dumps(agg, ensure_ascii=False, indent=2),
+                           encoding="utf-8")
+            print(f"[M257] 已写回 {AGG}")
+        return 0 if not bad else 1
 
     records = []
     for name, rel, key, extra in REPOS:
@@ -350,8 +437,14 @@ def main() -> int:
                   f" wall={rec['benchmark']['wall_s']}s", flush=True)
         records.append(rec)
 
-    agg = {"generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-           "repos": records}
+    agg = apply_repo_roles({"generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "repos": records})
+    _bad_roles = role_violations(records)
+    if _bad_roles:
+        for _b in _bad_roles:
+            print(f"[M253][FAIL] {_b}")
+    else:
+        print("[M253] 生产 Web 应用零空跑：PASS")
     # M135：总量块。跨仓聚类门禁（`cross_repo_clusters.py --check`）要拿
     # "独立根因总数"与聚类结果的计数守恒做对账 —— 口径必须由采集端给出，
     # 不能让下游自己 sum（两处各 sum 一次就会漂）。字段是**加性**的：
@@ -404,8 +497,10 @@ def main() -> int:
         if not args.no_report:
             act = splice_report(Path(args.report), render_sca_section(records))
             print(f"报告第七节：{act} → {args.report}")
-    return 0 if all(r["scan_rc"] == 0 and r.get("benchmark", {}).get("rc", 0) == 0
-                    for r in records) else 1
+    return 0 if (not _bad_roles
+                 and all(r["scan_rc"] == 0
+                         and r.get("benchmark", {}).get("rc", 0) == 0
+                         for r in records)) else 1
 
 
 if __name__ == "__main__":

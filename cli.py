@@ -5844,6 +5844,27 @@ def _doctor_wild_hunt_check(ok: bool) -> bool:
         n_fp = sum(int((r.get("benchmark") or {}).get("fp") or 0)
                    for r in repos)
         text = report.read_text(encoding="utf-8")
+        # M257/M253：角色分账 + 生产 Web 应用零空跑（与 wild_hunt.py 同一判据）
+        from benchmarks.wild_hunt import VALID_ROLES, role_violations
+        by_role = {role: 0 for role in VALID_ROLES}
+        role_bad: list[str] = []
+        for r in repos:
+            role = r.get("repo_role")
+            if role in by_role:
+                by_role[role] += 1
+            else:
+                role_bad.append(f"{r.get('name')}: 缺 repo_role")
+            if "web_app" not in r:
+                role_bad.append(f"{r.get('name')}: 缺 web_app 标记")
+        role_bad += role_violations(repos)
+        print(f"  roles：production {by_role['production']} / "
+              f"library {by_role['library']} / "
+              f"educational_demo {by_role['educational_demo']}")
+        if role_bad:
+            print(f"  [FAIL] M257/M253 角色门禁 {len(role_bad)} 项：{role_bad[:5]}")
+            ok = False
+        else:
+            print("  [OK] M257 分账齐全 / M253 生产 Web 应用零空跑")
         missing = []
         for label, needle in (
                 ("仓库数", f"**{n_repos} 个**"),
@@ -5920,12 +5941,28 @@ def cmd_export_packs(args) -> int:
         return rc
     out = Path(__file__).resolve().parent / "benchmarks" / "results" / "first_blood_packs"
     packs = sorted(d for d in out.iterdir() if d.is_dir()) if out.exists() else []
-    lines = ["# Top-10 交单包（nexus-audit v1.0.0）", "",
-             "| # | 包 | 四件套 |", "|---|---|---|"]
+    sel_path = out / "SELECTION.json"
+    sel = {}
+    if sel_path.is_file():
+        try:
+            sel = {t.get("pack"): t for t in json.loads(
+                sel_path.read_text(encoding="utf-8")).get("targets", [])}
+        except Exception:                                    # noqa: BLE001
+            sel = {}
+    packs.sort(key=lambda d: sel.get(d.name, {}).get("rank", 999))
+    lines = [f"# Top-10 候选交单包（nexus-audit v1.1.0 · 非教学仓严选；"
+             f"{len(packs)} 条通过补丁自检）", "",
+             "> M259：剔除教学仓与纯 CORS，同函数多规则合并，每仓最多 2 条；"
+             "补丁自检 True -> False 才入包。目标 Top-10，实测不足时**不拿"
+             "未验证补丁凑数**，缺额如实标注。", "",
+             "| # | 包 | 角色 | 类目 | CVSS | 四件套 |", "|---|---|---|---|---|---|"]
     for i, d in enumerate(packs, 1):
         need = ("ADVISORY.md", "fix.patch", "SUBMISSION_CHECKLIST.md")
         ok = all((d / f).is_file() for f in need)
-        lines.append(f"| {i} | {d.name} | {'✔' if ok else '✘'} |")
+        t = sel.get(d.name, {})
+        lines.append(f"| {i} | {d.name} | {t.get('repo_role', '—')} | "
+                     f"{t.get('category', '—')} | {t.get('cvss', '—')} | "
+                     f"{'✔' if ok else '✘'} |")
     (out / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"[export-packs] {len(packs)} 包 → {out / 'INDEX.md'}")
     return 0

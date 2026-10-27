@@ -3,7 +3,7 @@
 ## 0. 事实核对
 
 - 仓库：https://github.com/yangzongzhuan/RuoYi
-- 根因：sqli（CWE）
+- 根因：sqli（CWE-89）
 - 位置：GenController.java:195
 - 受影响路由：1 条（同一独立根因）
 - 补丁：已验证 True -> False，见 fix.patch
@@ -11,7 +11,7 @@
 ## 1. 私密报告（不要先开公开 issue）
 
 - [ ] 打开 https://github.com/yangzongzhuan/RuoYi/security/advisories/new
-- [ ] 标题：CWE in GenController.create
+- [ ] 标题：CWE-89 in GenController.create
 - [ ] 正文粘贴 ADVISORY.md（删掉本流程单）
 - [ ] 附上 poc_test.* 与 fix.patch
 - [ ] 受影响版本：以当前默认分支 HEAD 为准，再用 git tag --contains 确认区间

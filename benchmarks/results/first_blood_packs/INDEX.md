@@ -1,14 +1,15 @@
-# Top-10 交单包（nexus-audit v1.0.0）
+# Top-10 候选交单包（nexus-audit v1.1.0 · 非教学仓严选；9 条通过补丁自检）
 
-| # | 包 | 四件套 |
-|---|---|---|
-| 1 | My-Blog_unrestricted_upload_upload | ✔ |
-| 2 | My-Blog_unrestricted_upload_uploadFileByEditormd | ✔ |
-| 3 | My-Blog_weakrand_upload | ✔ |
-| 4 | My-Blog_weakrand_uploadFileByEditormd | ✔ |
-| 5 | newbee-mall-api_unrestricted_upload_upload | ✔ |
-| 6 | newbee-mall-api_weakrand_upload | ✔ |
-| 7 | newbee-mall_unrestricted_upload_upload | ✔ |
-| 8 | newbee-mall_weakrand_upload | ✔ |
-| 9 | RuoYi_sqli_create | ✔ |
-| 10 | spring-boot-demo_unrestricted_upload_local | ✔ |
+> M259：剔除教学仓与纯 CORS，同函数多规则合并，每仓最多 2 条；补丁自检 True -> False 才入包。目标 Top-10，实测不足时**不拿未验证补丁凑数**，缺额如实标注。
+
+| # | 包 | 角色 | 类目 | CVSS | 四件套 |
+|---|---|---|---|---|---|
+| 1 | Sentinel_log_injection_login | production | log_injection | 8.1 | ✔ |
+| 2 | Sentinel_log_injection_apiAssignAllClusterServersOfApp | production | log_injection | 8.1 | ✔ |
+| 3 | RuoYi_sqli_create | production | sqli | 9.8 | ✔ |
+| 4 | django-realworld_hardcoded_secret_py | production | hardcoded_secret | 9.8 | ✔ |
+| 5 | litemall_hardcoded_secret_java | production | hardcoded_secret | 9.8 | ✔ |
+| 6 | My-Blog_unrestricted_upload_uploadFileByEditormd | production | unrestricted_upload | 8.1 | ✔ |
+| 7 | My-Blog_unrestricted_upload_upload | production | unrestricted_upload | 8.1 | ✔ |
+| 8 | newbee-mall_unrestricted_upload_upload | production | unrestricted_upload | 8.1 | ✔ |
+| 9 | newbee-mall-api_unrestricted_upload_upload | production | unrestricted_upload | 8.1 | ✔ |

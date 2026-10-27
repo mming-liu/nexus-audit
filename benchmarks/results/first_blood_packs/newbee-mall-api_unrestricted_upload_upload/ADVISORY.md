@@ -5,7 +5,7 @@
 
 ## Affected Component
 
-- Repository: `reference_repos\newbee-mall-api-master`
+- Repository: https://github.com/newbee-ltd/newbee-mall-api
 - File: `src/main/java/ltd/newbee/mall/api/admin/NewBeeAdminUploadAPI.java:49`
 - Representative entry: `NewBeeAdminUploadAPI.upload`
 - Affected routes: **1**（同一独立根因）

@@ -1,12 +1,19 @@
 {
   "repo": "newbee-mall",
+  "repo_role": "production",
   "github": "newbee-ltd/newbee-mall",
   "category": "unrestricted_upload",
   "unit": "UploadController.upload",
   "file": "UploadController.java",
   "line": 49,
   "affected_routes": 1,
+  "cvss": 8.1,
+  "triage": "",
+  "merged_categories": [
+    "unrestricted_upload",
+    "weakrand",
+    "xss"
+  ],
   "patch_verified": true,
-  "poc_ok": true,
-  "component_cve": ""
+  "poc_ok": true
 }

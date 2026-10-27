@@ -1,0 +1,158 @@
+{
+  "generated_at": "2026-10-27 22:54:21",
+  "human_verified": false,
+  "rule": "production only; no cors; merge same function; max 2 per repo; drop LLM-flagged LIKELY_FP_GUARDED; patch self-check required",
+  "targets": [
+    {
+      "rank": 1,
+      "repo": "Sentinel",
+      "repo_role": "production",
+      "category": "log_injection",
+      "unit": "AuthController.login",
+      "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\Sentinel\\sentinel-dashboard\\src\\main\\java\\com\\alibaba\\csp\\sentinel\\dashboard\\controller\\AuthController.java",
+      "line": 52,
+      "affected_routes": 1,
+      "cvss": 8.1,
+      "triage": "CONFIRMED_TP",
+      "merged_categories": [
+        "log_injection"
+      ],
+      "pack": "Sentinel_log_injection_login"
+    },
+    {
+      "rank": 2,
+      "repo": "Sentinel",
+      "repo_role": "production",
+      "category": "log_injection",
+      "unit": "ClusterAssignController.apiAssignAllClusterServersOfApp",
+      "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\Sentinel\\sentinel-dashboard\\src\\main\\java\\com\\alibaba\\csp\\sentinel\\dashboard\\controller\\cluster\\ClusterAssignController.java",
+      "line": 50,
+      "affected_routes": 1,
+      "cvss": 8.1,
+      "triage": "CONFIRMED_TP",
+      "merged_categories": [
+        "log_injection"
+      ],
+      "pack": "Sentinel_log_injection_apiAssignAllClusterServersOfApp"
+    },
+    {
+      "rank": 3,
+      "repo": "RuoYi",
+      "repo_role": "production",
+      "category": "sqli",
+      "unit": "GenController.create",
+      "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\RuoYi-master\\ruoyi-generator\\src\\main\\java\\com\\ruoyi\\generator\\controller\\GenController.java",
+      "line": 195,
+      "affected_routes": 1,
+      "cvss": 9.8,
+      "triage": "",
+      "merged_categories": [
+        "sqli"
+      ],
+      "pack": "RuoYi_sqli_create"
+    },
+    {
+      "rank": 4,
+      "repo": "django-realworld",
+      "repo_role": "production",
+      "category": "hardcoded_secret",
+      "unit": "[secret-file] settings.py",
+      "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\django-realworld\\conduit\\settings.py",
+      "line": 1,
+      "affected_routes": 1,
+      "cvss": 9.8,
+      "triage": "",
+      "merged_categories": [
+        "hardcoded_secret"
+      ],
+      "pack": "django-realworld_hardcoded_secret_py"
+    },
+    {
+      "rank": 5,
+      "repo": "litemall",
+      "repo_role": "production",
+      "category": "hardcoded_secret",
+      "unit": "[secret-file] JwtHelper.java",
+      "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\litemall-master\\litemall-wx-api\\src\\main\\java\\org\\linlinjava\\litemall\\wx\\util\\JwtHelper.java",
+      "line": 1,
+      "affected_routes": 1,
+      "cvss": 9.8,
+      "triage": "",
+      "merged_categories": [
+        "hardcoded_secret"
+      ],
+      "pack": "litemall_hardcoded_secret_java"
+    },
+    {
+      "rank": 6,
+      "repo": "My-Blog",
+      "repo_role": "production",
+      "category": "unrestricted_upload",
+      "unit": "BlogController.uploadFileByEditormd",
+      "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\My-Blog-master\\src\\main\\java\\com\\site\\blog\\my\\core\\controller\\admin\\BlogController.java",
+      "line": 185,
+      "affected_routes": 1,
+      "cvss": 8.1,
+      "triage": "",
+      "merged_categories": [
+        "unrestricted_upload",
+        "weakrand"
+      ],
+      "pack": "My-Blog_unrestricted_upload_uploadFileByEditormd"
+    },
+    {
+      "rank": 7,
+      "repo": "My-Blog",
+      "repo_role": "production",
+      "category": "unrestricted_upload",
+      "unit": "UploadController.upload",
+      "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\My-Blog-master\\src\\main\\java\\com\\site\\blog\\my\\core\\controller\\admin\\UploadController.java",
+      "line": 35,
+      "affected_routes": 1,
+      "cvss": 8.1,
+      "triage": "",
+      "merged_categories": [
+        "unrestricted_upload",
+        "weakrand",
+        "xss"
+      ],
+      "pack": "My-Blog_unrestricted_upload_upload"
+    },
+    {
+      "rank": 8,
+      "repo": "newbee-mall",
+      "repo_role": "production",
+      "category": "unrestricted_upload",
+      "unit": "UploadController.upload",
+      "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-master\\src\\main\\java\\ltd\\newbee\\mall\\controller\\common\\UploadController.java",
+      "line": 49,
+      "affected_routes": 1,
+      "cvss": 8.1,
+      "triage": "",
+      "merged_categories": [
+        "unrestricted_upload",
+        "weakrand",
+        "xss"
+      ],
+      "pack": "newbee-mall_unrestricted_upload_upload"
+    },
+    {
+      "rank": 9,
+      "repo": "newbee-mall-api",
+      "repo_role": "production",
+      "category": "unrestricted_upload",
+      "unit": "NewBeeAdminUploadAPI.upload",
+      "file": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-api-master\\src\\main\\java\\ltd\\newbee\\mall\\api\\admin\\NewBeeAdminUploadAPI.java",
+      "line": 49,
+      "affected_routes": 1,
+      "cvss": 8.1,
+      "triage": "",
+      "merged_categories": [
+        "unrestricted_upload",
+        "weakrand",
+        "xss"
+      ],
+      "pack": "newbee-mall-api_unrestricted_upload_upload"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 // 自动生成的 PoC 骨架（M45 PoC 合成器）
-// 规则层判定：weakrand = True
-// 目标位置：UploadController.java:35
+// 规则层判定：log_injection = True
+// 目标位置：AuthController.java:52
 package poc;
 
 import org.junit.jupiter.api.Test;
@@ -15,14 +15,14 @@ import static org.hamcrest.Matchers.not;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-public class Uploadcontroller_uploadPocTest {
+public class Authcontroller_loginPocTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
     void otherAccountResourceDenied() throws Exception {
-        mockMvc.perform(get("/admin/upload/file").param("id", "9999")
+        mockMvc.perform(get("/auth/login").param("id", "9999")
                 .header("Authorization", "Bearer attacker-token"))
             .andExpect(status().is4xxClientError());
     }

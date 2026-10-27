@@ -5,7 +5,7 @@
 
 ## Affected Component
 
-- Repository: `reference_repos\RuoYi-master`
+- Repository: https://github.com/yangzongzhuan/RuoYi
 - File: `ruoyi-generator/src/main/java/com/ruoyi/generator/controller/GenController.java:195`
 - Representative entry: `GenController.create`
 - Affected routes: **1**（同一独立根因）

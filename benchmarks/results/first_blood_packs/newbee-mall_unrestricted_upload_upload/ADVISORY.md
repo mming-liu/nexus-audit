@@ -5,7 +5,7 @@
 
 ## Affected Component
 
-- Repository: `reference_repos\newbee-mall-master`
+- Repository: https://github.com/newbee-ltd/newbee-mall
 - File: `src/main/java/ltd/newbee/mall/controller/common/UploadController.java:49`
 - Representative entry: `UploadController.upload`
 - Affected routes: **1**（同一独立根因）
