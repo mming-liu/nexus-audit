@@ -16,5 +16,5 @@
   ],
   "patch_verified": true,
   "poc_ok": true,
-  "origin": "ZERO_RECORD_FRESH"
+  "origin": "STALE_REPO"
 }

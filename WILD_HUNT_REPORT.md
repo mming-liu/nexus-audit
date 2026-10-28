@@ -557,22 +557,44 @@ eladmin 上传、Synthetix unchecked 等）补丁自检均未通过。按「不�
 > Sentinel 两条是 LLM CONFIRMED_TP；其余 7 条在本轮复核范围外，仍需人工
 > 逐条读源码后才能对外披露。`human_verified` 一律为 `false`。
 
-## 十一、v1.2 双模式（M267 → M280）
+## 十一、v1.2 双模式（M267 → M284）
 
-### 活水首杀（live-hunt）
+### 活水首杀（live-hunt + 180 天活跃度硬门禁）
 
-`python cli.py live-hunt newbee-ltd/newbee-mall-api newbee-ltd/newbee-mall --limit 3` 实跑：
+`python cli.py live-hunt YunaiV/ruoyi-vue-pro apolloconfig/apollo alibaba/Sentinel newbee-ltd/newbee-mall-api newbee-ltd/newbee-mall`
+实跑：**78 条根因，板块 A 14 条 / 板块 B 64 条**；
+状态计数：STALE_REPO 19 / UNKNOWN 44 / DUPLICATE_ISSUE_OR_GHSA 1。
 
-- 远端默认分支 `master`，HEAD `0879d5a1fac0c2a42c99eaf70d8b2f6e92aa05a4`；
-- 6 条根因：**板块 A 3 条** `ZERO_RECORD_FRESH`（unrestricted_upload / weakrand / xss），
-  **板块 B 3 条**（newbee-mall 命中本地种子 Issue #100，自动拦截）；
-- 每条 A 记录带 HEAD 永久链接、Advisory/Issue/CVE.org 入口；
-- CORS 全局配置被排除，不进入首杀板块；
+- **A 全是 2026 活仓**：ruoyi-vue-pro HEAD `3ebbfb0c`（2026-10-25，3.8 天前）、
+  Sentinel HEAD `a3f40ba8`（2026-05-27，154 天前）；A 表每行都带
+  `HEAD 提交日期`，肉眼可验。
+- **STALE_REPO 19 条**：newbee-mall-api HEAD `0879d5a1`（2023-05-31，
+  1246 天前）与 newbee-mall HEAD `a069069b`（2025-10-27，366 天前）
+  全部被 180 天门禁挡在 B，不再污染 A。
+- **用户点名的 CRM 接口，源码复核后大多是“服务层已守卫”**：
+  `CrmContractController.getContractPageByCustomer/ByBusiness` 对应的
+  `CrmContractServiceImpl.getContractPageByCustomerId/getContractPageByBusinessId`
+  上有 `@CrmPermission(... READ)`（L372/L378）；
+  `CrmFollowUpRecordController.getFollowUpRecordPage` 对应
+  `CrmFollowUpRecordServiceImpl.getFollowUpRecordPage` 上有
+  `@CrmPermission(... READ)`（L139）。它们被 `service_guard` 判 B，
+  不是 A。
+- **用户点名的 `CrmFollowUpRecordController.createFollowUpRecord` 也已守卫**：
+  Service 实现上有 `@CrmPermission(... WRITE)`（L65），不是“无鉴权”。
+- **真正留在 A 的支付接口**：`PayWalletRechargeController.refundWalletRecharge`
+  （L40）控制器没有 `@PreAuthorize`，Service 也没有 `@CrmPermission`
+  或 `hasPermission()`，是当前最值得人工复核的一条。
+- **`AccessKeyController.enable` 判 B 也是正确的**：控制器只做
+  `BeanUtils.transform` + JPA `accessKeyService.update`，没有字符串 SQL
+  拼接，不是 SQLi。
+- 查重改成**端点级**：CIRCL 仓级命中不再连坐所有端点，只有 CVE 描述
+  真的出现该方法名才算 `DUPLICATE_CVE`；否则仍可 FRESH。
+  NVD 在本网络被 TLS 阻断时走 CIRCL + GitHub Issues/Advisories，
+  `coverage` 明确记录 `nvd=failed / circl=checked`，任一来源失败只给
+  `UNKNOWN`。
 - 每个 FRESH 包生成 `SUBMISSION_PLAYBOOK.md`（playbook-1.0），
-  Step 3 的 CVE.org 六字段零占位符，版本影响面写
-  `unknown, pending maintainer confirmation`；
-- 查重状态四态：NVD 在本网络被 TLS 阻断时自动走 CIRCL，
-  GitHub Issues/Advisories 实查；任一来源失败只能 `UNKNOWN`，不降级成 FRESH。
+  CVE.org 六字段零占位符，版本影响面写
+  `unknown, pending maintainer confirmation`。
 
 ### 客户离线交付（client-audit）
 
@@ -587,7 +609,7 @@ Java 片段缺少全局装配时 `authz` 只进 `NEEDS_HUMAN`，不冒充确定�
 
 ### 门禁
 
-- `smoke_test_chains.py`：[1]–[270] **1589 条断言 PASS**；
+- `smoke_test_chains.py`：[1]–[273] **1599 条断言 PASS**；
 - `doctor`：12 段 PASS；
 - `repro`：sha256 `284ec8c3` 守恒；
 - 版本：`core.__version__ = 1.2.0`。

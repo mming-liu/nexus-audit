@@ -35,9 +35,10 @@ STATUS_FRESH = "ZERO_RECORD_FRESH"
 STATUS_CVE = "DUPLICATE_CVE"
 STATUS_ISSUE = "DUPLICATE_ISSUE_OR_GHSA"
 STATUS_PATCHED = "PATCHED_UPSTREAM"
+STATUS_STALE = "STALE_REPO"
 STATUS_UNKNOWN = "UNKNOWN"
 ALL_STATUSES = (STATUS_FRESH, STATUS_CVE, STATUS_ISSUE, STATUS_PATCHED,
-                STATUS_UNKNOWN)
+                STATUS_STALE, STATUS_UNKNOWN)
 
 _LAST_CALL = 0.0
 _CACHE_TTL = 24 * 3600
@@ -120,9 +121,12 @@ def _local_match(slug: str, aliases: list[str], category: str,
         uni = str(sig.get("unit") or "")
         if cat and category and cat.lower() != category.lower():
             continue
-        if uni and unit and uni.lower() not in unit.lower() and \
-                unit.lower() not in uni.lower():
-            continue
+        if uni and unit:
+            # 精确到方法名：CVE 修的是 getFollowUpRecord，不能连坐
+            # 同文件的 getFollowUpRecordPage（后者仍是未修复入口）。
+            norm = lambda s: s.split("#")[0].strip().lower()
+            if norm(uni) != norm(unit):
+                continue
         out.append(sig)
     return out
 
@@ -157,13 +161,18 @@ def query_circl(slug: str) -> dict:
             continue
         total = int(data.get("total_count") or 0)
         ids: list[str] = []
+        items: list[dict] = []
         results = data.get("results") or {}
         for key in ("nvd", "cvelistv5"):
-            for item in (results.get(key) or [])[:5]:
+            for item in (results.get(key) or [])[:20]:
                 if isinstance(item, list) and item:
-                    ids.append(str(item[0]).upper())
-        return {"ok": True, "total": total, "ids": ids[:5], "url": url,
-                "error": ""}
+                    cid = str(item[0]).upper()
+                    ids.append(cid)
+                    items.append({"id": cid,
+                                  "text": json.dumps(item[1],
+                                                     ensure_ascii=False)[:6000]})
+        return {"ok": True, "total": total, "ids": ids[:5], "items": items,
+                "url": url, "error": ""}
     return {"ok": False, "total": 0, "ids": [], "url": urls[0] if urls else "",
             "error": last_err or "no_url"}
 
@@ -202,9 +211,19 @@ def query_github_advisories(slug: str) -> dict:
             "error": ""}
 
 
+def _unit_in_text(unit: str, file: str, text: str) -> bool:
+    """CVE 描述是否精确提到这个方法；不能因为同文件别的 CVE 连坐。"""
+    key = unit.split(".")[-1].split("#")[0].strip().lower()
+    stem = Path(file).stem.lower() if file else ""
+    t = (text or "").lower()
+    if key and len(key) > 3:
+        return key in t
+    return bool(stem and len(stem) > 3 and stem in t)
+
+
 def dedup(slug: str, category: str, unit: str, *,
-          aliases: list[str] | None = None, allow_online: bool = True,
-          use_cache: bool = True) -> dict:
+          file: str = "", aliases: list[str] | None = None,
+          allow_online: bool = True, use_cache: bool = True) -> dict:
     """四态查重。allow_online=False 时最多只能判 DUPLICATE_*，绝不 FRESH。"""
     aliases = aliases or []
     cpath = _cache_path(slug, category, unit)
@@ -244,7 +263,7 @@ def dedup(slug: str, category: str, unit: str, *,
         }
         return rec
 
-    nvd = query_nvd(f"{slug} {category}")
+    nvd = query_nvd(f"{slug} {unit}" if unit else f"{slug} {category}")
     circl: dict = {"ok": False, "total": 0, "ids": [], "url": "",
                    "error": "not_needed"}
     cve_src = nvd
@@ -260,10 +279,24 @@ def dedup(slug: str, category: str, unit: str, *,
     matched: list[str] = []
     evidence: list[str] = []
     status = ""
+    cve_hit = False
+    circl_hit = False
     if cve_src.get("ok") and cve_src.get("total", 0) > 0:
+        if cve_src is circl:
+            # CIRCL 是“仓级”搜索，不能因为仓库有别的 CVE 就把每个端点都
+            # 判重复；只在 CVE 描述里真的出现该方法/文件名时才命中。
+            hits = [x for x in (circl.get("items") or [])
+                    if _unit_in_text(unit, file, x.get("text", ""))]
+            if hits:
+                cve_hit = circl_hit = True
+                matched += [x["id"] for x in hits]
+                evidence.append(cve_src.get("url", ""))
+        else:
+            cve_hit = True
+            matched += cve_src.get("ids") or []
+            evidence.append(cve_src.get("url", ""))
+    if cve_hit:
         status = STATUS_CVE
-        matched += cve_src.get("ids") or []
-        evidence.append(cve_src.get("url", ""))
     elif ghsa.get("ok") and ghsa.get("total", 0) > 0:
         status = STATUS_ISSUE
         matched += ghsa.get("ids") or []
@@ -285,8 +318,9 @@ def dedup(slug: str, category: str, unit: str, *,
         "coverage": {
             "local_seed": "checked",
             "nvd": "checked" if nvd.get("ok") else "failed",
-            "circl": ("checked" if circl.get("ok") else
-                      "skipped" if nvd.get("ok") else "failed"),
+            "circl": ("checked" if circl.get("ok") and not circl_hit
+                      else "checked_hit" if circl_hit
+                      else "skipped" if nvd.get("ok") else "failed"),
             "github_issues": "checked" if issues.get("ok") else "failed",
             "github_advisories": ("checked" if ghsa.get("ok")
                                   else "failed"),

@@ -6044,6 +6044,7 @@ def cmd_live_hunt(args) -> int:
         args.repos, offline=args.offline, limit=args.limit,
         report=_Path(args.report), json_path=_Path(args.json),
         packs_dir=_Path(args.packs_dir), slug=args.slug,
+        max_head_age_days=args.max_head_age_days,
         dry_run=args.dry_run)
     s = res["summary"]
     if args.dry_run:
@@ -6326,6 +6327,8 @@ def main():
                         help="不联网/不 clone；只能产出 UNKNOWN 或本地种子重复")
     p_live.add_argument("--limit", type=int, default=0,
                         help="每仓最多复核多少条根因")
+    p_live.add_argument("--max-head-age-days", type=int, default=180,
+                        help="HEAD 提交超过该天数即判 STALE_REPO（默认 180）")
     p_live.add_argument("--report", default="LIVE_HUNT_REPORT.md")
     p_live.add_argument("--json", default="benchmarks/results/live_hunt.json")
     p_live.add_argument("--packs-dir", default="benchmarks/results/live_hunt_packs")

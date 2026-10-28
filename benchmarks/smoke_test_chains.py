@@ -10092,6 +10092,8 @@ _fix263 = [{
     "repo": "demo", "slug": "o/r", "category": "sqli", "unit": "A.run",
     "file": "A.java", "line": 3, "head_sha": _sha263,
     "permalink": f"https://github.com/o/r/blob/{_sha263}/A.java#L3",
+    "head_commit_date": "2026-10-01", "head_age_days": 27.0,
+    "max_head_age_days": 180, "stale": False,
     "status": "ZERO_RECORD_FRESH", "matched_ids": [],
     "evidence_urls": [], "checked_at": "2026-01-01 00:00:00"},
     {"repo": "demo", "slug": "o/r", "category": "xss", "unit": "A.x",
@@ -10226,7 +10228,70 @@ check("M280：README 含 v1.2 双模式",
 check("M280：已执行断言数 >=1570", COUNTS["n"] >= 1570, True)
 print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
 
-print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
+print("\n[271] M281：停更仓硬门禁（HEAD 年龄 > 180 天）")
+_old271 = Path(_ws_mkdtemp("smoke_stale_"))
+_sp261.run(["git", "init", "-q"], cwd=_old271, check=True)
+_sp261.run(["git", "config", "user.email", "smoke@example.com"],
+           cwd=_old271, check=True)
+_sp261.run(["git", "config", "user.name", "smoke"], cwd=_old271, check=True)
+(_old271 / "A.java").write_text(
+    "class A {\n  public void run(String id) {\n"
+    "    String q = \"select * from t where id=\" + id;\n  }\n}\n",
+    encoding="utf-8")
+_sp261.run(["git", "add", "."], cwd=_old271, check=True)
+_old_env = {**_os.environ, "GIT_AUTHOR_DATE": "2022-01-01T00:00:00",
+            "GIT_COMMITTER_DATE": "2022-01-01T00:00:00"}
+_sp261.run(["git", "commit", "-qm", "old"], cwd=_old271, check=True,
+           env=_old_env)
+_h271 = _up261.local_head(_old271)
+check("M281：旧仓 head_age_days > 180", _h271.get("head_age_days", 0) > 180,
+      True)
+from core.context.live_hunt import run_one as _ro271             # noqa: E402
+_r271 = _ro271(_old271, slug="o/r", offline=True, roots=[{
+    "category": "sqli", "unit_name": "A.run", "representative": "A.run",
+    "file": "A.java", "line": 3, "affected_routes": 1}])
+check("M281：旧仓判 STALE_REPO", _r271[0].get("status"), "STALE_REPO")
+check("M281：旧仓 stale 标记", _r271[0].get("stale"), True)
+from core.context.live_hunt_report import _board as _bd271       # noqa: E402
+check("M281：旧仓只能进板块 B", _bd271(_r271[0]), "B")
+
+print("\n[272] M284：大盘 STALE_REPO 计数守恒 / A 全是 2026 活仓")
+_md272 = (ROOT / "LIVE_HUNT_REPORT.md").read_text(encoding="utf-8")
+_js272 = json.loads((ROOT / "benchmarks" / "results" /
+                     "live_hunt.json").read_text(encoding="utf-8"))
+check("M284：大盘出现 STALE_REPO 计数", "STALE_REPO" in _md272, True)
+check("M284：JSON by_status 含 STALE_REPO",
+      _js272["summary"]["by_status"].get("STALE_REPO", 0) >= 1, True)
+_a272 = [r for r in _js272["records"]
+         if r.get("status") == "ZERO_RECORD_FRESH"]
+check("M284：板块 A 全部是 2026 年 HEAD",
+      all(str(r.get("head_commit_date", "")).startswith("2026-")
+          for r in _a272), True)
+
+print("\n[273] M283：服务层守卫识别（Controller 无注解 ≠ 无鉴权）")
+_gd273 = Path(_ws_mkdtemp("smoke_guard_"))
+(_gd273 / "CrmXController.java").write_text(
+    "public class CrmXController {\n"
+    "  public CommonResult<PageResult<X>> getPage(X req) {\n"
+    "    return success(service.getPage(req));\n  }\n}\n",
+    encoding="utf-8")
+(_gd273 / "CrmXServiceImpl.java").write_text(
+    "public class CrmXServiceImpl {\n"
+    "  @CrmPermission(bizTypeValue = \"#req.bizType\",\n"
+    "                 bizId = \"#req.bizId\", level = READ)\n"
+    "  public PageResult<X> getPage(X req) { return null; }\n}\n",
+    encoding="utf-8")
+(_gd273 / "CrmYServiceImpl.java").write_text(
+    "public class CrmYServiceImpl {\n"
+    "  public PageResult<Y> getPage(Y req) { return null; }\n}\n",
+    encoding="utf-8")
+from core.context.authz_guard import verify_service_guard as _vg273  # noqa: E402
+_g273 = _vg273(_gd273, "CrmXController.getPage")
+check("M283：服务层 @CrmPermission 被判已守卫", _g273.get("guarded"), True)
+check("M283：守卫证据带文件与行号",
+      _g273.get("evidence", "").startswith("CrmXServiceImpl.java:"), True)
+check("M283：无注解服务方法不被误判",
+      _vg273(_gd273, "CrmYServiceImpl.getPage").get("guarded"), False)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

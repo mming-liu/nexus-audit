@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,13 +31,32 @@ def _git(args: list[str], cwd: Path | None = None,
     try:
         env = {**os.environ, "GIT_SSL_BACKEND": "openssl",
                "GIT_TERMINAL_PROMPT": "0"}
-        p = subprocess.run(["git", "-c", "http.sslBackend=openssl", *args],
+        p = subprocess.run(["git", "-c", "http.sslBackend=openssl",
+                            "-c", "core.longpaths=true", *args],
                            cwd=str(cwd) if cwd else None,
                            capture_output=True, text=True, encoding="utf-8",
                            errors="replace", timeout=timeout, env=env)
         return p.returncode, (p.stdout or "") + (p.stderr or "")
     except (OSError, subprocess.SubprocessError) as e:
         return 1, f"{type(e).__name__}: {e}"
+
+
+def head_commit_info(repo: Path, sha: str | None = None) -> dict:
+    """读取 HEAD 提交时间；用于“仓库是否还在维护”的硬门禁。"""
+    rc, out = _git(["log", "-1", "--format=%ct|%ci", sha or "HEAD"],
+                   cwd=repo, timeout=30)
+    if rc != 0 or "|" not in out:
+        return {"head_commit_timestamp": 0, "head_commit_date": "",
+                "head_age_days": 999999.0}
+    ts_s, date_s = out.strip().split("|", 1)
+    try:
+        ts = int(ts_s.strip())
+    except ValueError:
+        return {"head_commit_timestamp": 0, "head_commit_date": "",
+                "head_age_days": 999999.0}
+    return {"head_commit_timestamp": ts,
+            "head_commit_date": date_s.strip()[:10],
+            "head_age_days": round((time.time() - ts) / 86400.0, 1)}
 
 
 def normalize_slug(value: str) -> str | None:
@@ -101,8 +121,9 @@ def sync_repo(slug: str, dest_root: Path = CACHE_ROOT,
     if rc != 0:
         return {"status": "UNKNOWN", "reason": "rev_parse_failed",
                 "slug": slug, "branch": branch, "path": str(dest)}
+    info = head_commit_info(dest, sha.strip())
     return {"status": "OK", "slug": slug, "branch": branch,
-            "head_sha": sha.strip(), "path": str(dest)}
+            "head_sha": sha.strip(), "path": str(dest), **info}
 
 
 def local_head(repo: Path) -> dict:
@@ -117,9 +138,10 @@ def local_head(repo: Path) -> dict:
     if rc != 0:
         return {"status": "UNKNOWN", "reason": "rev_parse_failed",
                 "path": str(repo)}
+    info = head_commit_info(repo, sha.strip())
     return {"status": "OK", "head_sha": sha.strip(),
             "branch": branch.strip() if rc2 == 0 else "",
-            "path": str(repo)}
+            "path": str(repo), **info}
 
 
 def read_at_head(repo: Path, rel_path: str, head_sha: str | None = None) -> str:

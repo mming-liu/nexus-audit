@@ -18,9 +18,14 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 ## v1.2 双模式（M267 → M280）
 
 - **活水首杀**：`python cli.py live-hunt owner/repo` —— 拉远端默认分支 HEAD →
+  **HEAD 提交年龄硬门禁（默认 180 天，超龄直接 `STALE_REPO` 进板块 B）** →
   `verify_unit_alive_on_head()` 存活校验 → NVD / CIRCL / GitHub Advisory / Issue
   四态查重 → 只把 `ZERO_RECORD_FRESH` 放进 `LIVE_HUNT_REPORT.md` 板块 A；
   每个 FRESH 包生成 `SUBMISSION_PLAYBOOK.md`（Step 1/2/3 零占位符）。
+  板块 A 每行都带 `HEAD 提交日期`，一眼可验是不是 2026 活仓；
+  **Controller 没写 `@PreAuthorize` 不等于无鉴权**——`authz_guard.py`
+  会核 `ServiceImpl` 上的 `@CrmPermission` / `@PreAuthorize` /
+  `@SaCheckPermission` / 方法体 `hasPermission()`，命中即判 `service_guard` 进 B。
 - **客户离线交付**：`python cli.py client-audit <dir|zip|file>` —— 默认 100%
   离线，生成 `01_EXECUTIVE_SUMMARY.md` / `02_DETAILED_AUDIT_REPORT.md` /
   `03_PATCH_BUNDLE/` / `04_REGRESSION_TESTS/` / `05_RETEST_VERIFICATION.md`。

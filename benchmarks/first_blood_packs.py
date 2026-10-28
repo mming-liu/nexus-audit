@@ -91,6 +91,8 @@ def _origin(live: dict, repo: str, cat: str, unit: str) -> str:
     status = rec.get("status")
     if status == "ZERO_RECORD_FRESH":
         return "ZERO_RECORD_FRESH"
+    if status == "STALE_REPO":
+        return "STALE_REPO"
     if status in ("DUPLICATE_CVE", "DUPLICATE_ISSUE_OR_GHSA",
                   "PATCHED_UPSTREAM"):
         return "KNOWN_CVE_BENCHMARK"

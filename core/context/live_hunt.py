@@ -8,7 +8,7 @@ import sys
 import uuid
 from pathlib import Path
 
-from core.context import cve_dedup, upstream_sync
+from core.context import authz_guard, cve_dedup, upstream_sync
 from core.context.live_hunt_report import (CVE_FORM, _advisory_url,
                                            _issue_url, write_outputs)
 
@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CLI = ROOT / "cli.py"
 TRIAGE = ROOT / "benchmarks" / "results" / "llm_root_triage.json"
 SKIP_CATEGORIES = {"cors"}
+MAX_HEAD_AGE_DAYS = 180
 _TRIAGE_CACHE: dict | None = None
 
 
@@ -86,6 +87,7 @@ def _rel(repo: Path, file: str) -> str:
 
 def run_one(repo: Path, *, slug: str | None = None, offline: bool = False,
             limit: int = 0, dedup_online: bool = True,
+            max_head_age_days: int = MAX_HEAD_AGE_DAYS,
             roots: list[dict] | None = None) -> list[dict]:
     repo = Path(repo).resolve()
     slug = slug_from_repo(repo, slug)
@@ -110,6 +112,10 @@ def run_one(repo: Path, *, slug: str | None = None, offline: bool = False,
             "file": rel, "line": line,
             "affected_routes": int(rc.get("affected_routes") or 1),
             "head_sha": head.get("head_sha", ""),
+            "head_commit_date": head.get("head_commit_date", ""),
+            "head_age_days": head.get("head_age_days", 999999.0),
+            "max_head_age_days": max_head_age_days,
+            "stale": False,
             "permalink": "", "status": cve_dedup.STATUS_UNKNOWN,
             "matched_ids": [], "sources": {}, "evidence_urls": [],
             "checked_at": "",
@@ -122,6 +128,31 @@ def run_one(repo: Path, *, slug: str | None = None, offline: bool = False,
             rec["reason"] = f"head_unavailable: {head.get('reason', '')}"
             out.append(rec)
             continue
+        if not rec["head_commit_date"]:
+            rec["status"] = cve_dedup.STATUS_UNKNOWN
+            rec["reason"] = "head_date_unknown: 无法证明仓库仍活跃"
+            out.append(rec)
+            continue
+        age = float(rec["head_age_days"] or 999999)
+        rec["stale"] = age > float(max_head_age_days)
+        if rec["stale"]:
+            rec["status"] = cve_dedup.STATUS_STALE
+            rec["reason"] = (f"stale_repo: HEAD {rec['head_commit_date']} "
+                             f"({age:.0f}d > {max_head_age_days}d)")
+            rec["permalink"] = upstream_sync.head_permalink(
+                slug, rec["head_sha"], rel, line)
+            out.append(rec)
+            continue
+        if cat == "authz":
+            guard = authz_guard.verify_service_guard(repo, unit, rel)
+            if guard.get("guarded"):
+                rec["status"] = cve_dedup.STATUS_UNKNOWN
+                rec["reason"] = (f"service_guard: {guard.get('evidence', '')} "
+                                 f"({guard.get('method', '')})")
+                rec["permalink"] = upstream_sync.head_permalink(
+                    slug, rec["head_sha"], rel, line)
+                out.append(rec)
+                continue
         if rec["triage"] in ("LIKELY_FP_GUARDED", "NEEDS_HUMAN"):
             rec["status"] = cve_dedup.STATUS_UNKNOWN
             rec["reason"] = f"llm_triage_{rec['triage'].lower()}: 不进入首杀板块"
@@ -142,7 +173,7 @@ def run_one(repo: Path, *, slug: str | None = None, offline: bool = False,
         rec["permalink"] = upstream_sync.head_permalink(
             slug, rec["head_sha"], rel, rec["line"])
         dd = cve_dedup.dedup(
-            slug, cat, unit,
+            slug, cat, unit, file=rel,
             aliases=[rec["repo"], Path(repo).name],
             allow_online=(not offline) and dedup_online)
         rec.update({k: dd.get(k, rec.get(k)) for k in
@@ -156,6 +187,7 @@ def run_one(repo: Path, *, slug: str | None = None, offline: bool = False,
 def run(repos: list[str], *, offline: bool = False, limit: int = 0,
         report: Path | None = None, json_path: Path | None = None,
         packs_dir: Path | None = None, slug: str | None = None,
+        max_head_age_days: int = MAX_HEAD_AGE_DAYS,
         dry_run: bool = False) -> dict:
     report = report or (ROOT / "LIVE_HUNT_REPORT.md")
     json_path = json_path or (ROOT / "benchmarks" / "results" /
@@ -198,7 +230,8 @@ def run(repos: list[str], *, offline: bool = False, limit: int = 0,
                 continue
         try:
             all_records += run_one(repo, slug=slug_val or slug,
-                                   offline=offline, limit=limit)
+                                   offline=offline, limit=limit,
+                                   max_head_age_days=max_head_age_days)
         except Exception as e:                                # noqa: BLE001
             all_records.append({
                 "repo": repo.name, "slug": slug_val or repo.name,

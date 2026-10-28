@@ -19,7 +19,7 @@
       ],
       "pack": "Sentinel_log_injection_login",
       "github": "alibaba/Sentinel",
-      "origin": "UNVERIFIED"
+      "origin": "KNOWN_CVE_BENCHMARK"
     },
     {
       "rank": 2,
@@ -37,7 +37,7 @@
       ],
       "pack": "Sentinel_log_injection_apiAssignAllClusterServersOfApp",
       "github": "alibaba/Sentinel",
-      "origin": "UNVERIFIED"
+      "origin": "ZERO_RECORD_FRESH"
     },
     {
       "rank": 3,
@@ -150,7 +150,7 @@
       ],
       "pack": "newbee-mall_unrestricted_upload_upload",
       "github": "newbee-ltd/newbee-mall",
-      "origin": "UNVERIFIED"
+      "origin": "STALE_REPO"
     },
     {
       "rank": 9,
@@ -170,7 +170,7 @@
       ],
       "pack": "newbee-mall-api_unrestricted_upload_upload",
       "github": "newbee-ltd/newbee-mall-api",
-      "origin": "ZERO_RECORD_FRESH"
+      "origin": "STALE_REPO"
     }
   ]
 }

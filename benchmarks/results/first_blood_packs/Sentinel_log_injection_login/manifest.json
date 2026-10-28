@@ -14,5 +14,5 @@
   ],
   "patch_verified": true,
   "poc_ok": true,
-  "origin": "UNVERIFIED"
+  "origin": "KNOWN_CVE_BENCHMARK"
 }

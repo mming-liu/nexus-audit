@@ -1,0 +1,10 @@
+--- a/ClusterAssignController.java
++++ b/ClusterAssignController.java
+@@ -62,6 +62,7 @@
+             return Result.ofSuccess(clusterAssignService.applyAssignToApp(app, assignRequest.getClusterMap(),
+                 assignRequest.getRemainingList()));
+         } catch (Throwable throwable) {
++            app = String.valueOf(app).replace("\r", "").replace("\n", "");
+             logger.error("Error when assigning full cluster servers for app: " + app, throwable);
+             return Result.ofFail(-1, throwable.getMessage());
+         }

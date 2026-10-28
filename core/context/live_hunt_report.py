@@ -16,7 +16,8 @@ from pathlib import Path
 
 from core.agents.vuln_categories import CATEGORIES
 from core.context.cve_dedup import (STATUS_CVE, STATUS_FRESH, STATUS_ISSUE,
-                                    STATUS_PATCHED, STATUS_UNKNOWN)
+                                    STATUS_PATCHED, STATUS_STALE,
+                                    STATUS_UNKNOWN)
 
 TEMPLATE_VERSION = "playbook-1.0"
 CVE_FORM = "https://www.cve.org/ReportRequest/ReportRequestForNonCNAs"
@@ -46,6 +47,11 @@ def _version_evidence(rec: dict) -> str:
 def _board(rec: dict) -> str:
     if rec.get("status") != STATUS_FRESH:
         return B
+    if rec.get("stale") or float(rec.get("head_age_days") or 999999) > float(
+            rec.get("max_head_age_days") or 180):
+        return B
+    if not str(rec.get("head_commit_date") or "").startswith("2026-"):
+        return B
     if not rec.get("head_sha") or not str(rec.get("permalink") or "").startswith(
             "https://github.com/"):
         return B
@@ -57,8 +63,11 @@ def _board(rec: dict) -> str:
 def _row_a(i: int, r: dict) -> str:
     playbook = r.get("playbook") or ""
     link = (f"[{Path(playbook).name}]({playbook})" if playbook else "—")
+    age = r.get("head_age_days", "")
+    date = r.get("head_commit_date", "")
     return (f"| {i} | {r.get('repo', '')} | {r.get('category', '')} | "
-            f"{r.get('unit', '')} | {r.get('head_sha', '')[:12]} | "
+            f"{r.get('unit', '')} | {date} ({age}d) | "
+            f"{r.get('head_sha', '')[:12]} | "
             f"[{r.get('file', '')}:{r.get('line', 0)}]({r.get('permalink', '')}) | "
             f"[Advisory]({_advisory_url(r.get('slug', ''))}) · "
             f"[Issue]({_issue_url(r.get('slug', ''))}) · "
@@ -84,7 +93,7 @@ def render_report(records: list[dict], generated_at: str | None = None) -> str:
     b = [r for r in rows if _board(r) == B]
     counts = {k: sum(1 for r in rows if r.get("status") == k) for k in
               (STATUS_FRESH, STATUS_CVE, STATUS_ISSUE, STATUS_PATCHED,
-               STATUS_UNKNOWN)}
+               STATUS_STALE, STATUS_UNKNOWN)}
     counts["BOARD_A"] = len(a)
     counts["BOARD_B"] = len(b)
     lines = [
@@ -99,18 +108,19 @@ def render_report(records: list[dict], generated_at: str | None = None) -> str:
         f"DUPLICATE_CVE {counts[STATUS_CVE]} / "
         f"DUPLICATE_ISSUE_OR_GHSA {counts[STATUS_ISSUE]} / "
         f"PATCHED_UPSTREAM {counts[STATUS_PATCHED]} / "
+        f"STALE_REPO {counts[STATUS_STALE]} / "
         f"UNKNOWN {counts[STATUS_UNKNOWN]}",
         "",
         "<!-- live_hunt_counts: " + json.dumps(counts, ensure_ascii=False,
                                                 sort_keys=True) + " -->",
         "",
         "## 板块 A｜🟢 可直接交单的 ZERO_RECORD_FRESH", "",
-        "| # | 仓库 | 类目 | 根因 | HEAD | 源码行 | 提单入口 | 本地手册 |",
-        "|---|---|---|---|---|---|---|---|",
+        "| # | 仓库 | 类目 | 根因 | HEAD 提交日期 | HEAD | 源码行 | 提单入口 | 本地手册 |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     lines += [_row_a(i, r) for i, r in enumerate(a, 1)]
     if not a:
-        lines.append("| — | — | — | — | — | — | — | — |")
+        lines.append("| — | — | — | — | — | — | — | — | — |")
     lines += ["", "## 板块 B｜🔴 自动拦截 / 不可交单", "",
               "| # | 仓库 | 类目 | 根因 | 状态 | 命中证据 | 拦截原因 | 官方链接 |",
               "|---|---|---|---|---|---|---|---|"]
@@ -158,6 +168,7 @@ def render_playbook(r: dict) -> str:
 > 模板版本：{TEMPLATE_VERSION} ｜ 事实源：live_hunt.json
 > 本文**不是**漏洞成立的法律证明；提交前请人工复核版本影响面与可达性。
 > 状态：{r.get('status', '')} ｜ HEAD：{r.get('head_sha', '')}
+> HEAD 提交日期：{r.get('head_commit_date', '')}（{r.get('head_age_days', '')} 天前）
 
 ## Step 1：点哪个网址
 
@@ -257,7 +268,7 @@ def write_outputs(records: list[dict], report_path: Path,
             "by_status": {k: sum(1 for r in records
                                  if r.get("status") == k) for k in
                           (STATUS_FRESH, STATUS_CVE, STATUS_ISSUE,
-                           STATUS_PATCHED, STATUS_UNKNOWN)},
+                           STATUS_PATCHED, STATUS_STALE, STATUS_UNKNOWN)},
         },
         "records": records,
     }

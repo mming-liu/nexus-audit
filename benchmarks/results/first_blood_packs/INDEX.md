@@ -4,12 +4,12 @@
 
 | # | 包 | 角色 | 来源 | 类目 | CVSS | 四件套 |
 |---|---|---|---|---|---|---|
-| 1 | Sentinel_log_injection_login | production | UNVERIFIED | log_injection | 8.1 | ✔ |
-| 2 | Sentinel_log_injection_apiAssignAllClusterServersOfApp | production | UNVERIFIED | log_injection | 8.1 | ✔ |
+| 1 | Sentinel_log_injection_login | production | KNOWN_CVE_BENCHMARK | log_injection | 8.1 | ✔ |
+| 2 | Sentinel_log_injection_apiAssignAllClusterServersOfApp | production | ZERO_RECORD_FRESH | log_injection | 8.1 | ✔ |
 | 3 | RuoYi_sqli_create | production | UNVERIFIED | sqli | 9.8 | ✔ |
 | 4 | django-realworld_hardcoded_secret_py | production | UNVERIFIED | hardcoded_secret | 9.8 | ✔ |
 | 5 | litemall_hardcoded_secret_java | production | UNVERIFIED | hardcoded_secret | 9.8 | ✔ |
 | 6 | My-Blog_unrestricted_upload_uploadFileByEditormd | production | UNVERIFIED | unrestricted_upload | 8.1 | ✔ |
 | 7 | My-Blog_unrestricted_upload_upload | production | UNVERIFIED | unrestricted_upload | 8.1 | ✔ |
-| 8 | newbee-mall_unrestricted_upload_upload | production | UNVERIFIED | unrestricted_upload | 8.1 | ✔ |
-| 9 | newbee-mall-api_unrestricted_upload_upload | production | ZERO_RECORD_FRESH | unrestricted_upload | 8.1 | ✔ |
+| 8 | newbee-mall_unrestricted_upload_upload | production | STALE_REPO | unrestricted_upload | 8.1 | ✔ |
+| 9 | newbee-mall-api_unrestricted_upload_upload | production | STALE_REPO | unrestricted_upload | 8.1 | ✔ |
