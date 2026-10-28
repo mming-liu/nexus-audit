@@ -105,8 +105,110 @@ def _emit_pocs(units, categories, out_dir: str) -> int:
     return 0 if rep.ok_count == len(rep.artifacts) else 1
 
 
+def cmd_scan_snippet(args) -> int:
+    """M273：单文件 / stdin 代码片段直扫（不依赖完整工程）。"""
+    import json as _json
+    import sys as _sys
+    from pathlib import Path as _Path
+    from core.agents.rule_detectors import verdict, build_rule_diagnostic
+    from core.agents.vuln_categories import CATEGORIES
+    from core.slicer.snippet_slicer import slice_text
+    from core.context import watchtower as _W
+
+    if getattr(args, "stdin", False):
+        import uuid as _uuid
+        text = _sys.stdin.read()
+        suffix = {"java": ".java", "solidity": ".sol"}.get(
+            (getattr(args, "lang", None) or "python"), ".py")
+        tmp = _Path(".tmp") / "snippet_stdin"
+        tmp.mkdir(parents=True, exist_ok=True)
+        tmp_file = tmp / f"stdin_{_uuid.uuid4().hex}{suffix}"
+        tmp_file.write_text(text, encoding="utf-8")
+        filename, scope = str(tmp_file), "snippet"
+    else:
+        p = _Path(args.snippet)
+        text = p.read_text(encoding="utf-8", errors="replace")
+        filename, scope = str(p), "single_file"
+    units = slice_text(text, filename, getattr(args, "lang", None))
+    cats = sorted(CATEGORIES)
+    p0: list[dict] = []
+    needs: list[dict] = []
+    for u in units:
+        for cat in cats:
+            if cat in ("authz", "cors"):
+                v = verdict(cat, u.source_code)
+                if v is True or build_rule_diagnostic(cat, u.source_code):
+                    needs.append({
+                        "category": cat, "unit": u.unit_name,
+                        "file": u.file_path, "line": u.start_line,
+                        "reason": "单文件/片段缺少全局安全装配证据，"
+                                  "authz/cors 只能 NEEDS_HUMAN"})
+                continue
+            try:
+                v = verdict(cat, u.source_code)
+            except Exception:                              # noqa: BLE001
+                continue
+            if v is True:
+                p0.append({
+                    "category": cat, "unit": u.unit_name,
+                    "file": u.file_path, "line": u.start_line,
+                    "end_line": u.end_line,
+                    "severity": "P0"})
+    patches: list[dict] = []
+    repo = _Path(filename).resolve().parent if filename != "<stdin>" else _Path.cwd()
+    for row in p0:
+        u = next((x for x in units if x.unit_name == row["unit"]), None)
+        if u is None:
+            continue
+        try:
+            diff, _rep, ok = _W._try_patch(repo, u, row["category"])
+        except Exception:                                  # noqa: BLE001
+            diff, ok = "", False
+        if ok and diff:
+            patches.append({"category": row["category"],
+                            "unit": row["unit"], "diff": diff})
+            row["patch_verified"] = True
+    payload = {
+        "mode": "snippet", "evidence_scope": scope,
+        "file": filename, "language": units[0].language.value,
+        "units": len(units), "p0": p0, "needs_human": needs,
+        "patches": patches,
+        "limitations": [
+            "单文件/片段模式没有 pom.xml、路由表与全局 SecurityConfig；",
+            "authz/cors 结论只进 NEEDS_HUMAN，不冒充确定无越权；",
+            "补丁只对当前片段做过 True→False 自检，合入前需在完整工程复跑。"]}
+    if getattr(args, "summary_json", None):
+        _Path(args.summary_json).parent.mkdir(parents=True, exist_ok=True)
+        _Path(args.summary_json).write_text(
+            _json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8")
+    out = getattr(args, "output", None)
+    md = [f"# 代码片段扫描报告（{scope}）", "",
+          f"- 文件：{filename}",
+          f"- 单元：{len(units)} ｜ P0：{len(p0)} ｜ "
+          f"待人工：{len(needs)} ｜ 已验证补丁：{len(patches)}", "",
+          "## P0 [Confirmed]", ""]
+    md += [f"- [{r['category']}] {r['unit']} @ {r['file']}:{r['line']}"
+           for r in p0] or ["- 无"]
+    md += ["", "## NEEDS_HUMAN", ""]
+    md += [f"- [{r['category']}] {r['unit']}：{r['reason']}"
+           for r in needs] or ["- 无"]
+    md += ["", "## 限制", ""] + [f"- {x}" for x in payload["limitations"]]
+    text_md = "\n".join(md) + "\n"
+    if out:
+        _Path(out).write_text(text_md, encoding="utf-8")
+        print(f"[snippet] 报告 → {out}")
+    else:
+        print(text_md)
+    print(f"[snippet] P0={len(p0)} NEEDS_HUMAN={len(needs)} "
+          f"patches={len(patches)}")
+    return 0
+
+
 def cmd_scan(args):
-    repo = Path(args.repo_path).resolve()
+    if getattr(args, "snippet", None) or getattr(args, "stdin", False):
+        return cmd_scan_snippet(args)
+    repo = Path(args.repo_path or ".").resolve()
     if args.web3:
         return cmd_scan_web3(args, repo)
 
@@ -2575,11 +2677,16 @@ def _fix_python_sqli(repo: Path, targets: list, lines: list) -> int:
             with open(f, "w", encoding="utf-8", newline="") as fh:
                 fh.write(patched)
             from core.slicer.web_treesitter import WebTreeSitterSlicer
+            from core.agents.rule_detectors import verdict as rule_verdict
             u2 = next((x for x in WebTreeSitterSlicer(repo).extract_entry_units()
                        if x.unit_name == u.unit_name
                        and Path(x.file_path) == f), None)
-            from core.agents.rule_detectors import verdict as rule_verdict
-            v2 = rule_verdict("sqli", u2.source_code) if u2 else None
+            if u2 is None and getattr(u, "snippet", False):
+                # 单文件/片段模式没有 Flask 工程可重切；直接对补丁后全文
+                # 重跑规则，仍是 True→False 的真实自检。
+                v2 = rule_verdict("sqli", patched)
+            else:
+                v2 = rule_verdict("sqli", u2.source_code) if u2 else None
         finally:
             with open(f, "w", encoding="utf-8", newline="") as fh:
                 fh.write(original)
@@ -5929,6 +6036,69 @@ def cmd_watch(args) -> int:
 
 
 
+def cmd_live_hunt(args) -> int:
+    """M271：活水首杀流水线。"""
+    from pathlib import Path as _Path
+    from core.context import live_hunt
+    res = live_hunt.run(
+        args.repos, offline=args.offline, limit=args.limit,
+        report=_Path(args.report), json_path=_Path(args.json),
+        packs_dir=_Path(args.packs_dir), slug=args.slug,
+        dry_run=args.dry_run)
+    s = res["summary"]
+    if args.dry_run:
+        print(f"[live-hunt] dry-run：{s.get('total', 0)} 条（未落盘）")
+    else:
+        print(f"[live-hunt] 总 {s.get('total', 0)} ｜ A {s.get('board_a', 0)} ｜ "
+              f"B {s.get('board_b', 0)}")
+        print(f"[live-hunt] 报告 → {args.report}；JSON → {args.json}")
+    return 0
+
+
+def cmd_client_audit(args) -> int:
+    """M274：客户离线交付五件套。"""
+    import zipfile
+    from pathlib import Path as _Path
+    from core.reporting.client_deliverable import build
+    from core.text_utils import ensure_utf8_stdio
+    ensure_utf8_stdio()
+    target = _Path(args.target).resolve()
+    if not target.exists():
+        print(f"[!] 目标不存在：{target}")
+        return 2
+    if target.suffix.lower() == ".zip":
+        dest = _Path(__file__).resolve().parent / ".cache" / "client_extract" / target.stem
+        dest.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(target) as zf:
+            for m in zf.infolist():
+                out = (dest / m.filename).resolve()
+                if not str(out).startswith(str(dest.resolve())):
+                    raise ValueError(f"zip 路径逃逸：{m.filename}")
+                if m.is_dir():
+                    out.mkdir(parents=True, exist_ok=True)
+                else:
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    with zf.open(m) as src, open(out, "wb") as dst:
+                        dst.write(src.read())
+        target = dest
+    if target.is_file():
+        # 单文件：先落到临时工程目录，仍走同一套离线交付
+        work = _Path(__file__).resolve().parent / ".cache" / "client_single" / target.stem
+        work.mkdir(parents=True, exist_ok=True)
+        dst = work / target.name
+        dst.write_bytes(target.read_bytes())
+        target = work
+    outdir = _Path(args.outdir) if args.outdir else (
+        _Path(__file__).resolve().parent / "benchmarks" / "results" /
+        "client_deliverables" / (args.project_name or target.name))
+    baseline = _Path(args.baseline_report) if args.baseline_report else None
+    manifest = build(target, outdir, args.project_name or target.name, baseline)
+    print(f"[client-audit] {manifest['root_causes']} 根因 / "
+          f"{manifest['patches']} 补丁 / LOC {manifest['loc']['lines']:,}")
+    print(f"[client-audit] 五件套 → {outdir}")
+    return 0
+
+
 def cmd_export_packs(args) -> int:
     """M234：Top-10 交单包生成 + INDEX.md。"""
     import subprocess
@@ -5950,17 +6120,19 @@ def cmd_export_packs(args) -> int:
         except Exception:                                    # noqa: BLE001
             sel = {}
     packs.sort(key=lambda d: sel.get(d.name, {}).get("rank", 999))
-    lines = [f"# Top-10 候选交单包（nexus-audit v1.1.0 · 非教学仓严选；"
+    lines = [f"# Top-10 候选交单包（nexus-audit v1.2.0 · 非教学仓严选；"
              f"{len(packs)} 条通过补丁自检）", "",
              "> M259：剔除教学仓与纯 CORS，同函数多规则合并，每仓最多 2 条；"
              "补丁自检 True -> False 才入包。目标 Top-10，实测不足时**不拿"
              "未验证补丁凑数**，缺额如实标注。", "",
-             "| # | 包 | 角色 | 类目 | CVSS | 四件套 |", "|---|---|---|---|---|---|"]
+             "| # | 包 | 角色 | 来源 | 类目 | CVSS | 四件套 |",
+             "|---|---|---|---|---|---|---|"]
     for i, d in enumerate(packs, 1):
         need = ("ADVISORY.md", "fix.patch", "SUBMISSION_CHECKLIST.md")
         ok = all((d / f).is_file() for f in need)
         t = sel.get(d.name, {})
         lines.append(f"| {i} | {d.name} | {t.get('repo_role', '—')} | "
+                     f"{t.get('origin', 'UNVERIFIED')} | "
                      f"{t.get('category', '—')} | {t.get('cvss', '—')} | "
                      f"{'✔' if ok else '✘'} |")
     (out / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -6028,8 +6200,15 @@ def main():
     parser = argparse.ArgumentParser(prog="nexus-audit", description="AI 自动化漏洞挖掘审计框架")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("doctor", help="依赖/规则注册表/缓存指纹/补丁器就位自检（只读）")
-    p_scan = sub.add_parser("scan", help="全量扫描目标仓库")
-    p_scan.add_argument("repo_path")
+    p_scan = sub.add_parser("scan", help="全量扫描目标仓库 / 单文件 / 片段")
+    p_scan.add_argument("repo_path", nargs="?", default=None)
+    p_scan.add_argument("--snippet", default=None, metavar="FILE",
+                        help="M273：单文件直扫（不依赖完整工程）")
+    p_scan.add_argument("--stdin", action="store_true",
+                        help="M273：从 stdin 读取代码片段")
+    p_scan.add_argument("--lang", default=None,
+                        choices=["java", "python", "solidity"],
+                        help="片段语言（默认按扩展名推断）")
     p_scan.add_argument("--offline", action="store_true", help="离线演示模式（不调用 LLM API）")
     p_scan.add_argument("--web3", action="store_true", help="Web3 赛道（Solidity 精度/逻辑缺陷检测）")
     p_scan.add_argument("--java", action="store_true", help="Java 赛道（Servlet/Spring 入口切片）")
@@ -6139,6 +6318,28 @@ def main():
                           help="M233：校验 40 类规则 CVSS/PoC/补丁器全覆盖，exit 0/1")
     p_matrix.add_argument("--json", action="store_true",
                           help="M233：stdout 追加机器可读 JSON 摘要")
+    p_live = sub.add_parser("live-hunt",
+                            help="M271：活水首杀（HEAD 存活 + CVE 查重 + 大盘）")
+    p_live.add_argument("repos", nargs="+", metavar="REPO",
+                        help="owner/repo 或本地路径")
+    p_live.add_argument("--offline", action="store_true",
+                        help="不联网/不 clone；只能产出 UNKNOWN 或本地种子重复")
+    p_live.add_argument("--limit", type=int, default=0,
+                        help="每仓最多复核多少条根因")
+    p_live.add_argument("--report", default="LIVE_HUNT_REPORT.md")
+    p_live.add_argument("--json", default="benchmarks/results/live_hunt.json")
+    p_live.add_argument("--packs-dir", default="benchmarks/results/live_hunt_packs")
+    p_live.add_argument("--slug", default=None, help="显式 owner/repo")
+    p_live.add_argument("--dry-run", action="store_true")
+    p_client = sub.add_parser("client-audit",
+                              help="M274：客户离线交付五件套")
+    p_client.add_argument("target", help="目录 / zip / 单文件")
+    p_client.add_argument("--project-name", default=None)
+    p_client.add_argument("--outdir", default=None)
+    p_client.add_argument("--baseline-report", default=None,
+                          help="上次 summary.json，用于 05 复测销账")
+    p_client.add_argument("--allow-llm", action="store_true",
+                          help="显式允许模型（默认 100%% 离线）")
     p_export = sub.add_parser("export-packs",
                               help="M234：生成 Top-10 交单包 + INDEX")
     p_export.add_argument("--check", action="store_true",
@@ -6184,6 +6385,10 @@ def main():
         sys.exit(cmd_watch(args))
     elif args.command == "ci-init":
         sys.exit(cmd_ci_init(args))
+    elif args.command == "live-hunt":
+        sys.exit(cmd_live_hunt(args))
+    elif args.command == "client-audit":
+        sys.exit(cmd_client_audit(args))
     elif args.command == "export-packs":
         sys.exit(cmd_export_packs(args))
     else:

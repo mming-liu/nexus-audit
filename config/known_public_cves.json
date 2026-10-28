@@ -1,0 +1,159 @@
+{
+  "template_version": "1.0",
+  "updated_at": "2026-10-28",
+  "note": "Conservative seed list. A match means DUPLICATE_*; a miss does NOT mean fresh unless online sources were actually queried.",
+  "signatures": [
+    {
+      "repo": "ZHENFENG13/My-Blog",
+      "aliases": [
+        "My-Blog",
+        "myblog"
+      ],
+      "id": "CVE-2024-13144",
+      "kind": "cve",
+      "category": "unrestricted_upload",
+      "unit": "",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-13144"
+    },
+    {
+      "repo": "yangzongzhuan/RuoYi",
+      "aliases": [
+        "RuoYi",
+        "ruoyi"
+      ],
+      "id": "CVE-2024-42900",
+      "kind": "cve",
+      "category": "sqli",
+      "unit": "GenController.create",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-42900"
+    },
+    {
+      "repo": "yangzongzhuan/RuoYi",
+      "aliases": [
+        "RuoYi",
+        "ruoyi"
+      ],
+      "id": "GHSA/Issue #300",
+      "kind": "issue",
+      "category": "",
+      "unit": "",
+      "url": "https://github.com/yangzongzhuan/RuoYi/issues/300"
+    },
+    {
+      "repo": "yangzongzhuan/RuoYi",
+      "aliases": [
+        "RuoYi",
+        "ruoyi"
+      ],
+      "id": "GHSA/Issue #337",
+      "kind": "issue",
+      "category": "",
+      "unit": "",
+      "url": "https://github.com/yangzongzhuan/RuoYi/issues/337"
+    },
+    {
+      "repo": "gz-yami/mall4j",
+      "aliases": [
+        "mall4j"
+      ],
+      "id": "CVE-2026-102363",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-102363"
+    },
+    {
+      "repo": "gz-yami/mall4j",
+      "aliases": [
+        "mall4j"
+      ],
+      "id": "CVE-2026-102366",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-102366"
+    },
+    {
+      "repo": "elunez/eladmin",
+      "aliases": [
+        "eladmin",
+        "eladmin-mp",
+        "eladmin-JPA"
+      ],
+      "id": "CVE-2026-77036",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "VerifyController.resetPass",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-77036"
+    },
+    {
+      "repo": "xuxueli/xxl-job",
+      "aliases": [
+        "xxl-job"
+      ],
+      "id": "CVE-2026-7303",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-7303"
+    },
+    {
+      "repo": "xuxueli/xxl-job",
+      "aliases": [
+        "xxl-job"
+      ],
+      "id": "CVE-2026-90487",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-90487"
+    },
+    {
+      "repo": "jeecgboot/JeecgBoot",
+      "aliases": [
+        "jeecg-boot",
+        "JeecgBoot"
+      ],
+      "id": "CVE-2026-108641",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-108641"
+    },
+    {
+      "repo": "jeecgboot/JeecgBoot",
+      "aliases": [
+        "jeecg-boot",
+        "JeecgBoot"
+      ],
+      "id": "CVE-2026-108642",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-108642"
+    },
+    {
+      "repo": "jeecgboot/JeecgBoot",
+      "aliases": [
+        "jeecg-boot",
+        "JeecgBoot"
+      ],
+      "id": "GHSA-63v7-3c98-c3mj",
+      "kind": "ghsa",
+      "category": "",
+      "unit": "SysAnnouncementSendController",
+      "url": "https://github.com/jeecgboot/JeecgBoot/security/advisories/GHSA-63v7-3c98-c3mj"
+    },
+    {
+      "repo": "newbee-ltd/newbee-mall",
+      "aliases": [
+        "newbee-mall"
+      ],
+      "id": "Issue #100",
+      "kind": "issue",
+      "category": "",
+      "unit": "",
+      "url": "https://github.com/newbee-ltd/newbee-mall/issues/100"
+    }
+  ]
+}

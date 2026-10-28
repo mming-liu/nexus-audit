@@ -556,3 +556,38 @@ eladmin 上传、Synthetix unchecked 等）补丁自检均未通过。按「不�
 
 > Sentinel 两条是 LLM CONFIRMED_TP；其余 7 条在本轮复核范围外，仍需人工
 > 逐条读源码后才能对外披露。`human_verified` 一律为 `false`。
+
+## 十一、v1.2 双模式（M267 → M280）
+
+### 活水首杀（live-hunt）
+
+`python cli.py live-hunt newbee-ltd/newbee-mall-api newbee-ltd/newbee-mall --limit 3` 实跑：
+
+- 远端默认分支 `master`，HEAD `0879d5a1fac0c2a42c99eaf70d8b2f6e92aa05a4`；
+- 6 条根因：**板块 A 3 条** `ZERO_RECORD_FRESH`（unrestricted_upload / weakrand / xss），
+  **板块 B 3 条**（newbee-mall 命中本地种子 Issue #100，自动拦截）；
+- 每条 A 记录带 HEAD 永久链接、Advisory/Issue/CVE.org 入口；
+- CORS 全局配置被排除，不进入首杀板块；
+- 每个 FRESH 包生成 `SUBMISSION_PLAYBOOK.md`（playbook-1.0），
+  Step 3 的 CVE.org 六字段零占位符，版本影响面写
+  `unknown, pending maintainer confirmation`；
+- 查重状态四态：NVD 在本网络被 TLS 阻断时自动走 CIRCL，
+  GitHub Issues/Advisories 实查；任一来源失败只能 `UNKNOWN`，不降级成 FRESH。
+
+### 客户离线交付（client-audit）
+
+`python cli.py client-audit reference_repos/newbee-mall-api-master --project-name newbee-mall-api`
+实跑：**9 个独立根因 / 2 个已验证补丁 / 7,733 行 Java / 120 个源码文件**，
+演示包在 `benchmarks/results/sample_client_deliverable/`（五件套 + manifest）。
+
+### 单文件/片段（scan --snippet / --stdin）
+
+Python Flask 片段命中 `sqli` 并产出 `True → False` 自检补丁；
+Java 片段缺少全局装配时 `authz` 只进 `NEEDS_HUMAN`，不冒充确定无越权。
+
+### 门禁
+
+- `smoke_test_chains.py`：[1]–[270] **1589 条断言 PASS**；
+- `doctor`：12 段 PASS；
+- `repro`：sha256 `284ec8c3` 守恒；
+- 版本：`core.__version__ = 1.2.0`。

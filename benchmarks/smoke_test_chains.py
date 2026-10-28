@@ -10042,6 +10042,190 @@ for _t259i in _t259:
 
 print("\n[260] M260：v1.1.0 断言里程碑")
 check("M260：已执行断言数 >=1550", COUNTS["n"] >= 1550, True)
+print("\n[261] M267：远端 HEAD 存活校验")
+import subprocess as _sp261                                       # noqa: E402
+_vdir = Path(_ws_mkdtemp("smoke_v12_head_"))
+_sp261.run(["git", "init", "-q"], cwd=_vdir, check=True)
+_sp261.run(["git", "config", "user.email", "smoke@example.com"],
+           cwd=_vdir, check=True)
+_sp261.run(["git", "config", "user.name", "smoke"], cwd=_vdir, check=True)
+_vjava = _vdir / "A.java"
+_vjava.write_text("class A {\n  public void run(String id) {\n"
+                  "    String q = \"select * from t where id=\" + id;\n"
+                  "  }\n}\n", encoding="utf-8")
+_sp261.run(["git", "add", "."], cwd=_vdir, check=True)
+_sp261.run(["git", "commit", "-qm", "init"], cwd=_vdir, check=True)
+from core.context import upstream_sync as _up261                  # noqa: E402
+_head261 = _up261.local_head(_vdir)
+check("M267：本地 HEAD 可解析", _head261.get("status"), "OK")
+check("M267：方法在 HEAD 存活",
+      _up261.verify_unit_alive_on_head(_vdir, "A.java", "A.run")
+      .get("status"), "ALIVE")
+_vjava.write_text("class A {\n  // public void run(String id) {\n"
+                  "  //   String q = \"select * from t where id=\" + id;\n"
+                  "  // }\n}\n", encoding="utf-8")
+_sp261.run(["git", "add", "."], cwd=_vdir, check=True)
+_sp261.run(["git", "commit", "-qm", "fix"], cwd=_vdir, check=True)
+check("M267：注释停用 → PATCHED_UPSTREAM",
+      _up261.verify_unit_alive_on_head(_vdir, "A.java", "A.run")
+      .get("status"), "PATCHED_UPSTREAM")
+
+print("\n[262] M268：CVE / Issue 四态查重")
+from core.context.cve_dedup import dedup as _dd262               # noqa: E402
+_ddup = _dd262("ZHENFENG13/My-Blog", "unrestricted_upload",
+               "BlogController.uploadFileByEditormd",
+               allow_online=False, use_cache=False)
+check("M268：本地种子命中 → DUPLICATE_CVE",
+      _ddup.get("status"), "DUPLICATE_CVE")
+_ddclean = _dd262("example/clean", "xss", "Foo.bar",
+                  allow_online=False, use_cache=False)
+check("M268：离线无命中 → UNKNOWN（绝不 FRESH）",
+      _ddclean.get("status"), "UNKNOWN")
+check("M268：离线原因写明 online_disabled",
+      "online_disabled" in (_ddclean.get("reason") or ""), True)
+
+print("\n[263] M270：活水大盘 JSON ↔ Markdown 计数守恒")
+from core.context.live_hunt_report import (render_report as _lr263,  # noqa: E402
+                                            write_outputs as _lw263)
+_sha263 = "a" * 40
+_fix263 = [{
+    "repo": "demo", "slug": "o/r", "category": "sqli", "unit": "A.run",
+    "file": "A.java", "line": 3, "head_sha": _sha263,
+    "permalink": f"https://github.com/o/r/blob/{_sha263}/A.java#L3",
+    "status": "ZERO_RECORD_FRESH", "matched_ids": [],
+    "evidence_urls": [], "checked_at": "2026-01-01 00:00:00"},
+    {"repo": "demo", "slug": "o/r", "category": "xss", "unit": "A.x",
+     "file": "A.java", "line": 9, "head_sha": _sha263,
+     "permalink": f"https://github.com/o/r/blob/{_sha263}/A.java#L9",
+     "status": "DUPLICATE_CVE", "matched_ids": ["CVE-2020-1"],
+     "evidence_urls": ["https://nvd.nist.gov/vuln/detail/CVE-2020-1"],
+     "checked_at": "2026-01-01 00:00:00"}]
+_md263 = _lr263(_fix263, "2026-01-01 00:00:00")
+_counts263 = json.loads(_md263.split("live_hunt_counts: ", 1)[1].split(" -->", 1)[0])
+check("M270：A/B 计数与 JSON 记录一致",
+      (_counts263["BOARD_A"], _counts263["BOARD_B"]), (1, 1))
+check("M270：永久链接带 head_sha",
+      f"/blob/{_sha263}/" in _md263, True)
+check("M270：永久链接不出现 main/master 分支",
+      ("/blob/main/" not in _md263 and "/blob/master/" not in _md263), True)
+check("M270：板块 B 收录 DUPLICATE_CVE",
+      "DUPLICATE_CVE" in _md263, True)
+
+_live_md270 = (ROOT / "LIVE_HUNT_REPORT.md").read_text(encoding="utf-8")
+_live_js270 = json.loads((ROOT / "benchmarks" / "results" /
+                          "live_hunt.json").read_text(encoding="utf-8"))
+_lc270 = json.loads(_live_md270.split("live_hunt_counts: ", 1)[1]
+                    .split(" -->", 1)[0])
+check("M270：实跑大盘 A 行数与 JSON 守恒",
+      _lc270["BOARD_A"], _live_js270["summary"]["board_a"])
+check("M270：实跑大盘 B 行数与 JSON 守恒",
+      _lc270["BOARD_B"], _live_js270["summary"]["board_b"])
+check("M270：实跑大盘总条数与 JSON 守恒",
+      _lc270["BOARD_A"] + _lc270["BOARD_B"], len(_live_js270["records"]))
+
+print("\n[264] M270：SUBMISSION_PLAYBOOK 零占位符")
+from core.context.live_hunt_report import render_playbook as _pb264  # noqa: E402
+_pb264 = _pb264(_fix263[0])
+check("M270：模板版本号", "playbook-1.0" in _pb264, True)
+check("M270：CVE.org 六字段齐全",
+      all(x in _pb264 for x in ("| Vendor |", "| Product |",
+                                "| Version affected |",
+                                "| Vulnerability Type |",
+                                "| Affected Component |",
+                                "| Suggested Description |")), True)
+check("M270：版本证据诚实回退",
+      "unknown, pending maintainer confirmation" in _pb264, True)
+check("M270：无 TODO/尖括号占位符",
+      ("TODO" not in _pb264 and "<your" not in _pb264
+       and "{{" not in _pb264), True)
+
+print("\n[265] M273：单文件 / 片段直扫与 authz 边界")
+_snip265 = Path(_ws_mkdtemp("smoke_v12_snip_"))
+_py265 = _snip265 / "app.py"
+_py265.write_text("from flask import Flask, request\n"
+                  "app = Flask(__name__)\n"
+                  "@app.route('/user')\n"
+                  "def user():\n"
+                  "    uid = request.args.get('id')\n"
+                  "    cur.execute('select * from users where id=' + uid)\n"
+                  "    return 'ok'\n", encoding="utf-8")
+_json265 = _snip265 / "out.json"
+_r265 = _sp261.run([sys.executable, str(ROOT / "cli.py"), "scan",
+                    "--snippet", str(_py265), "--lang", "python",
+                    "--offline", "--summary-json", str(_json265)],
+                   capture_output=True, text=True, encoding="utf-8",
+                   errors="replace")
+check("M273：片段扫描 exit 0", _r265.returncode, 0)
+_d265 = json.loads(_json265.read_text(encoding="utf-8"))
+check("M273：片段命中 sqli", any(x["category"] == "sqli"
+                                 for x in _d265["p0"]), True)
+check("M273：片段补丁 True→False 自检", len(_d265["patches"]) >= 1, True)
+check("M273：evidence_scope=single_file",
+      _d265.get("evidence_scope"), "single_file")
+_jv265 = _snip265 / "Admin.java"
+_jv265.write_text("public class Admin {\n"
+                  "  public R getUserInfo(String username){\n"
+                  "    User user = userMapper.getAllByUsername(username);\n"
+                  "    if (user != null) { return R.ok(user.getPassword()); }\n"
+                  "    return R.error(\"x\");\n"
+                  "  }\n}\n", encoding="utf-8")
+_json265b = _snip265 / "admin.json"
+_sp261.run([sys.executable, str(ROOT / "cli.py"), "scan",
+            "--snippet", str(_jv265), "--offline", "--summary-json",
+            str(_json265b)], capture_output=True, text=True,
+           encoding="utf-8", errors="replace")
+_d265b = json.loads(_json265b.read_text(encoding="utf-8"))
+check("M273：片段 authz 只进 NEEDS_HUMAN",
+      any(x["category"] == "authz" for x in _d265b["needs_human"]), True)
+check("M273：片段 authz 不进 P0",
+      all(x["category"] != "authz" for x in _d265b["p0"]), True)
+
+print("\n[266] M274：客户交付五件套")
+_cd266 = ROOT / "benchmarks" / "results" / "sample_client_deliverable"
+check("M274：五件套目录存在",
+      all((_cd266 / x).exists() for x in
+          ("01_EXECUTIVE_SUMMARY.md", "02_DETAILED_AUDIT_REPORT.md",
+           "03_PATCH_BUNDLE", "04_REGRESSION_TESTS",
+           "05_RETEST_VERIFICATION.md")), True)
+_man266 = json.loads((_cd266 / "manifest.json").read_text(encoding="utf-8"))
+check("M274：manifest 标注离线", _man266.get("offline"), True)
+check("M274：补丁包非空",
+      (_cd266 / "03_PATCH_BUNDLE" / "fix.patch").stat().st_size > 0, True)
+
+print("\n[267] M272：live-hunt 来源分级")
+from benchmarks.first_blood_packs import _origin as _org267      # noqa: E402
+check("M272：FRESH → ZERO_RECORD_FRESH",
+      _org267({("r", "sqli", "A.x"): {"status": "ZERO_RECORD_FRESH"}},
+              "r", "sqli", "A.x"), "ZERO_RECORD_FRESH")
+check("M272：CVE → KNOWN_CVE_BENCHMARK",
+      _org267({("r", "sqli", "A.x"): {"status": "DUPLICATE_CVE"}},
+              "r", "sqli", "A.x"), "KNOWN_CVE_BENCHMARK")
+
+print("\n[268] M270：报告幂等")
+_tmp268 = Path(_ws_mkdtemp("smoke_v12_idem_"))
+_lw263(_fix263, _tmp268 / "a.md", _tmp268 / "a.json",
+       _tmp268 / "packs", "2026-01-01 00:00:00")
+import hashlib as _h268                                         # noqa: E402
+_b1268 = _h268.sha256((_tmp268 / "a.md").read_bytes()).hexdigest()
+_lw263(_fix263, _tmp268 / "a.md", _tmp268 / "a.json",
+       _tmp268 / "packs", "2026-01-01 00:00:00")
+_b2268 = _h268.sha256((_tmp268 / "a.md").read_bytes()).hexdigest()
+check("M270：重复渲染字节一致", _b2268, _b1268)
+
+print("\n[269] M274：复测销账")
+_r269 = (_cd266 / "05_RETEST_VERIFICATION.md").read_text(encoding="utf-8")
+check("M274：复测含已修复/仍存在/新增",
+      all(x in _r269 for x in ("已修复", "仍存在", "新增")), True)
+check("M274：复测报告非空", len(_r269) > 80, True)
+
+print("\n[270] M280：v1.2.0 版本与断言里程碑")
+from core import __version__ as _ver270                           # noqa: E402
+check("M280：版本号 v1.2.0", _ver270, "1.2.0")
+check("M280：README 含 v1.2 双模式",
+      "v1.2 双模式" in (ROOT / "README.md").read_text(encoding="utf-8"), True)
+check("M280：已执行断言数 >=1570", COUNTS["n"] >= 1570, True)
+print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
+
 print(f"        （本文件已执行断言：{COUNTS['n']} 项）")
 
 check("M148：失败清单为空", len(FAILS), 0)

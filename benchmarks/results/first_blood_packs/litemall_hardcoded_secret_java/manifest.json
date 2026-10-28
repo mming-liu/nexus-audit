@@ -13,5 +13,6 @@
     "hardcoded_secret"
   ],
   "patch_verified": true,
-  "poc_ok": true
+  "poc_ok": true,
+  "origin": "UNVERIFIED"
 }

@@ -49,6 +49,7 @@ ensure_utf8_stdio()
 OUT = ROOT / "benchmarks" / "results" / "first_blood_packs"
 WILD = ROOT / "benchmarks" / "results" / "wild_hunt.json"
 TRIAGE = ROOT / "benchmarks" / "results" / "llm_root_triage.json"
+LIVE = ROOT / "benchmarks" / "results" / "live_hunt.json"
 SELECTION = OUT / "SELECTION.json"
 REQUIRED = ("ADVISORY.md", "fix.patch", "SUBMISSION_CHECKLIST.md")
 TOP_N = 10
@@ -70,6 +71,32 @@ SLUG_OVERRIDES = {
 _SLUG_CACHE: dict[str, str] = {}
 
 
+def _live_index() -> dict[tuple[str, str, str], dict]:
+    """活水大盘里的 (repo, category, unit) -> 记录；无则空。"""
+    if not LIVE.is_file():
+        return {}
+    try:
+        data = json.loads(LIVE.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    out = {}
+    for r in data.get("records") or []:
+        out[(r.get("repo", ""), r.get("category", ""),
+             r.get("unit", ""))] = r
+    return out
+
+
+def _origin(live: dict, repo: str, cat: str, unit: str) -> str:
+    rec = live.get((repo, cat, unit), {})
+    status = rec.get("status")
+    if status == "ZERO_RECORD_FRESH":
+        return "ZERO_RECORD_FRESH"
+    if status in ("DUPLICATE_CVE", "DUPLICATE_ISSUE_OR_GHSA",
+                  "PATCHED_UPSTREAM"):
+        return "KNOWN_CVE_BENCHMARK"
+    return "UNVERIFIED"
+
+
 def _triage_index() -> dict[tuple[str, str, str], str]:
     """(repo, category, representative) -> CONFIRMED_TP / ...；无台账则空。"""
     if not TRIAGE.is_file():
@@ -88,6 +115,7 @@ def _candidate_rows(data: dict, triage: dict) -> list[dict]:
     from core.context.cvss import compute_cvss31
 
     patcher_cats = set(W._cli().MATRIX_FIX_MAP)
+    live = _live_index()
     groups: dict[tuple[str, str], list[dict]] = {}
     for repo in data.get("repos", []):
         if repo.get("repo_role") == "educational_demo":
@@ -115,6 +143,8 @@ def _candidate_rows(data: dict, triage: dict) -> list[dict]:
                 "affected_routes": int(rc.get("affected_routes") or 0),
                 "kind": rc.get("kind", ""),
                 "score": score, "triage": tv,
+                "origin": _origin(live, repo_name, cat,
+                                  rc.get("representative", "")),
                 "rc": rc,
             })
 
@@ -269,6 +299,7 @@ def refresh_metadata() -> int:
         return 1
     data = json.loads(WILD.read_text(encoding="utf-8"))
     slugs = _slug_lookup(data)
+    live = _live_index()
     sel = json.loads(SELECTION.read_text(encoding="utf-8"))
     missing: list[str] = []
     for i, t in enumerate(sel.get("targets", []), 1):
@@ -277,7 +308,15 @@ def refresh_metadata() -> int:
         if not slug:
             missing.append(t["repo"])
         t["github"] = slug
-        _rewrite_pack_metadata(OUT / t["pack"], slug)
+        t["origin"] = _origin(live, t["repo"], t["category"], t["unit"])
+        pack = OUT / t["pack"]
+        _rewrite_pack_metadata(pack, slug)
+        mf = pack / "manifest.json"
+        if mf.is_file():
+            m = json.loads(mf.read_text(encoding="utf-8"))
+            m["origin"] = t["origin"]
+            mf.write_text(json.dumps(m, ensure_ascii=False, indent=2),
+                          encoding="utf-8")
     SELECTION.write_text(json.dumps(sel, ensure_ascii=False, indent=2),
                          encoding="utf-8")
     print(f"[first-blood] 回填 GitHub slug：{len(sel.get('targets', []))} 个包"
@@ -335,6 +374,7 @@ def _build_one(data: dict, cand: dict, units: list) -> dict | None:
         "unit": u.unit_name, "file": Path(cand["file"]).name,
         "line": cand["line"], "affected_routes": cand["affected_routes"],
         "cvss": cand["score"], "triage": cand["triage"],
+        "origin": cand.get("origin", "UNVERIFIED"),
         "merged_categories": cand["merged_categories"],
         "patch_verified": True,
         "poc_ok": bool(poc and poc.self_check_ok),
@@ -346,6 +386,7 @@ def _build_one(data: dict, cand: dict, units: list) -> dict | None:
             "category": cat, "unit": u.unit_name, "file": cand["file"],
             "line": cand["line"], "affected_routes": cand["affected_routes"],
             "cvss": cand["score"], "triage": cand["triage"],
+            "origin": cand.get("origin", "UNVERIFIED"),
             "merged_categories": cand["merged_categories"],
             "pack": pack_name}
 
@@ -398,6 +439,7 @@ def generate() -> int:
                 "repo_role": cand["repo_role"],
                 "github": slugs.get(cand["repo"], ""),
                 "cvss": cand["score"], "triage": cand["triage"],
+                "origin": cand.get("origin", "UNVERIFIED"),
                 "merged_categories": cand["merged_categories"],
                 "affected_routes": cand["affected_routes"],
             })
@@ -409,6 +451,7 @@ def generate() -> int:
                 "unit": cand["representative"], "file": cand["file"],
                 "line": cand["line"], "affected_routes": cand["affected_routes"],
                 "cvss": cand["score"], "triage": cand["triage"],
+                "origin": cand.get("origin", "UNVERIFIED"),
                 "merged_categories": cand["merged_categories"],
                 "pack": pack_name,
             })

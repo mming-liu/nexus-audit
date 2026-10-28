@@ -15,6 +15,21 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 > 野战口径（`benchmarks/results/wild_hunt.json`）：**50 个真实开源仓库 /
 > 15,800 个入口 / 208 个独立根因 / 126 个跨仓簇（15 个多仓共现）**。
 
+## v1.2 双模式（M267 → M280）
+
+- **活水首杀**：`python cli.py live-hunt owner/repo` —— 拉远端默认分支 HEAD →
+  `verify_unit_alive_on_head()` 存活校验 → NVD / CIRCL / GitHub Advisory / Issue
+  四态查重 → 只把 `ZERO_RECORD_FRESH` 放进 `LIVE_HUNT_REPORT.md` 板块 A；
+  每个 FRESH 包生成 `SUBMISSION_PLAYBOOK.md`（Step 1/2/3 零占位符）。
+- **客户离线交付**：`python cli.py client-audit <dir|zip|file>` —— 默认 100%
+  离线，生成 `01_EXECUTIVE_SUMMARY.md` / `02_DETAILED_AUDIT_REPORT.md` /
+  `03_PATCH_BUNDLE/` / `04_REGRESSION_TESTS/` / `05_RETEST_VERIFICATION.md`。
+- **单文件/片段直扫**：`python cli.py scan --snippet Foo.java` 或
+  `... --stdin --lang python`；缺全局装配时 `authz/cors` 只进 NEEDS_HUMAN，
+  其余规则照跑并验证补丁 `True → False`。
+- 计费边界：`LLM_ALLOW_PAID_FALLBACK` 默认 0，Tier-1 免费全灭时只保留
+  待复核队列，不静默降级付费。
+
 ## 目录结构
 
 ```text

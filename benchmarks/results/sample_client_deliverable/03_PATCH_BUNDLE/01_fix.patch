@@ -1,0 +1,11 @@
+--- a/NewBeeAdminUploadAPI.java
++++ b/NewBeeAdminUploadAPI.java
+@@ -54,7 +54,7 @@
+         String suffixName = fileName.substring(fileName.lastIndexOf("."));
+         //生成文件名称通用方法
+         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
+-        Random r = new Random();
++        Random r = new java.security.SecureRandom();
+         StringBuilder tempName = new StringBuilder();
+         tempName.append(sdf.format(new Date())).append(r.nextInt(100)).append(suffixName);
+         String newFileName = tempName.toString();

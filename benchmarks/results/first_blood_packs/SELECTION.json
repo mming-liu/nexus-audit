@@ -17,7 +17,9 @@
       "merged_categories": [
         "log_injection"
       ],
-      "pack": "Sentinel_log_injection_login"
+      "pack": "Sentinel_log_injection_login",
+      "github": "alibaba/Sentinel",
+      "origin": "UNVERIFIED"
     },
     {
       "rank": 2,
@@ -33,7 +35,9 @@
       "merged_categories": [
         "log_injection"
       ],
-      "pack": "Sentinel_log_injection_apiAssignAllClusterServersOfApp"
+      "pack": "Sentinel_log_injection_apiAssignAllClusterServersOfApp",
+      "github": "alibaba/Sentinel",
+      "origin": "UNVERIFIED"
     },
     {
       "rank": 3,
@@ -49,7 +53,9 @@
       "merged_categories": [
         "sqli"
       ],
-      "pack": "RuoYi_sqli_create"
+      "pack": "RuoYi_sqli_create",
+      "github": "yangzongzhuan/RuoYi",
+      "origin": "UNVERIFIED"
     },
     {
       "rank": 4,
@@ -65,7 +71,9 @@
       "merged_categories": [
         "hardcoded_secret"
       ],
-      "pack": "django-realworld_hardcoded_secret_py"
+      "pack": "django-realworld_hardcoded_secret_py",
+      "github": "gothinkster/django-realworld-example-app",
+      "origin": "UNVERIFIED"
     },
     {
       "rank": 5,
@@ -81,7 +89,9 @@
       "merged_categories": [
         "hardcoded_secret"
       ],
-      "pack": "litemall_hardcoded_secret_java"
+      "pack": "litemall_hardcoded_secret_java",
+      "github": "linlinjava/litemall",
+      "origin": "UNVERIFIED"
     },
     {
       "rank": 6,
@@ -98,7 +108,9 @@
         "unrestricted_upload",
         "weakrand"
       ],
-      "pack": "My-Blog_unrestricted_upload_uploadFileByEditormd"
+      "pack": "My-Blog_unrestricted_upload_uploadFileByEditormd",
+      "github": "ZHENFENG13/My-Blog",
+      "origin": "UNVERIFIED"
     },
     {
       "rank": 7,
@@ -116,7 +128,9 @@
         "weakrand",
         "xss"
       ],
-      "pack": "My-Blog_unrestricted_upload_upload"
+      "pack": "My-Blog_unrestricted_upload_upload",
+      "github": "ZHENFENG13/My-Blog",
+      "origin": "UNVERIFIED"
     },
     {
       "rank": 8,
@@ -134,7 +148,9 @@
         "weakrand",
         "xss"
       ],
-      "pack": "newbee-mall_unrestricted_upload_upload"
+      "pack": "newbee-mall_unrestricted_upload_upload",
+      "github": "newbee-ltd/newbee-mall",
+      "origin": "UNVERIFIED"
     },
     {
       "rank": 9,
@@ -152,7 +168,9 @@
         "weakrand",
         "xss"
       ],
-      "pack": "newbee-mall-api_unrestricted_upload_upload"
+      "pack": "newbee-mall-api_unrestricted_upload_upload",
+      "github": "newbee-ltd/newbee-mall-api",
+      "origin": "ZERO_RECORD_FRESH"
     }
   ]
 }

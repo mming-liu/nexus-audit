@@ -1,0 +1,329 @@
+{
+  "generated_at": "2026-10-28 08:03:41",
+  "generator": "core/context/live_hunt_report.py",
+  "human_verified": false,
+  "template_version": "playbook-1.0",
+  "summary": {
+    "total": 6,
+    "board_a": 3,
+    "board_b": 3,
+    "by_status": {
+      "ZERO_RECORD_FRESH": 3,
+      "DUPLICATE_CVE": 0,
+      "DUPLICATE_ISSUE_OR_GHSA": 3,
+      "PATCHED_UPSTREAM": 0,
+      "UNKNOWN": 0
+    }
+  },
+  "records": [
+    {
+      "repo": "newbee-mall",
+      "slug": "newbee-ltd/newbee-mall",
+      "category": "hash",
+      "unit": "AdminController.passwordUpdate",
+      "file": "src/main/java/ltd/newbee/mall/controller/admin/AdminController.java",
+      "line": 98,
+      "affected_routes": 1,
+      "head_sha": "a069069b07027613bf0e7f571736be86f431faee",
+      "permalink": "https://github.com/newbee-ltd/newbee-mall/blob/a069069b07027613bf0e7f571736be86f431faee/src/main/java/ltd/newbee/mall/controller/admin/AdminController.java#L98",
+      "status": "DUPLICATE_ISSUE_OR_GHSA",
+      "matched_ids": [
+        "Issue #100"
+      ],
+      "sources": {
+        "local_seed": {
+          "ok": true,
+          "total": 1,
+          "ids": [
+            "Issue #100"
+          ]
+        }
+      },
+      "evidence_urls": [
+        "https://github.com/newbee-ltd/newbee-mall/issues/100"
+      ],
+      "checked_at": "2026-10-28 08:02:28",
+      "reason": "",
+      "version_evidence": "",
+      "triage": "",
+      "advisory_url": "https://github.com/newbee-ltd/newbee-mall/security/advisories/new",
+      "issue_url": "https://github.com/newbee-ltd/newbee-mall/issues/new",
+      "cve_form_url": "https://www.cve.org/ReportRequest/ReportRequestForNonCNAs",
+      "coverage": {
+        "local_seed": "checked",
+        "online": "not_needed"
+      }
+    },
+    {
+      "repo": "newbee-mall",
+      "slug": "newbee-ltd/newbee-mall",
+      "category": "unrestricted_upload",
+      "unit": "UploadController.upload",
+      "file": "src/main/java/ltd/newbee/mall/controller/common/UploadController.java",
+      "line": 49,
+      "affected_routes": 1,
+      "head_sha": "a069069b07027613bf0e7f571736be86f431faee",
+      "permalink": "https://github.com/newbee-ltd/newbee-mall/blob/a069069b07027613bf0e7f571736be86f431faee/src/main/java/ltd/newbee/mall/controller/common/UploadController.java#L49",
+      "status": "DUPLICATE_ISSUE_OR_GHSA",
+      "matched_ids": [
+        "Issue #100"
+      ],
+      "sources": {
+        "local_seed": {
+          "ok": true,
+          "total": 1,
+          "ids": [
+            "Issue #100"
+          ]
+        }
+      },
+      "evidence_urls": [
+        "https://github.com/newbee-ltd/newbee-mall/issues/100"
+      ],
+      "checked_at": "2026-10-28 08:02:28",
+      "reason": "",
+      "version_evidence": "",
+      "triage": "",
+      "advisory_url": "https://github.com/newbee-ltd/newbee-mall/security/advisories/new",
+      "issue_url": "https://github.com/newbee-ltd/newbee-mall/issues/new",
+      "cve_form_url": "https://www.cve.org/ReportRequest/ReportRequestForNonCNAs",
+      "coverage": {
+        "local_seed": "checked",
+        "online": "not_needed"
+      }
+    },
+    {
+      "repo": "newbee-mall",
+      "slug": "newbee-ltd/newbee-mall",
+      "category": "weakrand",
+      "unit": "UploadController.upload",
+      "file": "src/main/java/ltd/newbee/mall/controller/common/UploadController.java",
+      "line": 49,
+      "affected_routes": 1,
+      "head_sha": "a069069b07027613bf0e7f571736be86f431faee",
+      "permalink": "https://github.com/newbee-ltd/newbee-mall/blob/a069069b07027613bf0e7f571736be86f431faee/src/main/java/ltd/newbee/mall/controller/common/UploadController.java#L49",
+      "status": "DUPLICATE_ISSUE_OR_GHSA",
+      "matched_ids": [
+        "Issue #100"
+      ],
+      "sources": {
+        "local_seed": {
+          "ok": true,
+          "total": 1,
+          "ids": [
+            "Issue #100"
+          ]
+        }
+      },
+      "evidence_urls": [
+        "https://github.com/newbee-ltd/newbee-mall/issues/100"
+      ],
+      "checked_at": "2026-10-28 08:02:28",
+      "reason": "",
+      "version_evidence": "",
+      "triage": "",
+      "advisory_url": "https://github.com/newbee-ltd/newbee-mall/security/advisories/new",
+      "issue_url": "https://github.com/newbee-ltd/newbee-mall/issues/new",
+      "cve_form_url": "https://www.cve.org/ReportRequest/ReportRequestForNonCNAs",
+      "coverage": {
+        "local_seed": "checked",
+        "online": "not_needed"
+      }
+    },
+    {
+      "repo": "newbee-mall-api",
+      "slug": "newbee-ltd/newbee-mall-api",
+      "category": "unrestricted_upload",
+      "unit": "NewBeeAdminUploadAPI.upload",
+      "file": "src/main/java/ltd/newbee/mall/api/admin/NewBeeAdminUploadAPI.java",
+      "line": 49,
+      "affected_routes": 1,
+      "head_sha": "0879d5a1fac0c2a42c99eaf70d8b2f6e92aa05a4",
+      "permalink": "https://github.com/newbee-ltd/newbee-mall-api/blob/0879d5a1fac0c2a42c99eaf70d8b2f6e92aa05a4/src/main/java/ltd/newbee/mall/api/admin/NewBeeAdminUploadAPI.java#L49",
+      "status": "ZERO_RECORD_FRESH",
+      "matched_ids": [],
+      "sources": {
+        "nvd": {
+          "ok": false,
+          "total": 0,
+          "ids": [],
+          "url": "https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=newbee-ltd/newbee-mall-api%20unrestricted_upload&resultsPerPage=5",
+          "error": "ConnectError: [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)"
+        },
+        "circl": {
+          "ok": true,
+          "total": 0,
+          "ids": [],
+          "url": "https://cve.circl.lu/api/search/newbee-ltd/newbee-mall-api",
+          "error": ""
+        },
+        "github_issues": {
+          "ok": true,
+          "total": 0,
+          "ids": [],
+          "url": "https://api.github.com/search/issues?q=repo%3Anewbee-ltd/newbee-mall-api%20NewBeeAdminUploadAPI.upload&per_page=5",
+          "error": ""
+        },
+        "github_advisories": {
+          "ok": true,
+          "total": 0,
+          "ids": [],
+          "url": "https://api.github.com/repos/newbee-ltd/newbee-mall-api/security-advisories",
+          "error": ""
+        },
+        "cve_org": {
+          "ok": true,
+          "note": "CVE.org records via NVD/CIRCL"
+        }
+      },
+      "evidence_urls": [],
+      "checked_at": "2026-10-28 07:37:00",
+      "reason": "",
+      "version_evidence": "",
+      "triage": "",
+      "advisory_url": "https://github.com/newbee-ltd/newbee-mall-api/security/advisories/new",
+      "issue_url": "https://github.com/newbee-ltd/newbee-mall-api/issues/new",
+      "cve_form_url": "https://www.cve.org/ReportRequest/ReportRequestForNonCNAs",
+      "coverage": {
+        "local_seed": "checked",
+        "nvd": "failed",
+        "circl": "checked",
+        "github_issues": "checked",
+        "github_advisories": "checked",
+        "cve_org": "via_circl"
+      },
+      "patch_verified": true,
+      "playbook": "benchmarks/results/live_hunt_packs/newbee-mall-api_unrestricted_upload_upload/SUBMISSION_PLAYBOOK.md"
+    },
+    {
+      "repo": "newbee-mall-api",
+      "slug": "newbee-ltd/newbee-mall-api",
+      "category": "weakrand",
+      "unit": "NewBeeAdminUploadAPI.upload",
+      "file": "src/main/java/ltd/newbee/mall/api/admin/NewBeeAdminUploadAPI.java",
+      "line": 49,
+      "affected_routes": 1,
+      "head_sha": "0879d5a1fac0c2a42c99eaf70d8b2f6e92aa05a4",
+      "permalink": "https://github.com/newbee-ltd/newbee-mall-api/blob/0879d5a1fac0c2a42c99eaf70d8b2f6e92aa05a4/src/main/java/ltd/newbee/mall/api/admin/NewBeeAdminUploadAPI.java#L49",
+      "status": "ZERO_RECORD_FRESH",
+      "matched_ids": [],
+      "sources": {
+        "nvd": {
+          "ok": false,
+          "total": 0,
+          "ids": [],
+          "url": "https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=newbee-ltd/newbee-mall-api%20weakrand&resultsPerPage=5",
+          "error": "ConnectError: [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)"
+        },
+        "circl": {
+          "ok": true,
+          "total": 0,
+          "ids": [],
+          "url": "https://cve.circl.lu/api/search/newbee-ltd/newbee-mall-api",
+          "error": ""
+        },
+        "github_issues": {
+          "ok": true,
+          "total": 0,
+          "ids": [],
+          "url": "https://api.github.com/search/issues?q=repo%3Anewbee-ltd/newbee-mall-api%20NewBeeAdminUploadAPI.upload&per_page=5",
+          "error": ""
+        },
+        "github_advisories": {
+          "ok": true,
+          "total": 0,
+          "ids": [],
+          "url": "https://api.github.com/repos/newbee-ltd/newbee-mall-api/security-advisories",
+          "error": ""
+        },
+        "cve_org": {
+          "ok": true,
+          "note": "CVE.org records via NVD/CIRCL"
+        }
+      },
+      "evidence_urls": [],
+      "checked_at": "2026-10-28 07:37:24",
+      "reason": "",
+      "version_evidence": "",
+      "triage": "",
+      "advisory_url": "https://github.com/newbee-ltd/newbee-mall-api/security/advisories/new",
+      "issue_url": "https://github.com/newbee-ltd/newbee-mall-api/issues/new",
+      "cve_form_url": "https://www.cve.org/ReportRequest/ReportRequestForNonCNAs",
+      "coverage": {
+        "local_seed": "checked",
+        "nvd": "failed",
+        "circl": "checked",
+        "github_issues": "checked",
+        "github_advisories": "checked",
+        "cve_org": "via_circl"
+      },
+      "patch_verified": false,
+      "playbook": "benchmarks/results/live_hunt_packs/newbee-mall-api_weakrand_upload/SUBMISSION_PLAYBOOK.md"
+    },
+    {
+      "repo": "newbee-mall-api",
+      "slug": "newbee-ltd/newbee-mall-api",
+      "category": "xss",
+      "unit": "NewBeeAdminUploadAPI.upload",
+      "file": "src/main/java/ltd/newbee/mall/api/admin/NewBeeAdminUploadAPI.java",
+      "line": 49,
+      "affected_routes": 1,
+      "head_sha": "0879d5a1fac0c2a42c99eaf70d8b2f6e92aa05a4",
+      "permalink": "https://github.com/newbee-ltd/newbee-mall-api/blob/0879d5a1fac0c2a42c99eaf70d8b2f6e92aa05a4/src/main/java/ltd/newbee/mall/api/admin/NewBeeAdminUploadAPI.java#L49",
+      "status": "ZERO_RECORD_FRESH",
+      "matched_ids": [],
+      "sources": {
+        "nvd": {
+          "ok": false,
+          "total": 0,
+          "ids": [],
+          "url": "https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=newbee-ltd/newbee-mall-api%20xss&resultsPerPage=5",
+          "error": "ConnectError: [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)"
+        },
+        "circl": {
+          "ok": true,
+          "total": 0,
+          "ids": [],
+          "url": "https://cve.circl.lu/api/search/newbee-ltd/newbee-mall-api",
+          "error": ""
+        },
+        "github_issues": {
+          "ok": true,
+          "total": 0,
+          "ids": [],
+          "url": "https://api.github.com/search/issues?q=repo%3Anewbee-ltd/newbee-mall-api%20NewBeeAdminUploadAPI.upload&per_page=5",
+          "error": ""
+        },
+        "github_advisories": {
+          "ok": true,
+          "total": 0,
+          "ids": [],
+          "url": "https://api.github.com/repos/newbee-ltd/newbee-mall-api/security-advisories",
+          "error": ""
+        },
+        "cve_org": {
+          "ok": true,
+          "note": "CVE.org records via NVD/CIRCL"
+        }
+      },
+      "evidence_urls": [],
+      "checked_at": "2026-10-28 07:38:25",
+      "reason": "",
+      "version_evidence": "",
+      "triage": "",
+      "advisory_url": "https://github.com/newbee-ltd/newbee-mall-api/security/advisories/new",
+      "issue_url": "https://github.com/newbee-ltd/newbee-mall-api/issues/new",
+      "cve_form_url": "https://www.cve.org/ReportRequest/ReportRequestForNonCNAs",
+      "coverage": {
+        "local_seed": "checked",
+        "nvd": "failed",
+        "circl": "checked",
+        "github_issues": "checked",
+        "github_advisories": "checked",
+        "cve_org": "via_circl"
+      },
+      "patch_verified": false,
+      "playbook": "benchmarks/results/live_hunt_packs/newbee-mall-api_xss_upload/SUBMISSION_PLAYBOOK.md"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "project": "newbee-mall-api",
+  "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\newbee-mall-api-master",
+  "generated_at": "2026-10-28 07:42:34",
+  "offline": true,
+  "loc": {
+    "by_language": {
+      "Java": {
+        "files": 120,
+        "lines": 7733
+      }
+    },
+    "files": 120,
+    "lines": 7733
+  },
+  "units": 62,
+  "root_causes": 9,
+  "patches": 2,
+  "baseline": "",
+  "files": [
+    "01_EXECUTIVE_SUMMARY.md",
+    "02_DETAILED_AUDIT_REPORT.md",
+    "03_PATCH_BUNDLE/",
+    "04_REGRESSION_TESTS/",
+    "05_RETEST_VERIFICATION.md"
+  ]
+}
