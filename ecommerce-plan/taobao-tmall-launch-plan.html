@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>淘宝/天猫 从零运营作战计划 · 服饰鞋包/美妆个护</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c232c; --line:#2b333d;
+    --txt:#e6edf3; --sub:#9da7b3; --accent:#ff4d4f; --accent2:#ff7a45;
+    --green:#3fb950; --blue:#58a6ff; --gold:#e3b341;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--txt);line-height:1.6;padding-bottom:60px}
+  header{background:linear-gradient(120deg,#1a1116,#161b22);
+    border-bottom:2px solid var(--accent);padding:28px 32px}
+  header h1{font-size:24px;color:#fff}
+  header .tag{display:inline-block;background:var(--accent);color:#fff;
+    font-size:12px;padding:2px 10px;border-radius:10px;margin-right:8px}
+  header p{color:var(--sub);margin-top:8px;font-size:14px}
+  nav{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);
+    padding:10px 32px;display:flex;gap:18px;flex-wrap:wrap;z-index:10;font-size:13px}
+  nav a{color:var(--sub);text-decoration:none}
+  nav a:hover{color:var(--accent)}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:24px;margin:22px 0}
+  h2{font-size:19px;color:#fff;margin-bottom:14px;padding-left:10px;
+    border-left:4px solid var(--accent)}
+  h3{font-size:15px;color:var(--accent2);margin:16px 0 8px}
+  p,li{font-size:14px;color:var(--txt)}
+  .sub{color:var(--sub);font-size:13px}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left}
+  th{background:var(--panel2);color:var(--accent2)}
+  tr:nth-child(even){background:#12171e}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:16px;margin:12px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .kpi .num{font-size:22px;font-weight:700;color:var(--gold)}
+  .kpi .lbl{font-size:12px;color:var(--sub)}
+  .warn{background:rgba(255,77,79,.12);border:1px solid var(--accent);
+    border-radius:10px;padding:14px;margin:12px 0;font-size:13px}
+  .ok{background:rgba(63,185,80,.12);border:1px solid var(--green);
+    border-radius:10px;padding:14px;margin:12px 0;font-size:13px}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);
+    border-radius:14px;padding:3px 10px;font-size:12px;margin:3px;color:var(--sub)}
+  .timeline{width:100%;overflow-x:auto}
+  code{background:#0b0f14;padding:1px 6px;border-radius:4px;color:var(--green);font-size:12px}
+  ul{margin:8px 0 8px 20px}
+  .footnote{color:var(--sub);font-size:12px;text-align:center;margin-top:30px}
+</style>
+</head>
+<body>
+<header>
+  <div><span class="tag">实战作战手册</span><span class="tag" style="background:var(--blue)">淘宝/天猫</span>
+    <span class="tag" style="background:var(--green)">0基础冷启</span></div>
+  <h1>服饰鞋包 / 美妆个护 · 淘宝天猫从零运营作战计划</h1>
+  <p>启动预算 ≤ 50 万 · 单平台聚焦 · 编制日期 2026-10-24 · 目标窗口：双12 + 年货节 → 2027 618 规模化</p>
+</header>
+
+<nav>
+  <a href="#s0">0 战略判断</a>
+  <a href="#s1">1 90天路线图</a>
+  <a href="#s2">2 店型与基建</a>
+  <a href="#s3">3  listing 优化</a>
+  <a href="#s4">4 流量与广告</a>
+  <a href="#s5">5 直播与内容</a>
+  <a href="#s6">6 大促日历</a>
+  <a href="#s7">7 KPI 看板</a>
+  <a href="#s8">8 组织与预算</a>
+  <a href="#s9">9 合规风险</a>
+</nav>
+
+<div class="wrap">
+
+<!-- 0 -->
+<section id="s0">
+  <h2>0 · 先定方向：三个不能错的战略判断</h2>
+  <div class="warn"><b>判断一：双11 已来不及，别硬冲。</b> 今天距 11.11 仅约 18 天，0基础从零开店无法完成店铺权重积累、测款、内容沉淀，强冲只会烧钱无果。把双11当作"观察竞品 + 抢返场流量"的窗口，主战场放到 <b>双12（12.12）</b> 与 <b>年货节（1月中）</b>。</div>
+  <div class="warn"><b>判断二：先用淘宝企业店冷启，暂不开天猫。</b> 天猫需保证金 5–15万 + 年费/技术服务费 3–6万/年 + 强营销考核，对 50万冷启资金是致命占用。先以<b>淘宝企业店</b>跑通转化模型（3–6个月），验证 ROI 后再升级天猫。</div>
+  <div class="ok"><b>判断三：视觉 + 内容决定生死。</b> 服饰鞋包/美妆个护是高毛利、强内容驱动品类，"图丑 = 没流量"。必须把 15–20% 预算压到视觉与短视频/直播上，单纯靠直通车买量是负毛利陷阱。</div>
+  <div class="grid">
+    <div class="kpi"><div class="num">淘宝店</div><div class="lbl">冷启店型（非天猫）</div></div>
+    <div class="kpi"><div class="num">90天</div><div class="lbl">第一阶段验证周期</div></div>
+    <div class="kpi"><div class="num">3:1</div><div class="lbl">全店 ROAS 底线</div></div>
+    <div class="kpi"><div class="num">双12/年货</div><div class="lbl">首个爆发窗口</div></div>
+  </div>
+</section>
+
+<!-- 1 -->
+<section id="s1">
+  <h2>1 · 90天冷启路线图（T0 = 2026-10-24）</h2>
+  <div class="timeline">
+  <svg viewBox="0 0 980 150" width="980" height="150" xmlns="http://www.w3.org/2000/svg" style="min-width:880px">
+    <line x1="40" y1="75" x2="940" y2="75" stroke="#2b333d" stroke-width="3"/>
+    <circle cx="40" cy="75" r="8" fill="#ff4d4f"/>
+    <circle cx="350" cy="75" r="8" fill="#ff7a45"/>
+    <circle cx="650" cy="75" r="8" fill="#e3b341"/>
+    <circle cx="940" cy="75" r="8" fill="#3fb950"/>
+    <text x="40" y="35" fill="#e6edf3" font-size="13" text-anchor="middle">T0 10.24</text>
+    <text x="350" y="35" fill="#e6edf3" font-size="13" text-anchor="middle">T30 11.23</text>
+    <text x="650" y="35" fill="#e6edf3" font-size="13" text-anchor="middle">T60 12.23</text>
+    <text x="940" y="35" fill="#e6edf3" font-size="13" text-anchor="middle">T90 1.22</text>
+    <text x="195" y="110" fill="#9da7b3" font-size="12" text-anchor="middle">① 基建·测款·内容铺垫</text>
+    <text x="500" y="110" fill="#9da7b3" font-size="12" text-anchor="middle">② 双12爆发·自播起量</text>
+    <text x="795" y="110" fill="#9da7b3" font-size="12" text-anchor="middle">③ 年货节·私域沉淀</text>
+  </svg>
+  </div>
+  <h3>阶段① T0–T30（10.24–11.23）｜店铺基建 + 测款</h3>
+  <ul>
+    <li>执照/店铺开通、类目选择、保证金缴纳（淘宝企业店保证金通常 1k–2k，远低天猫）</li>
+    <li>完成 10–15 个 SKU 上架，其中 <b>3 个引流款 + 7 个利润款 + 2 个活动款</b></li>
+    <li>视觉体系：主图5图规范、详情页模板、短视频 10 条（逛逛/有好货）</li>
+    <li>直通车小预算测词（日 100–200 元），用 7–10 天筛出 3–5 个高转化长尾词</li>
+    <li>双11 期间：只观察竞品定价/活动机制，不重投；11.12–11.14 用"返场"承接溢出流量</li>
+  </ul>
+  <h3>阶段② T30–T60（11.24–12.23）｜双12 爆发 + 自播起量</h3>
+  <ul>
+    <li>双12 蓄水（12.1–12.11）：涨粉、加购、预售定金；万相台 "货品加速" 拉新</li>
+    <li>12.12 当天：自播马拉松 8–12h + 直通车/万相台 加码 + 淘宝客冲量</li>
+    <li>自播间稳定日播 4h，跑出首条可复制的转化话术</li>
+    <li>目标：单月 GMV 冲 15 万，全店 ROAS ≥ 3:1</li>
+  </ul>
+  <h3>阶段③ T60–T90（12.24–1.22）｜年货节 + 私域沉淀</h3>
+  <ul>
+    <li>年货节（约 1.10–1.18）：礼盒/囤货装组合，做"送长辈/送闺蜜"场景</li>
+    <li>企微/微信群承接复购，沉淀首批 500+ 私域用户</li>
+    <li>复盘 90 天模型，决定是否升级天猫、扩品、加投</li>
+    <li>目标：单月 GMV 25 万，复购率 > 20%</li>
+  </ul>
+</section>
+
+<!-- 2 -->
+<section id="s2">
+  <h2>2 · 店型与货品结构</h2>
+  <h3>店型选择</h3>
+  <table>
+    <tr><th>方案</th><th>门槛/成本</th><th>适合度</th><th>结论</th></tr>
+    <tr><td>淘宝企业店</td><td>保证金 1k–2k，无年费</td><td>★★★★★</td><td><b>选这个</b>，冷启首选</td></tr>
+    <tr><td>淘宝个人店</td><td>几乎零成本</td><td>★★★</td><td>功能受限，不推荐</td></tr>
+    <tr><td>天猫旗舰店</td><td>保证金 5–15万 + 年费 3–6万</td><td>★</td><td>50万预算下暂缓</td></tr>
+  </table>
+  <h3>货品结构（黄金比例）</h3>
+  <div class="grid">
+    <div class="card"><b>引流款 10%</b><br><span class="sub">低毛利/微亏，用来拿搜索排名和进店流量。美妆可做一个9.9体验装；服饰做一个99基础款。</span></div>
+    <div class="card"><b>利润款 60%</b><br><span class="sub">主战场，毛利 50%+。承担全店盈利，详情页与直播重点推。</span></div>
+    <div class="card"><b>活动款 30%</b><br><span class="sub">双12/年货节专用，平时不低价，大促时放价冲量冲层级。</span></div>
+  </div>
+  <p class="sub">建议价格带：美妆个护 59–199 元；服饰鞋包 99–399 元。避免一上来做超低价（损品牌）或超高价（没权重承接）。</p>
+</section>
+
+<!-- 3 -->
+<section id="s3">
+  <h2>3 · Listing 优化（淘系公式）</h2>
+  <h3>标题公式（≤60字）</h3>
+  <p><code>[品牌] + [核心关键词] + [属性] + [卖点] + [场景]</code></p>
+  <p class="sub">例：<code>初妆 氨基酸洗面奶 温和控油 学生党 男女通用 早C晚A伴侣</code></p>
+  <p>用 <b>生意参谋</b>（或免费版"淘商机"）查词：优先选"搜索量大 + 竞争小"的长尾词，避开红海大词烧钱。</p>
+  <h3>主图 5 图规范</h3>
+  <table>
+    <tr><th>图位</th><th>作用</th><th>要点</th></tr>
+    <tr><td>图1</td><td>搜索展示图（决定点击）</td><td>白底/纯色干净，手机端一眼看清产品</td></tr>
+    <tr><td>图2</td><td>核心卖点</td><td>单一利益点 + 大字文案</td></tr>
+    <tr><td>图3</td><td>使用场景</td><td>真实生活化，别抠图假背景</td></tr>
+    <tr><td>图4</td><td>信任/数据</td><td>销量、检测报告、材质细节</td></tr>
+    <tr><td>图5</td><td>促销/CTA</td><td>当前活动、紧迫感</td></tr>
+  </table>
+  <h3>详情页 8 段结构</h3>
+  <ol>
+    <li>核心价值横幅（3秒钩子）</li>
+    <li>痛点/解决方案 + 生活化场景图</li>
+    <li>材质/规格参数（美妆重成分表，服饰重面料/尺码）</li>
+    <li>间接竞品对比图</li>
+    <li>买家秀/口碑展示</li>
+    <li>使用/护理说明</li>
+    <li>品牌故事 + 信任信号</li>
+    <li>FAQ（解决前 5 大购买顾虑）</li>
+  </ol>
+</section>
+
+<!-- 4 -->
+<section id="s4">
+  <h2>4 · 流量与广告（50万怎么花）</h2>
+  <h3>总预算分配（≤50万，含货款）</h3>
+  <table>
+    <tr><th>用途</th><th>金额</th><th>占比</th><th>说明</th></tr>
+    <tr><td>备货/货款</td><td>20万</td><td>40%</td><td>小批量多批次，避免压货</td></tr>
+    <tr><td>视觉/拍摄</td><td>6万</td><td>12%</td><td>主图+详情+短视频，宁缺毋滥</td></tr>
+    <tr><td>付费推广</td><td>15万</td><td>30%</td><td>直通车/万相台/超级推荐，分3月</td></tr>
+    <tr><td>直播搭建</td><td>4万</td><td>8%</td><td>设备+兼职主播+场地</td></tr>
+    <tr><td>达人/淘客</td><td>3万</td><td>6%</td><td>佣金预留+小额种草</td></tr>
+    <tr><td>机动/工具</td><td>2万</td><td>4%</td><td>软件、快递、应急</td></tr>
+  </table>
+  <h3>推广工具组合</h3>
+  <div class="grid">
+    <div class="card"><b>直通车（搜索）</b><br><span class="sub">测词+收割。日预算 100–300，先长尾后大词，ROAS 目标 ≥3:1。</span></div>
+    <div class="card"><b>万相台（智能）</b><br><span class="sub">"货品加速/拉新快"，交给系统跑量，周更创意。</span></div>
+    <div class="card"><b>超级推荐</b><br><span class="sub">猜你喜欢信息流，做种草与加购。</span></div>
+    <div class="card"><b>淘宝客/达人</b><br><span class="sub">设置佣金计划，让达人帮推，按成交付费。</span></div>
+  </div>
+  <div class="ok">冷启期广告纪律：<b>每天看一次 ROAS，连续 3 天 &lt;2:1 立即停词减负测</b>，绝不"亏着养权重"。</div>
+</section>
+
+<!-- 5 -->
+<section id="s5">
+  <h2>5 · 直播与内容（美妆/服饰的命脉）</h2>
+  <h3>自播间从 0 搭建</h3>
+  <ul>
+    <li><b>设备</b>：手机支架、补光灯、收音麦、干净背景（≈3000–5000元）</li>
+    <li><b>排班</b>：T30 起日播 4h，T60 起冲刺 8–12h（双12当天）</li>
+    <li><b>话术框架</b>：痛点引入 → 产品演示 → 成分/工艺信任 → 价格锚点 → 限时逼单</li>
+    <li><b>货品序列</b>：引流款留人 → 利润款放量 → 活动款冲 GMV</li>
+  </ul>
+  <h3>达人分销</h3>
+  <ul>
+    <li>淘宝客高佣金计划（如 20–30%）让大量中小达人帮推</li>
+    <li>找 5–10 个垂直中腰部达人（粉丝 1–10万）做测评/种草</li>
+    <li>小红书图文种草 → 淘内搜索承接，形成站外引流闭环</li>
+  </ul>
+</section>
+
+<!-- 6 -->
+<section id="s6">
+  <h2>6 · 大促作战日历</h2>
+  <table>
+    <tr><th>节点</th><th>蓄水期</th><th>爆发动作</th><th>目标</th></tr>
+    <tr><td>双11返场</td><td>11.11–11.14</td><td>不重投，捡溢出流量+观察竞品</td><td>低成本试水</td></tr>
+    <tr><td><b>双12</b></td><td>12.1–12.11</td><td>预售定金+万相台拉新+12.12自播马拉松</td><td>月GMV 15万</td></tr>
+    <tr><td><b>年货节</b></td><td>1.1–1.9</td><td>礼盒/囤货组合+私域唤醒</td><td>月GMV 25万</td></tr>
+    <tr><td>38女王节</td><td>2月底</td><td>美妆个护主场，提前备货</td><td>验证品类节奏</td></tr>
+    <tr><td>2027 618</td><td>4月起</td><td>规模化：扩品+加投+达播矩阵</td><td>单月GMV 50万+</td></tr>
+  </table>
+  <div class="warn">双12 是 0基础店第一个真正能打的爆发点。<b>T-30 必须完成所有视觉/货品/主播排练</b>，否则临时抱佛脚必翻车。</div>
+</section>
+
+<!-- 7 -->
+<section id="s7">
+  <h2>7 · KPI 看板（周/月复盘）</h2>
+  <table>
+    <tr><th>指标</th><th>冷启期目标</th><th>说明</th></tr>
+    <tr><td>店铺转化率</td><td>≥ 2.5%</td><td>服饰/美妆类目基准，低于则改详情页</td></tr>
+    <tr><td>全店 ROAS</td><td>≥ 3:1</td><td>低于 2:1 立即优化或停投</td></tr>
+    <tr><td>DSR 评分</td><td>≥ 4.8</td><td>影响搜索权重，发货/描述相符要稳</td></tr>
+    <tr><td>复购率（90天）</td><td>≥ 20%</td><td>美妆个护靠复购，私域承接</td></tr>
+    <tr><td>退货率</td><td>≤ 8%</td><td>服饰偏高需控尺码描述，美妆控功效预期</td></tr>
+    <tr><td>直播占比</td><td>≥ 20% GMV</td><td>阶段③目标</td></tr>
+  </table>
+</section>
+
+<!-- 8 -->
+<section id="s8">
+  <h2>8 · 组织与执行节奏</h2>
+  <h3>最小可行团队（50万预算）</h3>
+  <ul>
+    <li><b>运营 1 人</b>：全盘统筹、推广、活动（核心，必须懂淘系）</li>
+    <li><b>设计/拍摄 兼职或外包</b>：主图详情短视频</li>
+    <li><b>客服 1 人（可兼）</b>：响应 + 催付 + 售后</li>
+    <li><b>主播 1 人（兼职起）</b>：T30 起日播</li>
+  </ul>
+  <h3>周节奏</h3>
+  <p>周一复盘上周数据→周二至周四测新词/新创意→周五调价→周末监控少动。每月一次全店审计 + 预算再分配。</p>
+</section>
+
+<!-- 9 -->
+<section id="s9">
+  <h2>9 · 合规与风险红线</h2>
+  <div class="warn">
+    <ul>
+      <li><b>广告法</b>：禁用"最/第一/国家级/纯天然100%"等绝对化用语，违者罚款。</li>
+      <li><b>美妆</b>：不得宣称医疗功效（祛斑/美白需特证），普通化妆品不能写"修护屏障"越界。</li>
+      <li><b>服饰</b>：材质成分须如实标注，不可虚标"纯棉/羊毛"比例。</li>
+      <li><b>库存</b>：大促前锁库存，超卖直接掉 DSR 和权重。</li>
+      <li><b>刷单</b>：严打，一旦被抓店权重归零，宁慢勿刷。</li>
+    </ul>
+  </div>
+  <div class="ok">下一步建议：确认具体主营<b>二级类目</b>（如"口红"还是"连衣裙"），我可进一步给出<b>竞品拆解、定价模型和首批关键词词表</b>。</div>
+</section>
+
+<p class="footnote">本计划由「卖得好」中国电商运营专家生成 · 基于淘系冷启方法论 · 数据目标为行业基准估算，落地前需按真实类目校准</p>
+</div>
+</body>
+</html>
