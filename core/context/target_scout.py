@@ -61,11 +61,40 @@ def is_tutorial(slug: str, description: str = "",
     return bool(_TUTORIAL_RE.search(text))
 
 
+# M293：业务限定词。裸搜 language+pushed 抓回来的大半是驱动/插件/桌面工具，
+# 按语言轮询注入一个业务词，把候选拉回“有 Web 路由的业务后台”。
+BUSINESS_QUALIFIERS: dict[str, tuple[str, ...]] = {
+    "java": ("spring-boot", "admin", "cms", "erp", "crm", "mall"),
+    "python": ("fastapi", "django", "flask", "admin", "backend", "panel"),
+    "solidity": ("vault", "staking", "lending", "swap"),
+}
+
+# M293：纯工具库/驱动/插件/CLI/桌面/评测框架，没有业务路由，直接丢。
+_TOOL_LIB_RE = re.compile(
+    r"(?:^|[^a-z0-9])(driver|drivers|sdk|plugin|plugins|sphinx|cli|desktop|"
+    r"eval|evaluat\w*|benchmark)(?:[^a-z0-9]|$)", re.I)
+
+
+def is_tool_lib(slug: str, description: str = "",
+                topics: list[str] | tuple[str, ...] = ()) -> bool:
+    """仓库名/描述/topics 命中工具库标记即丢（M293）。"""
+    text = " ".join([slug or "", description or "", " ".join(topics or [])])
+    return bool(_TOOL_LIB_RE.search(text))
+
+
+def next_qualifier(language: str, day_index: int) -> str:
+    """按天轮询该语言的业务限定词（同一天结果稳定，逐日轮换）。"""
+    qs = BUSINESS_QUALIFIERS.get(str(language).lower()) or ()
+    return qs[day_index % len(qs)] if qs else ""
+
+
 def search_query(language: str, min_stars: int, max_stars: int,
-                 pushed_since: str, limit: int = 20) -> str:
-    """GitHub Search 限定串（M285 口径）。"""
-    return (f"language:{language} stars:{min_stars}..{max_stars} "
+                 pushed_since: str, limit: int = 20,
+                 qualifier: str = "") -> str:
+    """GitHub Search 限定串（M285 口径 + M293 业务限定词）。"""
+    base = (f"language:{language} stars:{min_stars}..{max_stars} "
             f"pushed:>{pushed_since} archived:false fork:false")
+    return f"{qualifier} {base}".strip() if qualifier else base
 
 
 def _headers() -> dict:
@@ -104,10 +133,15 @@ def _offline(language: str, min_stars: int, max_stars: int,
             "items": items[:limit], "dropped": 0, "error": ""}
 
 
-def _parse_search(payload: dict, language: str) -> tuple[list[dict], int]:
-    """把 GitHub 搜索响应转成候选项；返回 (items, 被剔除的教学仓数)。"""
+def _parse_search(payload: dict,
+                  language: str) -> tuple[list[dict], int, int]:
+    """把 GitHub 搜索响应转成候选项。
+
+    返回 (items, 教学仓剔除数, 工具库剔除数)。
+    """
     items: list[dict] = []
     dropped = 0
+    dropped_tool = 0
     for it in (payload.get("items") or []):
         slug = it.get("full_name") or ""
         if not slug:
@@ -116,6 +150,9 @@ def _parse_search(payload: dict, language: str) -> tuple[list[dict], int]:
         topics = [t for t in (it.get("topics") or []) if isinstance(t, str)]
         if is_tutorial(slug, desc, topics):
             dropped += 1
+            continue
+        if is_tool_lib(slug, desc, topics):
+            dropped_tool += 1
             continue
         has_issues = bool(it.get("has_issues", True))
         items.append({
@@ -131,7 +168,7 @@ def _parse_search(payload: dict, language: str) -> tuple[list[dict], int]:
             "topics": topics[:10],
             "source": "github_search",
         })
-    return items, dropped
+    return items, dropped, dropped_tool
 
 
 def scout(language: str = "java", min_stars: int = 300,
@@ -144,10 +181,10 @@ def scout(language: str = "java", min_stars: int = 300,
     if allow_online:
         ok, data, err = _get(url)
         if ok and isinstance(data, dict):
-            items, dropped = _parse_search(data, language)
+            items, dropped, dropped_tool = _parse_search(data, language)
             return {"ok": True, "source": "github_search", "query": q,
                     "queries": [q], "items": items[:limit], "dropped": dropped,
-                    "error": ""}
+                    "dropped_tool": dropped_tool, "error": ""}
         fallback = _offline(language, min_stars, max_stars, limit)
         fallback["error"] = err
         return fallback
@@ -173,10 +210,13 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
     queries: list[str] = []
     errors: list[str] = []
     dropped = 0
+    dropped_tool = 0
     online_ok = 0
+    day_index = today.toordinal()
 
     for lang in langs:
-        q = search_query(lang, min_stars, max_stars, since, limit)
+        qualifier = next_qualifier(lang, day_index)
+        q = search_query(lang, min_stars, max_stars, since, limit, qualifier)
         queries.append(q)
         if not allow_online:
             continue
@@ -187,9 +227,10 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             errors.append(f"{lang}: {err}")
             continue
         online_ok += 1
-        parsed, drop = _parse_search(data, lang)
+        parsed, drop, drop_tool = _parse_search(data, lang)
         items += parsed
         dropped += drop
+        dropped_tool += drop_tool
 
     if online_ok == 0:
         seeds: list[dict] = []
@@ -202,7 +243,8 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                                         -int(x.get("stars") or 0)))
         return {"ok": bool(ordered), "source": "offline_seed",
                 "queries": queries, "items": ordered[:max(1, limit)],
-                "dropped": 0, "error": "; ".join(errors)[:400]}
+                "dropped": 0, "dropped_tool": 0,
+                "error": "; ".join(errors)[:400]}
 
     merged: dict[str, dict] = {}
     for it in items:
@@ -217,4 +259,5 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
     ordered.sort(key=lambda x: not x.get("has_issues"))
     return {"ok": bool(ordered), "source": "github_search",
             "queries": queries, "items": ordered,
-            "dropped": dropped, "error": "; ".join(errors)[:400]}
+            "dropped": dropped, "dropped_tool": dropped_tool,
+            "error": "; ".join(errors)[:400]}

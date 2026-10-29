@@ -32,8 +32,8 @@ def slug_from_repo(repo: Path, explicit: str | None = None) -> str:
     return repo.name
 
 
-def scan_roots(repo: Path, timeout: int = 900) -> tuple[list[dict], str]:
-    """调现有 scan --auto --offline，返回 root_causes 与临时日志。
+def scan_repo(repo: Path, timeout: int = 900) -> dict:
+    """调现有 scan --auto --offline，返回 roots / total_units / 日志。
 
     临时目录必须落在工作区：DSH 沙箱下系统 %TEMP% 的 mkdtemp 目录带
     0o700 ACL，子进程再写会被 WinError 5 拒绝。
@@ -51,9 +51,17 @@ def scan_roots(repo: Path, timeout: int = 900) -> tuple[list[dict], str]:
             raise RuntimeError(f"scan failed rc={p.returncode}: "
                                f"{(p.stdout + p.stderr)[-500:]}")
         data = json.loads(out.read_text(encoding="utf-8"))
-        return data.get("root_causes") or [], (p.stdout + p.stderr)
+        return {"roots": data.get("root_causes") or [],
+                "total_units": int(data.get("total_units") or 0),
+                "log": p.stdout + p.stderr}
     finally:
         shutil.rmtree(td, ignore_errors=True)
+
+
+def scan_roots(repo: Path, timeout: int = 900) -> tuple[list[dict], str]:
+    """兼容旧入口：只要 roots 与日志。"""
+    res = scan_repo(repo, timeout=timeout)
+    return res["roots"], res["log"]
 
 
 def _triage_index() -> dict:
@@ -111,6 +119,7 @@ def run_one(repo: Path, *, slug: str | None = None, offline: bool = False,
             "repo": slug.split("/")[-1] if "/" in slug else slug,
             "slug": slug, "category": cat, "unit": unit,
             "file": rel, "line": line,
+            "routes": list(rc.get("routes") or []),
             "affected_routes": int(rc.get("affected_routes") or 1),
             "head_sha": head.get("head_sha", ""),
             "head_commit_date": head.get("head_commit_date", ""),

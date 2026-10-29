@@ -55,6 +55,23 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
   也不注册 Windows 计划任务（不出现 `scripts/register_daily_hunt_task.ps1`）。
   每天 09:00 由 harness 的定时任务把上面那条 `daily-hunt` 命令投给执行终端，
   跑完直接看根目录 `LIVE_HUNT_REPORT.md` 的「今日巡猎」与板块 A。
+
+### v1.3.1 靶向制导（M293 → M296）
+
+- **抓仓不再裸搜**：按语言轮询业务限定词（Java：`spring-boot/admin/cms/erp/crm/mall`，
+  Python：`fastapi/django/flask/admin/backend/panel`，Solidity：`vault/staking/lending/swap`），
+  并剔除 `driver/sdk/plugin/sphinx/cli/desktop/eval` 纯工具库；克隆后 `total_units == 0`
+  的纯库标 `ZERO_ENTRY_LIB` 顺延，**不占当天 10 个名额**。
+- **本地控制通道识别**：命中 `AF_UNIX` + `SO_PEERCRED`/`LOCAL_PEERCRED`/`socket_path`
+  的接口标 `LOCAL_UNIX_SOCKET_SERVER` 进板块 B（ssh-agent / docker.sock 同类，
+  设计上不可从网络到达）。
+- **Python 兄弟守卫**：`Depends(get_current_*)` / `Security(...)` / `@login_required` /
+  `@jwt_required` / `IsAuthenticated` 与 Java 注解同权；野仓模式下没有 HIGH 反差、
+  又不在 `/admin` 的裸 authz 一律标 `UNVERIFIED_WILD_AUTHZ` 进 B。
+- **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
+  `--repo-timeout`（默认 900s）单仓软超时。
+- **API 预算**：未配 `GITHUB_TOKEN` 时 GitHub core 限额 60 次/小时，建议每日跑
+  `--max-roots 5`（每仓最多复核 5 条根因）；配 token 后可放开。
 ## 目录结构
 
 ```text

@@ -42,6 +42,10 @@ ALL_STATUSES = (STATUS_FRESH, STATUS_CVE, STATUS_ISSUE, STATUS_PATCHED,
 
 _LAST_CALL = 0.0
 _CACHE_TTL = 24 * 3600
+# M294 性能：NVD 在部分网络被 TLS 阻断，每次白等 10s+；连续失败两次即熔断。
+# 仓库级结果（CIRCL / advisories）在同一进程内只查一次，避免每根因重复请求。
+_NVD_FAILS = 0
+_REPO_MEMO: dict[tuple[str, str], dict] = {}
 
 
 def load_signatures(path: Path = CONFIG) -> list[dict]:
@@ -132,11 +136,17 @@ def _local_match(slug: str, aliases: list[str], category: str,
 
 
 def query_nvd(keyword: str) -> dict:
+    global _NVD_FAILS
     q = urllib.parse.quote(keyword)
     url = f"{NVD_API}?keywordSearch={q}&resultsPerPage=5"
-    ok, data, err = _get_json(url)
+    if _NVD_FAILS >= 2:
+        return {"ok": False, "total": 0, "ids": [], "url": url,
+                "error": "nvd_circuit_open"}
+    ok, data, err = _get_json(url, timeout=8.0)
     if not ok or not isinstance(data, dict):
+        _NVD_FAILS += 1
         return {"ok": False, "total": 0, "ids": [], "url": url, "error": err}
+    _NVD_FAILS = 0
     vulns = data.get("vulnerabilities") or []
     ids = [v.get("cve", {}).get("id") for v in vulns
            if isinstance(v, dict) and v.get("cve", {}).get("id")]
@@ -146,6 +156,9 @@ def query_nvd(keyword: str) -> dict:
 
 def query_circl(slug: str) -> dict:
     """CIRCL CVE Search（NVD 在此网络被 TLS 阻断时的只读兜底）。"""
+    memo_key = ("circl", slug)
+    if memo_key in _REPO_MEMO:
+        return _REPO_MEMO[memo_key]
     parts = [p for p in slug.split("/") if p]
     urls = []
     if len(parts) == 2:
@@ -171,10 +184,14 @@ def query_circl(slug: str) -> dict:
                     items.append({"id": cid,
                                   "text": json.dumps(item[1],
                                                      ensure_ascii=False)[:6000]})
-        return {"ok": True, "total": total, "ids": ids[:5], "items": items,
-                "url": url, "error": ""}
-    return {"ok": False, "total": 0, "ids": [], "url": urls[0] if urls else "",
-            "error": last_err or "no_url"}
+        res = {"ok": True, "total": total, "ids": ids[:5], "items": items,
+               "url": url, "error": ""}
+        _REPO_MEMO[memo_key] = res
+        return res
+    res = {"ok": False, "total": 0, "ids": [],
+           "url": urls[0] if urls else "", "error": last_err or "no_url"}
+    _REPO_MEMO[memo_key] = res
+    return res
 
 
 def query_github_issues(slug: str, unit: str, category: str) -> dict:
@@ -193,6 +210,9 @@ def query_github_issues(slug: str, unit: str, category: str) -> dict:
 
 
 def query_github_advisories(slug: str) -> dict:
+    memo_key = ("advisories", slug)
+    if memo_key in _REPO_MEMO:
+        return _REPO_MEMO[memo_key]
     url = f"{GH_API}/repos/{slug}/security-advisories"
     ok, data, err = _get_json(url, headers={
         "Accept": "application/vnd.github+json",
@@ -200,15 +220,21 @@ def query_github_advisories(slug: str) -> dict:
     if not ok:
         # 私有/无权限/未开启 advisories 的仓返回 404；这属于“没查到”，
         # 不等于“没有”，必须保留在 coverage 里。
-        return {"ok": False, "total": 0, "ids": [], "url": url, "error": err}
+        res = {"ok": False, "total": 0, "ids": [], "url": url, "error": err}
+        _REPO_MEMO[memo_key] = res
+        return res
     if not isinstance(data, list):
-        return {"ok": False, "total": 0, "ids": [], "url": url,
-                "error": "non_list_response"}
+        res = {"ok": False, "total": 0, "ids": [], "url": url,
+               "error": "non_list_response"}
+        _REPO_MEMO[memo_key] = res
+        return res
     ids = [x.get("ghsa_id") or x.get("cve_id") or "" for x in data
            if isinstance(x, dict)]
     ids = [x for x in ids if x]
-    return {"ok": True, "total": len(ids), "ids": ids[:5], "url": url,
-            "error": ""}
+    res = {"ok": True, "total": len(ids), "ids": ids[:5], "url": url,
+           "error": ""}
+    _REPO_MEMO[memo_key] = res
+    return res
 
 
 def _unit_in_text(unit: str, file: str, text: str) -> bool:

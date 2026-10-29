@@ -8,6 +8,13 @@
                                  @PreAuthorize / @RequiresPermissions /
                                  @SaCheckPermission，唯独当前写接口没加
                                  → 高置信度真洞，提拔到板块 A 顶部（不拦截）
+
+M294 追加：
+  · LOCAL_UNIX_SOCKET_SERVER —— 绑定 AF_UNIX + 0700/0600 + SO_PEERCRED 的
+                                 本地控制通道（ssh-agent / docker.sock 同类），
+                                 本来就不可从网络到达，压进板块 B
+  · Python 版兄弟守卫         —— Depends(get_current_*) / Security(...) /
+                                 @login_required / @jwt_required / IsAuthenticated
 """
 from __future__ import annotations
 
@@ -17,6 +24,9 @@ from pathlib import Path
 DEMO_CONTROLLER = "DEMO_CONTROLLER"
 PUBLIC_READONLY_ENDPOINT = "PUBLIC_READONLY_ENDPOINT"
 AUTHZ_SIBLING_GUARD = "AUTHZ_SIBLING_GUARD"
+LOCAL_UNIX_SOCKET_SERVER = "LOCAL_UNIX_SOCKET_SERVER"
+UNVERIFIED_WILD_AUTHZ = "UNVERIFIED_WILD_AUTHZ"
+ZERO_ENTRY_LIB = "ZERO_ENTRY_LIB"
 
 PUBLIC_PREFIXES = ("/app-api/", "/public/", "/open-api/")
 
@@ -41,6 +51,28 @@ def _norm(value: str) -> str:
     return str(value or "").replace("\\", "/").lower()
 
 
+def _read(repo_root: Path | None, rel: str) -> str:
+    if not rel or repo_root is None:
+        return ""
+    try:
+        path = Path(repo_root) / rel
+        if not path.is_file():
+            return ""
+        return path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return ""
+
+
+def looks_local_socket(text: str) -> bool:
+    """AF_UNIX + 对端凭据/套接字路径 → 本地 IPC，不是网络服务。"""
+    if not text:
+        return False
+    if not any(h in text for h in ("AF_UNIX", "SO_PEERCRED", "LOCAL_PEERCRED")):
+        return False
+    return any(h in text for h in ("SO_PEERCRED", "LOCAL_PEERCRED",
+                                   "socket_path", "uds=", ".bind("))
+
+
 def classify(record: dict, repo_root: Path | None = None) -> dict:
     """判定一条 FRESH 根因是否属于“陌生野仓噪音”。
 
@@ -52,6 +84,11 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
     if "demo" in file or "demo" in unit.lower():
         return {"blocked": True, "code": DEMO_CONTROLLER,
                 "reason": "demo/示例入口（非生产代码）"}
+
+    if looks_local_socket(_read(repo_root, str(record.get("file") or ""))):
+        return {"blocked": True, "code": LOCAL_UNIX_SOCKET_SERVER,
+                "reason": ("AF_UNIX 本地控制通道（0700/0600 + 对端 UID 校验），"
+                           "设计上不可从网络到达")}
 
     if record.get("category") == "authz":
         path = "/" + file.lstrip("/")
@@ -112,13 +149,60 @@ def _methods(lines: list[str], start: int, end: int) -> list[dict]:
     return out
 
 
+_PY_DEF = re.compile(r"^\s*(?:async\s+)?def\s+(\w+)\s*\(")
+_PY_GUARD = ("Depends(get_current", "Depends(require", "Depends(verify",
+             "Depends(auth", "Security(", "@login_required", "@jwt_required",
+             "IsAuthenticated", "permission_required", "@requires_auth",
+             "LoginRequiredMixin")
+_PY_WRITE_DECOR = re.compile(r"@\w[\w.]*\.(?:post|put|patch|delete)\s*\(", re.I)
+
+
+def _py_functions(lines: list[str]) -> list[dict]:
+    out: list[dict] = []
+    for i, line in enumerate(lines):
+        m = _PY_DEF.match(line)
+        if not m:
+            continue
+        decos: list[str] = []
+        j = i - 1
+        while j >= 0:
+            s = lines[j].strip()
+            if s.startswith("@"):
+                decos.append(s)
+                j -= 1
+                continue
+            if not s:
+                j -= 1
+                continue
+            break
+        block = "\n".join(decos + [line] + lines[i + 1:i + 4])
+        out.append({"name": m.group(1), "line": i + 1,
+                    "guarded": any(g in block for g in _PY_GUARD),
+                    "write": bool(_PY_WRITE_DECOR.search("\n".join(decos)))})
+    return out
+
+
+def _python_promote(path: Path, lines: list[str], meth: str) -> dict:
+    funcs = _py_functions(lines)
+    target = next((f for f in funcs if f["name"] == meth), None)
+    if target is None or target["guarded"] or not target["write"]:
+        return {"level": "", "code": "", "evidence": ""}
+    guarded = [f for f in funcs if f["guarded"] and f["name"] != meth]
+    if not guarded:
+        return {"level": "", "code": "", "evidence": ""}
+    return {"level": "HIGH", "code": AUTHZ_SIBLING_GUARD,
+            "evidence": (f"同文件 {len(guarded)} 个入口带鉴权依赖"
+                         f"（Depends/Security/login_required），"
+                         f"唯 {meth} 无（{path.name}:{target['line']}）")}
+
+
 def promote(record: dict, repo_root: Path | None = None) -> dict:
     """authz 高置信度提拔：同文件其它写接口都被注解守卫，唯独当前写接口漏加。"""
     if record.get("category") != "authz" or repo_root is None:
         return {"level": "", "code": "", "evidence": ""}
     unit = str(record.get("unit") or "")
     cls, _, meth = unit.rpartition(".")
-    if not cls or not meth or not _WRITE_VERB.match(meth):
+    if not cls or not meth:
         return {"level": "", "code": "", "evidence": ""}
     path = Path(repo_root) / str(record.get("file") or "")
     if not path.is_file():
@@ -126,6 +210,10 @@ def promote(record: dict, repo_root: Path | None = None) -> dict:
     try:
         lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
     except OSError:
+        return {"level": "", "code": "", "evidence": ""}
+    if path.suffix.lower() == ".py":
+        return _python_promote(path, lines, meth)
+    if not _WRITE_VERB.match(meth):
         return {"level": "", "code": "", "evidence": ""}
     span = _class_span(lines, cls.split(".")[-1])
     start, end = span if span else (0, len(lines) - 1)

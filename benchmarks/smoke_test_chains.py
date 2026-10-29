@@ -10114,8 +10114,14 @@ check("M270：板块 B 收录 DUPLICATE_CVE",
       "DUPLICATE_CVE" in _md263, True)
 
 _live_md270 = (ROOT / "LIVE_HUNT_REPORT.md").read_text(encoding="utf-8")
-_live_js270 = json.loads((ROOT / "benchmarks" / "results" /
-                          "live_hunt.json").read_text(encoding="utf-8"))
+# 报告头会声明自己的机器事实源（live-hunt 或 daily-hunt）；按它去对账，
+# 不能硬编码 live_hunt.json —— 否则每日巡猎刷新报告后这里必红。
+_src270 = "benchmarks/results/live_hunt.json"
+if "机器事实源：" in _live_md270:
+    _decl270 = _live_md270.split("机器事实源：", 1)[1].split("。", 1)[0].strip()
+    if _decl270 and (ROOT / _decl270).is_file():
+        _src270 = _decl270
+_live_js270 = json.loads((ROOT / _src270).read_text(encoding="utf-8"))
 _lc270 = json.loads(_live_md270.split("live_hunt_counts: ", 1)[1]
                     .split(" -->", 1)[0])
 check("M270：实跑大盘 A 行数与 JSON 守恒",
@@ -10308,7 +10314,7 @@ check("M285：正常仓不误杀",
 _off274 = _ts274.scout_daily(["java", "python"], limit=5, allow_online=False)
 check("M285：离线回退标注来源", _off274.get("source"), "offline_seed")
 check("M285：离线候选非空", len(_off274.get("items") or []) > 0, True)
-_items274, _drop274 = _ts274._parse_search({"items": [
+_items274, _drop274, _drop_tool274 = _ts274._parse_search({"items": [
     {"full_name": "acme/billing-api", "description": "billing api",
      "stargazers_count": 900, "has_issues": True, "language": "Java",
      "pushed_at": "2026-10-28T00:00:00Z", "topics": ["spring"]},
@@ -10316,6 +10322,7 @@ _items274, _drop274 = _ts274._parse_search({"items": [
      "stargazers_count": 900, "has_issues": True},
 ]}, "java")
 check("M285：教学仓计数", _drop274, 1)
+check("M285：工具库计数（本样例 0）", _drop_tool274, 0)
 check("M285：有 Issues 走 issues 通道", _items274[0].get("channel"), "issues")
 
 print("\n[275] M286：状态账本（last_scanned_sha + exported_roots）")
@@ -10479,7 +10486,8 @@ check("M290：预览单含样例与边界",
 
 print("\n[280] M292：v1.3.0 版本 / harness 定时任务 / 断言里程碑")
 from core import __version__ as _ver280                          # noqa: E402
-check("M292：版本号 v1.3.0", _ver280, "1.3.0")
+check("M292：版本号 >= 1.3.0",
+      tuple(int(x) for x in _ver280.split(".")[:3]) >= (1, 3, 0), True)
 _readme280 = (ROOT / "README.md").read_text(encoding="utf-8")
 check("M292：README 含 v1.3 全自动巡猎",
       "v1.3 全自动巡猎" in _readme280, True)
@@ -10491,6 +10499,135 @@ check("M292：不生成 Windows 计划任务脚本",
       (ROOT / "scripts" / "register_daily_hunt_task.ps1").exists(), False)
 check("M292：调度交给 harness（README 明说）", "harness" in _readme280, True)
 check("M292：已执行断言数 >= 1590", COUNTS["n"] >= 1590, True)
+
+print("\n[281] M293：靶向制导（限定词 / 工具库剔除 / 纯库不占名额）")
+from core.context import target_scout as _ts293                   # noqa: E402
+_q293 = _ts293.search_query("java", 300, 30000, "2026-10-15", 10,
+                            "spring-boot")
+check("M293：限定词进查询", _q293.startswith("spring-boot language:java"), True)
+check("M293：按天轮询限定词",
+      _ts293.next_qualifier("python", 1) != _ts293.next_qualifier("python", 2),
+      True)
+check("M293：驱动库被剔除",
+      _ts293.is_tool_lib("neo4j/neo4j-python-driver", "official driver"), True)
+check("M293：Sphinx 插件被剔除",
+      _ts293.is_tool_lib("useblocks/sphinx-needs", "sphinx extension"), True)
+check("M293：业务后台不误杀",
+      _ts293.is_tool_lib("acme/mall", "e-commerce backend"), False)
+_items293, _drop293, _tool293 = _ts293._parse_search({"items": [
+    {"full_name": "neo4j/neo4j-python-driver", "description": "driver"},
+    {"full_name": "acme/shop", "description": "spring boot shop",
+     "has_issues": True, "stargazers_count": 500},
+]}, "java")
+check("M293：工具库剔除计数", _tool293, 1)
+check("M293：业务仓保留", len(_items293), 1)
+_docs293 = Path(_ws_mkdtemp("smoke_m293_docs_"))
+(_docs293 / "README.md").write_text("# docs only\n", encoding="utf-8")
+_sp261.run(["git", "init", "-q"], cwd=_docs293, check=True)
+_sp261.run(["git", "config", "user.email", "smoke@example.com"],
+           cwd=_docs293, check=True)
+_sp261.run(["git", "config", "user.name", "smoke"], cwd=_docs293, check=True)
+_sp261.run(["git", "add", "."], cwd=_docs293, check=True)
+_sp261.run(["git", "commit", "-qm", "docs"], cwd=_docs293, check=True)
+_out293 = Path(_ws_mkdtemp("smoke_m293_out_"))
+_res293 = _dh275.run(
+    limit=1, state_path=_out293 / "s.json", report=_out293 / "R.md",
+    json_path=_out293 / "R.json", packs_dir=_out293 / "packs",
+    scout_fn=lambda **kw: {"ok": True, "source": "github_search",
+                           "items": [{"slug": "acme/docs-only"},
+                                     {"slug": "acme/daily"}]},
+    sync_fn=lambda s: {"status": "OK",
+                       "path": str(_docs293 if s == "acme/docs-only"
+                                   else _dh_repo276)},
+    dedup_fn=_fresh276)
+check("M293：纯库标 ZERO_ENTRY_LIB",
+      _res293["ledger"][0].get("reason"), "ZERO_ENTRY_LIB")
+check("M293：纯库不占名额、顺延扫到真仓",
+      (_res293["ledger"][1]["result"], _res293["daily"]["scanned"]),
+      ("SCANNED", 1))
+
+print("\n[282] M294：本地控制通道 / Python 兄弟守卫 / 野仓裸 authz 降级")
+from core.context import wild_noise as _wn294                     # noqa: E402
+from core.context import daily_hunt as _dh294                     # noqa: E402
+_ws294 = Path(_ws_mkdtemp("smoke_m294_"))
+(_ws294 / "srv.py").write_text(
+    "import socket\nsock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)\n"
+    "sock.bind(socket_path)\n# SO_PEERCRED check in _peer_checked_http_protocol\n",
+    encoding="utf-8")
+(_ws294 / "api.py").write_text(
+    "from fastapi import Depends\n"
+    "@app.post('/cancel')\n"
+    "def cancel(id: str, user=Depends(get_current_user)):\n"
+    "    return {}\n\n"
+    "@app.post('/score')\n"
+    "def score(id: str):\n"
+    "    return {}\n", encoding="utf-8")
+check("M294：AF_UNIX 控制面被拦截",
+      _wn294.classify({"category": "authz", "unit": "srv.handle",
+                       "file": "srv.py"}, _ws294)["code"],
+      "LOCAL_UNIX_SOCKET_SERVER")
+check("M294：普通 FastAPI 接口不误杀",
+      _wn294.classify({"category": "authz", "unit": "api.score",
+                       "file": "api.py"}, _ws294)["blocked"], False)
+check("M294：Python 兄弟守卫 → HIGH",
+      _wn294.promote({"category": "authz", "unit": "api.score",
+                      "file": "api.py"}, _ws294)["level"], "HIGH")
+check("M294：目标自带 Depends 不提拔",
+      _wn294.promote({"category": "authz", "unit": "api.cancel",
+                      "file": "api.py"}, _ws294)["level"], "")
+_rc294 = {"category": "authz", "unit": "api.score", "file": "api.py",
+          "routes": ["/api/score"], "status": "ZERO_RECORD_FRESH"}
+check("M294：野仓裸 authz 降级", _dh294.downgrade_wild_authz(_rc294), True)
+check("M294：降级后状态 UNKNOWN", _rc294["status"], "UNKNOWN")
+check("M294：/admin 入口不降级",
+      _dh294.downgrade_wild_authz({"category": "authz",
+                                   "routes": ["/admin/user/save"],
+                                   "status": "ZERO_RECORD_FRESH"}), False)
+check("M294：HIGH 反差保留",
+      _dh294.downgrade_wild_authz({"category": "authz",
+                                   "confidence": "HIGH",
+                                   "status": "ZERO_RECORD_FRESH"}), False)
+
+print("\n[283] M295：失败仓 finally 焚缓存 / 单仓软超时")
+import inspect as _inspect295                                     # noqa: E402
+from core.context import upstream_sync as _up295                  # noqa: E402
+import shutil as _sh295                                           # noqa: E402
+_slug295 = "acme/broken-scan"
+_cache295 = _up295.CACHE_ROOT / _up295.safe_dirname(_slug295)
+_sh295.rmtree(_cache295, ignore_errors=True)
+_cache295.mkdir(parents=True)
+(_cache295 / "README.md").write_text("x", encoding="utf-8")
+_orig295 = _dh294.process_repo
+
+
+def _boom295(*_a, **_k):
+    raise RuntimeError("boom")
+
+
+_dh294.process_repo = _boom295
+try:
+    _out295 = Path(_ws_mkdtemp("smoke_m295_"))
+    _res295 = _dh294.run(
+        limit=1, state_path=_out295 / "s.json", report=_out295 / "R.md",
+        json_path=_out295 / "R.json", packs_dir=_out295 / "packs",
+        evict_cache=True,
+        scout_fn=lambda **kw: {"ok": True, "source": "github_search",
+                               "items": [{"slug": _slug295}]},
+        sync_fn=lambda s: {"status": "OK", "path": str(_cache295)})
+finally:
+    _dh294.process_repo = _orig295
+check("M295：失败仓也焚缓存", _cache295.is_dir(), False)
+check("M295：失败写入账本", _res295["ledger"][0]["result"], "FAILED")
+check("M295：单仓软超时参数存在",
+      "repo_timeout" in _inspect295.signature(_dh294.run).parameters, True)
+
+print("\n[284] M296：v1.3.1 靶向制导版本里程碑")
+from core import __version__ as _ver296                           # noqa: E402
+check("M296：版本号 v1.3.1", _ver296, "1.3.1")
+_readme296 = (ROOT / "README.md").read_text(encoding="utf-8")
+check("M296：README 含 v1.3.1 靶向制导", "v1.3.1 靶向制导" in _readme296, True)
+check("M296：README 写 ZERO_ENTRY_LIB", "ZERO_ENTRY_LIB" in _readme296, True)
+check("M296：已执行断言数 >= 1660", COUNTS["n"] >= 1660, True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

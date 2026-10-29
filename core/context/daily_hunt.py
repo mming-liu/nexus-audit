@@ -73,10 +73,12 @@ def root_key(record: dict) -> str:
 
 def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
                  dedup_online: bool = False, max_roots: int = 0,
-                 max_head_age_days: int = 180, dedup_fn=None) -> dict:
+                 max_head_age_days: int = 180, dedup_fn=None,
+                 repo_timeout: int = 900) -> dict:
     """扫一个仓库，返回本次“新引入且未导出”的 FRESH 根因。
 
-    返回值：records / entry / skipped_unchanged / head_sha / raw_roots
+    返回值：records / entry / skipped_unchanged / head_sha / raw_roots /
+    total_units（M293：0 表示纯库无路由，调用方据此不占名额）。
     """
     repo = Path(repo)
     entry = dict(entry or {})
@@ -87,9 +89,10 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
     if head_sha and entry.get("last_scanned_sha") == head_sha:
         return {"records": [], "entry": {**entry, **base},
                 "skipped_unchanged": True, "head_sha": head_sha,
-                "raw_roots": 0}
+                "raw_roots": 0, "total_units": None}
 
-    roots, _log = live_hunt.scan_roots(repo)
+    scan = live_hunt.scan_repo(repo, timeout=repo_timeout)
+    roots = scan["roots"]
     if max_roots and len(roots) > max_roots:
         roots = roots[:max_roots]
     recs = live_hunt.run_one(repo, slug=slug, offline=not dedup_online,
@@ -119,7 +122,8 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
         "exported_roots": sorted(exported | set(fresh_keys)),
     }
     return {"records": new, "entry": upd, "skipped_unchanged": False,
-            "head_sha": head_sha, "raw_roots": len(roots)}
+            "head_sha": head_sha, "raw_roots": len(roots),
+            "total_units": int(scan.get("total_units") or 0)}
 
 
 def _force_rmtree(path: Path) -> None:
@@ -147,6 +151,26 @@ def _evict(slug: str, evicted: list[str]) -> bool:
     if target.exists():
         return False
     evicted.append(slug)
+    return True
+
+
+def downgrade_wild_authz(record: dict) -> bool:
+    """M294：动态野仓模式下的裸 authz 不直接进 A。
+
+    没有“兄弟接口都有鉴权、唯它没有”的反差（置信度非 HIGH），又不是 /admin
+    入口的 authz，一律降成 UNVERIFIED_WILD_AUTHZ 压进板块 B。
+    """
+    if record.get("category") != "authz":
+        return False
+    if str(record.get("confidence") or "") == "HIGH":
+        return False
+    routes = [str(r).lower() for r in (record.get("routes") or [])]
+    if any("/admin" in r for r in routes):
+        return False
+    record["status"] = cve_dedup.STATUS_UNKNOWN
+    record["noise_code"] = wild_noise.UNVERIFIED_WILD_AUTHZ
+    record["reason"] = ("UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，"
+                        "野仓模式不直接进 A")
     return True
 
 
@@ -191,6 +215,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         packs_dir: Path | str | None = None, evict_cache: bool = False,
         offline: bool = False, dedup_online: bool = True,
         dry_run: bool = False, max_head_age_days: int = 180,
+        repo_timeout: int = 900,
         scout_fn=None, sync_fn=None, dedup_fn=None) -> dict:
     """M286 主流程；scout_fn / sync_fn 可注入（冒烟测试不联网）。"""
     started = _now()
@@ -205,7 +230,8 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
     scout = scout_fn(languages=lang_list, days=days, limit=limit,
                      min_stars=min_stars, max_stars=max_stars,
                      allow_online=not offline)
-    items = list(scout.get("items") or [])[:max(1, int(limit))]
+    # M293：候选不再硬截断到 limit —— 纯库/无路由仓不占名额，顺延抓下一个。
+    items = list(scout.get("items") or [])
     state = load_state(state_path)
     state.setdefault("repos", {})
 
@@ -213,8 +239,11 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
     ledger: list[dict] = []
     evicted: list[str] = []
     blocked = 0
+    scanned_slots = 0
 
     for item in items:
+        if scanned_slots >= max(1, int(limit)):
+            break
         slug = str(item.get("slug") or "").strip()
         if not slug:
             continue
@@ -240,7 +269,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
             res = process_repo(slug, repo, entry, dedup_online=dedup_online,
                                max_roots=max_roots,
                                max_head_age_days=max_head_age_days,
-                               dedup_fn=dedup_fn)
+                               dedup_fn=dedup_fn, repo_timeout=repo_timeout)
             if res["skipped_unchanged"]:
                 state["repos"][slug] = res["entry"]
                 ledger.append({"slug": slug, "result": "SKIPPED",
@@ -248,11 +277,19 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
                                "reason": "unchanged_head"})
                 continue
 
+            if res.get("total_units") == 0:
+                # M293③：纯库/文档仓，没有任何入口 —— 记账但不占当天名额。
+                state["repos"][slug] = res["entry"]
+                ledger.append({"slug": slug, "result": "SKIPPED",
+                               "head_sha": res["head_sha"],
+                               "reason": wild_noise.ZERO_ENTRY_LIB})
+                continue
+
             new: list[dict] = []
             for rec in res["records"]:
                 noise = wild_noise.classify(rec, repo)
                 if noise["blocked"]:
-                    # M287：噪音不删，只压进板块 B，保留证据可复核。
+                    # M287/M294：噪音不删，只压进板块 B，保留证据可复核。
                     rec["status"] = cve_dedup.STATUS_UNKNOWN
                     rec["noise_code"] = noise["code"]
                     rec["reason"] = f"{noise['code']}: {noise['reason']}"
@@ -262,19 +299,24 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
                     if promo.get("level"):
                         rec["confidence"] = promo["level"]
                         rec["authz_evidence"] = promo["evidence"]
+                    if downgrade_wild_authz(rec):
+                        blocked += 1
                 new.append(rec)
 
             records.extend(new)
             state["repos"][slug] = res["entry"]
+            scanned_slots += 1
             ledger.append({"slug": slug, "result": "SCANNED",
                            "head_sha": res["head_sha"],
                            "new_roots": len(new),
                            "fresh_total": res["entry"].get("fresh_total", 0)})
-            if evict_cache and not dry_run:
-                _evict(slug, evicted)
         except Exception as e:                                # noqa: BLE001
             ledger.append({"slug": slug, "result": "FAILED",
                            "reason": f"{type(e).__name__}: {e}"[:300]})
+        finally:
+            # M295：缓存清理放进 finally —— 扫描失败/超时也不留 50MB 垃圾。
+            if evict_cache and not dry_run:
+                _evict(slug, evicted)
 
     summary = _counts(records)
     daily_meta = {
