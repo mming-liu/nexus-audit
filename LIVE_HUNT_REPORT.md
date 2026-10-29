@@ -1,105 +1,54 @@
 # 活水首杀作战大盘（LIVE_HUNT）
 
-> 机器事实源：benchmarks/results/live_hunt.json。本报告的 A/B 行数必须与 JSON 计数一致；ZERO_RECORD_FRESH 只代表四个来源**实际查过且 0 命中**，不代表漏洞一定成立，更不代表人工已核验。
+> 机器事实源：benchmarks/results/daily_hunt.json。本报告的 A/B 行数必须与 JSON 计数一致；ZERO_RECORD_FRESH 只代表四个来源**实际查过且 0 命中**，不代表漏洞一定成立，更不代表人工已核验。
 
-- 生成时间：2026-10-28 22:18:01
-- 总条数：78 ｜ 板块 A：**14** ｜ 板块 B：**64**
-- 状态计数：ZERO_RECORD_FRESH 14 / DUPLICATE_CVE 0 / DUPLICATE_ISSUE_OR_GHSA 1 / PATCHED_UPSTREAM 0 / STALE_REPO 19 / UNKNOWN 44
+- 生成时间：2026-10-29 22:15:01
+- 总条数：6 ｜ 板块 A：**6** ｜ 板块 B：**0**
+- 状态计数：ZERO_RECORD_FRESH 6 / DUPLICATE_CVE 0 / DUPLICATE_ISSUE_OR_GHSA 0 / PATCHED_UPSTREAM 0 / STALE_REPO 0 / UNKNOWN 0
 
-<!-- live_hunt_counts: {"BOARD_A": 14, "BOARD_B": 64, "DUPLICATE_CVE": 0, "DUPLICATE_ISSUE_OR_GHSA": 1, "PATCHED_UPSTREAM": 0, "STALE_REPO": 19, "UNKNOWN": 44, "ZERO_RECORD_FRESH": 14} -->
+<!-- live_hunt_counts: {"BOARD_A": 6, "BOARD_B": 0, "DUPLICATE_CVE": 0, "DUPLICATE_ISSUE_OR_GHSA": 0, "PATCHED_UPSTREAM": 0, "STALE_REPO": 0, "UNKNOWN": 0, "ZERO_RECORD_FRESH": 6} -->
+
+## 今日巡猎（daily-hunt）
+
+> 自动流水线：近 14 天有提交的 java/python/solidity 仓 → 同 HEAD 直接跳过 → 只报新引入或尚未导出的 ZERO_RECORD_FRESH 根因；本次即扫即焚 7 个缓存。
+
+- 候选仓：10 ｜ 实扫：7 ｜ 跳过：0 ｜ 失败：3 ｜ 候选来源：github_search
+- 本次新增根因：6 ｜ 板块 A：6 ｜ 拦截进 B：0
+
+| 仓库 | HEAD | 结果 | 新增 |
+|---|---|---|---|
+| jazzband/django-sortedm2m | d113f8d68249 | SCANNED | 0 |
+| roboflow/trackers | c473ab5520c6 | SCANNED | 0 |
+| UKGovernmentBEIS/inspect_ai | c07fcbf01fbd | SCANNED | 6 |
+| MIgHTy-alIeN/ethereum-flashloan-mev-bot | bc396306c5d7 | SCANNED | 0 |
+| google/copybara | 6843b48cf02a | SCANNED | 0 |
+| Zettelkasten-Team/Zettelkasten | d58c86c31cf3 | SCANNED | 0 |
+| epam/ai-dial-core | 87a7ec71534b | SCANNED | 0 |
+| huggingface/lighteval |  | FAILED | 0 |
+| neo4j/neo4j-python-driver |  | FAILED | 0 |
+| useblocks/sphinx-needs |  | FAILED | 0 |
 
 ## 板块 A｜🟢 可直接交单的 ZERO_RECORD_FRESH
 
-| # | 仓库 | 类目 | 根因 | HEAD 提交日期 | HEAD | 源码行 | 提单入口 | 本地手册 |
-|---|---|---|---|---|---|---|---|---|
-| 1 | Sentinel | log_injection | ClusterAssignController.apiAssignAllClusterServersOfApp | 2026-05-27 (154.2d) | a3f40ba8e900 | [sentinel-dashboard/src/main/java/com/alibaba/csp/sentinel/dashboard/controller/cluster/ClusterAssignController.java:50](https://github.com/alibaba/Sentinel/blob/a3f40ba8e900c8489bd520274739f17235a7721c/sentinel-dashboard/src/main/java/com/alibaba/csp/sentinel/dashboard/controller/cluster/ClusterAssignController.java#L50) | [Advisory](https://github.com/alibaba/Sentinel/security/advisories/new) · [Issue](https://github.com/alibaba/Sentinel/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/Sentinel_log_injection_apiAssignAllClusterServersOfApp/SUBMISSION_PLAYBOOK.md) |
-| 2 | Sentinel | log_injection | ClusterAssignController.apiAssignSingleClusterServersOfApp | 2026-05-27 (154.2d) | a3f40ba8e900 | [sentinel-dashboard/src/main/java/com/alibaba/csp/sentinel/dashboard/controller/cluster/ClusterAssignController.java:70](https://github.com/alibaba/Sentinel/blob/a3f40ba8e900c8489bd520274739f17235a7721c/sentinel-dashboard/src/main/java/com/alibaba/csp/sentinel/dashboard/controller/cluster/ClusterAssignController.java#L70) | [Advisory](https://github.com/alibaba/Sentinel/security/advisories/new) · [Issue](https://github.com/alibaba/Sentinel/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/Sentinel_log_injection_apiAssignSingleClusterServersOfApp/SUBMISSION_PLAYBOOK.md) |
-| 3 | Sentinel | log_injection | ClusterConfigController.apiGetClusterStateOfApp | 2026-05-27 (154.2d) | a3f40ba8e900 | [sentinel-dashboard/src/main/java/com/alibaba/csp/sentinel/dashboard/controller/cluster/ClusterConfigController.java:186](https://github.com/alibaba/Sentinel/blob/a3f40ba8e900c8489bd520274739f17235a7721c/sentinel-dashboard/src/main/java/com/alibaba/csp/sentinel/dashboard/controller/cluster/ClusterConfigController.java#L186) | [Advisory](https://github.com/alibaba/Sentinel/security/advisories/new) · [Issue](https://github.com/alibaba/Sentinel/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/Sentinel_log_injection_apiGetClusterStateOfApp/SUBMISSION_PLAYBOOK.md) |
-| 4 | ruoyi-vue-pro | authz | AppBargainHelpController.getBargainHelpList | 2026-10-25 (3.8d) | 3ebbfb0c7694 | [yudao-module-mall/yudao-module-promotion/src/main/java/cn/iocoder/yudao/module/promotion/controller/app/bargain/AppBargainHelpController.java:46](https://github.com/YunaiV/ruoyi-vue-pro/blob/3ebbfb0c7694ea5154d045638674897f3dcea181/yudao-module-mall/yudao-module-promotion/src/main/java/cn/iocoder/yudao/module/promotion/controller/app/bargain/AppBargainHelpController.java#L46) | [Advisory](https://github.com/YunaiV/ruoyi-vue-pro/security/advisories/new) · [Issue](https://github.com/YunaiV/ruoyi-vue-pro/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/ruoyi-vue-pro_authz_getBargainHelpList/SUBMISSION_PLAYBOOK.md) |
-| 5 | ruoyi-vue-pro | authz | AppPayTransferController.syncTransfer | 2026-10-25 (3.8d) | 3ebbfb0c7694 | [yudao-module-pay/src/main/java/cn/iocoder/yudao/module/pay/controller/app/transfer/AppPayTransferController.java:29](https://github.com/YunaiV/ruoyi-vue-pro/blob/3ebbfb0c7694ea5154d045638674897f3dcea181/yudao-module-pay/src/main/java/cn/iocoder/yudao/module/pay/controller/app/transfer/AppPayTransferController.java#L29) | [Advisory](https://github.com/YunaiV/ruoyi-vue-pro/security/advisories/new) · [Issue](https://github.com/YunaiV/ruoyi-vue-pro/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/ruoyi-vue-pro_authz_syncTransfer/SUBMISSION_PLAYBOOK.md) |
-| 6 | ruoyi-vue-pro | authz | CombinationActivityController.getCombinationActivityListByIds | 2026-10-25 (3.8d) | 3ebbfb0c7694 | [yudao-module-mall/yudao-module-promotion/src/main/java/cn/iocoder/yudao/module/promotion/controller/admin/combination/CombinationActivityController.java:93](https://github.com/YunaiV/ruoyi-vue-pro/blob/3ebbfb0c7694ea5154d045638674897f3dcea181/yudao-module-mall/yudao-module-promotion/src/main/java/cn/iocoder/yudao/module/promotion/controller/admin/combination/CombinationActivityController.java#L93) | [Advisory](https://github.com/YunaiV/ruoyi-vue-pro/security/advisories/new) · [Issue](https://github.com/YunaiV/ruoyi-vue-pro/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/ruoyi-vue-pro_authz_getCombinationActivityListByIds/SUBMISSION_PLAYBOOK.md) |
-| 7 | ruoyi-vue-pro | authz | ImChannelMaterialController.getMaterial | 2026-10-25 (3.8d) | 3ebbfb0c7694 | [yudao-module-im/src/main/java/cn/iocoder/yudao/module/im/controller/admin/channel/ImChannelMaterialController.java:30](https://github.com/YunaiV/ruoyi-vue-pro/blob/3ebbfb0c7694ea5154d045638674897f3dcea181/yudao-module-im/src/main/java/cn/iocoder/yudao/module/im/controller/admin/channel/ImChannelMaterialController.java#L30) | [Advisory](https://github.com/YunaiV/ruoyi-vue-pro/security/advisories/new) · [Issue](https://github.com/YunaiV/ruoyi-vue-pro/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/ruoyi-vue-pro_authz_getMaterial/SUBMISSION_PLAYBOOK.md) |
-| 8 | ruoyi-vue-pro | authz | MesWmWarehouseLocationController.getWarehouseLocationSimpleList | 2026-10-25 (3.8d) | 3ebbfb0c7694 | [yudao-module-mes/src/main/java/cn/iocoder/yudao/module/mes/controller/admin/wm/warehouse/MesWmWarehouseLocationController.java:89](https://github.com/YunaiV/ruoyi-vue-pro/blob/3ebbfb0c7694ea5154d045638674897f3dcea181/yudao-module-mes/src/main/java/cn/iocoder/yudao/module/mes/controller/admin/wm/warehouse/MesWmWarehouseLocationController.java#L89) | [Advisory](https://github.com/YunaiV/ruoyi-vue-pro/security/advisories/new) · [Issue](https://github.com/YunaiV/ruoyi-vue-pro/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/ruoyi-vue-pro_authz_getWarehouseLocationSimpleList/SUBMISSION_PLAYBOOK.md) |
-| 9 | ruoyi-vue-pro | authz | PayChannelController.getEnableChannelCodeList | 2026-10-25 (3.8d) | 3ebbfb0c7694 | [yudao-module-pay/src/main/java/cn/iocoder/yudao/module/pay/controller/admin/channel/PayChannelController.java:83](https://github.com/YunaiV/ruoyi-vue-pro/blob/3ebbfb0c7694ea5154d045638674897f3dcea181/yudao-module-pay/src/main/java/cn/iocoder/yudao/module/pay/controller/admin/channel/PayChannelController.java#L83) | [Advisory](https://github.com/YunaiV/ruoyi-vue-pro/security/advisories/new) · [Issue](https://github.com/YunaiV/ruoyi-vue-pro/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/ruoyi-vue-pro_authz_getEnableChannelCodeList/SUBMISSION_PLAYBOOK.md) |
-| 10 | ruoyi-vue-pro | authz | PayDemoOrderController.refundDemoOrder | 2026-10-25 (3.8d) | 3ebbfb0c7694 | [yudao-module-pay/src/main/java/cn/iocoder/yudao/module/pay/controller/admin/demo/PayDemoOrderController.java:58](https://github.com/YunaiV/ruoyi-vue-pro/blob/3ebbfb0c7694ea5154d045638674897f3dcea181/yudao-module-pay/src/main/java/cn/iocoder/yudao/module/pay/controller/admin/demo/PayDemoOrderController.java#L58) | [Advisory](https://github.com/YunaiV/ruoyi-vue-pro/security/advisories/new) · [Issue](https://github.com/YunaiV/ruoyi-vue-pro/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/ruoyi-vue-pro_authz_refundDemoOrder/SUBMISSION_PLAYBOOK.md) |
-| 11 | ruoyi-vue-pro | authz | PayDemoWithdrawController.createDemoWithdraw | 2026-10-25 (3.8d) | 3ebbfb0c7694 | [yudao-module-pay/src/main/java/cn/iocoder/yudao/module/pay/controller/admin/demo/PayDemoWithdrawController.java:34](https://github.com/YunaiV/ruoyi-vue-pro/blob/3ebbfb0c7694ea5154d045638674897f3dcea181/yudao-module-pay/src/main/java/cn/iocoder/yudao/module/pay/controller/admin/demo/PayDemoWithdrawController.java#L34) | [Advisory](https://github.com/YunaiV/ruoyi-vue-pro/security/advisories/new) · [Issue](https://github.com/YunaiV/ruoyi-vue-pro/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/ruoyi-vue-pro_authz_createDemoWithdraw/SUBMISSION_PLAYBOOK.md) |
-| 12 | ruoyi-vue-pro | authz | PayWalletRechargeController.refundWalletRecharge | 2026-10-25 (3.8d) | 3ebbfb0c7694 | [yudao-module-pay/src/main/java/cn/iocoder/yudao/module/pay/controller/admin/wallet/PayWalletRechargeController.java:40](https://github.com/YunaiV/ruoyi-vue-pro/blob/3ebbfb0c7694ea5154d045638674897f3dcea181/yudao-module-pay/src/main/java/cn/iocoder/yudao/module/pay/controller/admin/wallet/PayWalletRechargeController.java#L40) | [Advisory](https://github.com/YunaiV/ruoyi-vue-pro/security/advisories/new) · [Issue](https://github.com/YunaiV/ruoyi-vue-pro/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/ruoyi-vue-pro_authz_refundWalletRecharge/SUBMISSION_PLAYBOOK.md) |
-| 13 | ruoyi-vue-pro | authz | PointActivityController.getPointActivityListByIds | 2026-10-25 (3.8d) | 3ebbfb0c7694 | [yudao-module-mall/yudao-module-promotion/src/main/java/cn/iocoder/yudao/module/promotion/controller/admin/point/PointActivityController.java:108](https://github.com/YunaiV/ruoyi-vue-pro/blob/3ebbfb0c7694ea5154d045638674897f3dcea181/yudao-module-mall/yudao-module-promotion/src/main/java/cn/iocoder/yudao/module/promotion/controller/admin/point/PointActivityController.java#L108) | [Advisory](https://github.com/YunaiV/ruoyi-vue-pro/security/advisories/new) · [Issue](https://github.com/YunaiV/ruoyi-vue-pro/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/ruoyi-vue-pro_authz_getPointActivityListByIds/SUBMISSION_PLAYBOOK.md) |
-| 14 | ruoyi-vue-pro | authz | SeckillActivityController.getSeckillActivityListByIds | 2026-10-25 (3.8d) | 3ebbfb0c7694 | [yudao-module-mall/yudao-module-promotion/src/main/java/cn/iocoder/yudao/module/promotion/controller/admin/seckill/SeckillActivityController.java:102](https://github.com/YunaiV/ruoyi-vue-pro/blob/3ebbfb0c7694ea5154d045638674897f3dcea181/yudao-module-mall/yudao-module-promotion/src/main/java/cn/iocoder/yudao/module/promotion/controller/admin/seckill/SeckillActivityController.java#L102) | [Advisory](https://github.com/YunaiV/ruoyi-vue-pro/security/advisories/new) · [Issue](https://github.com/YunaiV/ruoyi-vue-pro/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/live_hunt_packs/ruoyi-vue-pro_authz_getSeckillActivityListByIds/SUBMISSION_PLAYBOOK.md) |
+| # | 仓库 | 类目 | 根因 | 置信度 | HEAD 提交日期 | HEAD | 源码行 | 提单入口 | 本地手册 |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | inspect_ai | authz | list_eval_samples | — | 2026-10-29 (0.0d) | c07fcbf01fbd | [src/inspect_ai/_control/server.py:798](https://github.com/UKGovernmentBEIS/inspect_ai/blob/c07fcbf01fbd83e5b61c90c0e3b6288b98a8c303/src/inspect_ai/_control/server.py#L798) | [Advisory](https://github.com/UKGovernmentBEIS/inspect_ai/security/advisories/new) · [Issue](https://github.com/UKGovernmentBEIS/inspect_ai/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/inspect_ai_authz_list_eval_samples/SUBMISSION_PLAYBOOK.md) |
+| 2 | inspect_ai | authz | sample_cancel | — | 2026-10-29 (0.0d) | c07fcbf01fbd | [src/inspect_ai/_control/server.py:1224](https://github.com/UKGovernmentBEIS/inspect_ai/blob/c07fcbf01fbd83e5b61c90c0e3b6288b98a8c303/src/inspect_ai/_control/server.py#L1224) | [Advisory](https://github.com/UKGovernmentBEIS/inspect_ai/security/advisories/new) · [Issue](https://github.com/UKGovernmentBEIS/inspect_ai/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/inspect_ai_authz_sample_cancel/SUBMISSION_PLAYBOOK.md) |
+| 3 | inspect_ai | authz | sample_score_status | — | 2026-10-29 (0.0d) | c07fcbf01fbd | [src/inspect_ai/_control/server.py:1191](https://github.com/UKGovernmentBEIS/inspect_ai/blob/c07fcbf01fbd83e5b61c90c0e3b6288b98a8c303/src/inspect_ai/_control/server.py#L1191) | [Advisory](https://github.com/UKGovernmentBEIS/inspect_ai/security/advisories/new) · [Issue](https://github.com/UKGovernmentBEIS/inspect_ai/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/inspect_ai_authz_sample_score_status/SUBMISSION_PLAYBOOK.md) |
+| 4 | inspect_ai | authz | task_pause | — | 2026-10-29 (0.0d) | c07fcbf01fbd | [src/inspect_ai/_control/server.py:1073](https://github.com/UKGovernmentBEIS/inspect_ai/blob/c07fcbf01fbd83e5b61c90c0e3b6288b98a8c303/src/inspect_ai/_control/server.py#L1073) | [Advisory](https://github.com/UKGovernmentBEIS/inspect_ai/security/advisories/new) · [Issue](https://github.com/UKGovernmentBEIS/inspect_ai/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/inspect_ai_authz_task_pause/SUBMISSION_PLAYBOOK.md) |
+| 5 | inspect_ai | authz | task_resume | — | 2026-10-29 (0.0d) | c07fcbf01fbd | [src/inspect_ai/_control/server.py:1085](https://github.com/UKGovernmentBEIS/inspect_ai/blob/c07fcbf01fbd83e5b61c90c0e3b6288b98a8c303/src/inspect_ai/_control/server.py#L1085) | [Advisory](https://github.com/UKGovernmentBEIS/inspect_ai/security/advisories/new) · [Issue](https://github.com/UKGovernmentBEIS/inspect_ai/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/inspect_ai_authz_task_resume/SUBMISSION_PLAYBOOK.md) |
+| 6 | inspect_ai | authz | task_score_status | — | 2026-10-29 (0.0d) | c07fcbf01fbd | [src/inspect_ai/_control/server.py:1125](https://github.com/UKGovernmentBEIS/inspect_ai/blob/c07fcbf01fbd83e5b61c90c0e3b6288b98a8c303/src/inspect_ai/_control/server.py#L1125) | [Advisory](https://github.com/UKGovernmentBEIS/inspect_ai/security/advisories/new) · [Issue](https://github.com/UKGovernmentBEIS/inspect_ai/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/inspect_ai_authz_task_score_status/SUBMISSION_PLAYBOOK.md) |
 
 ## 板块 B｜🔴 自动拦截 / 不可交单
 
 | # | 仓库 | 类目 | 根因 | 状态 | 命中证据 | 拦截原因 | 官方链接 |
 |---|---|---|---|---|---|---|---|
-| 1 | Sentinel | log_injection | AuthController.login | **DUPLICATE_ISSUE_OR_GHSA** | #3639 fix: decouple HTTP status from body code in Zuul BlockRespon、#3638 fix: replace printStackTrace with RecordLog in ConfigUtil | local_seed_hit | https://api.github.com/search/issues?q=repo%3Aalibaba/Sentinel%20AuthController.login&per_page=5 |
-| 2 | Sentinel | log_injection | ClusterConfigController.apiGetClusterClientStateOfApp | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 3 | Sentinel | log_injection | ClusterConfigController.apiGetClusterServerStateOfApp | **UNKNOWN** | — | one_or_more_sources_failed: freshness not claimed | — |
-| 4 | Sentinel | log_injection | MachineRegistryController.receiveHeartBeat | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 5 | Sentinel | log_injection | ParamFlowRuleController.apiUpdateParamFlowRule | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 6 | apollo | sqli | AccessKeyController.enable | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 7 | apollo | xss | AppNamespaceController.create | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 8 | apollo | xss | ConsumerController.create | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 9 | apollo | xss | FavoriteController.addFavorite | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 10 | apollo | xss | ServerConfigController.createOrUpdateConfigDBConfig | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 11 | apollo | xss | ServerConfigController.createOrUpdatePortalDBConfig | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 12 | newbee-mall | authz | OrderController.paySuccess | **STALE_REPO** | — | stale_repo: HEAD 2025-10-27 (366d > 180d) | — |
-| 13 | newbee-mall | hash | AdminController.passwordUpdate | **STALE_REPO** | — | stale_repo: HEAD 2025-10-27 (366d > 180d) | — |
-| 14 | newbee-mall | hash | PersonalController.login | **STALE_REPO** | — | stale_repo: HEAD 2025-10-27 (366d > 180d) | — |
-| 15 | newbee-mall | redir | OrderController.saveOrder | **STALE_REPO** | — | stale_repo: HEAD 2025-10-27 (366d > 180d) | — |
-| 16 | newbee-mall | unrestricted_upload | UploadController.upload | **STALE_REPO** | — | stale_repo: HEAD 2025-10-27 (366d > 180d) | — |
-| 17 | newbee-mall | unrestricted_upload | UploadController.uploadV2 | **STALE_REPO** | — | stale_repo: HEAD 2025-10-27 (366d > 180d) | — |
-| 18 | newbee-mall | weakrand | UploadController.upload | **STALE_REPO** | — | stale_repo: HEAD 2025-10-27 (366d > 180d) | — |
-| 19 | newbee-mall | weakrand | UploadController.uploadV2 | **STALE_REPO** | — | stale_repo: HEAD 2025-10-27 (366d > 180d) | — |
-| 20 | newbee-mall | xss | PersonalController.updateInfo | **STALE_REPO** | — | stale_repo: HEAD 2025-10-27 (366d > 180d) | — |
-| 21 | newbee-mall | xss | UploadController.upload | **STALE_REPO** | — | stale_repo: HEAD 2025-10-27 (366d > 180d) | — |
-| 22 | newbee-mall | xss | UploadController.uploadV2 | **STALE_REPO** | — | stale_repo: HEAD 2025-10-27 (366d > 180d) | — |
-| 23 | newbee-mall-api | hash | NewBeeMallPersonalAPI.updateInfo | **STALE_REPO** | — | stale_repo: HEAD 2023-05-31 (1246d > 180d) | — |
-| 24 | newbee-mall-api | unrestricted_upload | NewBeeAdminUploadAPI.upload | **STALE_REPO** | — | stale_repo: HEAD 2023-05-31 (1246d > 180d) | — |
-| 25 | newbee-mall-api | unrestricted_upload | NewBeeAdminUploadAPI.uploadV2 | **STALE_REPO** | — | stale_repo: HEAD 2023-05-31 (1246d > 180d) | — |
-| 26 | newbee-mall-api | weakrand | NewBeeAdminUploadAPI.upload | **STALE_REPO** | — | stale_repo: HEAD 2023-05-31 (1246d > 180d) | — |
-| 27 | newbee-mall-api | weakrand | NewBeeAdminUploadAPI.uploadV2 | **STALE_REPO** | — | stale_repo: HEAD 2023-05-31 (1246d > 180d) | — |
-| 28 | newbee-mall-api | xss | NewBeeAdminUploadAPI.upload | **STALE_REPO** | — | stale_repo: HEAD 2023-05-31 (1246d > 180d) | — |
-| 29 | newbee-mall-api | xss | NewBeeAdminUploadAPI.uploadV2 | **STALE_REPO** | — | stale_repo: HEAD 2023-05-31 (1246d > 180d) | — |
-| 30 | newbee-mall-api | xss | NewBeeMallPersonalAPI.updateInfo | **STALE_REPO** | — | stale_repo: HEAD 2023-05-31 (1246d > 180d) | — |
-| 31 | ruoyi-vue-pro | authz | Ai1AgentController.getAgentSimpleList | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 32 | ruoyi-vue-pro | authz | Ai1ModelController.getModelSimpleList | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 33 | ruoyi-vue-pro | authz | AiImageController.getImagePagePublic | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 34 | ruoyi-vue-pro | authz | AiModelController.getModelSimpleList | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 35 | ruoyi-vue-pro | authz | AppBrokerageUserController.getBrokerageUserChildSummaryPageByPrice | **UNKNOWN** | — | llm_triage_needs_human: 不进入首杀板块 | — |
-| 36 | ruoyi-vue-pro | authz | AppBrokerageUserController.getBrokerageUserRankPageByUserCount | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 37 | ruoyi-vue-pro | authz | AppPayChannelController.getEnableChannelCodeList | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 38 | ruoyi-vue-pro | authz | BpmProcessDefinitionController.getProcessDefinition | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 39 | ruoyi-vue-pro | authz | CrmBusinessController.getBusinessPageByCustomer | **UNKNOWN** | — | service_guard: CrmBusinessServiceImpl.java:354 (getBusinessPageByCustomerId) | — |
-| 40 | ruoyi-vue-pro | authz | CrmBusinessStatusController.getBusinessStatusSimpleList | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 41 | ruoyi-vue-pro | authz | CrmContactController.getContactPageByBusiness | **UNKNOWN** | — | service_guard: CrmContactServiceImpl.java:288 (getContactPageByBusinessId) | — |
-| 42 | ruoyi-vue-pro | authz | CrmContactController.getContactPageByCustomer | **UNKNOWN** | — | service_guard: CrmContactServiceImpl.java:282 (getContactPageByCustomerId) | — |
-| 43 | ruoyi-vue-pro | authz | CrmContractController.getContractPageByBusiness | **UNKNOWN** | — | service_guard: CrmContractServiceImpl.java:378 (getContractPageByBusinessId) | — |
-| 44 | ruoyi-vue-pro | authz | CrmContractController.getContractPageByCustomer | **UNKNOWN** | — | service_guard: CrmContractServiceImpl.java:372 (getContractPageByCustomerId) | — |
-| 45 | ruoyi-vue-pro | authz | CrmFollowUpRecordController.createFollowUpRecord | **UNKNOWN** | — | service_guard: CrmFollowUpRecordServiceImpl.java:65 (createFollowUpRecord) | — |
-| 46 | ruoyi-vue-pro | authz | CrmFollowUpRecordController.getFollowUpRecordPage | **UNKNOWN** | — | service_guard: CrmFollowUpRecordServiceImpl.java:139 (getFollowUpRecordPage) | — |
-| 47 | ruoyi-vue-pro | authz | CrmReceivableController.getReceivablePageByCustomer | **UNKNOWN** | — | service_guard: CrmReceivableServiceImpl.java:291 (getReceivablePageByCustomerId) | — |
-| 48 | ruoyi-vue-pro | authz | ImChannelMaterialManagerController.getSimpleMaterialList | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 49 | ruoyi-vue-pro | authz | IotStatisticsController.getDeviceMessageSummaryByDate | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 50 | ruoyi-vue-pro | authz | MesWmWarehouseAreaController.getWarehouseAreaSimpleList | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 51 | ruoyi-vue-pro | authz | MpOpenController.handleMessage | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 52 | ruoyi-vue-pro | authz | OaSupplyItemController.getSupplyItemSelectPage | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 53 | ruoyi-vue-pro | authz | PayDemoOrderController.getDemoOrderPage | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 54 | ruoyi-vue-pro | authz | PayDemoWithdrawController.getDemoWithdrawPage | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 55 | ruoyi-vue-pro | hardcoded_secret | [secret-file] ImProperties.java | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 56 | ruoyi-vue-pro | xss | AppArticleController.addBrowseCount | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 57 | ruoyi-vue-pro | xss | AppCartController.addCart | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 58 | ruoyi-vue-pro | xss | AppCartController.updateCartCount | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 59 | ruoyi-vue-pro | xss | AppCartController.updateCartSelected | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 60 | ruoyi-vue-pro | xss | AppFavoriteController.createFavorite | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 61 | ruoyi-vue-pro | xss | AppFileController.createFile | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 62 | ruoyi-vue-pro | xss | FileController.createFile | **UNKNOWN** | — | llm_triage_needs_human: 不进入首杀板块 | — |
-| 63 | ruoyi-vue-pro | xss | PmsKnowledgeDocumentController.getDocument | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
-| 64 | ruoyi-vue-pro | xss | PmsKnowledgeFolderController.getFolder | **UNKNOWN** | — | llm_triage_likely_fp_guarded: 不进入首杀板块 | — |
+| — | — | — | — | — | — | — | — |
 
 ## 对账
 
 | 板块 | 行数 |
 |---|---|
-| A（ZERO_RECORD_FRESH） | 14 |
-| B（其余状态） | 64 |
-| 合计 | 78 |
+| A（ZERO_RECORD_FRESH） | 6 |
+| B（其余状态） | 0 |
+| 合计 | 6 |
