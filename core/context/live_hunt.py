@@ -88,7 +88,8 @@ def _rel(repo: Path, file: str) -> str:
 def run_one(repo: Path, *, slug: str | None = None, offline: bool = False,
             limit: int = 0, dedup_online: bool = True,
             max_head_age_days: int = MAX_HEAD_AGE_DAYS,
-            roots: list[dict] | None = None) -> list[dict]:
+            roots: list[dict] | None = None,
+            dedup_fn=None) -> list[dict]:
     repo = Path(repo).resolve()
     slug = slug_from_repo(repo, slug)
     head = upstream_sync.local_head(repo)
@@ -133,7 +134,13 @@ def run_one(repo: Path, *, slug: str | None = None, offline: bool = False,
             rec["reason"] = "head_date_unknown: 无法证明仓库仍活跃"
             out.append(rec)
             continue
-        age = float(rec["head_age_days"] or 999999)
+        # M286：HEAD 提交就在今天时 head_age_days == 0.0，`or 999999`
+        # 会把“刚提交”误判成“停更”；必须只把 None/空串当未知。
+        raw_age = rec.get("head_age_days")
+        try:
+            age = float(raw_age) if raw_age not in (None, "") else 999999.0
+        except (TypeError, ValueError):
+            age = 999999.0
         rec["stale"] = age > float(max_head_age_days)
         if rec["stale"]:
             rec["status"] = cve_dedup.STATUS_STALE
@@ -172,7 +179,7 @@ def run_one(repo: Path, *, slug: str | None = None, offline: bool = False,
         rec["line"] = int(alive.get("line") or line)
         rec["permalink"] = upstream_sync.head_permalink(
             slug, rec["head_sha"], rel, rec["line"])
-        dd = cve_dedup.dedup(
+        dd = (dedup_fn or cve_dedup.dedup)(
             slug, cat, unit, file=rel,
             aliases=[rec["repo"], Path(repo).name],
             allow_online=(not offline) and dedup_online)

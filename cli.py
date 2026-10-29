@@ -6056,8 +6056,38 @@ def cmd_live_hunt(args) -> int:
     return 0
 
 
+def cmd_daily_hunt(args) -> int:
+    """M285-M288：每日自动巡猎（scout → 只扫新提交 → 只报新根因）。"""
+    from pathlib import Path as _Path
+    from core.context import daily_hunt
+    from core.text_utils import ensure_utf8_stdio
+    ensure_utf8_stdio()
+    langs = [x.strip() for x in (args.languages or "").split(",") if x.strip()]
+    res = daily_hunt.run(
+        languages=langs or ["java", "python", "solidity"],
+        days=args.days, limit=args.limit, min_stars=args.min_stars,
+        max_stars=args.max_stars, max_roots=args.max_roots,
+        state_path=_Path(args.state) if args.state else None,
+        report=_Path(args.report) if args.report else None,
+        json_path=_Path(args.json) if args.json else None,
+        packs_dir=_Path(args.packs_dir) if args.packs_dir else None,
+        evict_cache=args.evict_cache, offline=args.offline,
+        dedup_online=not args.offline_dedup, dry_run=args.dry_run,
+        max_head_age_days=args.max_head_age_days)
+    d = res["daily"]
+    tag = "（dry-run，未落盘）" if res.get("dry_run") else ""
+    print(f"[daily-hunt]{tag} 候选 {d['candidates']} ｜ 实扫 {d['scanned']} ｜ "
+          f"跳过 {d['skipped']} ｜ 失败 {d['failed']}")
+    print(f"[daily-hunt] 新增根因 {d['new_roots']} ｜ 板块 A {d['board_a']} ｜ "
+          f"拦截进 B {d['blocked']} ｜ 即扫即焚 {len(d['evicted'])} 个")
+    if not res.get("dry_run"):
+        print(f"[daily-hunt] 报告 → {res['report']}；JSON → {res['json']}；"
+              f"账本 → {res['state_path']}")
+    return 0 if res.get("ok") else 1
+
+
 def cmd_client_audit(args) -> int:
-    """M274：客户离线交付五件套。"""
+    """M274/M290：客户离线交付五件套 / 售前预览单。"""
     import zipfile
     from pathlib import Path as _Path
     from core.reporting.client_deliverable import build
@@ -6093,10 +6123,14 @@ def cmd_client_audit(args) -> int:
         _Path(__file__).resolve().parent / "benchmarks" / "results" /
         "client_deliverables" / (args.project_name or target.name))
     baseline = _Path(args.baseline_report) if args.baseline_report else None
-    manifest = build(target, outdir, args.project_name or target.name, baseline)
+    manifest = build(target, outdir, args.project_name or target.name, baseline,
+                     presale=bool(getattr(args, "presale_preview", False)))
     print(f"[client-audit] {manifest['root_causes']} 根因 / "
           f"{manifest['patches']} 补丁 / LOC {manifest['loc']['lines']:,}")
-    print(f"[client-audit] 五件套 → {outdir}")
+    if manifest.get("presale"):
+        print(f"[client-audit] 售前预览单 → {outdir}")
+    else:
+        print(f"[client-audit] 五件套 → {outdir}")
     return 0
 
 
@@ -6121,7 +6155,7 @@ def cmd_export_packs(args) -> int:
         except Exception:                                    # noqa: BLE001
             sel = {}
     packs.sort(key=lambda d: sel.get(d.name, {}).get("rank", 999))
-    lines = [f"# Top-10 候选交单包（nexus-audit v1.2.0 · 非教学仓严选；"
+    lines = [f"# Top-10 候选交单包（nexus-audit v1.3.0 · 非教学仓严选；"
              f"{len(packs)} 条通过补丁自检）", "",
              "> M259：剔除教学仓与纯 CORS，同函数多规则合并，每仓最多 2 条；"
              "补丁自检 True -> False 才入包。目标 Top-10，实测不足时**不拿"
@@ -6334,8 +6368,35 @@ def main():
     p_live.add_argument("--packs-dir", default="benchmarks/results/live_hunt_packs")
     p_live.add_argument("--slug", default=None, help="显式 owner/repo")
     p_live.add_argument("--dry-run", action="store_true")
+    p_daily = sub.add_parser(
+        "daily-hunt",
+        help="M285：每日自动巡猎（抓新仓 → 只扫新提交 → 只报新根因）")
+    p_daily.add_argument("--languages", default="java,python,solidity",
+                         help="逗号分隔语言（默认 java,python,solidity）")
+    p_daily.add_argument("--days", type=int, default=14,
+                         help="只看最近 N 天有 push 的仓（默认 14）")
+    p_daily.add_argument("--limit", type=int, default=10,
+                         help="每天最多实扫多少个候选仓（默认 10）")
+    p_daily.add_argument("--max-roots", type=int, default=0,
+                         help="每仓最多复核多少条根因（0=全部）")
+    p_daily.add_argument("--min-stars", type=int, default=300)
+    p_daily.add_argument("--max-stars", type=int, default=30000)
+    p_daily.add_argument("--max-head-age-days", type=int, default=180,
+                         help="HEAD 提交超过该天数即判 STALE_REPO")
+    p_daily.add_argument("--state", default=None,
+                         help="账本路径（默认 benchmarks/results/daily_hunt_state.json）")
+    p_daily.add_argument("--report", default=None)
+    p_daily.add_argument("--json", default=None)
+    p_daily.add_argument("--packs-dir", default=None)
+    p_daily.add_argument("--evict-cache", action="store_true",
+                         help="提取完证据后删掉 .cache/upstream/<repo>（即扫即焚）")
+    p_daily.add_argument("--offline", action="store_true",
+                         help="完全离线：只用 .cache/upstream 里已有克隆")
+    p_daily.add_argument("--offline-dedup", action="store_true",
+                         help="不联网查 CVE/Issue（此时不可能判 FRESH）")
+    p_daily.add_argument("--dry-run", action="store_true")
     p_client = sub.add_parser("client-audit",
-                              help="M274：客户离线交付五件套")
+                              help="M274/M290：客户离线交付五件套 / 售前预览单")
     p_client.add_argument("target", help="目录 / zip / 单文件")
     p_client.add_argument("--project-name", default=None)
     p_client.add_argument("--outdir", default=None)
@@ -6343,6 +6404,8 @@ def main():
                           help="上次 summary.json，用于 05 复测销账")
     p_client.add_argument("--allow-llm", action="store_true",
                           help="显式允许模型（默认 100%% 离线）")
+    p_client.add_argument("--presale-preview", action="store_true",
+                          help="M290：只出一页纸售前预览单（不生成补丁/PoC/复测）")
     p_export = sub.add_parser("export-packs",
                               help="M234：生成 Top-10 交单包 + INDEX")
     p_export.add_argument("--check", action="store_true",
@@ -6390,6 +6453,8 @@ def main():
         sys.exit(cmd_ci_init(args))
     elif args.command == "live-hunt":
         sys.exit(cmd_live_hunt(args))
+    elif args.command == "daily-hunt":
+        sys.exit(cmd_daily_hunt(args))
     elif args.command == "client-audit":
         sys.exit(cmd_client_audit(args))
     elif args.command == "export-packs":

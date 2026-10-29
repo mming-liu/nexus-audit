@@ -1,0 +1,309 @@
+"""M286/M288：每日自动巡猎（daily-hunt）。
+
+把「找新仓 → 浅克隆 → 同 SHA 直接跳过 → 只扫新提交 → 只报新根因 →
+写手册 → 即扫即焚」串成一条可挂机流水线。调度不写进仓库：由 harness
+的定时任务（session schedule）每天触发 python cli.py daily-hunt，
+不生成 GitHub Actions，也不注册 Windows 计划任务。
+
+状态账本（默认 benchmarks/results/daily_hunt_state.json）记录
+last_scanned_sha 与 exported_roots；同 SHA 直接 0.1 秒跳过，同一个
+“类目|入口|文件”根因只报一次。
+"""
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import stat
+import time
+from pathlib import Path
+
+from core.context import cve_dedup, live_hunt, live_hunt_report, target_scout
+from core.context import upstream_sync, wild_noise
+
+STATE_VERSION = 1
+ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_STATE = ROOT / "benchmarks" / "results" / "daily_hunt_state.json"
+DEFAULT_REPORT = ROOT / "LIVE_HUNT_REPORT.md"
+DEFAULT_JSON = ROOT / "benchmarks" / "results" / "daily_hunt.json"
+DEFAULT_PACKS = ROOT / "benchmarks" / "results" / "daily_hunt_packs"
+MAX_LEDGER_ROWS = 40
+
+
+def _now() -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def empty_state() -> dict:
+    return {"version": STATE_VERSION, "updated_at": "", "repos": {}}
+
+
+def load_state(path: Path) -> dict:
+    path = Path(path)
+    if not path.is_file():
+        return empty_state()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return empty_state()
+    if not isinstance(data, dict):
+        return empty_state()
+    data.setdefault("repos", {})
+    data.setdefault("version", STATE_VERSION)
+    return data
+
+
+def save_state(path: Path, state: dict) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    state["version"] = STATE_VERSION
+    state["updated_at"] = _now()
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(state, ensure_ascii=False, indent=2,
+                              sort_keys=True), encoding="utf-8")
+    tmp.replace(path)
+
+
+def root_key(record: dict) -> str:
+    """账本去重键：类目 + 入口 + 文件（同一入口的多条路由只算一条）。"""
+    return "|".join((str(record.get("category") or ""),
+                     str(record.get("unit") or ""),
+                     str(record.get("file") or "")))
+
+
+def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
+                 dedup_online: bool = False, max_roots: int = 0,
+                 max_head_age_days: int = 180, dedup_fn=None) -> dict:
+    """扫一个仓库，返回本次“新引入且未导出”的 FRESH 根因。
+
+    返回值：records / entry / skipped_unchanged / head_sha / raw_roots
+    """
+    repo = Path(repo)
+    entry = dict(entry or {})
+    head = upstream_sync.local_head(repo)
+    head_sha = head.get("head_sha") or ""
+    base = {"scans": int(entry.get("scans") or 0) + 1}
+
+    if head_sha and entry.get("last_scanned_sha") == head_sha:
+        return {"records": [], "entry": {**entry, **base},
+                "skipped_unchanged": True, "head_sha": head_sha,
+                "raw_roots": 0}
+
+    roots, _log = live_hunt.scan_roots(repo)
+    if max_roots and len(roots) > max_roots:
+        roots = roots[:max_roots]
+    recs = live_hunt.run_one(repo, slug=slug, offline=not dedup_online,
+                             max_head_age_days=max_head_age_days,
+                             roots=roots, dedup_fn=dedup_fn)
+
+    exported = set(entry.get("exported_roots") or [])
+    fresh_keys: list[str] = []
+    new: list[dict] = []
+    for rec in recs:
+        if rec.get("status") != cve_dedup.STATUS_FRESH:
+            continue
+        key = root_key(rec)
+        fresh_keys.append(key)
+        if key in exported:
+            continue
+        new.append(rec)
+
+    upd = {
+        **entry, **base,
+        "last_scanned_sha": head_sha,
+        "last_scanned_at": _now(),
+        "head_commit_date": head.get("head_commit_date", ""),
+        "branch": head.get("branch", ""),
+        "fresh_total": len(fresh_keys),
+        "last_new_roots": len(new),
+        "exported_roots": sorted(exported | set(fresh_keys)),
+    }
+    return {"records": new, "entry": upd, "skipped_unchanged": False,
+            "head_sha": head_sha, "raw_roots": len(roots)}
+
+
+def _force_rmtree(path: Path) -> None:
+    """Windows 下 .git/objects 是只读文件，直接 rmtree 会静默失败。"""
+    for base, dirs, files in os.walk(path):
+        for name in dirs + files:
+            try:
+                os.chmod(os.path.join(base, name), stat.S_IWRITE)
+            except OSError:
+                pass
+    try:
+        os.chmod(path, stat.S_IWRITE)
+    except OSError:
+        pass
+    shutil.rmtree(path, ignore_errors=True)
+
+
+def _evict(slug: str, evicted: list[str]) -> bool:
+    """删掉 .cache/upstream/<repo>，只留报告与账本；拒绝越界路径。"""
+    root = upstream_sync.CACHE_ROOT.resolve()
+    target = (root / upstream_sync.safe_dirname(slug)).resolve()
+    if target.parent != root or not target.is_dir():
+        return False
+    _force_rmtree(target)
+    if target.exists():
+        return False
+    evicted.append(slug)
+    return True
+
+
+def _counts(records: list[dict]) -> dict:
+    a = sum(1 for r in records if live_hunt_report._board(r) == "A")
+    return {"total": len(records), "board_a": a,
+            "board_b": len(records) - a}
+
+
+def _header(ledger: list[dict], scout: dict, *, days: int,
+            languages: list[str], evicted: list[str], summary: dict,
+            blocked: int) -> str:
+    scanned = [x for x in ledger if x["result"] == "SCANNED"]
+    skipped = [x for x in ledger if x["result"] == "SKIPPED"]
+    failed = [x for x in ledger if x["result"] == "FAILED"]
+    lines = [
+        "## 今日巡猎（daily-hunt）", "",
+        f"> 自动流水线：近 {days} 天有提交的 {'/'.join(languages)} 仓 → "
+        f"同 HEAD 直接跳过 → 只报新引入或尚未导出的 ZERO_RECORD_FRESH 根因；"
+        f"本次即扫即焚 {len(evicted)} 个缓存。",
+        "",
+        f"- 候选仓：{len(ledger)} ｜ 实扫：{len(scanned)} ｜ "
+        f"跳过：{len(skipped)} ｜ 失败：{len(failed)} ｜ "
+        f"候选来源：{scout.get('source', '') or '—'}",
+        f"- 本次新增根因：{summary['total']} ｜ 板块 A：{summary['board_a']} ｜ "
+        f"拦截进 B：{blocked}",
+        "",
+        "| 仓库 | HEAD | 结果 | 新增 |",
+        "|---|---|---|---|",
+    ]
+    for x in ledger[:MAX_LEDGER_ROWS]:
+        lines.append(f"| {x.get('slug', '')} | "
+                     f"{str(x.get('head_sha') or '')[:12]} | "
+                     f"{x.get('result', '')} | {x.get('new_roots', 0)} |")
+    return "\n".join(lines)
+
+
+def run(*, languages=("java", "python", "solidity"), days: int = 14,
+        limit: int = 10, min_stars: int = 300, max_stars: int = 30000,
+        max_roots: int = 0, state_path: Path | str | None = None,
+        report: Path | str | None = None, json_path: Path | str | None = None,
+        packs_dir: Path | str | None = None, evict_cache: bool = False,
+        offline: bool = False, dedup_online: bool = True,
+        dry_run: bool = False, max_head_age_days: int = 180,
+        scout_fn=None, sync_fn=None, dedup_fn=None) -> dict:
+    """M286 主流程；scout_fn / sync_fn 可注入（冒烟测试不联网）。"""
+    started = _now()
+    state_path = Path(state_path) if state_path else DEFAULT_STATE
+    report = Path(report) if report else DEFAULT_REPORT
+    json_path = Path(json_path) if json_path else DEFAULT_JSON
+    packs_dir = Path(packs_dir) if packs_dir else DEFAULT_PACKS
+    scout_fn = scout_fn or target_scout.scout_daily
+    sync_fn = sync_fn or upstream_sync.sync_repo
+    lang_list = [str(x) for x in languages if str(x).strip()]
+
+    scout = scout_fn(languages=lang_list, days=days, limit=limit,
+                     min_stars=min_stars, max_stars=max_stars,
+                     allow_online=not offline)
+    items = list(scout.get("items") or [])[:max(1, int(limit))]
+    state = load_state(state_path)
+    state.setdefault("repos", {})
+
+    records: list[dict] = []
+    ledger: list[dict] = []
+    evicted: list[str] = []
+    blocked = 0
+
+    for item in items:
+        slug = str(item.get("slug") or "").strip()
+        if not slug:
+            continue
+        entry = dict(state["repos"].get(slug) or {})
+        try:
+            if offline:
+                cached = (upstream_sync.CACHE_ROOT /
+                          upstream_sync.safe_dirname(slug))
+                if not cached.is_dir():
+                    ledger.append({"slug": slug, "result": "SKIPPED",
+                                   "reason": "offline_no_cache"})
+                    continue
+                repo = cached
+            else:
+                sync = sync_fn(slug)
+                if sync.get("status") != "OK":
+                    ledger.append({
+                        "slug": slug, "result": "FAILED",
+                        "reason": str(sync.get("reason") or "sync_failed")[:200]})
+                    continue
+                repo = Path(sync["path"])
+
+            res = process_repo(slug, repo, entry, dedup_online=dedup_online,
+                               max_roots=max_roots,
+                               max_head_age_days=max_head_age_days,
+                               dedup_fn=dedup_fn)
+            if res["skipped_unchanged"]:
+                state["repos"][slug] = res["entry"]
+                ledger.append({"slug": slug, "result": "SKIPPED",
+                               "head_sha": res["head_sha"],
+                               "reason": "unchanged_head"})
+                continue
+
+            new: list[dict] = []
+            for rec in res["records"]:
+                noise = wild_noise.classify(rec, repo)
+                if noise["blocked"]:
+                    # M287：噪音不删，只压进板块 B，保留证据可复核。
+                    rec["status"] = cve_dedup.STATUS_UNKNOWN
+                    rec["noise_code"] = noise["code"]
+                    rec["reason"] = f"{noise['code']}: {noise['reason']}"
+                    blocked += 1
+                else:
+                    promo = wild_noise.promote(rec, repo)
+                    if promo.get("level"):
+                        rec["confidence"] = promo["level"]
+                        rec["authz_evidence"] = promo["evidence"]
+                new.append(rec)
+
+            records.extend(new)
+            state["repos"][slug] = res["entry"]
+            ledger.append({"slug": slug, "result": "SCANNED",
+                           "head_sha": res["head_sha"],
+                           "new_roots": len(new),
+                           "fresh_total": res["entry"].get("fresh_total", 0)})
+            if evict_cache and not dry_run:
+                _evict(slug, evicted)
+        except Exception as e:                                # noqa: BLE001
+            ledger.append({"slug": slug, "result": "FAILED",
+                           "reason": f"{type(e).__name__}: {e}"[:300]})
+
+    summary = _counts(records)
+    daily_meta = {
+        "generated_at": started, "languages": lang_list, "days": days,
+        "candidates": len(items),
+        "scanned": sum(1 for x in ledger if x["result"] == "SCANNED"),
+        "skipped": sum(1 for x in ledger if x["result"] == "SKIPPED"),
+        "failed": sum(1 for x in ledger if x["result"] == "FAILED"),
+        "new_roots": summary["total"], "board_a": summary["board_a"],
+        "blocked": blocked, "evicted": evicted,
+        "scout_source": scout.get("source", ""),
+        "state_path": str(state_path),
+    }
+
+    if dry_run:
+        return {"ok": True, "dry_run": True, "scout": scout, "ledger": ledger,
+                "records": records, "summary": summary, "daily": daily_meta,
+                "state_path": str(state_path), "report": str(report),
+                "json": str(json_path), "evicted": evicted}
+
+    live_hunt_report.write_outputs(
+        records, report, json_path, packs_dir, generated_at=started,
+        header_extra=_header(ledger, scout, days=days, languages=lang_list,
+                             evicted=evicted, summary=summary,
+                             blocked=blocked),
+        with_confidence=True, extra={"daily": daily_meta})
+    save_state(state_path, state)
+
+    return {"ok": True, "dry_run": False, "scout": scout, "ledger": ledger,
+            "records": records, "summary": summary, "daily": daily_meta,
+            "state_path": str(state_path), "report": str(report),
+            "json": str(json_path), "evicted": evicted}

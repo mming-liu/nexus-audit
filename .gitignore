@@ -35,3 +35,8 @@ benchmarks/results/wild_hunt/
 
 # M258 LLM 复核断点续跑日志（完整结果在 llm_root_triage.json，含 raw）
 benchmarks/results/llm_root_triage.jsonl
+
+# M286 每日巡猎账本与产物（每天重写，不入库）
+benchmarks/results/daily_hunt_state.json
+benchmarks/results/daily_hunt.json
+benchmarks/results/daily_hunt_packs/

@@ -10222,7 +10222,8 @@ check("M274：复测报告非空", len(_r269) > 80, True)
 
 print("\n[270] M280：v1.2.0 版本与断言里程碑")
 from core import __version__ as _ver270                           # noqa: E402
-check("M280：版本号 v1.2.0", _ver270, "1.2.0")
+check("M280：版本号 >= 1.2.0",
+      tuple(int(x) for x in _ver270.split(".")[:3]) >= (1, 2, 0), True)
 check("M280：README 含 v1.2 双模式",
       "v1.2 双模式" in (ROOT / "README.md").read_text(encoding="utf-8"), True)
 check("M280：已执行断言数 >=1570", COUNTS["n"] >= 1570, True)
@@ -10292,6 +10293,204 @@ check("M283：守卫证据带文件与行号",
       _g273.get("evidence", "").startswith("CrmXServiceImpl.java:"), True)
 check("M283：无注解服务方法不被误判",
       _vg273(_gd273, "CrmYServiceImpl.getPage").get("guarded"), False)
+
+print("\n[274] M285：每日动态抓仓（窗口 / 教学仓剔除 / Issues 优先）")
+from core.context import target_scout as _ts274                  # noqa: E402
+_q274 = _ts274.search_query("java", 300, 30000, "2026-10-15", 10)
+check("M285：查询含 pushed 窗口", "pushed:>2026-10-15" in _q274, True)
+check("M285：查询含 stars 区间", "stars:300..30000" in _q274, True)
+check("M285：查询排除 archived/fork",
+      "archived:false" in _q274 and "fork:false" in _q274, True)
+check("M285：教学仓被剔除",
+      _ts274.is_tutorial("acme/spring-boot-demo", "a demo project"), True)
+check("M285：正常仓不误杀",
+      _ts274.is_tutorial("apolloconfig/apollo", "config center"), False)
+_off274 = _ts274.scout_daily(["java", "python"], limit=5, allow_online=False)
+check("M285：离线回退标注来源", _off274.get("source"), "offline_seed")
+check("M285：离线候选非空", len(_off274.get("items") or []) > 0, True)
+_items274, _drop274 = _ts274._parse_search({"items": [
+    {"full_name": "acme/billing-api", "description": "billing api",
+     "stargazers_count": 900, "has_issues": True, "language": "Java",
+     "pushed_at": "2026-10-28T00:00:00Z", "topics": ["spring"]},
+    {"full_name": "acme/spring-tutorial", "description": "tutorial",
+     "stargazers_count": 900, "has_issues": True},
+]}, "java")
+check("M285：教学仓计数", _drop274, 1)
+check("M285：有 Issues 走 issues 通道", _items274[0].get("channel"), "issues")
+
+print("\n[275] M286：状态账本（last_scanned_sha + exported_roots）")
+from core.context import daily_hunt as _dh275                    # noqa: E402
+_st275 = Path(_ws_mkdtemp("smoke_daily_state_")) / "s.json"
+_s275 = _dh275.empty_state()
+_s275["repos"]["acme/api"] = {"last_scanned_sha": "abc123",
+                              "exported_roots": ["sqli|A.run|A.java"]}
+_dh275.save_state(_st275, _s275)
+_l275 = _dh275.load_state(_st275)
+check("M286：账本版本", _l275.get("version"), 1)
+check("M286：sha 可回读", _l275["repos"]["acme/api"]["last_scanned_sha"], "abc123")
+check("M286：已导出根因可回读",
+      _l275["repos"]["acme/api"]["exported_roots"], ["sqli|A.run|A.java"])
+check("M286：缺失账本返回空态",
+      _dh275.load_state(_st275.with_name("nope.json"))["repos"], {})
+check("M286：去重键稳定",
+      _dh275.root_key({"category": "sqli", "unit": "A.run", "file": "A.java"}),
+      "sqli|A.run|A.java")
+
+print("\n[276] M286：同 HEAD 跳过 / 只报新引入根因")
+_dh_repo276 = Path(_ws_mkdtemp("smoke_daily_repo_"))
+(_dh_repo276 / "src/main/java/com/acme/web").mkdir(parents=True)
+
+
+def _git276(*args):
+    _sp261.run(["git", *args], cwd=_dh_repo276, check=True,
+               capture_output=True, text=True)
+
+
+def _fresh276(*_a, **_k):
+    return {"status": "ZERO_RECORD_FRESH", "matched_ids": [], "sources": {},
+            "evidence_urls": [], "checked_at": "", "coverage": {}}
+
+
+(_dh_repo276 / "src/main/java/com/acme/web/UserController.java").write_text(
+    "package com.acme.web;\n@RestController\n"
+    "@RequestMapping(\"/api/user\")\npublic class UserController {\n"
+    "  @Autowired private JdbcTemplate jdbcTemplate;\n"
+    "  @GetMapping(\"/list\")\n  public Object list(String name) {\n"
+    "    return jdbcTemplate.queryForList(\"select * from t_user where name='\""
+    " + name + \"'\");\n  }\n}\n", encoding="utf-8")
+_git276("init", "-q")
+_git276("config", "user.email", "smoke@example.com")
+_git276("config", "user.name", "smoke")
+_git276("add", ".")
+_git276("commit", "-qm", "init")
+_r276a = _dh275.process_repo("acme/daily", _dh_repo276, {},
+                             dedup_online=True, dedup_fn=_fresh276)
+check("M286：首扫报出新根因", len(_r276a["records"]), 1)
+check("M286：账本记录 HEAD",
+      bool(_r276a["entry"].get("last_scanned_sha")), True)
+_r276b = _dh275.process_repo("acme/daily", _dh_repo276, _r276a["entry"],
+                             dedup_online=True, dedup_fn=_fresh276)
+check("M286：同 HEAD 直接跳过", _r276b["skipped_unchanged"], True)
+check("M286：跳过时不重复报根因", _r276b["records"], [])
+(_dh_repo276 / "src/main/java/com/acme/web/AdminController.java").write_text(
+    "package com.acme.web;\n@RestController\npublic class AdminController {\n"
+    "  @Autowired private JdbcTemplate jdbcTemplate;\n"
+    "  @GetMapping(\"/admin\")\n  public Object q(String id) {\n"
+    "    return jdbcTemplate.queryForList(\"select * from t_admin where id=\""
+    " + id);\n  }\n}\n", encoding="utf-8")
+_git276("add", ".")
+_git276("commit", "-qm", "add admin")
+_r276c = _dh275.process_repo("acme/daily", _dh_repo276, _r276b["entry"],
+                             dedup_online=True, dedup_fn=_fresh276)
+check("M286：新提交只报新根因", len(_r276c["records"]), 1)
+check("M286：新根因来自新增文件",
+      "AdminController" in _r276c["records"][0]["unit"], True)
+
+print("\n[277] M286：即扫即焚（--evict-cache）")
+from core.context import upstream_sync as _up277                  # noqa: E402
+import shutil as _sh277                                          # noqa: E402
+_slug277 = "acme/daily-evict"
+_cache277 = _up277.CACHE_ROOT / _up277.safe_dirname(_slug277)
+_sh277.rmtree(_cache277, ignore_errors=True)
+_sh277.copytree(_dh_repo276, _cache277)
+_out277 = Path(_ws_mkdtemp("smoke_daily_out_"))
+_res277 = _dh275.run(
+    limit=1, state_path=_out277 / "state.json", report=_out277 / "R.md",
+    json_path=_out277 / "R.json", packs_dir=_out277 / "packs",
+    evict_cache=True,
+    scout_fn=lambda **kw: {"ok": True, "source": "github_search",
+                           "items": [{"slug": _slug277}]},
+    sync_fn=lambda s: {"status": "OK", "path": str(_cache277)},
+    dedup_fn=_fresh276)
+check("M277：缓存目录已焚", _cache277.is_dir(), False)
+check("M277：报告仍落盘", (_out277 / "R.md").is_file(), True)
+_md277 = (_out277 / "R.md").read_text(encoding="utf-8")
+check("M277：报告含今日巡猎段", "今日巡猎" in _md277, True)
+_d277 = json.loads((_out277 / "R.json").read_text(encoding="utf-8"))
+check("M277：JSON 带 daily 段", _d277.get("daily", {}).get("scanned"), 1)
+_st277 = json.loads((_out277 / "state.json").read_text(encoding="utf-8"))
+check("M277：账本已记 HEAD",
+      bool(_st277["repos"][_slug277]["last_scanned_sha"]), True)
+
+print("\n[278] M287：陌生野仓板块 A 降噪（public 只读 / demo / 兄弟注解）")
+from core.context import wild_noise as _wn278                    # noqa: E402
+check("M287：public 只读 authz 接口拦截",
+      _wn278.classify({"category": "authz",
+                       "unit": "UserController.getUserList",
+                       "file": "src/main/java/com/x/app-api/UserController.java"}
+                      )["code"], "PUBLIC_READONLY_ENDPOINT")
+check("M287：public 写接口不拦",
+      _wn278.classify({"category": "authz",
+                       "unit": "UserController.refundWallet",
+                       "file": "src/main/java/com/x/app-api/UserController.java"}
+                      )["blocked"], False)
+check("M287：非 authz 的 public 接口不拦",
+      _wn278.classify({"category": "sqli",
+                       "unit": "UserController.getUserList",
+                       "file": "src/main/java/com/x/public/UserController.java"}
+                      )["blocked"], False)
+check("M287：DemoController 拦截",
+      _wn278.classify({"category": "authz", "unit": "DemoController.save",
+                       "file": "src/main/java/DemoController.java"})["code"],
+      "DEMO_CONTROLLER")
+_demo278 = Path(_ws_mkdtemp("smoke_noise_"))
+(_demo278 / "RefundController.java").write_text(
+    "public class RefundController {\n"
+    "  @PreAuthorize(\"hasRole('ADMIN')\")\n"
+    "  @PostMapping(\"/save\")\n"
+    "  public R save(X req) { return R.ok(); }\n\n"
+    "  @PreAuthorize(\"hasRole('ADMIN')\")\n"
+    "  @PostMapping(\"/audit\")\n"
+    "  public R audit(X req) { return R.ok(); }\n\n"
+    "  @PostMapping(\"/refundWalletRecharge\")\n"
+    "  public R refundWalletRecharge(Long id) { return R.ok(); }\n}\n",
+    encoding="utf-8")
+_p278 = _wn278.promote({"category": "authz",
+                        "unit": "RefundController.refundWalletRecharge",
+                        "file": "RefundController.java"}, _demo278)
+check("M287：兄弟接口都有注解 → 高置信度", _p278["level"], "HIGH")
+check("M287：提拔证据带注解名", "@PreAuthorize" in _p278["evidence"], True)
+(_demo278 / "GuardedController.java").write_text(
+    "public class GuardedController {\n"
+    "  @PreAuthorize(\"hasRole('ADMIN')\")\n"
+    "  @PostMapping(\"/save\")\n"
+    "  public R save(X req) { return R.ok(); }\n"
+    "  public R del(Long id) { return R.ok(); }\n}\n", encoding="utf-8")
+check("M287：目标自身有注解不提拔",
+      _wn278.promote({"category": "authz", "unit": "GuardedController.save",
+                      "file": "GuardedController.java"}, _demo278)["level"], "")
+
+print("\n[279] M290：售前免费试扫预览单")
+_out279 = Path(_ws_mkdtemp("smoke_presale_"))
+_p279 = _sp261.run([sys.executable, str(ROOT / "cli.py"), "client-audit",
+                    str(_dh_repo276), "--presale-preview",
+                    "--outdir", str(_out279)],
+                   capture_output=True, text=True, encoding="utf-8",
+                   errors="replace", cwd=ROOT, timeout=900)
+check("M290：预览单 exit 0", _p279.returncode, 0)
+check("M290：产出预览单",
+      (_out279 / "00_PRESALE_PREVIEW.md").is_file(), True)
+_man279 = json.loads((_out279 / "manifest.json").read_text(encoding="utf-8"))
+check("M290：manifest 标注 presale", _man279.get("presale"), True)
+check("M290：不生成补丁包", (_out279 / "03_PATCH_BUNDLE").exists(), False)
+_md279 = (_out279 / "00_PRESALE_PREVIEW.md").read_text(encoding="utf-8")
+check("M290：预览单含样例与边界",
+      all(x in _md279 for x in ("样例", "边界")), True)
+
+print("\n[280] M292：v1.3.0 版本 / harness 定时任务 / 断言里程碑")
+from core import __version__ as _ver280                          # noqa: E402
+check("M292：版本号 v1.3.0", _ver280, "1.3.0")
+_readme280 = (ROOT / "README.md").read_text(encoding="utf-8")
+check("M292：README 含 v1.3 全自动巡猎",
+      "v1.3 全自动巡猎" in _readme280, True)
+check("M292：README 写清 daily-hunt", "daily-hunt" in _readme280, True)
+check("M292：不生成 GitHub Actions 巡猎工作流",
+      (ROOT / ".github" / "workflows" / "nexus-daily-hunt.yml").exists(),
+      False)
+check("M292：不生成 Windows 计划任务脚本",
+      (ROOT / "scripts" / "register_daily_hunt_task.ps1").exists(), False)
+check("M292：调度交给 harness（README 明说）", "harness" in _readme280, True)
+check("M292：已执行断言数 >= 1590", COUNTS["n"] >= 1590, True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

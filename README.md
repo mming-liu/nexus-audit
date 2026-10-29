@@ -35,6 +35,26 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - 计费边界：`LLM_ALLOW_PAID_FALLBACK` 默认 0，Tier-1 免费全灭时只保留
   待复核队列，不静默降级付费。
 
+## v1.3 全自动巡猎（M285 → M292）
+
+- **每日自动巡猎**：`python cli.py daily-hunt --languages java,python,solidity --days 14 --limit 10 --evict-cache`。
+  `target_scout.py` 按 `pushed:>{近 14 天} stars:300..30000 archived:false fork:false`
+  抓 Java / Python / Solidity 新仓，剔除 demo / tutorial / ctf / interview 教学仓，
+  优先保留开启 Issues 的仓；`daily_hunt_state.json` 记录 `last_scanned_sha` 与
+  `exported_roots`：同 HEAD 直接 0.1 秒跳过，只报“新引入或尚未导出”的
+  `ZERO_RECORD_FRESH` 根因；`--evict-cache` 提取完代码行证据即删
+  `.cache/upstream/<repo>`，连续挂机一年也不会撑爆磁盘。
+- **陌生野仓零噪音（板块 A 提纯）**：`wild_noise.py` 把 `/app-api/`、`/public/`
+  下的 `get*List` / `get*Page` 公开只读接口（`PUBLIC_READONLY_ENDPOINT`）与
+  `DemoController`（`DEMO_CONTROLLER`）压进板块 B；反向对 authz 提拔
+  “同文件其它写接口都带 `@PreAuthorize` / `@RequiresPermissions`、唯独当前写接口
+  漏加”的高置信度真洞（`AUTHZ_SIBLING_GUARD`，板块 A 置顶并标注置信度）。
+- **售前免费试扫预览单**：`python cli.py client-audit <dir|zip|file> --presale-preview`
+  —— 只出一页纸 `00_PRESALE_PREVIEW.md` + 管理层摘要，不生成补丁 / PoC / 复测。
+- **调度交给 harness，不写进仓库**：不生成 `.github/workflows/nexus-daily-hunt.yml`，
+  也不注册 Windows 计划任务（不出现 `scripts/register_daily_hunt_task.ps1`）。
+  每天 09:00 由 harness 的定时任务把上面那条 `daily-hunt` 命令投给执行终端，
+  跑完直接看根目录 `LIVE_HUNT_REPORT.md` 的「今日巡猎」与板块 A。
 ## 目录结构
 
 ```text

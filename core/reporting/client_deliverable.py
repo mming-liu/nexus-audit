@@ -60,7 +60,8 @@ def price_table(loc: int) -> list[dict]:
              "note": "规则层 + 确定性补丁；不含人工渗透与业务逻辑深挖"}]
 
 
-def run_scan(target: Path, work: Path) -> tuple[dict, str, str]:
+def run_scan(target: Path, work: Path, with_fix: bool = True,
+             with_poc: bool = True) -> tuple[dict, str, str]:
     work.mkdir(parents=True, exist_ok=True)
     summary_p = work / "summary.json"
     report_p = work / "report.md"
@@ -68,7 +69,11 @@ def run_scan(target: Path, work: Path) -> tuple[dict, str, str]:
     poc_dir = work / "poc"
     cmd = [sys.executable, str(CLI), "scan", str(target), "--auto",
            "--offline", "--summary-json", str(summary_p),
-           "--output", str(report_p), "--fix", "--emit-poc", str(poc_dir)]
+           "--output", str(report_p)]
+    if with_fix:
+        cmd.append("--fix")
+    if with_poc:
+        cmd += ["--emit-poc", str(poc_dir)]
     p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
                        encoding="utf-8", errors="replace", timeout=1800)
     if not summary_p.is_file():
@@ -124,14 +129,63 @@ def _baseline_keys(path: Path | None) -> set[tuple[str, str]]:
                  str(rc.get("representative") or rc.get("unit_name") or "")))
     return out
 
+def _presale_lines(project_name: str, target: Path, loc: dict,
+                   summary: dict, roots: list[dict], generated: str) -> list[str]:
+    """M290：售前免费试扫预览单（一页纸，不含补丁/PoC 细节）。"""
+    cats: dict[str, int] = {}
+    for rc in roots:
+        cat = str(rc.get("category") or "")
+        cats[cat] = cats.get(cat, 0) + 1
+    top = sorted(cats.items(), key=lambda x: (-x[1], x[0]))[:6]
+    lines = [
+        f"# 售前免费试扫预览单 —— {project_name}", "",
+        f"- 项目：{target}",
+        f"- 生成时间：{generated}",
+        "- 模式：100% 离线规则层试扫（不出网、不调用外部模型，源码不离开本机）",
+        f"- 代码规模：**{loc['files']} 个源码文件 / {loc['lines']:,} 行**",
+        "",
+        "## 一、本次试扫信号", "",
+        f"- 入口单元：{summary.get('total_units', 0)}",
+        f"- 路由级 P0：{summary.get('p0_route_level_hits', 0)}",
+        f"- 独立根因：{len(roots)}",
+        "",
+        "| 类目 | 根因数 |", "|---|---:|",
+    ]
+    lines += [f"| {c or 'unknown'} | {n} |" for c, n in top] or [
+        "| — | 0 |"]
+    lines += ["", "## 二、样例（最多 5 条，只到文件:行）", ""]
+    for rc in roots[:5]:
+        lines.append(
+            f"- [{rc.get('category', '')}] {rc.get('representative', '')} — "
+            f"`{Path(str(rc.get('file', ''))).name}:{rc.get('line', 0)}`")
+    if not roots:
+        lines.append("- 本次规则层未发现确定性 P0。")
+    lines += [
+        "", "## 三、正式交付包含", "",
+        "| 项目 | 售前预览 | 正式交付 |", "|---|---|---|",
+        "| 根因清单 | 类目计数 + 5 条样例 | 全量根因 + 影响路由 |",
+        "| 补丁 | — | 每个根因一份已验证 fix.patch |",
+        "| 回归 PoC | — | 按语言接入 CI 的 PoC 集合 |",
+        "| 复测销账 | — | 整改前后差异报告 |",
+        "| 报价 | — | 按 LOC 区间的交付报价 |",
+        "", "## 四、边界", "",
+        "- 本预览单是规则层确定性结论的**抽样**，不是完整审计报告；",
+        "- 单文件/片段模式缺全局装配证据，authz 类只进待复核队列；",
+        "- 正式交付前需在客户环境复跑全量扫描并人工复核可达性。", "",
+    ]
+    return lines
+
+
 def build(target: Path, outdir: Path, project_name: str,
-          baseline_report: Path | None = None) -> dict:
+          baseline_report: Path | None = None, presale: bool = False) -> dict:
     target = Path(target).resolve()
     outdir = Path(outdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
     loc = loc_stats(target)
     work = ROOT / ".cache" / "client_audit" / (project_name or "client")
-    summary, log, fix_text = run_scan(target, work)
+    summary, log, fix_text = run_scan(target, work,
+                                      with_fix=not presale,
+                                      with_poc=not presale)
     roots = _root_rows(summary)
     generated = time.strftime("%Y-%m-%d %H:%M:%S")
     cats: dict[str, int] = {}
@@ -168,6 +222,24 @@ def build(target: Path, outdir: Path, project_name: str,
               "- 默认离线：客户源码不离开本机，不调用外部模型。", ""]
     (outdir / "01_EXECUTIVE_SUMMARY.md").write_text("\n".join(lines),
                                                     encoding="utf-8")
+
+    if presale:
+        # M290：售前预览只交一页纸 + 管理层摘要，不生成补丁/PoC/复测。
+        (outdir / "00_PRESALE_PREVIEW.md").write_text(
+            "\n".join(_presale_lines(project_name, target, loc, summary,
+                                     roots, generated)), encoding="utf-8")
+        manifest = {"project": project_name, "target": str(target),
+                    "generated_at": generated, "offline": True,
+                    "presale": True, "loc": loc,
+                    "units": summary.get("total_units", 0),
+                    "root_causes": len(roots), "patches": 0,
+                    "baseline": "",
+                    "files": ["00_PRESALE_PREVIEW.md",
+                              "01_EXECUTIVE_SUMMARY.md"]}
+        (outdir / "manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2),
+            encoding="utf-8")
+        return manifest
 
     det = [f"# 详细审计与源码整改手册 —— {project_name}", "",
            f"- 入口：{summary.get('total_units', 0)} ｜ "

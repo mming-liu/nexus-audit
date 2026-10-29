@@ -44,10 +44,19 @@ def _version_evidence(rec: dict) -> str:
     return v if v else "unknown, pending maintainer confirmation"
 
 
+def _age_days(rec: dict) -> float:
+    """HEAD 年龄；0.0 是合法值（今天刚提交），只有缺失才是未知。"""
+    raw = rec.get("head_age_days")
+    try:
+        return float(raw) if raw not in (None, "") else 999999.0
+    except (TypeError, ValueError):
+        return 999999.0
+
+
 def _board(rec: dict) -> str:
     if rec.get("status") != STATUS_FRESH:
         return B
-    if rec.get("stale") or float(rec.get("head_age_days") or 999999) > float(
+    if rec.get("stale") or _age_days(rec) > float(
             rec.get("max_head_age_days") or 180):
         return B
     if not str(rec.get("head_commit_date") or "").startswith("2026-"):
@@ -60,13 +69,14 @@ def _board(rec: dict) -> str:
     return A
 
 
-def _row_a(i: int, r: dict) -> str:
+def _row_a(i: int, r: dict, with_confidence: bool = False) -> str:
     playbook = r.get("playbook") or ""
     link = (f"[{Path(playbook).name}]({playbook})" if playbook else "—")
     age = r.get("head_age_days", "")
     date = r.get("head_commit_date", "")
+    conf = f" {r.get('confidence') or '—'} |" if with_confidence else ""
     return (f"| {i} | {r.get('repo', '')} | {r.get('category', '')} | "
-            f"{r.get('unit', '')} | {date} ({age}d) | "
+            f"{r.get('unit', '')} |{conf} {date} ({age}d) | "
             f"{r.get('head_sha', '')[:12]} | "
             f"[{r.get('file', '')}:{r.get('line', 0)}]({r.get('permalink', '')}) | "
             f"[Advisory]({_advisory_url(r.get('slug', ''))}) · "
@@ -84,7 +94,10 @@ def _row_b(i: int, r: dict) -> str:
             f"{matched} | {reason} | {evidence} |")
 
 
-def render_report(records: list[dict], generated_at: str | None = None) -> str:
+def render_report(records: list[dict], generated_at: str | None = None,
+                  header_extra: str = "",
+                  with_confidence: bool = False,
+                  source_json: str = "") -> str:
     generated_at = generated_at or time.strftime("%Y-%m-%d %H:%M:%S")
     rows = sorted(records, key=lambda r: (r.get("repo", ""),
                                           r.get("category", ""),
@@ -98,7 +111,8 @@ def render_report(records: list[dict], generated_at: str | None = None) -> str:
     counts["BOARD_B"] = len(b)
     lines = [
         "# 活水首杀作战大盘（LIVE_HUNT）", "",
-        "> 机器事实源：benchmarks/results/live_hunt.json。"
+        "> 机器事实源：" + (source_json or
+                          "benchmarks/results/live_hunt.json") + "。"
         "本报告的 A/B 行数必须与 JSON 计数一致；"
         "ZERO_RECORD_FRESH 只代表四个来源**实际查过且 0 命中**，"
         "不代表漏洞一定成立，更不代表人工已核验。", "",
@@ -114,13 +128,20 @@ def render_report(records: list[dict], generated_at: str | None = None) -> str:
         "<!-- live_hunt_counts: " + json.dumps(counts, ensure_ascii=False,
                                                 sort_keys=True) + " -->",
         "",
-        "## 板块 A｜🟢 可直接交单的 ZERO_RECORD_FRESH", "",
-        "| # | 仓库 | 类目 | 根因 | HEAD 提交日期 | HEAD | 源码行 | 提单入口 | 本地手册 |",
-        "|---|---|---|---|---|---|---|---|---|",
     ]
-    lines += [_row_a(i, r) for i, r in enumerate(a, 1)]
+    if header_extra:
+        lines += [header_extra.rstrip(), ""]
+    head_cells = ("| # | 仓库 | 类目 | 根因 | 置信度 | HEAD 提交日期 | HEAD | 源码行 | "
+                  "提单入口 | 本地手册 |" if with_confidence else
+                  "| # | 仓库 | 类目 | 根因 | HEAD 提交日期 | HEAD | 源码行 | "
+                  "提单入口 | 本地手册 |")
+    sep = ("|---|---|---|---|---|---|---|---|---|---|" if with_confidence else
+           "|---|---|---|---|---|---|---|---|---|")
+    lines += ["## 板块 A｜🟢 可直接交单的 ZERO_RECORD_FRESH", "", head_cells, sep]
+    lines += [_row_a(i, r, with_confidence) for i, r in enumerate(a, 1)]
     if not a:
-        lines.append("| — | — | — | — | — | — | — | — | — |")
+        cells = " — |" * (10 if with_confidence else 9)
+        lines.append("|" + cells)
     lines += ["", "## 板块 B｜🔴 自动拦截 / 不可交单", "",
               "| # | 仓库 | 类目 | 根因 | 状态 | 命中证据 | 拦截原因 | 官方链接 |",
               "|---|---|---|---|---|---|---|---|"]
@@ -223,7 +244,11 @@ Fix: {patch_line}
 
 def write_outputs(records: list[dict], report_path: Path,
                   json_path: Path, packs_dir: Path,
-                  generated_at: str | None = None) -> dict:
+                  generated_at: str | None = None,
+                  header_extra: str = "",
+                  with_confidence: bool = False,
+                  extra: dict | None = None,
+                  source_json: str = "") -> dict:
     """写 JSON + Markdown + 每个 FRESH 包的 Playbook（幂等）。"""
     generated_at = generated_at or time.strftime("%Y-%m-%d %H:%M:%S")
     records = sorted(records, key=lambda r: (r.get("repo", ""),
@@ -255,7 +280,15 @@ def write_outputs(records: list[dict], report_path: Path,
                 Path(__file__).resolve().parents[2]).as_posix()
         except ValueError:
             r["playbook"] = playbook.as_posix()
-    report = render_report(records, generated_at)
+    if not source_json:
+        try:
+            source_json = json_path.resolve().relative_to(
+                Path(__file__).resolve().parents[2]).as_posix()
+        except ValueError:
+            source_json = json_path.as_posix()
+    report = render_report(records, generated_at, header_extra=header_extra,
+                           with_confidence=with_confidence,
+                           source_json=source_json)
     report_path.write_text(report, encoding="utf-8")
     payload = {
         "generated_at": generated_at,
@@ -272,6 +305,8 @@ def write_outputs(records: list[dict], report_path: Path,
         },
         "records": records,
     }
+    if extra:
+        payload.update(extra)
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
                          encoding="utf-8")
     return payload["summary"]
