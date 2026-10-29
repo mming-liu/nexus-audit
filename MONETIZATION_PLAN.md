@@ -57,3 +57,13 @@
 ## 五、红线（不变）
 
 只碰开源代码 / 授权 scope；GHSA 私密报告优先于公开 issue；不发未修复漏洞细节与可武器化 PoC；不卖 exp。
+
+## CVE 申请跟踪
+
+| CAN 号 | 目标 | 提交时间 | 渠道 | 状态 |
+|---|---|---|---|---|
+| CAN-2026-2041058 | YunaiV/ruoyi-vue-pro `PayWalletRechargeController.refundWalletRecharge`（CWE-862，master 2026-10-25 未修） | 2026-10-28 | MITRE CNA-LR (CVE Services, production) | 已提交，等审核邮件 |
+| （待提交） | newbee-mall-api 任意文件上传 | — | GHSA 私密报告 | 未启动 |
+| （查重中） | JeecgBoot SysAnnouncementSendController add/queryById | — | 需先对 GHSA-63v7-3c98-c3mj 查重 | 搁置 |
+
+注意事项：CAN 号不是 CVE 编号，审核期间不得对外披露；通知走提交时登录的 Google 邮箱；4-6 周无动静可带 CAN 号催办。
