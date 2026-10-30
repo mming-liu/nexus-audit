@@ -231,8 +231,14 @@ def query_github_advisories(slug: str) -> dict:
     ids = [x.get("ghsa_id") or x.get("cve_id") or "" for x in data
            if isinstance(x, dict)]
     ids = [x for x in ids if x]
+    # M290：同时保留每条公告的文本（summary+description），供 dedup 做
+    # 方法级匹配——"仓里有公告"不等于"这个端点已被覆盖"。
+    items = [{"id": (x.get("ghsa_id") or x.get("cve_id") or ""),
+              "text": " ".join(str(x.get(k) or "") for k in
+                               ("summary", "description", "details"))}
+             for x in data if isinstance(x, dict)]
     res = {"ok": True, "total": len(ids), "ids": ids[:5], "url": url,
-           "error": ""}
+           "items": items, "error": ""}
     _REPO_MEMO[memo_key] = res
     return res
 
@@ -305,6 +311,7 @@ def dedup(slug: str, category: str, unit: str, *,
     matched: list[str] = []
     evidence: list[str] = []
     status = ""
+    rec_reason = ""
     cve_hit = False
     circl_hit = False
     if cve_src.get("ok") and cve_src.get("total", 0) > 0:
@@ -324,9 +331,19 @@ def dedup(slug: str, category: str, unit: str, *,
     if cve_hit:
         status = STATUS_CVE
     elif ghsa.get("ok") and ghsa.get("total", 0) > 0:
-        status = STATUS_ISSUE
-        matched += ghsa.get("ids") or []
-        evidence.append(ghsa.get("url", ""))
+        # M290：仓库级公告列表不能连坐——只有公告文本真的命中方法/文件名
+        # 才判重复；否则转 UNKNOWN 并注明"仓有公告但无方法级命中"。
+        gh_hits = [x for x in (ghsa.get("items") or [])
+                   if x.get("id") and _unit_in_text(unit, file,
+                                                    x.get("text", ""))]
+        if gh_hits:
+            status = STATUS_ISSUE
+            matched += [x["id"] for x in gh_hits]
+            evidence.append(ghsa.get("url", ""))
+        else:
+            status = STATUS_UNKNOWN
+            rec_reason = ("repo_advisories_no_unit_match: 仓库存在安全公告，"
+                          "但均未命中本方法/文件，需人工查重后定性")
     elif issues.get("ok") and issues.get("total", 0) > 0:
         status = STATUS_ISSUE
         matched += issues.get("ids") or []
@@ -355,7 +372,8 @@ def dedup(slug: str, category: str, unit: str, *,
         },
     }
     if status == STATUS_UNKNOWN:
-        rec["reason"] = "one_or_more_sources_failed: freshness not claimed"
+        rec["reason"] = (rec_reason if rec_reason else
+                         "one_or_more_sources_failed: freshness not claimed")
     if use_cache:
         _cache_put(cpath, rec)
     return rec

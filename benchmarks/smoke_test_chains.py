@@ -10134,13 +10134,20 @@ check("M270：实跑大盘总条数与 JSON 守恒",
 print("\n[264] M270：SUBMISSION_PLAYBOOK 零占位符")
 from core.context.live_hunt_report import render_playbook as _pb264  # noqa: E402
 _pb264 = _pb264(_fix263[0])
-check("M270：模板版本号", "playbook-1.0" in _pb264, True)
+check("M270：模板版本号", "playbook-1.1" in _pb264, True)
 check("M270：CVE.org 六字段齐全",
       all(x in _pb264 for x in ("| Vendor |", "| Product |",
                                 "| Version affected |",
                                 "| Vulnerability Type |",
                                 "| Affected Component |",
                                 "| Suggested Description |")), True)
+check("M270：CVE Services 逐框指引齐全（Step 3B）",
+      all(x in _pb264 for x in ("Step 3B", "Problem types", "Program routines",
+                                "Reserve One CAN", "unsupported-when-assigned",
+                                "| Purl |", "| Default status |",
+                                "单 CNA 红线")), True)
+check("M270：CVE Services Description 生成",
+      "affected by a" in _pb264 and "reachable" in _pb264, True)
 check("M270：版本证据诚实回退",
       "unknown, pending maintainer confirmation" in _pb264, True)
 check("M270：无 TODO/尖括号占位符",

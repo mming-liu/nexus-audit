@@ -19,7 +19,7 @@ from core.context.cve_dedup import (STATUS_CVE, STATUS_FRESH, STATUS_ISSUE,
                                     STATUS_PATCHED, STATUS_STALE,
                                     STATUS_UNKNOWN)
 
-TEMPLATE_VERSION = "playbook-1.0"
+TEMPLATE_VERSION = "playbook-1.1"
 CVE_FORM = "https://www.cve.org/ReportRequest/ReportRequestForNonCNAs"
 A, B = "A", "B"
 FENCE = chr(96) * 3
@@ -172,15 +172,42 @@ def _english_description(r: dict) -> str:
         f"Source permalink: {r.get('permalink', '')}. {patch_sentence}")
 
 
+def _cve_services_description(r: dict) -> str:
+    """CVE Services 提交用 Description：事实句 + 修复状态，可整体粘贴。
+
+    过审三要素中的「根因」「影响」两句需人工按 Step 3B 的句式范例补写
+    （工具只知道类目与位置，不知道具体触发机制，禁止机器编造）。
+    """
+    meta = _meta(r.get("category", ""))
+    display = meta["display"]
+    cwe = meta["cwe"] or "CWE-000"
+    fix_sentence = (
+        "A deterministic fix patch is included in the submission pack and "
+        "passed the True-to-False self-check."
+        if r.get("patch_verified") else
+        "No verified automatic patch is included; the code remains unfixed "
+        "at the referenced commit.")
+    return (
+        f"The {r.get('repo', '')} repository "
+        f"(https://github.com/{r.get('slug', '')}) at commit "
+        f"{r.get('head_sha', '')} is affected by a {display} vulnerability "
+        f"({cwe}) in {r.get('unit', '')} of {r.get('file', '')} "
+        f"(line {r.get('line', 0)}). The affected entry point is reachable "
+        f"through the product's documented API surface. {fix_sentence}")
+
+
 def render_playbook(r: dict) -> str:
     meta = _meta(r.get("category", ""))
     slug = r.get("slug", "")
     owner, _, product = slug.partition("/")
     version = _version_evidence(r)
     cwe = meta["cwe"] or "CWE-000"
+    display = meta["display"]
     title = (f"[{r.get('category', '').upper()}] "
              f"{r.get('unit', '')} in {Path(r.get('file', '')).name}")
     desc = _english_description(r)
+    cve_desc = _cve_services_description(r)
+    purl = f"pkg:github/{owner}/{product}"
     patch_line = ("see fix.patch ([Auto-Fix Verified])"
                   if r.get("patch_verified")
                   else "manual patch required (no verified patch in this pack)")
@@ -232,6 +259,78 @@ Fix: {patch_line}
 | Vulnerability Type | {cwe} |
 | Affected Component | {r.get('file', '')}:{r.get('line', 0)} |
 | Suggested Description | {desc} |
+
+## Step 3B：CVE Services（MITRE CNA-LR）逐框填写
+
+> 入口提示：cve.org 的 ReportRequestForNonCNAs 页面**只是流程指引**，
+> 真正的表单在指引页里 "MITRE CNA-LR — CVE ID Requests → Go to web form"
+> 打开的 CVE Program Portal（选 production 环境）。
+> 流程：Google 登录 → Reserve One CAN（领 CAN-YYYY-##### 跟踪号，
+> **它不是 CVE 编号**）→ 按下表逐框填写 → 红标清零 → Download 存草稿
+> → Submit Request。审核通知走登录用的 Google 邮箱。
+
+### 逐框预填值
+
+| CVE Services 字段 | 预填值 |
+|---|---|
+| Problem types | {cwe}，描述填：{display} |
+| Vendor or project | {owner} |
+| Product name | {product} |
+| Purl | {purl} |
+| Source repository | https://github.com/{slug} |
+| Program routines (OSS) | {r.get('unit', '')} |
+| References | {r.get('permalink', '')} |
+| Description | 见下方整段粘贴 |
+
+### Versions 表（versionType 选 custom）
+
+| 列 | 值 |
+|---|---|
+| Affected | y |
+| Version (or start of a range) | 0 |
+| <= Version (range) | {version} |
+| Default status | y |
+
+### Description（整段粘贴）
+
+{FENCE}
+{cve_desc}
+{FENCE}
+
+**过审三要素**——提交前在 Description 末尾手工补两句，缺了会被退回：
+
+1. **根因句**（代码层面怎么触发）：例如缺权限注解类写
+   "lacks a @PreAuthorize permission annotation, which is the sole
+   function-level authorization mechanism in this framework; any
+   authenticated low-privileged user can therefore ..."；
+   注入类写 "the parameter is concatenated directly into the SQL
+   statement without parameterization or identifier validation"。
+2. **影响句**（攻击者拿到什么）：例如 "read or modify database
+   contents" / "trigger a refund of another user's order"。
+3. **修复状态句**：写 "unfixed as of <branch> (<date>)"——用真实分支名
+   与日期，已核实 HEAD 未修复才可写。
+
+### 表单问题区固定答法
+
+| 问题 | 答法 |
+|---|---|
+| 确认已阅读 CNA-LR 主页信息 | yes |
+| CVE partner onboarding 注册组织 | 留空（个人报告者） |
+| 是否已联系供应商要 CVE | 未联系过选 no（供应商不在 Partner 列表属正常） |
+| 是否现在就在 CVE List 公开 | yes |
+| Additional Information | 默认留空；仅当同时走了 GitHub 私密 Advisory 时写 "A private GitHub Security Advisory has also been drafted. Please coordinate CVE ID assignment to avoid duplication." |
+
+### Tags 判断
+
+- 厂商历史 CVE 记录里出现 "contacted but did not respond" → 加
+  unsupported-when-assigned 标签，可加快审阅。
+- 厂商有配合记录（如 issue 修复跟踪）→ 不加。
+
+### 单 CNA 红线
+
+- 一个漏洞只能投一个 CNA：若已开 GitHub 私密 Advisory（发布时 GitHub
+  自动发号），**不要再投 MITRE**；普通公开 issue 不冲突。
+- 审核期间 CAN 号与漏洞细节不得在任何渠道对外披露。
 
 ## 提交前检查
 

@@ -63,8 +63,12 @@
 | CAN 号 | 目标 | 提交时间 | 渠道 | 状态 |
 |---|---|---|---|---|
 | CAN-2026-2041058 | YunaiV/ruoyi-vue-pro — Admin Pay Module Missing @PreAuthorize（Vendor Confirmed in commit 2f655a81, Embargoed pending remote push） | 2026-10-28 | MITRE CNA-LR (CVE Services, production) | 已提交；厂商已确认并本地修复，补丁尚未推送到远端，静默期 |
-| （待提交） | newbee-mall-api 任意文件上传 | — | GHSA 私密报告 | 未启动 |
-| （查重中） | JeecgBoot SysAnnouncementSendController add/queryById | — | 需先对 GHSA-63v7-3c98-c3mj 查重 | 搁置 |
+| （待定） | metasfresh — Debug REST SQLi（细节静默期不记录，Issue #27079） | 2026-10-30 发私密通道请求（公开单未贴细节） | 先 GitHub 私密通道 → 72h 无回应追问 → 7 天无回应转 MITRE CNA-LR（publish 视协调结果） | 等维护者回应；远端 HEAD 复核仍未修；完整英文报告已备好未发出 |
+| （已否决） | ~~newbee-mall-api paySuccess~~ → 查重撞车 CVE-2025-10422（newbee-mall 同根因，issue #100）；原"任意文件上传"系标签误挂，实为 My-Blog 的发现 | — | — | DUPLICATE_CVE，不提交 |
+| （已否决） | JeecgBoot SysAnnouncementSendController add/queryById | — | 需先对 GHSA-63v7-3c98-c3mj 查重 | 搁置 |
+| （已否决） | ~~My-Blog 任意文件上传~~ → 查重撞车 **CVE-2024-13144**（`BlogController.uploadFileByEditormd`，VulDB，issue #140）+ **CVE-2024-13145**（`UploadController.upload`，VulDB，issue #141），两条 unrestricted_upload 根因全部被覆盖；上游 master 复核仍未修但无披露价值 | — | — | DUPLICATE_CVE ×2，不提交 |
+
+**CVE 线存量结论（2026-10-30）**：本地已验证的 4 个候选单中，1 单已投（ruoyi-vue-pro，等 MITRE + 厂商推送）、1 单等维护者（metasfresh）、3 单查重否决（newbee、My-Blog×2 洞）。**本地存量已无待交单**；后续 CVE 产出必须来自新猎物（Huntr AI/ML 仓 / 大仓 111 根因模型复核 / Sherlock 竞赛），不再有"存量捡漏"。
 
 注意事项：CAN 号不是 CVE 编号，审核期间不得对外披露；通知走提交时登录的 Google 邮箱；4-6 周无动静可带 CAN 号催办。
 
