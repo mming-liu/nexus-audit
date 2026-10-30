@@ -70,6 +70,20 @@
 
 **CVE 线存量结论（2026-10-30）**：本地已验证的 4 个候选单中，1 单已投（ruoyi-vue-pro，等 MITRE + 厂商推送）、1 单等维护者（metasfresh）、3 单查重否决（newbee、My-Blog×2 洞）。**本地存量已无待交单**；后续 CVE 产出必须来自新猎物（Huntr AI/ML 仓 / 大仓 111 根因模型复核 / Sherlock 竞赛），不再有"存量捡漏"。
 
+## Huntr 开线战报（2026-10-30，路径①启动）
+
+| 靶场 | 结果 |
+|---|---|
+| inspect_ai（存量 7 包） | ❌ 证伪：控制服务器绑 AF_UNIX 用户私有套接字，"缺 HTTP 鉴权"是设计内行为 |
+| fastapi-best-architecture（存量 4 包） | ❌ 证伪：RBAC 链在场（RequestPermission+DependsRBAC），无注入点 |
+| vllm-project/vllm | ❌ 7 根因全拦截：5 条撞公开 GHSA、2 条上游已修——顶级靶场被翻烂 |
+| mlflow/mlflow | ❌ 45 根因全拦截：39 GHSA 重复 + 6 已修——Huntr 最大 CVE 产地 |
+| HumanSignal/label-studio | ⏳ 22 根因：5 真重复 + **17 条待人工查重**（14 log_injection / 2 sqli / 1 ssrf / 1 mass_assignment） |
+
+**顺手修了 M290 工具 bug**：GHSA 查重原来是仓级连坐（仓里有公告就把所有根因判重复），现在方法级匹配——label-studio 21 条假重复被纠正为 17 条真候选。commit `0221488`。
+
+**结论**：明星仓（vllm/mlflow/label-studio）已被职业猎人全覆盖，规则层首杀要靠**新代码**——daily-hunt watcher 盯小而活跃的 AI/ML 仓的新提交才是产出路线。17 条 label-studio 候选的人工查重与可达性验证是下一步。
+
 注意事项：CAN 号不是 CVE 编号，审核期间不得对外披露；通知走提交时登录的 Google 邮箱；4-6 周无动静可带 CAN 号催办。
 
 > 静默期规则：厂商补丁推到远端分支之前，本仓库不新增函数名/文件路径级细节；CVE/GHSA 编号在发布后回填。
