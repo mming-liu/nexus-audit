@@ -5995,6 +5995,12 @@ def _looks_python(source: str) -> bool:
 
 
 def _looks_solidity(source: str) -> bool:
+    # M297：Python 切片里只要出现 `contract = ...` 之类的词，旧正则
+    # `\bcontract\s+[A-Za-z_]\w*` 就会把整段判成 Solidity，Solidity 专有类目
+    # （unchecked_low_level_calls 等）随即落到 .py 入口上。先按语言排除：
+    # 有 `def` 且没有 `pragma solidity` 的切片不可能是 Solidity。
+    if _looks_python(source) and not re.search(r"\bpragma\s+solidity\b", source):
+        return False
     if re.search(r"\bpragma\s+solidity\b|\bcontract\s+[A-Za-z_]\w*", source):
         return True
     # 函数级切片（smartbugs 逐函数审计）：文件头不在切片里，

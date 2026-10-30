@@ -6156,7 +6156,7 @@ def cmd_export_packs(args) -> int:
         except Exception:                                    # noqa: BLE001
             sel = {}
     packs.sort(key=lambda d: sel.get(d.name, {}).get("rank", 999))
-    lines = [f"# Top-10 候选交单包（nexus-audit v1.3.1 · 非教学仓严选；"
+    lines = [f"# Top-10 候选交单包（nexus-audit v1.3.2 · 非教学仓严选；"
              f"{len(packs)} 条通过补丁自检）", "",
              "> M259：剔除教学仓与纯 CORS，同函数多规则合并，每仓最多 2 条；"
              "补丁自检 True -> False 才入包。目标 Top-10，实测不足时**不拿"

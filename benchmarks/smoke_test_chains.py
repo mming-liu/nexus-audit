@@ -10623,11 +10623,45 @@ check("M295：单仓软超时参数存在",
 
 print("\n[284] M296：v1.3.1 靶向制导版本里程碑")
 from core import __version__ as _ver296                           # noqa: E402
-check("M296：版本号 v1.3.1", _ver296, "1.3.1")
+check("M296：版本号 >= 1.3.1",
+      tuple(int(x) for x in _ver296.split(".")[:3]) >= (1, 3, 1), True)
 _readme296 = (ROOT / "README.md").read_text(encoding="utf-8")
 check("M296：README 含 v1.3.1 靶向制导", "v1.3.1 靶向制导" in _readme296, True)
 check("M296：README 写 ZERO_ENTRY_LIB", "ZERO_ENTRY_LIB" in _readme296, True)
 check("M296：已执行断言数 >= 1660", COUNTS["n"] >= 1660, True)
+
+print("\n[285] M297：Solidity 类目不得落到 Python 入口")
+from core.context import wild_noise as _wn297                     # noqa: E402
+from core.agents import rule_detectors as _rd297                  # noqa: E402
+check("M297：.py 上的 unchecked_low_level_calls 被拦",
+      _wn297.classify({"category": "unchecked_low_level_calls",
+                       "unit": "x.y", "file": "main.py"})["code"],
+      "RULE_LANGUAGE_MISMATCH")
+check("M297：.sol 上的同类目不拦",
+      _wn297.classify({"category": "unchecked_low_level_calls",
+                       "unit": "x.y", "file": "V.sol"})["blocked"], False)
+_py297 = ("def set_enabled(contract, request):\n"
+          "    body = contract.json()\n"
+          "    return body\n")
+check("M297：Python 切片不再被判成 Solidity",
+      _rd297.verdict("unchecked_low_level_calls", _py297), None)
+_sol297 = ("contract V {\n"
+           "  function withdraw() public {\n"
+           "    msg.sender.call{value: 1}(\"\");\n"
+           "  }\n}\n")
+check("M297：Solidity 切片仍正常判定",
+      _rd297.verdict("unchecked_low_level_calls", _sol297), True)
+
+print("\n[286] M298：Python 限定词去 panel")
+from core.context import target_scout as _ts298                   # noqa: E402
+_py298 = _ts298.BUSINESS_QUALIFIERS["python"]
+check("M298：panel 已移出 Python 词表", "panel" not in _py298, True)
+check("M298：业务词 cms/saas/erp 就位",
+      {"cms", "saas", "erp"} <= set(_py298), True)
+check("M298：轮询按天稳定",
+      _ts298.next_qualifier("python", 7) == _ts298.next_qualifier("python", 7),
+      True)
+check("M298：已执行断言数 >= 1670", COUNTS["n"] >= 1670, True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

@@ -65,7 +65,10 @@ def is_tutorial(slug: str, description: str = "",
 # 按语言轮询注入一个业务词，把候选拉回“有 Web 路由的业务后台”。
 BUSINESS_QUALIFIERS: dict[str, tuple[str, ...]] = {
     "java": ("spring-boot", "admin", "cms", "erp", "crm", "mall"),
-    "python": ("fastapi", "django", "flask", "admin", "backend", "panel"),
+    # M298：`panel` 实测只捞到桌面/UI panel（holoviz-panel、nwg-panel、
+    # SpiderPanel…），一半扫出 0；换成业务后台词。
+    "python": ("fastapi", "django", "flask", "admin", "backend", "cms",
+               "saas", "erp"),
     "solidity": ("vault", "staking", "lending", "swap"),
 }
 

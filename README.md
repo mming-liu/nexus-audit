@@ -70,6 +70,14 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
   又不在 `/admin` 的裸 authz 一律标 `UNVERIFIED_WILD_AUTHZ` 进 B。
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
+
+### v1.3.2 语言闸门（M297 → M298）
+
+- `_looks_solidity()` 先排除 Python 切片（有 `def`、无 `pragma solidity`）：
+  Solidity 专有类目不再落到 `.py` 入口；
+- `wild_noise` 新增 `RULE_LANGUAGE_MISMATCH`：`reentrancy` / `unchecked_low_level_calls` /
+  `tx_origin` / `delegatecall_untrusted` 出现在非 `.sol` 文件 → 板块 B；
+- Python 业务限定词把 `panel` 换成 `cms` / `saas` / `erp`（实测 `panel` 只捞到桌面 UI）。
 - **API 预算**：未配 `GITHUB_TOKEN` 时 GitHub core 限额 60 次/小时，建议每日跑
   `--max-roots 5`（每仓最多复核 5 条根因）；配 token 后可放开。
 ## 目录结构

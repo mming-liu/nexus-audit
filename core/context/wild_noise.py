@@ -27,6 +27,11 @@ AUTHZ_SIBLING_GUARD = "AUTHZ_SIBLING_GUARD"
 LOCAL_UNIX_SOCKET_SERVER = "LOCAL_UNIX_SOCKET_SERVER"
 UNVERIFIED_WILD_AUTHZ = "UNVERIFIED_WILD_AUTHZ"
 ZERO_ENTRY_LIB = "ZERO_ENTRY_LIB"
+RULE_LANGUAGE_MISMATCH = "RULE_LANGUAGE_MISMATCH"
+
+# M297：只在 Solidity 里成立的类目；落到 .py/.java 入口一定是判据串了语言。
+SOLIDITY_ONLY = frozenset({"reentrancy", "unchecked_low_level_calls",
+                           "tx_origin", "delegatecall_untrusted"})
 
 PUBLIC_PREFIXES = ("/app-api/", "/public/", "/open-api/")
 
@@ -84,6 +89,12 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
     if "demo" in file or "demo" in unit.lower():
         return {"blocked": True, "code": DEMO_CONTROLLER,
                 "reason": "demo/示例入口（非生产代码）"}
+
+    if str(record.get("category") or "") in SOLIDITY_ONLY and not file.endswith(
+            ".sol"):
+        return {"blocked": True, "code": RULE_LANGUAGE_MISMATCH,
+                "reason": (f"{record.get('category')} 是 Solidity 类目，"
+                           f"入口文件是 {Path(file).suffix or '未知类型'}")}
 
     if looks_local_socket(_read(repo_root, str(record.get("file") or ""))):
         return {"blocked": True, "code": LOCAL_UNIX_SOCKET_SERVER,
