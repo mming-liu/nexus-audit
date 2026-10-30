@@ -62,8 +62,10 @@
 
 | CAN 号 | 目标 | 提交时间 | 渠道 | 状态 |
 |---|---|---|---|---|
-| CAN-2026-2041058 | YunaiV/ruoyi-vue-pro `PayWalletRechargeController.refundWalletRecharge`（CWE-862，master 2026-10-25 未修） | 2026-10-28 | MITRE CNA-LR (CVE Services, production) | 已提交，等审核邮件 |
+| CAN-2026-2041058 | YunaiV/ruoyi-vue-pro — Admin Pay Module Missing @PreAuthorize（Vendor Confirmed in commit 2f655a81, Embargoed pending remote push） | 2026-10-28 | MITRE CNA-LR (CVE Services, production) | 已提交；厂商已确认并本地修复，补丁尚未推送到远端，静默期 |
 | （待提交） | newbee-mall-api 任意文件上传 | — | GHSA 私密报告 | 未启动 |
 | （查重中） | JeecgBoot SysAnnouncementSendController add/queryById | — | 需先对 GHSA-63v7-3c98-c3mj 查重 | 搁置 |
 
 注意事项：CAN 号不是 CVE 编号，审核期间不得对外披露；通知走提交时登录的 Google 邮箱；4-6 周无动静可带 CAN 号催办。
+
+> 静默期规则：厂商补丁推到远端分支之前，本仓库不新增函数名/文件路径级细节；CVE/GHSA 编号在发布后回填。
