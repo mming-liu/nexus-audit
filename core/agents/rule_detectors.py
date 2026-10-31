@@ -6044,7 +6044,226 @@ _PY_SQL_SINK_RE = re.compile(r"\.\s*execute(?:script)?\s*\(|\.\s*executemany\s*\
 # SQLAlchemy 2.0 Core/ORM 表达式：`session.execute(select(Model).where(...))`
 # 是绑定参数，不是 SQL 文本（M80 FastAPI 实测）。
 _PY_ORM_EXPR_RE = re.compile(
-    r"^\s*(?:select|insert|update|delete)\s*\(", re.I)
+    r"^\s*(?:[\w.]+\.)?(?:select|insert|update|delete|"
+    r"sql_delete|sql_insert|sql_update)\s*\(", re.I)
+
+# M301：不算“客户端可控”的形参名（连接/会话/文件句柄/自身）。
+_PY_NON_INPUT_PARAMS = frozenset({
+    "self", "cls", "db", "session", "conn", "connection", "cursor",
+    "file", "fp", "engine", "tx", "trx"})
+
+
+def _py_enclosing_def(source: str, pos: int | None):
+    """pos 所在的 def：返回 (函数名, 形参名列表, def 起点)。"""
+    if pos is None:
+        return None
+    defs = list(re.finditer(r"(?m)^[ \t]*(?:async\s+)?def\s+(\w+)\s*\(",
+                            source[:pos]))
+    if not defs:
+        return None
+    m = defs[-1]
+    params = _balanced_cond(source, m.end())
+    names: list[str] = []
+    for p in _split_args(params or ""):
+        p = p.strip()
+        if not p or p in {"*", "/"}:
+            continue
+        mm = re.match(r"\*{0,2}([A-Za-z_]\w*)", p)
+        if mm:
+            names.append(mm.group(1))
+    return m.group(1), names, m.start()
+
+
+def _py_is_input_param(source: str, name: str, pos: int | None) -> bool:
+    """裸标识符是不是当前函数的**真实形参**（M301 收紧）。
+
+    旧行为：入口区域找不到赋值就 return True —— 于是 ORM 表达式里的
+    模型类名（`select(ListingMonitorTask)`）被当成客户端可控值，把
+    `session.execute(stmt)` 判成 SQL 注入。现在只认 def 的形参表，
+    且排除 self/cls/db/session/conn/file 与全大写常量。
+    """
+    if re.fullmatch(r"[A-Z][A-Z0-9_]*", name):
+        return False
+    if name in _PY_NON_INPUT_PARAMS:
+        return False
+    info = _py_enclosing_def(source, pos)
+    if info:
+        return name in info[1]
+    if pos is None:
+        # 兼容旧调用方（无 pos）：按全源码的 def 形参表判断。
+        return bool(re.search(
+            rf"(?m)^\s*(?:async\s+)?def\s+\w*\s*\([^)]*\b{re.escape(name)}\b",
+            source))
+    return False
+
+
+def _py_sink_reachable(source: str, pos: int) -> bool:
+    """sink 所在的辅助函数是否真被入口调用（M301 跨跳归属）。
+
+    upload_image 的切片把同模块别的 service 的 `session.execute(stmt)`
+    带了进来，入口根本没调用那个 service —— 这种跳不进证据链。
+    多跳链路要跟着走：vulpy 的 do_key_create → keygen(Hop 1) → login(Hop 2)，
+    sink 在 Hop 2，只查"入口直接调用"会把真漏洞判丢。
+    """
+    info = _py_enclosing_def(source, pos)
+    if not info:
+        return True
+    name, _params, start = info
+    entry = _py_entry_region(source)
+    if start < len(entry):
+        return True                        # sink 就在入口体里
+    seen: set[str] = set()
+    queue = re.findall(r"\b([A-Za-z_]\w*)\s*\(", entry)
+    while queue and len(seen) < 200:
+        cur = queue.pop()
+        if cur in seen:
+            continue
+        seen.add(cur)
+        if cur == name:
+            return True
+        body = _py_function_body(source, cur)
+        if body:
+            queue.extend(re.findall(r"\b([A-Za-z_]\w*)\s*\(", body))
+    return False
+
+
+def _py_entry_has_no_input(source: str) -> bool:
+    """入口完全没有外部输入面（无请求参数、也不读 request）。"""
+    entry = _py_entry_region(source)
+    m = re.search(r"(?m)^[ \t]*(?:async\s+)?def\s+\w+\s*\(", entry)
+    if not m:
+        return False                       # 解析不出入口就不启用守卫
+    params = _balanced_cond(entry, m.end())
+    if params is None:
+        return False
+    names = []
+    for p in _split_args(params):
+        p = p.strip()
+        if not p or p in {"*", "/"}:
+            continue
+        mm = re.match(r"\*{0,2}([A-Za-z_]\w*)", p)
+        if mm:
+            names.append(mm.group(1))
+    names = [n for n in names if n not in {"self", "cls"}]
+    if names:
+        return False
+    return not re.search(r"\brequest\b", entry)
+
+
+_PY_TEXT_WRAP_RE = re.compile(r"^(?:(?:sa|sqlalchemy)\s*\.\s*)?text\s*\(",
+                               re.I)
+
+
+def _py_text_wrapper_inner(expr: str) -> str | None:
+    """`text("...") / sa.text(...)` 的内层实参；不是整串包装就返回 None。
+
+    M301：SQLAlchemy 的 `text()` 只是把字符串标成 SQL 文本，值域判定必须
+    看**里面的字符串**（`text("SELECT 1")` → 安全；`text(f"...{x}")` → 注入）。
+    """
+    m = _PY_TEXT_WRAP_RE.match(expr)
+    if not m:
+        return None
+    inner = _balanced_cond(expr, m.end())
+    if inner is None:
+        return None
+    close = m.end() + len(inner)
+    if expr[close:].strip() != ")":
+        return None
+    return inner
+
+
+_ORM_CHAIN_METHODS = frozenset({
+    "where", "limit", "offset", "order_by", "join", "filter", "filter_by",
+    "group_by", "having", "options", "distinct", "select_from", "subquery",
+    "outerjoin", "with_for_update", "execution_options"})
+
+
+def _py_strip_outer_parens(expr: str) -> str:
+    e = expr.strip()
+    while e.startswith("(") and e.endswith(")"):
+        inner = _balanced_cond(e, 1)
+        if inner is None or inner.strip() != e[1:-1].strip():
+            break
+        e = e[1:-1].strip()
+    return e
+
+
+def _py_assignments(region: str, name: str) -> list[str]:
+    """region 里该名字的**全部**赋值右值（含 PEP 8 折行续行）。"""
+    lines = region.split("\n")
+    pat = re.compile(rf"^[ \t]*{re.escape(name)}\s*=\s*(?!=)(.*)$")
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        m = pat.match(lines[i])
+        if not m:
+            i += 1
+            continue
+        buf = [m.group(1)]
+        depth = (sum(lines[i].count(c) for c in "([{")
+                 - sum(lines[i].count(c) for c in ")]}"))
+        j = i + 1
+        while depth > 0 and j < len(lines):
+            buf.append(lines[j])
+            depth += (sum(lines[j].count(c) for c in "([{")
+                      - sum(lines[j].count(c) for c in ")]}"))
+            j += 1
+        out.append("\n".join(buf).strip())
+        i = j
+    return out
+
+
+def _py_function_body(source: str, name: str) -> str:
+    m = re.search(rf"(?m)^[ \t]*(?:async\s+)?def\s+{re.escape(name)}\s*\(",
+                  source)
+    if not m:
+        return ""
+    nxt = re.search(r"(?m)^[ \t]*(?:async\s+)?def\s+\w+\s*\(",
+                    source[m.end():])
+    end = m.end() + nxt.start() if nxt else len(source)
+    return source[m.start():end]
+
+
+def _py_orm_expr(expr: str, source: str, pos: int | None = None,
+                 _depth: int = 0) -> bool:
+    """表达式是不是 SQLAlchemy ORM 语句对象（绑定参数，永不是 SQL 文本）。
+
+    覆盖三种真实写法：直接构造 `select(Model)...`、变量持有（含折行与
+    `.where/.limit` 链式追加）、以及 `self._xxx_stmt(...)` 这类只返回
+    语句对象的构造函数。
+    """
+    if _depth > 3:
+        return False
+    e = _py_strip_outer_parens(expr)
+    if _PY_ORM_EXPR_RE.match(e):
+        return True
+    if re.fullmatch(r"[A-Za-z_]\w*", e) and pos is not None:
+        region = _py_local_region(source, pos)
+        for rhs in _py_assignments(region, e):
+            rhs = _py_strip_outer_parens(rhs)
+            if _PY_ORM_EXPR_RE.match(rhs):
+                return True
+            m = re.match(r"([A-Za-z_]\w*)\s*\.\s*(\w+)\s*\(", rhs)
+            if (m and m.group(2) in _ORM_CHAIN_METHODS
+                    and m.group(1) != e
+                    and _py_orm_expr(m.group(1), source, pos, _depth + 1)):
+                return True
+            if (re.match(r"[A-Za-z_][\w.]*\s*\(", rhs)
+                    and _py_orm_expr(rhs, source, pos, _depth + 1)):
+                return True
+        return False
+    m = re.match(r"(?:self\s*\.\s*)?([A-Za-z_]\w*)\s*\(", e)
+    if m:
+        fname = m.group(1)
+        body = _py_function_body(source, fname)
+        if body:
+            return bool(_PY_ORM_EXPR_RE.search(body)
+                        or re.search(r"\.\s*(?:where|limit|offset|order_by)\s*\(",
+                                     body))
+        # 函数体不在切片里、名字明显是"造语句"的构造器 —— 按语句对象处理。
+        if re.search(r"(?:_stmt|_statement|_query|_select|_clause)$", fname, re.I):
+            return True
+    return False
 
 
 def python_sqli_verdict(source: str) -> bool | None:
@@ -6080,6 +6299,10 @@ def python_sqli_verdict(source: str) -> bool | None:
             if re.search(r"[:$][A-Za-z_]\w*|\$\d+|%\([^)]*\)s|\?", first):
                 return False           # 占位符 + 独立实参 = 绑定
         return None
+    # M301：入口没有任何外部输入面（无请求参数也不读 request）——
+    # 无论切片里带进来多少个 execute(...)，都不可能是客户端驱动的注入。
+    if _py_entry_has_no_input(source):
+        return False
     saw_safe = False
     for m in _PY_SQL_SINK_RE.finditer(source):
         args = _balanced_cond(source, m.end())
@@ -6092,8 +6315,11 @@ def python_sqli_verdict(source: str) -> bool | None:
             saw_safe = True            # 带参数元组/字典 → 参数化
             continue
         sql = parts[0].strip()
-        if _PY_ORM_EXPR_RE.match(sql):
-            saw_safe = True            # SQLAlchemy 2.0 表达式，绑定参数
+        if _py_orm_expr(sql, source, m.start()):
+            saw_safe = True            # SQLAlchemy ORM 语句对象，绑定参数
+            continue
+        # M301：sink 在 Hop 段里、但入口根本没调用那个辅助函数 —— 不进证据链。
+        if not _py_sink_reachable(source, m.start()):
             continue
         nat = _py_value_text_capable(sql, source, pos=m.start())
         if nat is True:
@@ -6157,6 +6383,10 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0,
     if re.fullmatch(r"(?:f|rf|fr|r)?['\"][^'\"]*['\"](?:\s*%s*)?", e) and "{" not in e \
             and "+" not in e and "%" not in e and ".format(" not in e:
         return False
+    # M301：SQLAlchemy text(...) 只是"这是 SQL 文本"的包装，剥开看内层。
+    _inner = _py_text_wrapper_inner(e)
+    if _inner is not None:
+        return _py_value_text_capable(_inner, source, depth + 1, pos=pos)
     # f-string / % / + / .format
     # f-string 必须有 f 前缀：普通字符串里的 '{}' 占位符（vulpy 的
     # "... username = '{}'".format(x)）会让 `{` 出现在表达式里，若只看
@@ -6166,7 +6396,8 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0,
         # f-string：花括号里的表达式
         natures = []
         for im in re.finditer(r"\{([^{}]+)\}", e):
-            natures.append(_py_interp_text_capable(im.group(1), source, depth))
+            natures.append(_py_interp_text_capable(im.group(1), source, depth,
+                                                     pos))
         if natures and all(n is False for n in natures):
             return False
         if any(n is True for n in natures):
@@ -6188,7 +6419,7 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0,
             rhs = e[last + 1:].strip()
             if rhs.startswith("(") and rhs.endswith(")"):
                 rhs = rhs[1:-1]
-            natures = [_py_interp_text_capable(a, source, depth)
+            natures = [_py_interp_text_capable(a, source, depth, pos)
                        for a in _split_args(rhs)]
             if natures and all(n is False for n in natures):
                 return False
@@ -6198,7 +6429,7 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0,
     if ".format(" in e:
         call_args = _balanced_cond(e, e.find(".format(") + len(".format("))
         if call_args is not None:
-            natures = [_py_interp_text_capable(a, source, depth)
+            natures = [_py_interp_text_capable(a, source, depth, pos)
                        for a in _split_args(call_args)]
             if natures and all(n is False for n in natures):
                 return False
@@ -6207,7 +6438,8 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0,
         return None
     if "+" in e:
         parts = [p for p in e.split("+") if p.strip()]
-        natures = [_py_value_text_capable(p, source, depth + 1) for p in parts]
+        natures = [_py_value_text_capable(p, source, depth + 1, pos=pos)
+                   for p in parts]
         if natures and all(n is False for n in natures):
             return False
         if any(n is True for n in natures):
@@ -6250,9 +6482,8 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0,
                 d = 0
             i += 1
         if rhs is not None:
-            return _py_value_text_capable(rhs, source, depth + 1)
-        if re.search(rf"(?m)^\s*(?:async\s+)?def\s+\w*\s*\([^)]*\b{re.escape(e)}\b",
-                     source):
+            return _py_value_text_capable(rhs, source, depth + 1, pos=pos)
+        if _py_is_input_param(source, e, pos):
             return True
         return None
     # 方法调用：int()/float()/len() 锁死值域；str(x)/foo(x) 取实参值域。
@@ -6277,7 +6508,7 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0,
             a = a.strip()
             km = re.match(r"[A-Za-z_]\w*\s*=\s*(.+)$", a, re.S)
             parts2.append(km.group(1).strip() if km else a)
-        natures = [_py_interp_text_capable(a, source, depth + 1)
+        natures = [_py_interp_text_capable(a, source, depth + 1, pos)
                    for a in parts2]
         if natures and all(n is False for n in natures):
             return False
@@ -6286,22 +6517,31 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0,
     return None
 
 
-def _py_interp_text_capable(expr: str, source: str, depth: int = 0) -> bool | None:
-    """插值表达式（f-string 花括号 / % 元组元素 / format 实参）的值域。"""
+def _py_interp_text_capable(expr: str, source: str, depth: int = 0,
+                            pos: int | None = None) -> bool | None:
+    """插值表达式（f-string 花括号 / % 元组元素 / format 实参）的值域。
+
+    M301：带 pos 时按**sink 所在函数**找局部赋值（旧实现只看入口区域，
+    Hop 段的 `stmt = select(...)` 完全看不见）；找不到赋值时只认真正的
+    形参，模型类名 / 模块别名 / 常量一律返回 None，不再无条件判 True。
+    """
     e = expr.strip()
     if re.fullmatch(r"-?\d+(?:\.\d+)?", e):
         return False
     if re.fullmatch(r"(?:int|float)\(([^()]*)\)", e):
         return False                      # int()/float() 转换锁死值域
     if re.fullmatch(r"[A-Za-z_]\w*", e):
-        region = _py_entry_region(source)
+        region = (_py_local_region(source, pos) if pos is not None
+                  else _py_entry_region(source))
         rhs = None
-        for am in re.finditer(rf"^[ \t]*{re.escape(e)}\s*=\s*(.+)$", region, re.M):
+        for am in re.finditer(rf"(?m)^[ \t]*{re.escape(e)}\s*=\s*(.+)$", region):
             rhs = am.group(1)
         if rhs is not None:
-            return _py_value_text_capable(rhs, source, depth + 1)
-        return True                       # 裸形参/字段：客户端可控
-    return _py_value_text_capable(e, source, depth + 1)
+            return _py_value_text_capable(rhs, source, depth + 1, pos=pos)
+        if _py_is_input_param(source, e, pos):
+            return True                   # 真形参：客户端可控
+        return None                       # 类名/模块/常量：不判
+    return _py_value_text_capable(e, source, depth + 1, pos=pos)
 
 
 _PY_TPL_STRING_RE = re.compile(r"\brender_template_string\s*\(|\bMarkup\s*\(|\bmarkupsafe\s*\.\s*Markup\s*\(")

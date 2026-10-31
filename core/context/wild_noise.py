@@ -15,6 +15,12 @@ M294 追加：
                                  本来就不可从网络到达，压进板块 B
   · Python 版兄弟守卫         —— Depends(get_current_*) / Security(...) /
                                  @login_required / @jwt_required / IsAuthenticated
+
+M302 追加：
+  · NO_SQL_SINK              —— Python sqli 但入口文件里一个
+                                 .execute/.executemany/.executescript 都没有：
+                                 根因来自切片里未被入口调用的辅助函数
+                                 （跨跳污染），压进板块 B 等人工复核
 """
 from __future__ import annotations
 
@@ -28,6 +34,11 @@ LOCAL_UNIX_SOCKET_SERVER = "LOCAL_UNIX_SOCKET_SERVER"
 UNVERIFIED_WILD_AUTHZ = "UNVERIFIED_WILD_AUTHZ"
 ZERO_ENTRY_LIB = "ZERO_ENTRY_LIB"
 RULE_LANGUAGE_MISMATCH = "RULE_LANGUAGE_MISMATCH"
+# M302：入口文件里根本没有 SQL 执行语句，sqli 根因一定来自切片里
+# 未被入口调用的辅助函数（跨跳污染）。宁可进 B 等人工复核，不进 A。
+NO_SQL_SINK = "NO_SQL_SINK"
+
+_PY_SQL_SINK_RE = re.compile(r"\.\s*(?:execute|executemany|executescript)\s*\(")
 
 # M297：只在 Solidity 里成立的类目；落到 .py/.java 入口一定是判据串了语言。
 SOLIDITY_ONLY = frozenset({"reentrancy", "unchecked_low_level_calls",
@@ -100,6 +111,15 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
         return {"blocked": True, "code": LOCAL_UNIX_SOCKET_SERVER,
                 "reason": ("AF_UNIX 本地控制通道（0700/0600 + 对端 UID 校验），"
                            "设计上不可从网络到达")}
+
+    if record.get("category") == "sqli" and file.endswith(".py"):
+        raw = str(record.get("file") or "")
+        src = _read(repo_root, raw)
+        if src and not _PY_SQL_SINK_RE.search(src):
+            return {"blocked": True, "code": NO_SQL_SINK,
+                    "reason": ("入口文件无任何 SQL 执行语句"
+                               "（.execute/.executemany/.executescript），"
+                               "sqli 来自切片里未被入口调用的辅助函数")}
 
     if record.get("category") == "authz":
         path = "/" + file.lstrip("/")

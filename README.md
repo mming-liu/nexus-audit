@@ -80,6 +80,22 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - Python 业务限定词把 `panel` 换成 `cms` / `saas` / `erp`（实测 `panel` 只捞到桌面 UI）。
 - **API 预算**：未配 `GITHUB_TOKEN` 时 GitHub core 限额 60 次/小时，建议每日跑
   `--max-roots 5`（每仓最多复核 5 条根因）；配 token 后可放开。
+### v1.3.4 Python SQLi 收口（M301 → M303）
+
+- **`text(...)` 包装剥开看内层**：`conn.execute(text("SELECT 1"))` 判安全，
+  `text(f"...{name}")` 仍判注入（SQLAlchemy 的 `text()` 只是"这是 SQL 文本"的标记）；
+- **ORM 语句对象不算 SQL 文本**：`stmt = select(Model).where(...)` 后再
+  `session.execute(stmt)` 判安全（`sql_delete/sql_insert/sql_update` 同）；
+- **裸标识符只认真形参**：旧实现"入口区域找不到赋值就 return True"，把
+  `select(ListingMonitorTask)` 的模型类名当成客户端可控值；现在按 sink 所在
+  函数找局部赋值，找不到时只认 `def` 的形参（排除 self/cls/db/session/conn/file
+  与全大写常量），其余返回 None；
+- **跨跳归属**：sink 在 Hop 段、但入口根本没调用那个辅助函数 → 不进证据链
+  （`upload_image` 把同模块别的 service 的 `session.execute` 带进来，就是这样误报的）；
+- **无参入口守卫**：入口既没有请求形参也不读 `request` → 直接判安全；
+- **`NO_SQL_SINK` 兜底**：Python sqli 但入口文件没有任何 SQL 执行语句 → 板块 B；
+  `target_scout` 工具词补 `testcontainers`。
+
 ### v1.3.3 冷却期免克隆（M299 → M300）
 
 - **克隆前 7 天冷却期**：`daily_hunt.py` 遍历 `scout_daily` 返回的**完整候选池**

@@ -10768,6 +10768,115 @@ check("M300：工具库剔除计数", _t300, 3)
 check("M300：业务仓保留", [x["slug"] for x in _items300], ["acme/crm"])
 check("M300：已执行断言数 >= 1690", COUNTS["n"] >= 1690, True)
 
+print("\n[289] M301：Python SQLi 三态收口（text 包装 / ORM 语句对象 / 无参入口 / 跨跳归属）")
+_rd301 = _rd297
+check("M301：text(\"SELECT 1\") 判安全",
+      _rd301.python_sqli_verdict(
+          'def health_check():\n    conn.execute(text("SELECT 1"))\n'), False)
+check("M301：无参入口一律不判注入",
+      _rd301.python_sqli_verdict(
+          'def health_check():\n    conn.execute(text("SELECT * FROM t"))\n'),
+      False)
+check("M301：text(f\"...{name}\") 仍判注入",
+      _rd301.python_sqli_verdict(
+          'def user(name):\n'
+          '    conn.execute(text(f"SELECT * FROM t WHERE n = \'{name}\'"))\n'),
+      True)
+check("M301：拼接形参仍判注入",
+      _rd301.python_sqli_verdict(
+          'def u(uid):\n    cur.execute("SELECT * FROM t WHERE id = " + uid)\n'),
+      True)
+check("M301：.format 形参仍判注入",
+      _rd301.python_sqli_verdict(
+          'def f(username):\n'
+          '    cur.execute("SELECT * FROM u WHERE n = \'{}\'".format(username))\n'),
+      True)
+check("M301：ORM 语句对象（局部变量）判安全",
+      _rd301.python_sqli_verdict(
+          'def list_tasks(owner_id):\n'
+          '    stmt = select(Task).where(Task.owner_id == owner_id)\n'
+          '    return session.execute(stmt)\n'), False)
+check("M301：sql_delete(...) 变量同样判安全",
+      _rd301.python_sqli_verdict(
+          'def purge(days):\n'
+          '    stmt = sql_delete(Log).where(Log.created_at < days)\n'
+          '    return session.execute(stmt)\n'), False)
+check("M301：ORM 链式追加（.where/.limit）仍判安全",
+      _rd301.python_sqli_verdict(
+          'def f(kw):\n'
+          '    stmt = select(User)\n'
+          '    if kw:\n'
+          '        stmt = stmt.where(User.name.ilike(f"%{kw}%"))\n'
+          '    stmt = stmt.limit(10).offset(0)\n'
+          '    return session.execute(stmt)\n'), False)
+check("M301：语句构造器（_stmt 结尾）返回对象判安全",
+      _rd301.python_sqli_verdict(
+          'def g(ids):\n'
+          '    tail_stmt = build_usage_stmt(ids)\n'
+          '    return session.execute(tail_stmt)\n'), False)
+check("M301：多跳链路（入口→Hop1→Hop2）仍归属",
+      _rd301.python_sqli_verdict(
+          'def do_key_create():\n'
+          '    data = request.get_json()\n'
+          '    key = libapi.keygen(data["u"], data["p"])\n'
+          '// ---- 跨文件辅助\n'
+          'def keygen(username, password=None):\n'
+          '    return libuser.login(username, password)\n'
+          '// 来自 libuser.py:5 [Hop 2]\n'
+          'def login(username, password):\n'
+          '    c.execute("SELECT * FROM users WHERE u = \'{}\'".format(username))\n'), True)
+check("M301：helper 未被入口调用则不归属",
+      _rd301.python_sqli_verdict(
+          'def upload_image(image, user):\n    return {"ok": True}\n'
+          '// ---- 跨文件辅助\n'
+          'def other(task_id):\n'
+          '    return session.execute(text("SELECT " + task_id))\n'), None)
+check("M301：入口真调用的 hop 仍判注入",
+      _rd301.python_sqli_verdict(
+          'def handler(task_id):\n    return dao.get(task_id)\n'
+          '// ---- 跨文件辅助\n'
+          'def get(self, task_id):\n'
+          '    stmt = text("SELECT * FROM t WHERE id = " + task_id)\n'
+          '    return self.session.execute(stmt)\n'), True)
+check("M301：text 包装只剥一层（内层仍是字面量）",
+      _rd301._py_text_wrapper_inner('sa.text("SELECT 1")'), '"SELECT 1"')
+check("M301：非整串 text 包装不误剥",
+      _rd301._py_text_wrapper_inner('text("a") + b'), None)
+check("M301：ORM 构造器识别（含模块前缀）",
+      (_rd301._py_orm_expr("sqlalchemy.select(T)", ""),
+       _rd301._py_orm_expr('text("SELECT 1")', "")), (True, False))
+check("M301：入口输入面识别",
+      (_rd301._py_entry_has_no_input(
+          'def health_check():\n    return 1\n'),
+       _rd301._py_entry_has_no_input(
+          'def user(name):\n    return name\n')), (True, False))
+
+print("\n[290] M302：NO_SQL_SINK 兜底 + testcontainers 过滤")
+_wn302 = _wn294
+_ws302 = Path(_ws_mkdtemp("smoke_m302_"))
+(_ws302 / "upload.py").write_text(
+    "async def upload_image(image, user):\n"
+    "    return {'ok': True}\n", encoding="utf-8")
+check("M302：入口文件无 SQL → NO_SQL_SINK",
+      _wn302.classify({"category": "sqli", "unit": "upload_image",
+                       "file": "upload.py"}, _ws302)["code"], "NO_SQL_SINK")
+(_ws302 / "repo.py").write_text(
+    "def list_users(name):\n"
+    "    return conn.execute('SELECT * FROM u WHERE n = ' + name)\n",
+    encoding="utf-8")
+check("M302：有 SQL 执行的入口不拦",
+      _wn302.classify({"category": "sqli", "unit": "list_users",
+                       "file": "repo.py"}, _ws302)["blocked"], False)
+(_ws302 / "oracle.py").write_text(
+    "def q(name):\n    return conn.execute(\"x\")\n", encoding="utf-8")
+_ts302 = _ts300
+check("M302：testcontainers 归工具库",
+      _ts302.is_tool_lib("testcontainers/testcontainers-java",
+                         "testing library for java"), True)
+check("M302：业务仓仍不误杀",
+      _ts302.is_tool_lib("acme/erp", "open source ERP backend"), False)
+check("M302：已执行断言数 >= 1720", COUNTS["n"] >= 1720, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

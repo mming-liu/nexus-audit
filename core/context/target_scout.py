@@ -82,7 +82,7 @@ _TOOL_LIB_RE = re.compile(
     r"(?:^|[^a-z0-9])(?:(?:driver|drivers|sdk|plugin|plugins|sphinx|cli|desktop|"
     r"eval|evaluat\w*|benchmark|generator|generators|codegen|datamodel|"
     r"telemetry|observability|logfire|spring-tools|citrus|test-framework|"
-    r"testing-framework)(?:[^a-z0-9]|$)"
+    r"testing-framework|testcontainers)(?:[^a-z0-9]|$)"
     r"|(?:ide|vscode|intellij|eclipse)-)", re.I)
 
 
