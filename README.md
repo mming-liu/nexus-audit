@@ -59,7 +59,7 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 ### v1.3.1 靶向制导（M293 → M296）
 
 - **抓仓不再裸搜**：按语言轮询业务限定词（Java：`spring-boot/admin/cms/erp/crm/mall`，
-  Python：`fastapi/django/flask/admin/backend/panel`，Solidity：`vault/staking/lending/swap`），
+  Python：`fastapi/django/flask/admin/backend/cms/saas/erp`，Solidity：`vault/staking/lending/swap`），
   并剔除 `driver/sdk/plugin/sphinx/cli/desktop/eval` 纯工具库；克隆后 `total_units == 0`
   的纯库标 `ZERO_ENTRY_LIB` 顺延，**不占当天 10 个名额**。
 - **本地控制通道识别**：命中 `AF_UNIX` + `SO_PEERCRED`/`LOCAL_PEERCRED`/`socket_path`
@@ -80,6 +80,20 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - Python 业务限定词把 `panel` 换成 `cms` / `saas` / `erp`（实测 `panel` 只捞到桌面 UI）。
 - **API 预算**：未配 `GITHUB_TOKEN` 时 GitHub core 限额 60 次/小时，建议每日跑
   `--max-roots 5`（每仓最多复核 5 条根因）；配 token 后可放开。
+### v1.3.3 冷却期免克隆（M299 → M300）
+
+- **克隆前 7 天冷却期**：`daily_hunt.py` 遍历 `scout_daily` 返回的**完整候选池**
+  （不是先 `items[:limit]` 截断），在 `sync_fn(slug)` 之前先看账本
+  `last_scanned_at`：距上次扫描不足 `--cooldown-days`（默认 7 天）的仓，
+  无论远端是否又推了新 Commit，直接 0 秒记 `SKIPPED (cooldown_7d)` 并顺延，
+  直到真正扫满 `--limit` 个**近 7 天没碰过**的新仓。`--cooldown-days 0` 关闭。
+- **开发工具过滤词扩充**：`target_scout.py` 的非业务黑名单补入
+  `generator/codegen/datamodel/telemetry/observability/logfire/spring-tools/citrus/test-framework/testing-framework`
+  与 `ide-/vscode-/intellij-/eclipse-` 前缀，把 10 个实扫名额留给真正的
+  ERP / CMS / CRM / 商城 / AI 业务后台与 DeFi 协议。
+- **A=0 只刷新不落库**：当日板块 A 为 0 时不把空报告提交进 Git（状态记忆在
+  `daily_hunt_state.json`），历史有效视图不被空快照覆盖。
+
 ## 目录结构
 
 ```text

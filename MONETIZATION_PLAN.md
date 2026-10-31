@@ -35,7 +35,7 @@
 4. 同批仓库挂 `python cli.py watch <repo> --bundle-dir watch_bundles` 持续盯新 commit
 
 ### 路径 2：审计私单（与路径 1 并行积信誉）
-- 第一步：newbee-mall-api 文件上传等**未重复**漏洞走 GHSA 私密报告 → CVE；JeecgBoot 两条先查重
+- 第一步：~~newbee-mall-api 文件上传走 GHSA 私密报告~~ → **该仓已永久废弃（STALE_REPO：HEAD 0879d5a1 / 2023-05-31，停更 1,246 天，且同作者主仓 Issue #100 已撞车），不再投入任何时间**；荣誉资产改由 ruoyi-vue-pro（CAN-2026-2041058，厂商已修复推送 2f655a81）承接；JeecgBoot 两条先查重
 - 第二步：README 顶部挂 `Discovered CVEs` + 25 仓实测大表（WILD_HUNT_REPORT.md）
 - 第三步：报价单按行计价（市场价 ~0.5 万/万行，10 万行 Java ≈ 1.3 万起）；交付物 = 零误报根因报告 + fix.patch + 回归测试
 - 注意合规：个人报告定位"内部整改参考"；等保/验收级报告需挂靠有 CNAS/CMA 资质机构
@@ -50,7 +50,7 @@
 
 ## 四、本周三步走（修正版）
 
-1. **荣誉资产**：newbee-mall-api 报告提交 GHSA 私密报告；JeecgBoot 两条按"affected ≤3.9.5 / 已修 / GHSA 查重中"口径发——**不承诺本周拿号**
+1. **荣誉资产**：~~newbee-mall-api 报告提交 GHSA 私密报告~~（**已废弃 / STALE_REPO，不再提交**）；改推 ruoyi-vue-pro 的 CAN-2026-2041058（补丁已上远端，静默期解除）；JeecgBoot 两条按"affected ≤3.9.5 / 已修 / GHSA 查重中"口径发——**不承诺本周拿号**
 2. **大仓筛真洞**：用现有 `scan --auto` 对 ruoyi-vue-pro 等大仓新根因过一遍 LLM 复核，找第二个未公开真洞
 3. **开张选边**：主攻路径 1 → 从 Huntr 挑 3 个 Python AI 仓跑首轮；主攻路径 3 → 先做 Web3 老仓复现补课
 
@@ -64,7 +64,7 @@
 |---|---|---|---|---|
 | CAN-2026-2041058 | YunaiV/ruoyi-vue-pro `PayWalletRechargeController.refundWalletRecharge`（CWE-862；修复 commit `2f655a81`，已推送远端） | 2026-10-28 | MITRE CNA-LR (CVE Services, production) | 已提交；厂商已修复并推送（2026-10-30 22:56 UTC），静默期结束，待 GHSA/CVE 编号 |
 | （待定） | metasfresh — Debug REST SQLi（细节静默期不记录，Issue #27079） | 2026-10-30 发私密通道请求（公开单未贴细节） | 先 GitHub 私密通道 → 72h 无回应追问 → 7 天无回应转 MITRE CNA-LR（publish 视协调结果） | 等维护者回应；远端 HEAD 复核仍未修；完整英文报告已备好未发出 |
-| （已否决） | ~~newbee-mall-api paySuccess~~ → 查重撞车 CVE-2025-10422（newbee-mall 同根因，issue #100）；原"任意文件上传"系标签误挂，实为 My-Blog 的发现 | — | — | DUPLICATE_CVE，不提交 |
+| （已否决） | ~~newbee-mall-api~~ **已永久废弃（STALE_REPO）**：HEAD 0879d5a1 停留在 2023-05-31（停更 1,246 天），且 paySuccess 查重撞车 CVE-2025-10422（newbee-mall 同根因，issue #100）；原"任意文件上传"系标签误挂，实为 My-Blog 的发现 | — | — | STALE_REPO + DUPLICATE_CVE，永久不提交 |
 | （已否决） | JeecgBoot SysAnnouncementSendController add/queryById | — | 需先对 GHSA-63v7-3c98-c3mj 查重 | 搁置 |
 | （已否决） | ~~My-Blog 任意文件上传~~ → 查重撞车 **CVE-2024-13144**（`BlogController.uploadFileByEditormd`，VulDB，issue #140）+ **CVE-2024-13145**（`UploadController.upload`，VulDB，issue #141），两条 unrestricted_upload 根因全部被覆盖；上游 master 复核仍未修但无披露价值 | — | — | DUPLICATE_CVE ×2，不提交 |
 

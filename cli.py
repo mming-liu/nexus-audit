@@ -6074,13 +6074,15 @@ def cmd_daily_hunt(args) -> int:
         evict_cache=args.evict_cache, offline=args.offline,
         dedup_online=not args.offline_dedup, dry_run=args.dry_run,
         max_head_age_days=args.max_head_age_days,
-        repo_timeout=args.repo_timeout)
+        repo_timeout=args.repo_timeout, cooldown_days=args.cooldown_days)
     d = res["daily"]
     tag = "（dry-run，未落盘）" if res.get("dry_run") else ""
     print(f"[daily-hunt]{tag} 候选 {d['candidates']} ｜ 实扫 {d['scanned']} ｜ "
           f"跳过 {d['skipped']} ｜ 失败 {d['failed']}")
     print(f"[daily-hunt] 新增根因 {d['new_roots']} ｜ 板块 A {d['board_a']} ｜ "
           f"拦截进 B {d['blocked']} ｜ 即扫即焚 {len(d['evicted'])} 个")
+    print(f"[daily-hunt] 冷却期免克隆 {d.get('cooldown_skipped', 0)} 个"
+          f"（--cooldown-days {d.get('cooldown_days', 0)}）")
     if not res.get("dry_run"):
         print(f"[daily-hunt] 报告 → {res['report']}；JSON → {res['json']}；"
               f"账本 → {res['state_path']}")
@@ -6156,7 +6158,7 @@ def cmd_export_packs(args) -> int:
         except Exception:                                    # noqa: BLE001
             sel = {}
     packs.sort(key=lambda d: sel.get(d.name, {}).get("rank", 999))
-    lines = [f"# Top-10 候选交单包（nexus-audit v1.3.2 · 非教学仓严选；"
+    lines = [f"# Top-10 候选交单包（nexus-audit v1.3.3 · 非教学仓严选；"
              f"{len(packs)} 条通过补丁自检）", "",
              "> M259：剔除教学仓与纯 CORS，同函数多规则合并，每仓最多 2 条；"
              "补丁自检 True -> False 才入包。目标 Top-10，实测不足时**不拿"
@@ -6386,6 +6388,9 @@ def main():
                          help="HEAD 提交超过该天数即判 STALE_REPO")
     p_daily.add_argument("--repo-timeout", type=int, default=900,
                          help="单仓扫描软超时秒数（默认 900，超时记 FAILED 并焚缓存）")
+    p_daily.add_argument("--cooldown-days", type=int, default=7,
+                         help="克隆前冷却期：距上次扫描不足 N 天的仓免克隆顺延"
+                              "（默认 7；0=关闭，每次有新提交都重扫）")
     p_daily.add_argument("--state", default=None,
                          help="账本路径（默认 benchmarks/results/daily_hunt_state.json）")
     p_daily.add_argument("--report", default=None)

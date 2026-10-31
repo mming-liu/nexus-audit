@@ -72,10 +72,18 @@ BUSINESS_QUALIFIERS: dict[str, tuple[str, ...]] = {
     "solidity": ("vault", "staking", "lending", "swap"),
 }
 
-# M293：纯工具库/驱动/插件/CLI/桌面/评测框架，没有业务路由，直接丢。
+# M293/M300：纯工具库/驱动/插件/CLI/桌面/评测框架/开发工具/测试框架，
+# 没有业务路由，直接丢。2026-10-31 实盘里 datamodel-code-generator（代码生成器）、
+# logfire（日志 SDK）、citrus（测试框架）、spring-tools（IDE 工具）各占掉一个
+# 实扫名额 —— 这些词必须在侦察阶段就挡掉，把名额留给真业务后台。
+# 注意：IDE 系（ide-/vscode-/intellij-/eclipse-）只认带连字符的前缀，
+# 避免把描述里写 “IDE integration” 的业务仓误杀。
 _TOOL_LIB_RE = re.compile(
-    r"(?:^|[^a-z0-9])(driver|drivers|sdk|plugin|plugins|sphinx|cli|desktop|"
-    r"eval|evaluat\w*|benchmark)(?:[^a-z0-9]|$)", re.I)
+    r"(?:^|[^a-z0-9])(?:(?:driver|drivers|sdk|plugin|plugins|sphinx|cli|desktop|"
+    r"eval|evaluat\w*|benchmark|generator|generators|codegen|datamodel|"
+    r"telemetry|observability|logfire|spring-tools|citrus|test-framework|"
+    r"testing-framework)(?:[^a-z0-9]|$)"
+    r"|(?:ide|vscode|intellij|eclipse)-)", re.I)
 
 
 def is_tool_lib(slug: str, description: str = "",

@@ -40,3 +40,6 @@ benchmarks/results/llm_root_triage.jsonl
 benchmarks/results/daily_hunt_state.json
 benchmarks/results/daily_hunt.json
 benchmarks/results/daily_hunt_packs/
+
+# M299 临时扫描报告（scan --report 的默认落点，随手生成，不入库）
+report_auto.md

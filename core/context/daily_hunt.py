@@ -8,6 +8,11 @@
 状态账本（默认 benchmarks/results/daily_hunt_state.json）记录
 last_scanned_sha 与 exported_roots；同 SHA 直接 0.1 秒跳过，同一个
 “类目|入口|文件”根因只报一次。
+
+M299：克隆前冷却期（--cooldown-days，默认 7 天）。距上次扫描不足 N 天
+的仓，无论远端是否又推了新 Commit，都不再克隆，直接 0 秒记
+SKIPPED (cooldown_Nd) 并顺延下一个候选 —— 否则 metasfresh 这类每天
+推若干次的高频大仓会永久霸占当天的实扫名额，排在后面的新仓永远轮不到。
 """
 from __future__ import annotations
 
@@ -16,6 +21,7 @@ import os
 import shutil
 import stat
 import time
+from datetime import datetime
 from pathlib import Path
 
 from core.context import cve_dedup, live_hunt, live_hunt_report, target_scout
@@ -28,10 +34,41 @@ DEFAULT_REPORT = ROOT / "LIVE_HUNT_REPORT.md"
 DEFAULT_JSON = ROOT / "benchmarks" / "results" / "daily_hunt.json"
 DEFAULT_PACKS = ROOT / "benchmarks" / "results" / "daily_hunt_packs"
 MAX_LEDGER_ROWS = 40
+# M299：同一个仓默认 7 天内只完整克隆扫描一次（--cooldown-days 0 关闭）。
+DEFAULT_COOLDOWN_DAYS = 7
+_TIME_FMT = "%Y-%m-%d %H:%M:%S"
 
 
 def _now() -> str:
-    return time.strftime("%Y-%m-%d %H:%M:%S")
+    return time.strftime(_TIME_FMT)
+
+
+def parse_scanned_at(value) -> datetime | None:
+    """解析账本 last_scanned_at（本地时间；容忍 ISO 8601 与空格分隔写法）。"""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        pass
+    for fmt in (_TIME_FMT, "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def last_scan_age_days(entry: dict, now: datetime | None = None) -> float | None:
+    """距上次扫描过去了多少天；无记录/解析失败返回 None（按可扫处理）。"""
+    stamp = parse_scanned_at((entry or {}).get("last_scanned_at"))
+    if stamp is None:
+        return None
+    now = now or datetime.now()
+    if stamp.tzinfo is not None and now.tzinfo is None:
+        now = now.astimezone()
+    return (now - stamp).total_seconds() / 86400.0
 
 
 def empty_state() -> dict:
@@ -182,7 +219,8 @@ def _counts(records: list[dict]) -> dict:
 
 def _header(ledger: list[dict], scout: dict, *, days: int,
             languages: list[str], evicted: list[str], summary: dict,
-            blocked: int) -> str:
+            blocked: int, cooldown_days: int = 0,
+            cooldown_skipped: int = 0) -> str:
     scanned = [x for x in ledger if x["result"] == "SCANNED"]
     skipped = [x for x in ledger if x["result"] == "SKIPPED"]
     failed = [x for x in ledger if x["result"] == "FAILED"]
@@ -197,6 +235,9 @@ def _header(ledger: list[dict], scout: dict, *, days: int,
         f"候选来源：{scout.get('source', '') or '—'}",
         f"- 本次新增根因：{summary['total']} ｜ 板块 A：{summary['board_a']} ｜ "
         f"拦截进 B：{blocked}",
+        f"- 冷却期免克隆：{cooldown_skipped} 个"
+        + (f"（--cooldown-days {cooldown_days}：距上次扫描不足 "
+           f"{cooldown_days} 天的仓直接 0 秒顺延）" if cooldown_days else "（已关闭）"),
         "",
         "| 仓库 | HEAD | 结果 | 新增 |",
         "|---|---|---|---|",
@@ -215,7 +256,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         packs_dir: Path | str | None = None, evict_cache: bool = False,
         offline: bool = False, dedup_online: bool = True,
         dry_run: bool = False, max_head_age_days: int = 180,
-        repo_timeout: int = 900,
+        repo_timeout: int = 900, cooldown_days: int = DEFAULT_COOLDOWN_DAYS,
         scout_fn=None, sync_fn=None, dedup_fn=None) -> dict:
     """M286 主流程；scout_fn / sync_fn 可注入（冒烟测试不联网）。"""
     started = _now()
@@ -226,6 +267,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
     scout_fn = scout_fn or target_scout.scout_daily
     sync_fn = sync_fn or upstream_sync.sync_repo
     lang_list = [str(x) for x in languages if str(x).strip()]
+    cooldown_days = max(0, int(cooldown_days or 0))
 
     scout = scout_fn(languages=lang_list, days=days, limit=limit,
                      min_stars=min_stars, max_stars=max_stars,
@@ -240,6 +282,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
     evicted: list[str] = []
     blocked = 0
     scanned_slots = 0
+    cooldown_skipped = 0
 
     for item in items:
         if scanned_slots >= max(1, int(limit)):
@@ -248,6 +291,17 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         if not slug:
             continue
         entry = dict(state["repos"].get(slug) or {})
+        # M299：克隆前冷却期 —— 不足 N 天就免克隆跳过，把名额让给新候选。
+        if cooldown_days > 0:
+            age_days = last_scan_age_days(entry)
+            if age_days is not None and age_days < cooldown_days:
+                ledger.append({
+                    "slug": slug, "result": "SKIPPED",
+                    "reason": f"cooldown_{cooldown_days}d",
+                    "age_days": round(age_days, 2),
+                    "head_sha": str(entry.get("last_scanned_sha") or "")})
+                cooldown_skipped += 1
+                continue
         try:
             if offline:
                 cached = (upstream_sync.CACHE_ROOT /
@@ -327,6 +381,8 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         "failed": sum(1 for x in ledger if x["result"] == "FAILED"),
         "new_roots": summary["total"], "board_a": summary["board_a"],
         "blocked": blocked, "evicted": evicted,
+        "cooldown_days": cooldown_days,
+        "cooldown_skipped": cooldown_skipped,
         "scout_source": scout.get("source", ""),
         "state_path": str(state_path),
     }
@@ -341,7 +397,8 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         records, report, json_path, packs_dir, generated_at=started,
         header_extra=_header(ledger, scout, days=days, languages=lang_list,
                              evicted=evicted, summary=summary,
-                             blocked=blocked),
+                             blocked=blocked, cooldown_days=cooldown_days,
+                             cooldown_skipped=cooldown_skipped),
         with_confidence=True, extra={"daily": daily_meta})
     save_state(state_path, state)
 

@@ -10670,6 +10670,104 @@ check("M298：轮询按天稳定",
       True)
 check("M298：已执行断言数 >= 1670", COUNTS["n"] >= 1670, True)
 
+print("\n[287] M299：克隆前 7 天冷却期免克隆顺延")
+import datetime as _dt299                                        # noqa: E402
+_dh299 = _dh275
+_out299 = Path(_ws_mkdtemp("smoke_m299_"))
+_st299 = _out299 / "state.json"
+_now299 = _dt299.datetime.now()
+_fmt299 = lambda d: d.strftime("%Y-%m-%d %H:%M:%S")              # noqa: E731
+_s299 = _dh299.empty_state()
+_s299["repos"] = {
+    "acme/hot-1": {"last_scanned_at": _fmt299(_now299),
+                   "last_scanned_sha": "aaa"},
+    "acme/hot-2": {"last_scanned_at": _fmt299(_now299 - _dt299.timedelta(days=3)),
+                   "last_scanned_sha": "bbb"},
+    "acme/hot-3": {"last_scanned_at": _fmt299(_now299 - _dt299.timedelta(days=6, hours=20)),
+                   "last_scanned_sha": "ccc"},
+    "acme/cold-1": {"last_scanned_at": _fmt299(_now299 - _dt299.timedelta(days=8)),
+                    "last_scanned_sha": "ddd"},
+}
+_dh299.save_state(_st299, _s299)
+check("M299：账本里的 5 天前是可解析的",
+      round(_dh299.last_scan_age_days(
+          {"last_scanned_at": _fmt299(_now299 - _dt299.timedelta(days=5))}) or 0, 1),
+      5.0)
+check("M299：无 last_scanned_at 视为可扫",
+      _dh299.last_scan_age_days({"last_scanned_sha": "x"}), None)
+check("M299：坏时间戳不阻塞扫描",
+      _dh299.last_scan_age_days({"last_scanned_at": "not-a-time"}), None)
+_up299 = []
+def _sync299(slug):
+    _up299.append(slug)
+    return {"status": "OK", "path": str(_dh_repo276)}
+_res299 = _dh299.run(
+    limit=2, state_path=_st299, report=_out299 / "R.md",
+    json_path=_out299 / "R.json", packs_dir=_out299 / "packs",
+    scout_fn=lambda **kw: {"ok": True, "source": "github_search",
+                           "items": [{"slug": "acme/hot-1"},
+                                     {"slug": "acme/hot-2"},
+                                     {"slug": "acme/hot-3"},
+                                     {"slug": "acme/cold-1"},
+                                     {"slug": "acme/new-1"}]},
+    sync_fn=_sync299, dedup_fn=_fresh276)
+check("M299：冷却期内 3 个仓全部 0 秒跳过",
+      [x["reason"] for x in _res299["ledger"][:3]],
+      ["cooldown_7d", "cooldown_7d", "cooldown_7d"])
+check("M299：冷却期仓不触发克隆",
+      _up299, ["acme/cold-1", "acme/new-1"])
+check("M299：顺延后仍扫满 limit",
+      (_res299["daily"]["scanned"], _res299["daily"]["cooldown_skipped"]), (2, 3))
+check("M299：跳过仓账本时间戳不被改写",
+      json.loads(_st299.read_text(encoding="utf-8"))["repos"]["acme/hot-1"]["last_scanned_at"],
+      _fmt299(_now299))
+_md299 = (_out299 / "R.md").read_text(encoding="utf-8")
+check("M299：报告写明冷却期免克隆", "冷却期免克隆" in _md299, True)
+check("M299：daily.json 记录冷却参数",
+      json.loads((_out299 / "R.json").read_text(encoding="utf-8"))["daily"]["cooldown_days"], 7)
+_up299.clear()
+_res299b = _dh299.run(
+    limit=1, state_path=_st299, report=_out299 / "R2.md",
+    json_path=_out299 / "R2.json", packs_dir=_out299 / "packs2",
+    cooldown_days=0,
+    scout_fn=lambda **kw: {"ok": True, "source": "github_search",
+                           "items": [{"slug": "acme/hot-1"}]},
+    sync_fn=_sync299, dedup_fn=_fresh276)
+check("M299：--cooldown-days 0 关闭冷却", _up299, ["acme/hot-1"])
+check("M299：关闭后正常实扫", _res299b["daily"]["scanned"], 1)
+
+print("\n[288] M300：开发工具 / 测试框架过滤词")
+_ts300 = _ts293
+for _slug300, _desc300 in [
+        ("datamodel-code-generator/datamodel-code-generator", "code generator"),
+        ("pydantic/logfire", "observability and telemetry sdk"),
+        ("spring-projects/spring-tools", "IDE tooling for spring"),
+        ("citrusframework/citrus", "test framework"),
+        ("microsoft/vscode-python", "vscode extension"),
+        ("acme/intellij-plugin", "intellij plugin"),
+        ("acme/eclipse-plugin", "eclipse plugin")]:
+    check(f"M300：{_slug300} 被剔除", _ts300.is_tool_lib(_slug300, _desc300), True)
+for _slug300, _desc300 in [
+        ("acme/mall", "e-commerce backend"),
+        ("acme/erp", "open source ERP / CRM backend"),
+        ("acme/crm", "customer management backend"),
+        ("acme/shop", "spring boot shop")]:
+    check(f"M300：{_slug300} 不误杀", _ts300.is_tool_lib(_slug300, _desc300), False)
+check("M300：IDE 只在带连字符时才算工具",
+      (_ts300.is_tool_lib("acme/idea", "business app with IDE integration"),
+       _ts300.is_tool_lib("acme/vscode-ext", "extension")), (False, True))
+_items300, _d300, _t300 = _ts300._parse_search({"items": [
+    {"full_name": "datamodel-code-generator/datamodel-code-generator",
+     "description": "generator"},
+    {"full_name": "pydantic/logfire", "description": "telemetry"},
+    {"full_name": "citrusframework/citrus", "description": "test framework"},
+    {"full_name": "acme/crm", "description": "crm backend",
+     "has_issues": True, "stargazers_count": 800},
+]}, "python")
+check("M300：工具库剔除计数", _t300, 3)
+check("M300：业务仓保留", [x["slug"] for x in _items300], ["acme/crm"])
+check("M300：已执行断言数 >= 1690", COUNTS["n"] >= 1690, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
