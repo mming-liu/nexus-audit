@@ -4795,14 +4795,20 @@ PATH_SINK_RE = re.compile(
     r"new\s+File(?:InputStream|OutputStream|Reader|Writer)?\s*\(|"
     r"Files\s*\.\s*(?:readAllBytes|readAllLines|readString|newInputStream|"
     r"newOutputStream|copy|write|delete|move)\s*\(|"
-    r"Paths\s*\.\s*get\s*\(|"
+    # M309：大小写敏感 —— Python 的 `paths.get(key)`（dict 方法）不能当
+    # Java 的 `Paths.get(...)`（文件 API）。dramaclaw 的 sketch_grid_preview
+    # 就是被这条 re.I 误伤的。
+    r"(?-i:\bPaths\s*\.\s*get\s*\()|"
     r"FileUtils\s*\.\s*(?:read|copy|writeFile|open)\w*\s*\(|"
     # M64 淬火⑨：IOUtils 读 `request.getInputStream()` 是读 **HTTP 请求体**
     # （litemall payNotify 微信回调解析），不是文件路径面 —— 排除。
     r"IOUtils\s*\.\s*(?:toByteArray|copy|toString)\s*\("
     r"(?!\s*request\s*\.\s*getInputStream)"
     r"|"
-    r"\.\s*listFiles\s*\(|getResourceAsStream\s*\(|ZipFile\s*\(", re.I)
+    # M309：只认 Java 的 `new ZipFile(...)`（读压缩包）；Python 的
+    # `zipfile.ZipFile(tmp, "w")` 是写临时包，属于 zip_slip 类目，不是路径穿越。
+    r"\.\s*listFiles\s*\(|getResourceAsStream\s*\(|new\s+ZipFile\s*\(",
+    re.I)
 # 真正的路径约束：规范化后再比较，或直接剥掉目录
 PATH_SAFE_RE = re.compile(
     r"getCanonicalPath\s*\(\s*\)\s*\.\s*startsWith\s*\(|"

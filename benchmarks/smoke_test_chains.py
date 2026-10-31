@@ -11091,6 +11091,28 @@ check("M309：上传对象整体传给辅助函数仍可判 False",
           '        f.write(b"")\n'), False)
 check("M309：已执行断言数 >= 1760", COUNTS["n"] >= 1760, True)
 
+print("\n[296] M310：Paths.get 大小写 + ZipFile 写包不判 pathtraver")
+check("M310：Python dict paths.get(key) 不算文件 API",
+      bool(_rd307.PATH_SINK_RE.search("paths.get(beat_num)")), False)
+check("M310：Java Paths.get(...) 仍算文件 API",
+      bool(_rd307.PATH_SINK_RE.search("Paths.get(userInput)")), True)
+check("M310：zipfile.ZipFile(tmp, \"w\") 不算路径穿越 sink",
+      bool(_rd307.PATH_SINK_RE.search('zipfile.ZipFile(tmp_path, "w")')), False)
+check("M310：Java new ZipFile(...) 仍算",
+      bool(_rd307.PATH_SINK_RE.search("new ZipFile(file)")), True)
+check("M310：dramaclaw 两条 pathtraver 不再判 True",
+      (_rd307.pathtraver_verdict(
+           'def f(ep_grids_dir):\n'
+           '    paths = build(ep_grids_dir)\n'
+           '    return paths.get(1)\n') is not True,
+       _rd307.pathtraver_verdict(
+           'def g(project_dir):\n'
+           '    tmp = tempfile.NamedTemporaryFile(delete=False)\n'
+           '    with zipfile.ZipFile(tmp.name, "w") as zf:\n'
+           '        zf.write(project_dir / "a.mp4", "a.mp4")\n') is not True),
+      (True, True))
+check("M310：已执行断言数 >= 1765", COUNTS["n"] >= 1765, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

@@ -71,6 +71,14 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.8 pathtraver 大小写与压缩包 sink 收口（M310）
+
+- **Paths.get 大小写敏感**：Python 的 paths.get(key)（dict 方法）不再被 re.I
+  误判成 Java 的 Paths.get(...) 文件 API（dramaclaw sketch_grid_preview）。
+- **压缩包 sink 只认 Java 读包**：zipfile.ZipFile(tmp, "w") 是写临时包（属 zip_slip 类目），
+  从 PATH_SINK_RE 移除；保留 new ZipFile(...)。
+- 实码回归：dramaclaw export_zip / sketch_grid_preview 由 True 变 None。
+
 ### v1.3.7 临时文件与上传面收口（M309 收尾）
 
 - **临时文件删除豁免**：`arbitrary_file_delete_verdict` 识别
