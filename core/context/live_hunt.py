@@ -93,6 +93,39 @@ def _rel(repo: Path, file: str) -> str:
         return Path(file).name
 
 
+def _base_record(repo: Path, slug: str, rc: dict, head: dict,
+                 max_head_age_days: int) -> dict:
+    """按根因构造报告记录骨架（不做任何状态判定）。
+
+    M304：daily_hunt 需要在**联网查重之前**就把噪音项压进板块 B，所以把
+    记录骨架抽出来给两边共用，避免 run_one 与降噪分支的字段漂移。
+    """
+    cat = rc.get("category", "")
+    unit = rc.get("unit_name") or rc.get("representative") or ""
+    file = rc.get("file", "")
+    line = int(rc.get("line") or 0)
+    rel = _rel(repo, file)
+    return {
+        "repo": slug.split("/")[-1] if "/" in slug else slug,
+        "slug": slug, "category": cat, "unit": unit,
+        "file": rel, "line": line,
+        "routes": list(rc.get("routes") or []),
+        "affected_routes": int(rc.get("affected_routes") or 1),
+        "head_sha": head.get("head_sha", ""),
+        "head_commit_date": head.get("head_commit_date", ""),
+        "head_age_days": head.get("head_age_days", 999999.0),
+        "max_head_age_days": max_head_age_days,
+        "stale": False,
+        "permalink": "", "status": cve_dedup.STATUS_UNKNOWN,
+        "matched_ids": [], "sources": {}, "evidence_urls": [],
+        "checked_at": "",
+        "reason": "", "version_evidence": "",
+        "triage": _triage_verdict(slug, cat, unit),
+        "advisory_url": _advisory_url(slug),
+        "issue_url": _issue_url(slug), "cve_form_url": CVE_FORM,
+    }
+
+
 def run_one(repo: Path, *, slug: str | None = None, offline: bool = False,
             limit: int = 0, dedup_online: bool = True,
             max_head_age_days: int = MAX_HEAD_AGE_DAYS,
@@ -115,25 +148,7 @@ def run_one(repo: Path, *, slug: str | None = None, offline: bool = False,
         file = rc.get("file", "")
         line = int(rc.get("line") or 0)
         rel = _rel(repo, file)
-        rec = {
-            "repo": slug.split("/")[-1] if "/" in slug else slug,
-            "slug": slug, "category": cat, "unit": unit,
-            "file": rel, "line": line,
-            "routes": list(rc.get("routes") or []),
-            "affected_routes": int(rc.get("affected_routes") or 1),
-            "head_sha": head.get("head_sha", ""),
-            "head_commit_date": head.get("head_commit_date", ""),
-            "head_age_days": head.get("head_age_days", 999999.0),
-            "max_head_age_days": max_head_age_days,
-            "stale": False,
-            "permalink": "", "status": cve_dedup.STATUS_UNKNOWN,
-            "matched_ids": [], "sources": {}, "evidence_urls": [],
-            "checked_at": "",
-            "reason": "", "version_evidence": "",
-            "triage": _triage_verdict(slug, cat, unit),
-            "advisory_url": _advisory_url(slug),
-            "issue_url": _issue_url(slug), "cve_form_url": CVE_FORM,
-        }
+        rec = _base_record(repo, slug, rc, head, max_head_age_days)
         if not rec["head_sha"]:
             rec["reason"] = f"head_unavailable: {head.get('reason', '')}"
             out.append(rec)

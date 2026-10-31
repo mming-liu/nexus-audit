@@ -71,6 +71,21 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.5 巡猎顺序与包装类收口（M304 → M306）
+
+- **先降噪、再截断、最后联网**：`daily_hunt.process_repo` 拿到全仓 roots 后先在本地跑
+  `wild_noise.classify` / `promote`，被拦截的噪音（`UNVERIFIED_WILD_AUTHZ`、
+  `PUBLIC_READONLY_ENDPOINT`、`LOW_SEVERITY_LOG_INJECTION`、`NO_SQL_SINK` …）
+  直接进板块 B，**不消耗 GitHub API 配额、不占 `--max-roots` 名额**；通过筛选的候选
+  按交单价值排序（第一梯队 `sqli/cmdi/deserial/ssti/ssrf/xxe/jndi_injection/`
+  `unrestricted_upload/zip_slip/pathtraver/arbitrary_file_delete/spel` 与
+  `confidence=HIGH` 的 authz），截取前 N 条才送 `cve_dedup`。
+  旧顺序（先 `roots[:max_roots]` 后降噪）会让第 6 条真 sqli 被前 5 条噪音挤掉。
+- **统一 JSON 包装按命名机制识别**：`_DB_WRAPPED_ECHO_RE` 覆盖
+  `R / ResponseEntity / \w*Result / \w*Response / \w*Resp` 的
+  `.ok/.success/.error/.fail/.data/.of`，`ApiResult.success(...)` 不再被报成存储型 XSS。
+- **log_injection 降级**：CWE-117 日志伪造归 `LOW_SEVERITY_LOG_INJECTION` 进板块 B。
+
 ### v1.3.2 语言闸门（M297 → M298）
 
 - `_looks_solidity()` 先排除 Python 切片（有 `def`、无 `pragma solidity`）：

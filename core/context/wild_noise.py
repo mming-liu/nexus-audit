@@ -21,6 +21,10 @@ M302 追加：
                                  .execute/.executemany/.executescript 都没有：
                                  根因来自切片里未被入口调用的辅助函数
                                  （跨跳污染），压进板块 B 等人工复核
+
+M305 追加：
+  · LOW_SEVERITY_LOG_INJECTION —— CWE-117 日志伪造属低危，维护者与 MITRE
+                                 极少单独下发 CVE，不占板块 A 的交单席位
 """
 from __future__ import annotations
 
@@ -37,6 +41,9 @@ RULE_LANGUAGE_MISMATCH = "RULE_LANGUAGE_MISMATCH"
 # M302：入口文件里根本没有 SQL 执行语句，sqli 根因一定来自切片里
 # 未被入口调用的辅助函数（跨跳污染）。宁可进 B 等人工复核，不进 A。
 NO_SQL_SINK = "NO_SQL_SINK"
+# M305：CWE-117 日志伪造属低危，维护者与 MITRE 极少单独下发 CVE，
+# 野仓模式下不占板块 A 的交单席位。
+LOW_SEVERITY_LOG_INJECTION = "LOW_SEVERITY_LOG_INJECTION"
 
 _PY_SQL_SINK_RE = re.compile(r"\.\s*(?:execute|executemany|executescript)\s*\(")
 
@@ -111,6 +118,11 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
         return {"blocked": True, "code": LOCAL_UNIX_SOCKET_SERVER,
                 "reason": ("AF_UNIX 本地控制通道（0700/0600 + 对端 UID 校验），"
                            "设计上不可从网络到达")}
+
+    if record.get("category") == "log_injection":
+        return {"blocked": True, "code": LOW_SEVERITY_LOG_INJECTION,
+                "reason": ("CWE-117 日志伪造（CRLF 注入）属低危，"
+                           "不作为首杀交单项")}
 
     if record.get("category") == "sqli" and file.endswith(".py"):
         raw = str(record.get("file") or "")

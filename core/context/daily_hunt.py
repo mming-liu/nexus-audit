@@ -108,14 +108,47 @@ def root_key(record: dict) -> str:
                      str(record.get("file") or "")))
 
 
+# M304：CVE 交单价值第一梯队。联网查重配额只花在这些类目 + HIGH authz 上。
+HIGH_VALUE_CATEGORIES = (
+    "sqli", "cmdi", "deserial", "ssti", "ssrf", "xxe", "jndi_injection",
+    "unrestricted_upload", "zip_slip", "pathtraver", "arbitrary_file_delete",
+    "spel",
+)
+_CATEGORY_RANK = {c: i for i, c in enumerate(HIGH_VALUE_CATEGORIES)}
+
+
+def root_priority(record: dict, confidence: str = "") -> tuple[int, int]:
+    """查重优先级：第一梯队 0，其余 1；同档按类目重要度、再按扫描顺序。"""
+    cat = str(record.get("category") or "")
+    if cat in _CATEGORY_RANK:
+        return (0, _CATEGORY_RANK[cat])
+    if cat == "authz" and str(confidence or record.get("confidence") or "") == "HIGH":
+        return (0, len(_CATEGORY_RANK))
+    return (1, 0)
+
+
+def _root_view(rc: dict, repo: Path) -> dict:
+    """根因 → 降噪/提拔可读的最小记录（相对路径 + 入口名）。"""
+    return {
+        "category": str(rc.get("category") or ""),
+        "unit": str(rc.get("unit_name") or rc.get("representative") or ""),
+        "file": live_hunt._rel(repo, str(rc.get("file") or "")),
+        "routes": list(rc.get("routes") or []),
+    }
+
+
 def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
                  dedup_online: bool = False, max_roots: int = 0,
                  max_head_age_days: int = 180, dedup_fn=None,
                  repo_timeout: int = 900) -> dict:
-    """扫一个仓库，返回本次“新引入且未导出”的 FRESH 根因。
+    """扫一个仓库，返回本次“新引入且未导出”的根因（含本地拦截的 B 项）。
 
     返回值：records / entry / skipped_unchanged / head_sha / raw_roots /
     total_units（M293：0 表示纯库无路由，调用方据此不占名额）。
+
+    M304：顺序必须是 **本地降噪 → 优先级排序 → 截断 → 联网查重**。
+    旧实现先 roots[:max_roots] 再降噪，前 5 条若全是 UNVERIFIED_WILD_AUTHZ
+    / log_injection，第 6 条真 sqli 会被直接丢掉，还白烧 5 次 API 配额。
     """
     repo = Path(repo)
     entry = dict(entry or {})
@@ -129,17 +162,55 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
                 "raw_roots": 0, "total_units": None}
 
     scan = live_hunt.scan_repo(repo, timeout=repo_timeout)
-    roots = scan["roots"]
-    if max_roots and len(roots) > max_roots:
-        roots = roots[:max_roots]
+    roots = list(scan["roots"])
+    exported = set(entry.get("exported_roots") or [])
+
+    kept: list[tuple[tuple[int, int], dict, dict]] = []
+    blocked_roots: list[tuple[dict, dict]] = []
+    for rc in roots:
+        view = _root_view(rc, repo)
+        if root_key(view) in exported:
+            continue                     # 已导出过：不查重、不占名额
+        noise = wild_noise.classify(view, repo)
+        if noise.get("blocked"):
+            blocked_roots.append((rc, noise))
+            continue
+        promo = wild_noise.promote(view, repo)
+        kept.append((root_priority(view, promo.get("level", "")), rc, promo))
+    kept.sort(key=lambda x: x[0])        # 稳定排序：同档保持扫描顺序
+    if max_roots:
+        kept = kept[:max_roots]
+
     recs = live_hunt.run_one(repo, slug=slug, offline=not dedup_online,
                              max_head_age_days=max_head_age_days,
-                             roots=roots, dedup_fn=dedup_fn)
+                             roots=[rc for _p, rc, _m in kept],
+                             dedup_fn=dedup_fn)
 
-    exported = set(entry.get("exported_roots") or [])
+    promo_by_key = {root_key(_root_view(rc, repo)): promo
+                    for _p, rc, promo in kept}
+    for rec in recs:
+        promo = promo_by_key.get(root_key(rec)) or {}
+        if promo.get("level"):
+            rec["confidence"] = promo["level"]
+            rec["authz_evidence"] = promo.get("evidence", "")
+
+    # 噪音项：0 网络请求、不占 --max-roots 名额，直接进板块 B 留证。
+    for rc, noise in blocked_roots:
+        rec = live_hunt._base_record(repo, slug, rc, head, max_head_age_days)
+        rec["status"] = cve_dedup.STATUS_UNKNOWN
+        rec["noise_code"] = noise.get("code", "")
+        rec["reason"] = f"{noise.get('code', '')}: {noise.get('reason', '')}"
+        if rec["head_sha"]:
+            rec["permalink"] = upstream_sync.head_permalink(
+                slug, rec["head_sha"], rec["file"], rec["line"])
+        recs.append(rec)
+
     fresh_keys: list[str] = []
     new: list[dict] = []
     for rec in recs:
+        if rec.get("noise_code"):
+            new.append(rec)              # 本地已判 B，无需再查重
+            continue
         if rec.get("status") != cve_dedup.STATUS_FRESH:
             continue
         key = root_key(rec)
@@ -341,20 +412,12 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
 
             new: list[dict] = []
             for rec in res["records"]:
-                noise = wild_noise.classify(rec, repo)
-                if noise["blocked"]:
-                    # M287/M294：噪音不删，只压进板块 B，保留证据可复核。
-                    rec["status"] = cve_dedup.STATUS_UNKNOWN
-                    rec["noise_code"] = noise["code"]
-                    rec["reason"] = f"{noise['code']}: {noise['reason']}"
+                # M304：降噪/提拔已在 process_repo 的联网查重之前完成，
+                # 这里只做计数与 authz 置信度门槛，不再重复读文件。
+                if rec.get("noise_code"):
                     blocked += 1
-                else:
-                    promo = wild_noise.promote(rec, repo)
-                    if promo.get("level"):
-                        rec["confidence"] = promo["level"]
-                        rec["authz_evidence"] = promo["evidence"]
-                    if downgrade_wild_authz(rec):
-                        blocked += 1
+                elif downgrade_wild_authz(rec):
+                    blocked += 1
                 new.append(rec)
 
             records.extend(new)

@@ -10877,6 +10877,105 @@ check("M302：业务仓仍不误杀",
       _ts302.is_tool_lib("acme/erp", "open source ERP backend"), False)
 check("M302：已执行断言数 >= 1720", COUNTS["n"] >= 1720, True)
 
+print("\n[291] M304：先降噪 + 优先级排序，再按 max_roots 截断送查重")
+from core.context import daily_hunt as _dh304                       # noqa: E402
+_repo304 = Path(_ws_mkdtemp("smoke_m304_"))
+(_repo304 / "app.py").write_text(
+    'def f():\n    return conn.execute("SELECT 1")\n', encoding="utf-8")
+_sp261.run(["git", "init", "-q"], cwd=_repo304, check=True)
+_sp261.run(["git", "config", "user.email", "smoke@example.com"], cwd=_repo304, check=True)
+_sp261.run(["git", "config", "user.name", "smoke"], cwd=_repo304, check=True)
+_sp261.run(["git", "add", "."], cwd=_repo304, check=True)
+_sp261.run(["git", "commit", "-qm", "init"], cwd=_repo304, check=True)
+_f304 = str(_repo304 / "app.py")
+
+
+def _root304(cat, unit):
+    return {"category": cat, "unit_name": unit, "file": _f304,
+            "line": 1, "routes": ["/x"], "affected_routes": 1}
+
+
+_roots304 = [_root304("log_injection", f"Noise{i}.run") for i in range(5)]
+_roots304.append(_root304("hardcoded_secret", "Config.load"))
+_roots304.append(_root304("sqli", "Query.run"))
+_seen304 = {"cats": []}
+_scan_orig, _run_orig = _dh304.live_hunt.scan_repo, _dh304.live_hunt.run_one
+
+
+def _scan304(repo, timeout=900):
+    return {"roots": list(_roots304), "total_units": len(_roots304)}
+
+
+def _run304(repo, **kw):
+    passed = list(kw.get("roots") or [])
+    _seen304["cats"] = [r.get("category") for r in passed]
+    out = []
+    for rc in passed:
+        rec = _dh304.live_hunt._base_record(
+            repo, "acme/noise-order", rc,
+            {"head_sha": "deadbeef", "head_commit_date": "2026-10-31",
+             "head_age_days": 0.0}, 180)
+        rec["status"] = _dh304.cve_dedup.STATUS_FRESH
+        out.append(rec)
+    return out
+
+
+_dh304.live_hunt.scan_repo = _scan304
+_dh304.live_hunt.run_one = _run304
+try:
+    _res304 = _dh304.process_repo("acme/noise-order", _repo304, {},
+                                  dedup_online=False, max_roots=2)
+finally:
+    _dh304.live_hunt.scan_repo = _scan_orig
+    _dh304.live_hunt.run_one = _run_orig
+check("M304：第 6/7 条真洞没被前 5 条噪音挤掉", _seen304["cats"],
+      ["sqli", "hardcoded_secret"])
+check("M304：噪音不送联网查重（0 次 run_one）",
+      [c for c in _seen304["cats"] if c == "log_injection"], [])
+_noise304 = [r for r in _res304["records"] if r.get("noise_code")]
+check("M304：5 条噪音直接进板块 B", len(_noise304), 5)
+check("M304：噪音码正确",
+      {r["noise_code"] for r in _noise304}, {"LOW_SEVERITY_LOG_INJECTION"})
+check("M304：真 sqli 仍为 FRESH",
+      [r["category"] for r in _res304["records"]
+       if r.get("status") == "ZERO_RECORD_FRESH"],
+      ["sqli", "hardcoded_secret"])
+check("M304：查重优先级函数（sqli 高于 xss）",
+      _dh304.root_priority({"category": "sqli"})
+      < _dh304.root_priority({"category": "xss"}), True)
+check("M304：HIGH authz 进第一梯队",
+      _dh304.root_priority({"category": "authz"}, "HIGH")[0], 0)
+
+print("\n[292] M305：ApiResult 统一包装不报存储型 XSS + log_injection 进 B")
+_rd305 = _rd301
+for _wrapped305, _label305 in (
+        ("return ApiResult.success(list);", "ApiResult.success"),
+        ("return R.ok(page);", "R.ok"),
+        ("return ResponseEntity.ok(body);", "ResponseEntity.ok"),
+        ("return CommonResult.success(data);", "CommonResult.success"),
+        ("return ApiResp.of(rows);", "ApiResp.of")):
+    check(f"M305：{_label305} 被识别为 JSON 包装",
+          bool(_rd305._DB_WRAPPED_ECHO_RE.search(_wrapped305)), True)
+check("M305：ApiResult 包装不算回显",
+      _rd305._db_echo("return ApiResult.success(xssMapper.list());"), False)
+check("M305：直出仓储结果仍算回显",
+      _rd305._db_echo("return xssMapper.list();"), True)
+_body305 = ("public ApiResult<List> get() {\n"
+            "  return ApiResult.success(xssMapper.list());\n}")
+check("M305：渲染点筛选丢弃 ApiResult 包装",
+      _rd305._db_render_points([_body305]), [])
+_body305b = "public List get() {\n  return xssMapper.list();\n}"
+check("M305：直出渲染点保留",
+      _rd305._db_render_points([_body305b]), [_body305b])
+_wn305 = _wn302
+check("M305：log_injection 归入板块 B",
+      _wn305.classify({"category": "log_injection", "unit": "x.y",
+                       "file": "a.py"})["code"], "LOW_SEVERITY_LOG_INJECTION")
+check("M305：sqli 不受影响",
+      _wn305.classify({"category": "sqli", "unit": "x.y",
+                       "file": "a.py"})["blocked"], False)
+check("M305：已执行断言数 >= 1740", COUNTS["n"] >= 1740, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

@@ -2032,9 +2032,14 @@ _DB_FETCH_CALL_RE = re.compile(
 # 页面由前端渲染。这类**不构成本类目的证据支点**：
 # 值确实进了响应，但"是否原样进 HTML"取决于前端怎么渲染，Java 侧看不到。
 # 规则手里没有可核对的事实，按第 5 条只能 None。
+# M305：包装类名不穷举。sz-boot-parent 用的是 `ApiResult.success(...)`，
+# 旧词表只列了 R/Result/AjaxResult/CommonResult/ResponseEntity/BaseResponse，
+# 于是三条 PUT 写接口被当成"库里的值直接进响应体"报成存储型 XSS。
+# 按命名机制收口：任意 w*Result / w*Response / w*Resp 的统一 JSON 包装
+# 都属于"结构固定、前端渲染"，Java 侧看不到不转义输出 → 退回 None。
 _DB_WRAPPED_ECHO_RE = re.compile(
-    r"return\s+(?:R|Result|AjaxResult|CommonResult|ResponseEntity|BaseResponse)\s*\."
-    r"\s*(?:ok|success|error|fail)\s*\(", re.I)
+    r"return\s+(?:R|ResponseEntity|\w*Result|\w*Response|\w*Resp)\s*\."
+    r"\s*(?:ok|success|error|fail|data|of)\s*\(", re.I)
 
 
 def _db_writer_takes_value(body: str) -> bool:
