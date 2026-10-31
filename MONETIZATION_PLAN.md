@@ -62,7 +62,7 @@
 
 | CAN 号 | 目标 | 提交时间 | 渠道 | 状态 |
 |---|---|---|---|---|
-| CAN-2026-2041058 | YunaiV/ruoyi-vue-pro — Admin Pay Module Missing @PreAuthorize（Vendor Confirmed in commit 2f655a81, Embargoed pending remote push） | 2026-10-28 | MITRE CNA-LR (CVE Services, production) | 已提交；厂商已确认并本地修复，补丁尚未推送到远端，静默期 |
+| CAN-2026-2041058 | YunaiV/ruoyi-vue-pro `PayWalletRechargeController.refundWalletRecharge`（CWE-862；修复 commit `2f655a81`，已推送远端） | 2026-10-28 | MITRE CNA-LR (CVE Services, production) | 已提交；厂商已修复并推送（2026-10-30 22:56 UTC），静默期结束，待 GHSA/CVE 编号 |
 | （待定） | metasfresh — Debug REST SQLi（细节静默期不记录，Issue #27079） | 2026-10-30 发私密通道请求（公开单未贴细节） | 先 GitHub 私密通道 → 72h 无回应追问 → 7 天无回应转 MITRE CNA-LR（publish 视协调结果） | 等维护者回应；远端 HEAD 复核仍未修；完整英文报告已备好未发出 |
 | （已否决） | ~~newbee-mall-api paySuccess~~ → 查重撞车 CVE-2025-10422（newbee-mall 同根因，issue #100）；原"任意文件上传"系标签误挂，实为 My-Blog 的发现 | — | — | DUPLICATE_CVE，不提交 |
 | （已否决） | JeecgBoot SysAnnouncementSendController add/queryById | — | 需先对 GHSA-63v7-3c98-c3mj 查重 | 搁置 |
@@ -87,3 +87,4 @@
 注意事项：CAN 号不是 CVE 编号，审核期间不得对外披露；通知走提交时登录的 Google 邮箱；4-6 周无动静可带 CAN 号催办。
 
 > 静默期规则：厂商补丁推到远端分支之前，本仓库不新增函数名/文件路径级细节；CVE/GHSA 编号在发布后回填。
+> 2026-10-31 状态：`2f655a81` 已出现在 `YunaiV/ruoyi-vue-pro` 远端，本条解除静默；该仓尚未发布 GitHub Security Advisory。
