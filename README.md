@@ -71,6 +71,21 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.6 cmdi 归属与上传白名单收口（M307 → M309）
+
+- **cmdi 跨跳归属**：`python_cmdi_verdict` 接入 `_py_sink_reachable()`，
+  入口没调用到的辅助函数里的 `subprocess/os.system` 不再算数；`service.run(...)`
+  也不会因为同名而绑定到 `def run(cmd)`（通用动词白名单）；
+  模块尾部 `if __name__ == "__main__":` 自测块整体排除；
+  删掉"有形参就兜底判 True"的激进分支（`nat is None` 保持 None）。
+- **上传白名单按机制识别**：`if ext not in {".png", ".jpg"}` 这类**内联后缀集合**
+  现在算白名单；`if ...: ext = ".png"` 的固定后缀回落算防护；if 块内允许 1–3 行
+  日志/赋值再 `raise/return`；守卫与 `.filename`/sink 的检查范围扩展到
+  入口可达的 Hop 1 辅助函数；`Image.open(...)` 这类**读**文件不再当上传 sink。
+- **路径守卫补 Python 形态**：`PATH_SAFE_RE` 识别
+  `os.path.realpath(p).startswith(base)` 与 `Path(p).resolve().is_relative_to(root)`。
+- **`NO_CMD_SINK`**：Python cmdi 但入口文件没有任何命令执行调用 → 板块 B。
+
 ### v1.3.5 巡猎顺序与包装类收口（M304 → M306）
 
 - **先降噪、再截断、最后联网**：`daily_hunt.process_repo` 拿到全仓 roots 后先在本地跑

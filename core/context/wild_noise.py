@@ -25,6 +25,11 @@ M302 追加：
 M305 追加：
   · LOW_SEVERITY_LOG_INJECTION —— CWE-117 日志伪造属低危，维护者与 MITRE
                                  极少单独下发 CVE，不占板块 A 的交单席位
+
+M307 追加：
+  · NO_CMD_SINK              —— Python cmdi 但入口文件里一个
+                                 os.system/subprocess/asyncio.create_subprocess
+                                 都没有：根因来自跨模块贴进来的辅助函数
 """
 from __future__ import annotations
 
@@ -44,8 +49,16 @@ NO_SQL_SINK = "NO_SQL_SINK"
 # M305：CWE-117 日志伪造属低危，维护者与 MITRE 极少单独下发 CVE，
 # 野仓模式下不占板块 A 的交单席位。
 LOW_SEVERITY_LOG_INJECTION = "LOW_SEVERITY_LOG_INJECTION"
+# M307：入口文件里根本没有命令执行调用，cmdi 根因来自切片里未被入口
+# 调用的辅助函数（`.run()` 这类通用方法名被跨模块贴进来）。
+NO_CMD_SINK = "NO_CMD_SINK"
 
 _PY_SQL_SINK_RE = re.compile(r"\.\s*(?:execute|executemany|executescript)\s*\(")
+_CMD_SINK_RE = re.compile(
+    r"\b(?:os\s*\.\s*(?:system|popen|exec\w*|spawn\w*)|"
+    r"subprocess\s*\.\s*\w+|commands\s*\.\s*getoutput|"
+    r"asyncio\s*\.\s*create_subprocess\w*|pty\s*\.\s*spawn)\s*\(",
+    re.I)
 
 # M297：只在 Solidity 里成立的类目；落到 .py/.java 入口一定是判据串了语言。
 SOLIDITY_ONLY = frozenset({"reentrancy", "unchecked_low_level_calls",
@@ -118,6 +131,14 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
         return {"blocked": True, "code": LOCAL_UNIX_SOCKET_SERVER,
                 "reason": ("AF_UNIX 本地控制通道（0700/0600 + 对端 UID 校验），"
                            "设计上不可从网络到达")}
+
+    if record.get("category") == "cmdi" and file.endswith(".py"):
+        src = _read(repo_root, str(record.get("file") or ""))
+        if src and not _CMD_SINK_RE.search(src):
+            return {"blocked": True, "code": NO_CMD_SINK,
+                    "reason": ("入口文件无任何命令执行调用"
+                               "（os.system/subprocess/asyncio.create_subprocess），"
+                               "cmdi 来自切片里未被入口调用的辅助函数")}
 
     if record.get("category") == "log_injection":
         return {"blocked": True, "code": LOW_SEVERITY_LOG_INJECTION,

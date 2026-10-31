@@ -4810,7 +4810,14 @@ PATH_SAFE_RE = re.compile(
     r"toRealPath\s*\(\s*\)\s*\.\s*startsWith\s*\(|"
     r"FilenameUtils\s*\.\s*getName\s*\(|"
     r"getFileName\s*\(\s*\)|"
-    r"\.\s*getName\s*\(\s*\)\s*;?\s*$", re.I)
+    r"\.\s*getName\s*\(\s*\)\s*;?\s*$|"
+    # M309：Python 侧的等价防护 —— 规范化后再做前缀/归属校验。
+    # dramaclaw / 常见 FastAPI 仓都写成 Path(...).resolve().is_relative_to(root)
+    # 或 os.path.realpath(p).startswith(base)，旧词表只认 Java 形态。
+    r"os\s*\.\s*path\s*\.\s*(?:realpath|abspath)\s*\([^)]*\)\s*"
+    r"\.\s*startswith\s*\(|"
+    r"\.\s*resolve\s*\(\s*\)\s*\.\s*(?:is_relative_to|startswith)\s*\(",
+    re.I)
 # 疑似防护调用（含黑名单），只用于决定"是否退回模型"
 _PATH_GUARD_RE = re.compile(
     r"\b\w*(?:check|filter|valid|verify|allow|safe|traversal)\w*\s*\(", re.I)
@@ -6102,6 +6109,14 @@ def _py_is_input_param(source: str, name: str, pos: int | None) -> bool:
     return False
 
 
+# M307：这些动词几乎都是"某个对象的方法"，跨模块同名函数（如
+# distroless-entrypoint.py 的 run(cmd)）不能因为 service.run( 就被绑上。
+# 只收"几乎只作为对象方法出现"的动词；get/save/load 这类是常见辅助函数名，
+# 收进来会把 dao.get(...) 这种合法跨跳路径判丢（冒烟 [289] 回归）。
+_GENERIC_HOP_NAMES = frozenset({
+    "run", "execute", "start", "call", "handle", "process", "apply"})
+
+
 def _py_sink_reachable(source: str, pos: int) -> bool:
     """sink 所在的辅助函数是否真被入口调用（M301 跨跳归属）。
 
@@ -6114,9 +6129,19 @@ def _py_sink_reachable(source: str, pos: int) -> bool:
     if not info:
         return True
     name, _params, start = info
+    # M307：模块尾部的 `if __name__ == "__main__":` 自测块不属于任何路由，
+    # 即使它前面最近的 def 是入口函数也不能算"入口体里"。
+    if source.rfind('__name__ == "__main__"', 0, pos) > start:
+        return False
     entry = _py_entry_region(source)
     if start < len(entry):
         return True                        # sink 就在入口体里
+    if name in _GENERIC_HOP_NAMES:
+        # 只认裸调用或 self.xxx（真辅助方法）；service.run(...) 是别的对象的方法。
+        bare = re.search(rf"(?<![.\w]){re.escape(name)}\s*\(", entry)
+        self_call = re.search(rf"\bself\s*\.\s*{re.escape(name)}\s*\(", entry)
+        if not bare and not self_call:
+            return False
     seen: set[str] = set()
     queue = re.findall(r"\b([A-Za-z_]\w*)\s*\(", entry)
     while queue and len(seen) < 200:
@@ -6227,6 +6252,30 @@ def _py_function_body(source: str, name: str) -> str:
                     source[m.end():])
     end = m.end() + nxt.start() if nxt else len(source)
     return source[m.start():end]
+
+
+def _py_reachable_bodies(source: str, limit: int = 60) -> str:
+    """入口沿调用链可达的 Python 函数体（M308）。
+
+    白名单/固定重命名常写在被调用的 `save_image(...)` / `upload_helper(...)`
+    里，只看入口体（entry_body）会漏证据，把已校验的上传报成任意上传。
+    只走**入口真正调用到**的函数，避免把同模块无关方法的校验算进来。
+    """
+    entry = _py_entry_region(source)
+    seen: set[str] = set()
+    queue = re.findall(r"\b([A-Za-z_]\w*)\s*\(", entry)
+    out: list[str] = []
+    while queue and len(seen) < limit:
+        name = queue.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        body = _py_function_body(source, name)
+        if not body:
+            continue
+        out.append(body)
+        queue.extend(re.findall(r"\b([A-Za-z_]\w*)\s*\(", body))
+    return "\n".join(out)
 
 
 def _py_orm_expr(expr: str, source: str, pos: int | None = None,
@@ -6613,6 +6662,11 @@ def python_cmdi_verdict(source: str) -> bool | None:
     tainted = False
     safe = False
     for m in _PY_CMDSINK_RE.finditer(source):
+        # M307：跨跳归属 —— 入口没调用到的辅助函数里的 subprocess 不算。
+        # codex-lb 的 cache_isolation_probe 因通用方法名 .run() 被贴进
+        # 别的模块的 subprocess.run(...)，入口根本没调它。
+        if not _py_sink_reachable(source, m.start()):
+            continue
         args = _balanced_cond(source, m.end())
         if args is None:
             continue
@@ -6629,10 +6683,10 @@ def python_cmdi_verdict(source: str) -> bool | None:
         nat = _py_value_text_capable(first, source, pos=m.start())
         if nat is True:
             tainted = True
-        elif nat is None and _py_func_params(source):
-            # 有形参且命令里出现标识符 → 交保守判：字符串命令 + 有输入面
-            tainted = True
         else:
+            # M307：nat is None = "证明不了外部输入流进命令参数"。
+            # 旧实现仅凭"入口有形参"就兜底判 True，纯内部命令（探针/运维脚本）
+            # 会被整片报成 CMDi；现在 None 保持 None，只认确定性的 True。
             safe = safe or nat is False
     if tainted:
         return True
@@ -10775,7 +10829,10 @@ _UPLOAD_PY_NAME_RE = re.compile(r"\.\s*filename\b")
 _UPLOAD_PY_PARAM_RE = re.compile(
     r"\bUploadFile\b|\brequest\s*\.\s*files\b|\bFileStorage\b")
 _UPLOAD_PY_SINK_RE = re.compile(
-    r"\bopen\s*\(|\bshutil\s*\.\s*copyfileobj\s*\(|\.\s*save\s*\(")
+    # M308：`Image.open(...)` / `os.fdopen(...)` 是**读**文件，不是落盘。
+    # 旧正则会把它当成上传 sink，send_image 就这样被报成 unrestricted_upload。
+    r"(?<![\w.])open\s*\(|\bshutil\s*\.\s*copyfileobj\s*\(|"
+    r"\.\s*save\s*\(")
 
 # 白名单/固定后缀的"证据面"：必须同时出现**判定**与**中止**，
 # 只写一个 ALLOWED 常量但从不拿它 if，不算防护。
@@ -10783,7 +10840,10 @@ _UPLOAD_WHITELIST_HINT_RE = re.compile(
     r"(?i)(?:allowed|permitted|valid)_?(?:ext|exts|extensions?|suffix|suffixes|filetypes?|types?)"
     r"|\bwhitelist\b|\.\s*endsWith\s*\(|\.\s*endswith\s*\("
     r"|\b(?:in|not\s+in)\s+\w*(?:ALLOWED|SAFE|PERMITTED|VALID)\w*"
-    r"|\.\s*contains\s*\(\s*(?:ext|suffix|fileType)\s*\)")
+    r"|\.\s*contains\s*\(\s*(?:ext|suffix|fileType)\s*\)"
+    # M308：内联后缀字面量集合 —— if ext not in {".png", ".jpg"} / [...]
+    r"|(?:in|not\s+in)\s*[\(\[\{][^)\]\}]{0,240}\."
+    r"(?:png|jpe?g|gif|webp|bmp|svg|pdf|zip|txt|docx?|xlsx?)")
 _UPLOAD_JAVA_GUARD_RE = re.compile(
     # 条件里可能有两层括号（if (...) { ... } 与 contains(...)），
     # 只吃一个右括号会把 ")) {" 判成不匹配 —— 白名单明明写了却判 True。
@@ -10791,7 +10851,13 @@ _UPLOAD_JAVA_GUARD_RE = re.compile(
     r"ALLOWED|valid)[^)]{0,400}\)\s*\)?\s*\{[^}]{0,600}(?:return|throw|continue)")
 _UPLOAD_PY_GUARD_RE = re.compile(
     r"(?is)if\s+[^:\n]{0,400}(?:not\s+in|endswith|allowed|safe|permitted)"
-    r"[^:\n]{0,400}:\s*\n\s*(?:raise|return|continue|abort)")
+    # M308：if 块内允许 1–3 行日志/赋值再中止（之前要求 raise 紧跟下一行）
+    r"[^:\n]{0,400}:\s*\n(?:\s*[^\n]{0,200}\n){0,3}\s*"
+    r"(?:raise|return|continue|abort)")
+_UPLOAD_PY_COERCE_RE = re.compile(
+    # M308：白名单不命中就**强制改成固定安全后缀**（ext = ".png"）同样安全。
+    r"(?is)if\s+[^:\n]{0,300}(?:not\s+in|endswith)[^:\n]{0,300}:"
+    r"\s*\n\s*\w+\s*=\s*[\"']\.(?:png|jpe?g|gif|webp|bmp)[\"']")
 # 服务端重命名 + **固定后缀**：UUID 后跟字面量 .png/.jpg 才算；
 # UUID + 原始后缀（fileName.substring(...)）仍然可传 .jsp，不算。
 _UPLOAD_GENERATED_RE = re.compile(
@@ -10802,6 +10868,8 @@ _UPLOAD_GENERATED_RE = re.compile(
 def _upload_has_guard(body: str, python: bool) -> bool:
     if not _UPLOAD_WHITELIST_HINT_RE.search(body):
         return False
+    if python and _UPLOAD_PY_COERCE_RE.search(body):
+        return True
     return bool((_UPLOAD_PY_GUARD_RE if python else _UPLOAD_JAVA_GUARD_RE)
                 .search(body))
 
@@ -10823,13 +10891,16 @@ def unrestricted_upload_verdict(source: str) -> bool | None:
         if not (_UPLOAD_PY_PARAM_RE.search(source)
                 or _UPLOAD_PY_PARAM_RE.search(body)):
             return None
-        if not _UPLOAD_PY_NAME_RE.search(body):
+        # M308：文件名读取/sink 也可能整体在 Hop 1 的 save_image(...) 里，
+        # 检测范围与守卫范围保持一致（入口体 + 可达辅助体）。
+        scope = body + "\n" + _py_reachable_bodies(source)
+        if not _UPLOAD_PY_NAME_RE.search(scope):
             return None
-        if not _UPLOAD_PY_SINK_RE.search(body):
+        if not _UPLOAD_PY_SINK_RE.search(scope):
             return None
-        if _upload_has_guard(body, python=True):
+        if _upload_has_guard(scope, python=True):
             return False
-        if _UPLOAD_GENERATED_RE.search(body):
+        if _UPLOAD_GENERATED_RE.search(scope):
             return False
         return True
     # Java / Kotlin

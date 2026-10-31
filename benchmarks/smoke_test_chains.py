@@ -10976,6 +10976,82 @@ check("M305：sqli 不受影响",
                        "file": "a.py"})["blocked"], False)
 check("M305：已执行断言数 >= 1740", COUNTS["n"] >= 1740, True)
 
+print("\n[293] M307：cmdi 跨跳归属 + 不再凭形参兜底")
+_rd307 = _rd301
+check("M307：service.run() 不绑定到跨模块的 run(cmd)",
+      _rd307.python_cmdi_verdict(
+          'def run_cache_isolation_probe(request):\n'
+          '    return service.run(request)\n'
+          '// ---- 跨文件辅助\n'
+          'def run(cmd):\n'
+          '    subprocess.run(cmd, shell=True)\n'), None)
+check("M307：真命令注入仍判 True",
+      _rd307.python_cmdi_verdict(
+          'def handler(host):\n'
+          '    subprocess.run("ping " + host, shell=True)\n'), True)
+check("M307：常量命令 + 有形参不再误报",
+      _rd307.python_cmdi_verdict(
+          'def probe(x):\n'
+          '    subprocess.run("ls -l", shell=True)\n'), False)
+_ws307 = Path(_ws_mkdtemp("smoke_m307_"))
+(_ws307 / "probe.py").write_text(
+    "def probe(request):\n    return request\n", encoding="utf-8")
+check("M307：入口文件无命令 sink → NO_CMD_SINK",
+      _wn302.classify({"category": "cmdi", "unit": "probe",
+                       "file": "probe.py"}, _ws307)["code"], "NO_CMD_SINK")
+(_ws307 / "runner.py").write_text(
+    "def run(cmd):\n    return subprocess.run(cmd, shell=True)\n",
+    encoding="utf-8")
+check("M307：有命令 sink 的入口不拦",
+      _wn302.classify({"category": "cmdi", "unit": "run",
+                       "file": "runner.py"}, _ws307)["blocked"], False)
+
+print("\n[294] M308：内联后缀集合 / 固定后缀重命名 / Hop1 守卫")
+check("M308：内联集合白名单判 False",
+      _rd307.verdict("unrestricted_upload",
+                     'def upload(file: UploadFile):\n'
+                     '    ext = os.path.splitext(file.filename)[1]\n'
+                     '    if ext not in {".png", ".jpg"}:\n'
+                     '        raise ValueError("bad")\n'
+                     '    with open("/tmp/x" + ext, "wb") as f:\n'
+                     '        f.write(b"")\n'), False)
+check("M308：非法后缀强制回落 .png 判 False",
+      _rd307.verdict("unrestricted_upload",
+                     'def upload_qr(file: UploadFile):\n'
+                     '    ext = os.path.splitext(file.filename)[1]\n'
+                     '    if ext not in [".png", ".jpg"]:\n'
+                     '        ext = ".png"\n'
+                     '    with open("/tmp/qr" + ext, "wb") as f:\n'
+                     '        f.write(b"")\n'), False)
+check("M308：白名单写在 Hop1 辅助函数里也判 False",
+      _rd307.verdict("unrestricted_upload",
+                     'def upload(file: UploadFile):\n'
+                     '    return save_image(file)\n'
+                     '// ---- 跨文件辅助\n'
+                     'def save_image(file: UploadFile):\n'
+                     '    ext = os.path.splitext(file.filename)[1]\n'
+                     '    if ext not in (".png", ".jpg"):\n'
+                     '        return None\n'
+                     '    with open("/tmp/" + ext, "wb") as f:\n'
+                     '        f.write(b"")\n'), False)
+check("M308：无白名单仍判 True",
+      _rd307.verdict("unrestricted_upload",
+                     'def up(file: UploadFile):\n'
+                     '    with open("/tmp/" + file.filename, "wb") as f:\n'
+                     '        f.write(b"")\n'), True)
+check("M308：Image.open 是读文件，不算上传 sink",
+      _rd307.verdict("unrestricted_upload",
+                     'def send(image: UploadFile):\n'
+                     '    img = Image.open(image.filename)\n'
+                     '    return img.size\n'), None)
+check("M309：Path.resolve().is_relative_to 识别为路径守卫",
+      bool(_rd307.PATH_SAFE_RE.search(
+          "p = Path(x).resolve().is_relative_to(root)")), True)
+check("M309：realpath().startswith 识别为路径守卫",
+      bool(_rd307.PATH_SAFE_RE.search(
+          "if os.path.realpath(p).startswith(base):")), True)
+check("M309：已执行断言数 >= 1750", COUNTS["n"] >= 1750, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
