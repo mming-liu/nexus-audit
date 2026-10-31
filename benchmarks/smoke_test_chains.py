@@ -11052,6 +11052,45 @@ check("M309：realpath().startswith 识别为路径守卫",
           "if os.path.realpath(p).startswith(base):")), True)
 check("M309：已执行断言数 >= 1750", COUNTS["n"] >= 1750, True)
 
+print("\n[295] M309：临时文件删除豁免 + 上传辅助函数只跟“上传对象”")
+check("M309：mkstemp 出来的临时文件删除判 False",
+      _rd307.arbitrary_file_delete_verdict(
+          'def rm(file):\n'
+          '    fd, tmp = tempfile.mkstemp()\n'
+          '    os.remove(tmp)\n'), False)
+check("M309：先置 None 再 mkstemp 也能识别",
+      _rd307.arbitrary_file_delete_verdict(
+          'def rm(file):\n'
+          '    tmp = None\n'
+          '    tmp = tempfile.mkstemp()[1]\n'
+          '    os.remove(tmp)\n'), False)
+check("M309：直接删外部路径仍判 True",
+      _rd307.arbitrary_file_delete_verdict(
+          'def rm(path):\n    os.remove(path)\n'), True)
+check("M309：下游处理函数不算上传面（send_image 形态）",
+      _rd307.unrestricted_upload_verdict(
+          'def send(image: UploadFile):\n'
+          '    temp = mkstemp()\n'
+          '    with open(temp, "rb") as f:\n'
+          '        pass\n'
+          '    return uploader.upload_image(temp)\n'
+          '// ---- 跨文件辅助\n'
+          'def upload_image(path):\n'
+          '    with open(path, "rb") as f:\n'
+          '        f.write(b"")\n'), None)
+check("M309：上传对象整体传给辅助函数仍可判 False",
+      _rd307.unrestricted_upload_verdict(
+          'def upload(file: UploadFile):\n'
+          '    return save_image(file)\n'
+          '// ---- 跨文件辅助\n'
+          'def save_image(file: UploadFile):\n'
+          '    ext = os.path.splitext(file.filename)[1]\n'
+          '    if ext not in (".png", ".jpg"):\n'
+          '        return None\n'
+          '    with open("/tmp/" + ext, "wb") as f:\n'
+          '        f.write(b"")\n'), False)
+check("M309：已执行断言数 >= 1760", COUNTS["n"] >= 1760, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

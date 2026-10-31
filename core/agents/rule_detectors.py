@@ -6278,6 +6278,35 @@ def _py_reachable_bodies(source: str, limit: int = 60) -> str:
     return "\n".join(out)
 
 
+def _py_upload_helper_bodies(source: str) -> str:
+    """入口把**上传对象本身**交给的辅助函数体（M308/M309）。
+
+    只跟"实参里出现 <upload>.filename 的那个对象"的调用，避免把
+    `uploader.upload_image(temp_path)` 这类下游处理函数也算进上传面
+    （send_image 就是这样被误判回 True 的）。
+    """
+    entry = _py_entry_region(source)
+    uploads = set(re.findall(r"\b([A-Za-z_]\w*)\s*\.\s*filename\b", entry))
+    # 入口自己没读 .filename、直接整体传给辅助函数时，靠注解认上传对象。
+    uploads |= set(re.findall(
+        r"\b([A-Za-z_]\w*)\s*:\s*(?:UploadFile|FileStorage)\b", entry))
+    if not uploads:
+        return ""
+    called: list[str] = []
+    for m in re.finditer(r"\b([A-Za-z_]\w*)\s*\(", entry):
+        args = _balanced_cond(entry, m.end())
+        if not args:
+            continue
+        if any(re.search(rf"(?<![\w.]){re.escape(u)}\b", args) for u in uploads):
+            called.append(m.group(1))
+    out: list[str] = []
+    for name in dict.fromkeys(called):
+        body = _py_function_body(source, name)
+        if body:
+            out.append(body)
+    return "\n".join(out)
+
+
 def _py_orm_expr(expr: str, source: str, pos: int | None = None,
                  _depth: int = 0) -> bool:
     """表达式是不是 SQLAlchemy ORM 语句对象（绑定参数，永不是 SQL 文本）。
@@ -10893,7 +10922,7 @@ def unrestricted_upload_verdict(source: str) -> bool | None:
             return None
         # M308：文件名读取/sink 也可能整体在 Hop 1 的 save_image(...) 里，
         # 检测范围与守卫范围保持一致（入口体 + 可达辅助体）。
-        scope = body + "\n" + _py_reachable_bodies(source)
+        scope = body + "\n" + _py_upload_helper_bodies(source)
         if not _UPLOAD_PY_NAME_RE.search(scope):
             return None
         if not _UPLOAD_PY_SINK_RE.search(scope):
@@ -11281,6 +11310,11 @@ _FILE_DELETE_SAFE_RE = re.compile(
     r"realpath\s*\([^)]*\)\s*\.\s*startswith|"
     r"os\s*\.\s*path\s*\.\s*basename\s*\(|"
     r"deleteFileCheck\s*\(|checkResult\s*\.\s*isFailure\s*\(")
+# M309：删除目标是本函数刚创建的临时文件（mkstemp/NamedTemporaryFile）时，
+# 路径不是外部输入 —— send_image 的 finally: os.remove(temp_path) 就是这种。
+_TEMP_FILE_ORIGIN_RE = re.compile(
+    r"\b(?:tempfile\s*\.\s*)?(?:mkstemp|mkdtemp|NamedTemporaryFile|"
+    r"TemporaryFile|TemporaryDirectory)\s*\(", re.I)
 
 
 def arbitrary_file_delete_verdict(source: str) -> bool | None:
@@ -11302,6 +11336,14 @@ def arbitrary_file_delete_verdict(source: str) -> bool | None:
         return True
     if re.fullmatch(r"\"[^\"]*\"|'[^']*'", arg):
         return False
+    if re.fullmatch(r"[A-Za-z_]\w*", arg):
+        # 删除的是本函数自己 mkstemp 出来的临时文件 → 不是任意文件删除。
+        # 取 sink 之前**最后一次**赋值（先 temp_path = None、后 mkstemp 是常见写法）。
+        assigns = [am for am in re.finditer(
+            rf"(?m)^[ \t]*(?:[^=\n]*,\s*)?{re.escape(arg)}\s*=\s*[^\n]*$",
+            body) if am.start() < m.start()]
+        if assigns and _TEMP_FILE_ORIGIN_RE.search(assigns[-1].group(0)):
+            return False
     params = set(_bare_params(_entry_signature(source)))
     if (re.fullmatch(r"[A-Za-z_]\w*", arg) or "request" in arg
             or any(re.search(rf"\b{re.escape(p)}\b", arg) for p in params)):

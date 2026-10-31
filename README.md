@@ -71,6 +71,16 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.7 临时文件与上传面收口（M309 收尾）
+
+- **临时文件删除豁免**：`arbitrary_file_delete_verdict` 识别
+  `tempfile.mkstemp / NamedTemporaryFile` 来源（取 sink 前最后一次赋值），
+  `finally: os.remove(temp_path)` 这类"删自己刚建的临时文件"不再报任意文件删除。
+- **上传面只跟"上传对象"**：白名单/sink 的辅助函数范围从"所有可达函数"收窄为
+  "实参里出现上传对象（`file`/`image` 或 `UploadFile` 注解）的调用"，
+  `uploader.upload_image(temp_path)` 这类下游处理函数不再被算成上传 sink。
+- 新增冒烟 [295]（mkstemp 豁免 3 项 + 上传面收窄 2 项）。
+
 ### v1.3.6 cmdi 归属与上传白名单收口（M307 → M309）
 
 - **cmdi 跨跳归属**：`python_cmdi_verdict` 接入 `_py_sink_reachable()`，
