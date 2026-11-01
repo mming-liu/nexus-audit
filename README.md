@@ -71,6 +71,17 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.10 A 板块 11 条开箱与判据收口（M313）
+
+- **sqli**：MyBatis-Plus 拼接出口 `.last("limit " + n)` 若 n 是 int / `Math.max/min`
+  / 整型方法返回值，不再判注入；`.apply(event)` 这类业务对象调用不再被当成
+  Wrapper 拼接（EA framework 5 条 sqli 全属这两类）。
+- **pathtraver**：只读 classpath 常量资源（`getResourceAsStream("stencilset.json")`）
+  判 False。
+- **redir**：`new RedirectView("/", true, false)` 这类编译期常量目标判 False。
+- **配置块**：`package-lock.json / yarn.lock / *.lock` 不再被拍平进切片
+  （锁文件几千个 `packages.node_modules/...` 键会把规则带偏）。
+
 ### v1.3.9 选靶富矿词池与跨语言配额（M311 → M312）
 
 - **跨语言 Round-Robin**：`scout_daily()` 不再把所有语言按 `pushed_at` 全局混排截断

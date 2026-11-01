@@ -851,7 +851,13 @@ _MP_CONCAT_EXIT_RE = re.compile(
     r"\.(?:apply|last|inSql|orderBySql)\s*\("
     # 前导填充必须与实参字符同类排除引号：否则 `"name = {0}", name` 这种
     # 占位符绑定会把整段字符串吞进填充、再拿第二实参的裸变量凑成"拼接"。
-    r"[^()\"]*(?:\"[^\"]*\"\s*\+|\+\s*\"|[^()\"]*\b[a-z_]\w+\b)")
+    # M313：去掉"裸标识符"分支 —— `service.apply(event)` 会被它误当成
+    # MyBatis-Plus 拼接出口（EA framework 的 apply 就是这种）。
+    r"[^()\"]*(?:\"[^\"]*\"\s*\+|\+\s*\")")
+# 裸变量出口（`.last(orderBy)`）：只有变量是 String 形参或由字符串拼接赋值时
+# 才算注入面；`service.apply(event)` 的 event 是业务对象，不算。
+_MP_BARE_ARG_RE = re.compile(
+    r"\.(?:apply|last|inSql|orderBySql)\s*\(\s*([A-Za-z_]\w*)\s*\)")
 # JPA 的手写查询入口：`entityManager.createQuery(jpql)` / `createNativeQuery(sql)`。
 # 它就是 JPQL 世界的 `prepareStatement` —— 传进去的是**语句文本**，不是参数，
 # 所以判据与 prepareStatement 完全同构：先回溯源变量，再看文本里有没有拼接。
@@ -1078,6 +1084,30 @@ def _sql_stmt_whole_user_controlled(source: str) -> bool | None:
     return None
 
 
+def _java_numeric_expr(expr: str, source: str) -> bool:
+    """实参是否只由数字 / 整型变量 / 整型方法返回值拼成（M313）。
+
+    MyBatis-Plus `.last("limit " + n)` 里 n 若是 int，落进 SQL 的只能是
+    数字，注入不了。EA framework 的 5 条 sqli 全是这种（safeLimit /
+    Math.max/min / page*pageSize）。判据：剥掉字符串字面量后，剩下的
+    标识符必须都能在切片里找到 int/long 声明（变量或方法返回类型）。
+    """
+    stripped = re.sub(r'"[^"]*"', "", expr)
+    names = re.findall(r"[A-Za-z_]\w*", stripped)
+    if not names:
+        return True
+    int_decl = (r"\b(?:int|long|short|byte|Integer|Long|Short|Byte)\s+"
+                r"([A-Za-z_]\w*)\s*[=;,)]")
+    int_vars = set(re.findall(int_decl, source))
+    int_methods = set(re.findall(
+        r"\b(?:int|long|short|byte|Integer|Long|Short|Byte)\s+"
+        r"([A-Za-z_]\w*)\s*\(", source))
+    allowed = {"Math", "max", "min", "abs", "toIntExact", "parseInt",
+               "parseLong", "valueOf", "intValue", "longValue", "floor",
+               "ceil", "round"}
+    return all(n in int_vars or n in int_methods or n in allowed for n in names)
+
+
 def sqli_verdict(source: str) -> bool | None:
     body = entry_body(source)
     impl = _impl_segment(source)
@@ -1104,7 +1134,26 @@ def sqli_verdict(source: str) -> bool | None:
     #     置于 MyBatis 判定之前：拼接出口是显式注入面，优先级高于 ${}/#{}
     #     的其它证据。False 侧（纯参数化 Wrapper）在 B 之后收口（C4），
     #     避免与集合方法 `.in(`、MyBatis ${} 判定互相打架。
-    if _MP_CONCAT_EXIT_RE.search(body):
+    # M313：拼接出口里如果只有数字/整型变量（`.last("limit " + safeLimit)`），
+    # 落进 SQL 的是数字，不是注入面 —— 继续走后面的参数化判定。
+    _mp_hit = False
+    for _mp in _MP_CONCAT_EXIT_RE.finditer(body):
+        _open = body.find("(", _mp.start())
+        _args = _balanced_cond(body, _open + 1) if _open >= 0 else None
+        if _args is None or not _java_numeric_expr(_args, source):
+            _mp_hit = True
+            break
+    if not _mp_hit:
+        for _mb in _MP_BARE_ARG_RE.finditer(body):
+            _var = _mb.group(1)
+            if re.search(rf"\bString\s+{re.escape(_var)}\b", source):
+                _mp_hit = True
+                break
+            if re.search(rf"\b{re.escape(_var)}\s*=\s*[^;\n]*\"[^\"]*\"\s*\+",
+                         source):
+                _mp_hit = True
+                break
+    if _mp_hit:
         return True
 
     # C2b) MyBatis Generator Example 参数化（Module 38，mall 形态）：
@@ -4016,6 +4065,9 @@ REDIR_WHITELIST_RE = re.compile(
 REDIR_CONST_TARGET_RE = re.compile(
     r"return\s+\"redirect:[^\"$]{0,200}\"\s*;|"
     r"(?:sendRedirect|sendError)\s*\(\s*\"[^\"]*\"\s*\)|"
+    # M313：Spring 的 `new RedirectView("/", true, false)` 也是编译期常量
+    # （skyeye/xxl-job 的 toLogin 被判 True 就是漏了这条）。
+    r"new\s+RedirectView\s*\(\s*\"[^\"]*\"\s*[,)]|"
     r"(?:setHeader|addHeader)\s*\(\s*\"[Ll]ocation\"\s*,\s*\"[^\"]*\"\s*\)", re.I)
 
 
@@ -5027,6 +5079,14 @@ def pathtraver_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not body:
         return None
+    # M313：classpath 常量资源（`getResourceAsStream("stencilset.json")`）没有
+    # 外部输入面，不是路径穿越（skyeye 的 getStencilset 被判 True 就是这条）。
+    _sink_all = [m for m in PATH_SINK_RE.finditer(body)
+                 if "IOUtils" not in m.group(0)]
+    _stream = [m for m in _sink_all if "getResourceAsStream" in m.group(0)]
+    if (_stream and len(_stream) == len(_sink_all)
+            and not re.search(r"getResourceAsStream\s*\(\s*[A-Za-z_]", body)):
+        return False
     # Python 分支（Module 24，pygoat 实测）：裸 `open(path)` / `send_file`
     # 的路径若来自 request 输入且无清洗 → True。os.path.join(常量, 输入)
     # **不**清洗 `..` 与绝对路径（输入以 / 开头时 join 直接丢弃前缀）——

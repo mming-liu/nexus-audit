@@ -51,9 +51,19 @@ class ConfigResolver:
 
     # ---------- 索引 ----------
 
+    # M313：锁文件不是"配置"——package-lock.json 会被拍平成几千个
+    # `packages.node_modules/...` 键，整块塞进切片后把规则带偏
+    # （EA framework 的 RetrievalController.test 就是这样被判成 sqli）。
+    _LOCK_FILES = {
+        "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "composer.lock",
+        "cargo.lock", "poetry.lock", "pipfile.lock", "go.sum", "bun.lockb",
+    }
+
     def _iter_configs(self):
         for p in self.repo_root.rglob("*"):
             if p.suffix.lower() not in CONFIG_SUFFIXES:
+                continue
+            if p.name.lower() in self._LOCK_FILES or p.name.lower().endswith(".lock"):
                 continue
             if any(part in IGNORE_DIRS for part in p.parts):
                 continue

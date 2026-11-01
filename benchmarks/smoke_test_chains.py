@@ -3992,13 +3992,23 @@ public Object users(String name) {
 check("M29：Wrapper 拼接出口 .last 带裸变量 → True",
       _verdict("sqli", '''
 @GetMapping("/page")
+public Object page(String sort) {
+    QueryWrapper<User> qw = new QueryWrapper<>();
+    qw.eq("status", 1);
+    qw.last("order by " + sort);
+    return userService.list(qw);
+}
+'''), True)
+check("M313：.last 拼 Integer 参数不再判注入",
+      _verdict("sqli", '''
+@GetMapping("/page")
 public Object page(Integer page) {
     QueryWrapper<User> qw = new QueryWrapper<>();
     qw.eq("status", 1);
     qw.last("limit " + page);
     return userService.list(qw);
 }
-'''), True)
+'''), False)
 check("M29：纯参数化 Wrapper（.eq/.like）→ False（C4）",
       _verdict("sqli", '''
 @GetMapping("/search")
@@ -11169,6 +11179,53 @@ finally:
     _ts311._get = _orig_get311
 check("M311：每语言默认查 2 个轮换词", len(_calls311), 4)
 check("M312：已执行断言数 >= 1775", COUNTS["n"] >= 1775, True)
+
+print("\n[298] M313：数字拼接 / 业务 apply / classpath 常量 / RedirectView 常量 / 锁文件")
+check("M313：.last(常量 + int) 不判 sqli",
+      _rd307.sqli_verdict(
+          '@GetMapping("/x")\n'
+          'public String f(@RequestParam String name, int limit) {\n'
+          '    int safe = Math.min(limit, 10);\n'
+          '    return m.selectList(w.last("limit " + safe)).toString();\n'
+          '}'), False)
+check("M313：.last(常量 + String) 仍判 sqli",
+      _rd307.sqli_verdict(
+          '@GetMapping("/x")\n'
+          'public String f(@RequestParam String order) {\n'
+          '    return m.selectList(w.last("order by " + order)).toString();\n'
+          '}'), True)
+check("M313：service.apply(event) 不算 MP 拼接",
+      _rd307.sqli_verdict(
+          'public R apply(@RequestBody E event) {\n'
+          '    return ok(service.apply(event));\n'
+          '}'), False)
+check("M313：classpath 常量资源不判 pathtraver",
+      _rd307.verdict("pathtraver",
+                     'public String f() { return IOUtils.toString('
+                     'getClass().getClassLoader().getResourceAsStream("stencilset.json"), "utf-8"); }'),
+      False)
+check("M313：getResourceAsStream(变量) 仍判 True",
+      _rd307.verdict("pathtraver",
+                     'public String f(String name) { return IOUtils.toString('
+                     'getClass().getClassLoader().getResourceAsStream(name), "utf-8"); }'),
+      True)
+check("M313：new RedirectView(常量) 判 False",
+      _rd307.verdict("redir",
+                     'public ModelAndView f() { return new ModelAndView(new RedirectView("/", true, false)); }'),
+      False)
+check("M313：new RedirectView(变量) 仍判 True",
+      _rd307.verdict("redir",
+                     'public ModelAndView f(String url) { return new ModelAndView(new RedirectView(url, true, false)); }'),
+      True)
+_cfg313 = Path(_ws_mkdtemp("smoke_cfg313_"))
+(_cfg313 / "package-lock.json").write_text(
+    '{"packages":{"node_modules/x":{"version":"1.0.0"}}}', encoding="utf-8")
+(_cfg313 / "app.yaml").write_text("server:\n  port: 8080\n", encoding="utf-8")
+from core.context.config_resolver import ConfigResolver as _CR313
+_cfg313_tbl = _CR313(_cfg313).load()
+check("M313：锁文件不进配置块",
+      any("node_modules" in k for k in _cfg313_tbl), False)
+check("M313：已执行断言数 >= 1790", COUNTS["n"] >= 1790, True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 
