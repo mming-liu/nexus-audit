@@ -57,3 +57,24 @@ jowilf/starlette-admin (Python)       insistence/RuoYi-FastAPI (Python)
 ~~~
 
 Java : Python = 7 : 3（旧结构下是 1 : 13）。
+
+第二次实跑（10:17–10:35，`--languages java,python --days 14 --limit 10 --max-roots 5 --evict-cache`）：
+
+| 指标 | 数值 |
+| --- | --- |
+| 候选 / 实扫 / 跳过 / 失败 | 10 / 5 / 5 / 0 |
+| 新增根因 | 22 |
+| 板块 A | **11**（v1.3.5 之后最高） |
+| 板块 B | 11（全本地降噪，0 API） |
+| 冷却跳过 | 3 |
+
+板块 A 分布（全部来自真业务后台）：
+
+| 仓库 | 类目 | 单元 |
+| --- | --- | --- |
+| EnterpriseAgentFramework | sqli ×5 | BusinessUserDirectoryController.listBusinessUsers、PersonalMemoryIndexInternalController.apply、PlatformAccountRoleController.listAuditEvents、RetrievalController.test、RuntimeTraceCenterController.listGuardDecisions |
+| skyeye | pathtraver / redir / xss | StencilsetRestResource.getStencilset、IndexController.toLogin ×2 |
+| LZ-litchi | redir / xss | FileController.getFileContent、VectorImageController.uploadImage |
+| yshop-oa-crm | authz | CrmFlowController.deleteFlowStep |
+
+即：换上 Java 富矿词池 + Round-Robin 后，A 从 0 直接回到 11，且 5 个仓里 4 个是 Java 业务系统。
