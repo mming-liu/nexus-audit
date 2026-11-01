@@ -11268,6 +11268,8 @@ def _fake_get314(url, headers=None, timeout=20.0):
                        "summary": "demo path traversal in Foo.deleteFlowStep",
                        "description": "demo"}], ""
     if "/search/issues" in url:
+        if "repo%3A" in url or "repo:" in url:
+            return True, {"total_count": 0, "items": []}, ""
         return True, {"total_count": 1,
                       "items": [{"number": 9, "title": "PoC",
                                  "repository_url":
@@ -11278,6 +11280,8 @@ def _fake_get314(url, headers=None, timeout=20.0):
 _cd314._get_json = _fake_get314
 try:
     _cd314._REPO_MEMO.clear()
+    _cd314._GLOBAL_ADV_MEMO.update(ok=None, items=[], error="")
+    Path(".cache/cve_dedup/_global_advisories.json").unlink(missing_ok=True)
     _g300 = _cd314.query_github_global_advisories("acme/demo",
                                                   "Foo.deleteFlowStep")
     check("M314：全局 advisory 命中 CVE-2026-99999",
@@ -11300,7 +11304,72 @@ try:
 finally:
     _cd314._get_json = _orig_get314
     _cd314._REPO_MEMO.clear()
+    _cd314._GLOBAL_ADV_MEMO.update(ok=None, items=[], error="")
+    Path(".cache/cve_dedup/_global_advisories.json").unlink(missing_ok=True)
 check("M316：已执行断言数 >= 1800", COUNTS["n"] >= 1800, True)
+
+print("\n[301] M317：全局 advisory 缓存复用 + 短路 + 泛化词跳过")
+_orig_get317 = _cd314._get_json
+_orig_tok317 = _cd314._github_token
+_calls317 = []
+
+
+def _fake_get317(url, headers=None, timeout=20.0):
+    _calls317.append(url)
+    if "/advisories" in url:
+        return True, [{"ghsa_id": "GHSA-cache-1", "cve_id": "CVE-2026-0001",
+                       "summary": "acme/demo path traversal in Foo.deleteFlowStep"}], ""
+    if "/search/issues" in url:
+        return True, {"total_count": 0, "items": []}, ""
+    if "security-advisories" in url:
+        return True, [], ""
+    if "cve.circl.lu" in url:
+        return True, {"total_count": 0, "results": {}}, ""
+    return True, {"totalResults": 0, "vulnerabilities": []}, ""
+
+
+_cd314._get_json = _fake_get317
+_cd314._github_token = lambda: ""
+try:
+    _cd314._GLOBAL_ADV_MEMO.update(ok=None, items=[], error="")
+    Path(".cache/cve_dedup/_global_advisories.json").unlink(missing_ok=True)
+    _cd314._REPO_MEMO.clear()
+    _a301 = _cd314.query_github_global_advisories("acme/demo",
+                                                  "Foo.deleteFlowStep")
+    _b301 = _cd314.query_github_global_advisories("acme/other",
+                                                  "Foo.deleteFlowStep")
+    check("M317：两次查询只发 1 次 /advisories 请求",
+          len([u for u in _calls317 if "/advisories" in u]), 1)
+    check("M317：第二个仓库复用缓存（未新增 HTTP）", _b301["total"], 0)
+    _seen301 = []
+    _orig_gi317 = _cd314.query_github_issues_global
+    _cd314.query_github_issues_global = (
+        lambda c, m: _seen301.append((c, m)) or
+        {"ok": True, "total": 0, "ids": [], "url": "", "error": ""})
+    try:
+        _r301 = _cd314.dedup("guchengwuyue/yshop-oa-crm", "authz",
+                             "CrmFlowController.deleteFlowStep",
+                             allow_online=False, use_cache=False)
+        check("M317：local seed 命中后短路",
+              (_r301["status"], _seen301), ("DUPLICATE_CVE", []))
+        _r301b = _cd314.dedup("acme/demo", "authz", "IndexController.list",
+                              allow_online=True, use_cache=False)
+        check("M317：泛化类名+方法名跳过全网搜索",
+              _r301b["coverage"]["github_global_issues"], "skipped")
+        check("M317：泛化组合未触发查询", _seen301, [])
+        _r301c = _cd314.dedup("acme/demo", "authz",
+                              "CrmFlowController.deleteFlowStep",
+                              allow_online=True, use_cache=False)
+        check("M317：高辨识度组合照常触发",
+              _seen301, [("CrmFlowController", "deleteFlowStep")])
+    finally:
+        _cd314.query_github_issues_global = _orig_gi317
+finally:
+    _cd314._get_json = _orig_get317
+    _cd314._github_token = _orig_tok317
+    _cd314._GLOBAL_ADV_MEMO.update(ok=None, items=[], error="")
+    Path(".cache/cve_dedup/_global_advisories.json").unlink(missing_ok=True)
+check("M317：已执行断言数 >= 1810", COUNTS["n"] >= 1810, True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

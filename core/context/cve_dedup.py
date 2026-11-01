@@ -329,8 +329,61 @@ def query_github_issues_global(class_name: str, method_name: str) -> dict:
             "ids": ids[:5], "url": url, "error": ""}
 
 
+GLOBAL_ADV_CACHE = CACHE / "_global_advisories.json"
+_GLOBAL_ADV_MEMO: dict = {"ok": None, "items": [], "error": ""}
+
+
+def _github_token() -> str:
+    return (os.getenv("GITHUB_TOKEN") or os.getenv("NEXUS_GITHUB_TOKEN")
+            or os.getenv("GH_TOKEN") or "").strip()
+
+
+def load_global_advisories() -> tuple[bool, list[dict], str]:
+    """整轮共用一份全局 advisory 列表（M317）。
+
+    `GET /advisories` 与"当前查哪个方法"无关；旧实现每个单元翻 3 页，
+    一个仓 5 个单元就发 15 次重复请求。现在 24h 落盘缓存 + 进程内 memo：
+    无 Token 拉 1 页（100 条），有 Token 拉 2 页（200 条）。
+    """
+    if _GLOBAL_ADV_MEMO["ok"] is not None:
+        return (_GLOBAL_ADV_MEMO["ok"], _GLOBAL_ADV_MEMO["items"],
+                _GLOBAL_ADV_MEMO["error"])
+    if GLOBAL_ADV_CACHE.is_file():
+        try:
+            rec = json.loads(GLOBAL_ADV_CACHE.read_text(encoding="utf-8"))
+            if time.time() - float(rec.get("_cached_at") or 0) <= _CACHE_TTL:
+                items = rec.get("items") or []
+                _GLOBAL_ADV_MEMO.update(ok=True, items=items, error="")
+                return True, items, ""
+        except (json.JSONDecodeError, OSError, ValueError):
+            pass
+    pages = 2 if _github_token() else 1
+    items: list[dict] = []
+    ok_any = False
+    err = ""
+    for page in range(1, pages + 1):
+        ok, data, e = _get_json(
+            f"{GH_API}/advisories?per_page=100&page={page}",
+            headers={"Accept": "application/vnd.github+json",
+                     "User-Agent": "nexus-audit/1.3"})
+        if not ok or not isinstance(data, list):
+            err = e or "non_list_response"
+            break
+        ok_any = True
+        items.extend(a for a in data if isinstance(a, dict))
+        if len(data) < 100:
+            break
+    if ok_any:
+        GLOBAL_ADV_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        GLOBAL_ADV_CACHE.write_text(json.dumps(
+            {"_cached_at": time.time(), "items": items},
+            ensure_ascii=False), encoding="utf-8")
+    _GLOBAL_ADV_MEMO.update(ok=ok_any, items=items, error=err)
+    return ok_any, items, err
+
+
 def query_github_global_advisories(slug: str, unit: str = "",
-                                   file: str = "", pages: int = 3) -> dict:
+                                   file: str = "", pages: int = 0) -> dict:
     """GitHub 全局漏洞库 `GET /advisories`（M314）。
 
     `/repos/{slug}/security-advisories` 只返回作者手动发布的公告（国内仓几乎
@@ -338,43 +391,32 @@ def query_github_global_advisories(slug: str, unit: str = "",
     在 summary/description/source_code_location 里匹配，命中后再用方法名
     收窄，避免"仓里有公告"连坐。
     """
-    memo_key = ("global_advisories", slug.lower())
+    # 注意：memo 必须带 unit/file —— 同一仓库不同方法命中不同公告，
+    # 只按 slug 缓存会把上一个方法的结果连坐给下一个（M317 修）。
+    memo_key = ("global_advisories", slug.lower(), unit, file)
     if memo_key in _REPO_MEMO:
         return _REPO_MEMO[memo_key]
+    ok_any, data, err = load_global_advisories()
     name = (slug.split("/")[-1] if slug else "").lower()
     ids: list[str] = []
     items: list[dict] = []
-    ok_any = False
-    err = ""
-    url = f"{GH_API}/advisories?per_page=100&page=1"
-    for page in range(1, max(1, pages) + 1):
-        url = f"{GH_API}/advisories?per_page=100&page={page}"
-        ok, data, e = _get_json(url, headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "nexus-audit/1.3"})
-        if not ok or not isinstance(data, list):
-            err = e or "non_list_response"
-            break
-        ok_any = True
-        for adv in data:
-            if not isinstance(adv, dict):
-                continue
-            text = " ".join(str(adv.get(k) or "") for k in
-                            ("summary", "description", "source_code_location"))
-            low = text.lower()
-            if name and name not in low:
-                continue
-            if unit and not _unit_in_text(unit, file, text):
-                continue
-            # CVE 优先：判重时 CVE 命中要压过 GHSA（[300] 也按 CVE 断言）
-            aid = adv.get("cve_id") or adv.get("ghsa_id") or ""
-            if aid:
-                ids.append(aid)
-                items.append({"id": aid, "text": text})
-        if len(data) < 100:
-            break
-    res = {"ok": ok_any, "total": len(ids), "ids": ids[:5], "url": url,
-           "items": items, "error": err}
+    for adv in data:
+        if not isinstance(adv, dict):
+            continue
+        text = " ".join(str(adv.get(k) or "") for k in
+                        ("summary", "description", "source_code_location"))
+        low = text.lower()
+        if name and name not in low:
+            continue
+        if unit and not _unit_in_text(unit, file, text):
+            continue
+        # CVE 优先：判重时 CVE 命中要压过 GHSA（[300] 也按 CVE 断言）
+        aid = adv.get("cve_id") or adv.get("ghsa_id") or ""
+        if aid:
+            ids.append(aid)
+            items.append({"id": aid, "text": text})
+    res = {"ok": ok_any, "total": len(ids), "ids": ids[:5],
+           "url": f"{GH_API}/advisories", "items": items, "error": err}
     _REPO_MEMO[memo_key] = res
     return res
 
@@ -387,6 +429,32 @@ def _unit_in_text(unit: str, file: str, text: str) -> bool:
     if key and len(key) > 3:
         return key in t
     return bool(stem and len(stem) > 3 and stem in t)
+
+
+# M317：泛化方法名 / 通用控制器 —— 这类组合全网搜只会烧配额，跳过。
+_GENERIC_METHODS = frozenset({
+    "apply", "test", "index", "login", "logout", "list", "page", "get",
+    "create", "update", "delete", "save", "upload", "download", "export",
+    "import", "query", "run", "execute", "handle", "main", "init", "info",
+    "detail", "edit", "add", "remove", "search", "select",
+})
+_GENERIC_CLASSES = frozenset({
+    "BaseController", "CommonController", "IndexController",
+    "ApiController", "TestController",
+})
+
+
+def _is_distinctive(class_name: str, method_name: str) -> bool:
+    """类名 + 方法名是否足够独特，值得发一次全网 Issue 搜索（M317）。"""
+    cls = (class_name or "").strip()
+    meth = (method_name or "").strip()
+    if not cls or not meth or len(meth) < 6:
+        return False
+    if meth.lower() in _GENERIC_METHODS:
+        return False
+    if cls in _GENERIC_CLASSES:
+        return False
+    return True
 
 
 def dedup(slug: str, category: str, unit: str, *,
@@ -448,14 +516,7 @@ def dedup(slug: str, category: str, unit: str, *,
     ghsa = query_github_advisories(slug)
     _cls = class_name or (unit.split(".")[0] if "." in unit else "")
     _meth = unit.split(".")[-1].split("#")[0] if unit else ""
-    global_issues = query_github_issues_global(_cls, _meth)
-    global_adv = query_github_global_advisories(slug, unit, file)
-    sources = {"nvd": nvd, "circl": circl, "github_issues": issues,
-               "github_advisories": ghsa,
-               "github_global_issues": global_issues,
-               "github_global_advisories": global_adv,
-               "cve_org": {"ok": nvd.get("ok", False) or circl.get("ok", False),
-                           "note": "CVE.org records via NVD/CIRCL"}}
+
     matched: list[str] = []
     evidence: list[str] = []
     status = ""
@@ -476,48 +537,68 @@ def dedup(slug: str, category: str, unit: str, *,
             cve_hit = True
             matched += cve_src.get("ids") or []
             evidence.append(cve_src.get("url", ""))
-    _gadv_items = [x for x in (global_adv.get("items") or []) if x.get("id")]
-    _gadv_cve = [x for x in _gadv_items
-                 if str(x.get("id", "")).upper().startswith("CVE-")]
-    _gissue_hit = bool(global_issues.get("ok")
-                       and global_issues.get("total", 0) > 0)
+    gh_hits = [x for x in (ghsa.get("items") or [])
+               if x.get("id") and _unit_in_text(unit, file, x.get("text", ""))]
+
     if cve_hit:
         status = STATUS_CVE
-    elif _gadv_cve:
-        status = STATUS_CVE
-        matched += [x["id"] for x in _gadv_cve]
-        evidence.append(global_adv.get("url", ""))
-    elif ghsa.get("ok") and ghsa.get("total", 0) > 0:
-        # M290：仓库级公告列表不能连坐——只有公告文本真的命中方法/文件名
-        # 才判重复；否则转 UNKNOWN 并注明"仓有公告但无方法级命中"。
-        gh_hits = [x for x in (ghsa.get("items") or [])
-                   if x.get("id") and _unit_in_text(unit, file,
-                                                    x.get("text", ""))]
-        if gh_hits:
-            status = STATUS_ISSUE
-            matched += [x["id"] for x in gh_hits]
-            evidence.append(ghsa.get("url", ""))
-        else:
-            status = STATUS_UNKNOWN
-            rec_reason = ("repo_advisories_no_unit_match: 仓库存在安全公告，"
-                          "但均未命中本方法/文件，需人工查重后定性")
-    elif _gadv_items:
+    elif gh_hits:
         status = STATUS_ISSUE
-        matched += [x["id"] for x in _gadv_items]
-        evidence.append(global_adv.get("url", ""))
-    elif _gissue_hit:
-        status = STATUS_ISSUE
-        matched += global_issues.get("ids") or []
-        evidence.append(global_issues.get("url", ""))
+        matched += [x["id"] for x in gh_hits]
+        evidence.append(ghsa.get("url", ""))
     elif issues.get("ok") and issues.get("total", 0) > 0:
         status = STATUS_ISSUE
         matched += issues.get("ids") or []
         evidence.append(issues.get("url", ""))
-    elif not (cve_src.get("ok") and issues.get("ok") and ghsa.get("ok")
-              and global_issues.get("ok") and global_adv.get("ok")):
+    elif ghsa.get("ok") and ghsa.get("total", 0) > 0:
+        # M290：仓库级公告列表不能连坐——只有公告文本真的命中方法/文件名
+        # 才判重复；否则转 UNKNOWN 并注明"仓有公告但无方法级命中"。
         status = STATUS_UNKNOWN
-    else:
-        status = STATUS_FRESH
+        rec_reason = ("repo_advisories_no_unit_match: 仓库存在安全公告，"
+                      "但均未命中本方法/文件，需人工查重后定性")
+
+    # M317 短路早退：前面任一来源已命中 DUPLICATE_*，不再发全网查询；
+    # 泛化类名/方法名也跳过（不记为 failed，仅 coverage 标 skipped）。
+    global_issues: dict = {"ok": True, "total": 0, "ids": [], "url": "",
+                           "error": "skipped_short_circuit"}
+    global_adv: dict = {"ok": True, "total": 0, "ids": [], "url": "",
+                        "error": "skipped_short_circuit"}
+    if not status:
+        global_adv = query_github_global_advisories(slug, unit, file)
+        if _is_distinctive(_cls, _meth):
+            global_issues = query_github_issues_global(_cls, _meth)
+        else:
+            global_issues = {"ok": True, "total": 0, "ids": [], "url": "",
+                             "error": "skipped_generic"}
+        _gadv_items = [x for x in (global_adv.get("items") or []) if x.get("id")]
+        _gadv_cve = [x for x in _gadv_items
+                     if str(x.get("id", "")).upper().startswith("CVE-")]
+        _gissue_hit = bool(global_issues.get("ok")
+                           and global_issues.get("total", 0) > 0)
+        if _gadv_cve:
+            status = STATUS_CVE
+            matched += [x["id"] for x in _gadv_cve]
+            evidence.append(global_adv.get("url", ""))
+        elif _gadv_items:
+            status = STATUS_ISSUE
+            matched += [x["id"] for x in _gadv_items]
+            evidence.append(global_adv.get("url", ""))
+        elif _gissue_hit:
+            status = STATUS_ISSUE
+            matched += global_issues.get("ids") or []
+            evidence.append(global_issues.get("url", ""))
+        elif not (cve_src.get("ok") and issues.get("ok") and ghsa.get("ok")
+                  and global_issues.get("ok") and global_adv.get("ok")):
+            status = STATUS_UNKNOWN
+        else:
+            status = STATUS_FRESH
+
+    sources = {"nvd": nvd, "circl": circl, "github_issues": issues,
+               "github_advisories": ghsa,
+               "github_global_issues": global_issues,
+               "github_global_advisories": global_adv,
+               "cve_org": {"ok": nvd.get("ok", False) or circl.get("ok", False),
+                           "note": "CVE.org records via NVD/CIRCL"}}
 
     rec = {
         "status": status, "matched_ids": [x for x in matched if x],
@@ -533,10 +614,12 @@ def dedup(slug: str, category: str, unit: str, *,
             "github_issues": "checked" if issues.get("ok") else "failed",
             "github_advisories": ("checked" if ghsa.get("ok")
                                   else "failed"),
-            "github_global_issues": ("checked" if global_issues.get("ok")
-                                     else "failed"),
-            "github_global_advisories": ("checked" if global_adv.get("ok")
-                                         else "failed"),
+            "github_global_issues": (
+                "skipped" if str(global_issues.get("error", "")).startswith("skipped")
+                else "checked" if global_issues.get("ok") else "failed"),
+            "github_global_advisories": (
+                "skipped" if str(global_adv.get("error", "")).startswith("skipped")
+                else "checked" if global_adv.get("ok") else "failed"),
             "cve_org": "via_nvd" if nvd.get("ok") else
                        "via_circl" if circl.get("ok") else "unchecked",
         },

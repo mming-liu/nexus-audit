@@ -71,6 +71,17 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.12 查重省流：全局缓存 + 短路 + 泛化词跳过（M317）
+
+- **全局 advisory 整轮共用**：`GET /advisories` 落盘缓存 24h
+  （`.cache/cve_dedup/_global_advisories.json`），无 Token 拉 1 页、有 Token 拉 2 页；
+  同一轮扫 10 个仓只发 1–2 次请求，不再每个单元翻 3 页。
+- **短路早退**：local seed / NVD / CIRCL / 仓内 Issue / 仓内 Advisory 任一命中
+  `DUPLICATE_*` 就返回，不再发全网查询。
+- **泛化词跳过**：方法名是 `apply/test/index/list/get/create/...` 或长度 < 6，
+  或类名是 `BaseController/CommonController/IndexController/ApiController/TestController`
+  时跳过全网 `"类名" "方法名"` 搜索（coverage 标 `skipped`，不算 failed）。
+
 ### v1.3.11 跨仓查重三防线（M314 → M316）
 
 - **全局 Advisory 库**：查重不再只查 `/repos/{slug}/security-advisories`（作者手动发布，
