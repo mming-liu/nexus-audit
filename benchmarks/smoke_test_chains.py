@@ -11227,6 +11227,81 @@ check("M313：锁文件不进配置块",
       any("node_modules" in k for k in _cfg313_tbl), False)
 check("M313：已执行断言数 >= 1790", COUNTS["n"] >= 1790, True)
 
+print("\n[299] M314/M315：跨仓查重拦下已公开 CVE")
+from core.context import cve_dedup as _cd314
+_cd314._REPO_MEMO.clear()
+_r299a = _cd314.dedup("guchengwuyue/yshop-oa-crm", "authz",
+                      "CrmFlowController.deleteFlowStep",
+                      allow_online=False, use_cache=False)
+check("M315：yshop deleteFlowStep → DUPLICATE_CVE",
+      _r299a["status"], "DUPLICATE_CVE")
+check("M315：命中 CVE-2026-92462",
+      "CVE-2026-92462" in _r299a["matched_ids"], True)
+_r299b = _cd314.dedup("guchengwuyue/yshop-oa-crm", "authz",
+                      "CrmFlowController.getFlowUserIds",
+                      allow_online=False, use_cache=False)
+check("M315：getFlowUserIds 命中 CVE-2026-92461",
+      "CVE-2026-92461" in _r299b["matched_ids"], True)
+_r299c = _cd314.dedup("SpringSunYY/LZ-litchi", "pathtraver",
+                      "FileController.getFileContent",
+                      allow_online=False, use_cache=False)
+check("M315：LZ getFileContent → DUPLICATE_CVE",
+      _r299c["status"], "DUPLICATE_CVE")
+check("M315：命中 CVE-2026-71805",
+      "CVE-2026-71805" in _r299c["matched_ids"], True)
+_r299d = _cd314.dedup("YunaiV/ruoyi-vue-pro", "pathtraver",
+                      "FileController.getFileContent",
+                      allow_online=False, use_cache=False)
+check("M315：上游 ruoyi Issue 命中 → DUPLICATE_ISSUE_OR_GHSA",
+      _r299d["status"], "DUPLICATE_ISSUE_OR_GHSA")
+
+print("\n[300] M314：全局 Advisory + 全网类名/方法名 + 二开基座别名")
+_orig_get314 = _cd314._get_json
+
+
+def _fake_get314(url, headers=None, timeout=20.0):
+    if "security-advisories" in url:
+        return True, [], ""
+    if "/advisories" in url:
+        return True, [{"ghsa_id": "GHSA-test-0001",
+                       "cve_id": "CVE-2026-99999",
+                       "summary": "demo path traversal in Foo.deleteFlowStep",
+                       "description": "demo"}], ""
+    if "/search/issues" in url:
+        return True, {"total_count": 1,
+                      "items": [{"number": 9, "title": "PoC",
+                                 "repository_url":
+                                     "https://api.github.com/repos/W000i/vuln"}]}, ""
+    return False, None, "test"
+
+
+_cd314._get_json = _fake_get314
+try:
+    _cd314._REPO_MEMO.clear()
+    _g300 = _cd314.query_github_global_advisories("acme/demo",
+                                                  "Foo.deleteFlowStep")
+    check("M314：全局 advisory 命中 CVE-2026-99999",
+          "CVE-2026-99999" in _g300["ids"], True)
+    _gi300 = _cd314.query_github_issues_global("CrmFlowController",
+                                               "deleteFlowStep")
+    check("M314：全网 issue 搜索抓到外部 PoC 仓",
+          "W000i/vuln#9" in (_gi300["ids"] or [""])[0], True)
+    _u300 = Path(_ws_mkdtemp("smoke_upstream300_"))
+    (_u300 / "pom.xml").write_text(
+        "<project><artifactId>yudao-server</artifactId></project>",
+        encoding="utf-8")
+    _al300 = _cd314.detect_upstream_aliases(_u300)
+    check("M314：yudao pom → 上游 ruoyi-vue-pro 别名",
+          "YunaiV/ruoyi-vue-pro" in _al300, True)
+    _d300 = _cd314.dedup("acme/demo", "authz", "Foo.deleteFlowStep",
+                         repo_root=_u300, allow_online=True, use_cache=False)
+    check("M314：全局 advisory 命中 → DUPLICATE_CVE",
+          _d300["status"], "DUPLICATE_CVE")
+finally:
+    _cd314._get_json = _orig_get314
+    _cd314._REPO_MEMO.clear()
+check("M316：已执行断言数 >= 1800", COUNTS["n"] >= 1800, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

@@ -206,6 +206,8 @@ def run_one(repo: Path, *, slug: str | None = None, offline: bool = False,
         dd = (dedup_fn or cve_dedup.dedup)(
             slug, cat, unit, file=rel,
             aliases=[rec["repo"], Path(repo).name],
+            repo_root=repo,
+            class_name=unit.split(".")[0] if "." in unit else "",
             allow_online=(not offline) and dedup_online)
         rec.update({k: dd.get(k, rec.get(k)) for k in
                     ("status", "matched_ids", "sources", "evidence_urls",

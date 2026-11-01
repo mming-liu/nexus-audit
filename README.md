@@ -71,6 +71,16 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.11 跨仓查重三防线（M314 → M316）
+
+- **全局 Advisory 库**：查重不再只查 `/repos/{slug}/security-advisories`（作者手动发布，
+  国内仓几乎永远为空），改为同时翻 `GET /advisories` 全局库并按仓库名 + 方法名收窄。
+- **全网 `"类名" "方法名"` 搜索**：去掉 `repo:{slug}` 限制，能抓到改名仓
+  （yshop-crm → yshop-oa-crm）与外部 PoC 仓（W000i/vuln、LinYuanyi1/cve-request-poc）。
+- **二开基座溯源**：源码包名含 `cn.iocoder.yudao / org.jeecg / com.ruoyi`，或 pom 里
+  出现 yudao/ruoyi/jeecg 指纹时，自动把上游主仓加入查重别名。
+- **种子库**：补录 yshop 7 条 CVE、LZ-litchi CVE-2026-71805 与 ruoyi Issue #1146/#1188。
+
 ### v1.3.10 A 板块 11 条开箱与判据收口（M313）
 
 - **sqli**：MyBatis-Plus 拼接出口 `.last("limit " + n)` 若 n 是 int / `Math.max/min`

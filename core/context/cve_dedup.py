@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import time
 import urllib.parse
 from pathlib import Path
@@ -46,6 +47,63 @@ _CACHE_TTL = 24 * 3600
 # 仓库级结果（CIRCL / advisories）在同一进程内只查一次，避免每根因重复请求。
 _NVD_FAILS = 0
 _REPO_MEMO: dict[tuple[str, str], dict] = {}
+
+
+# M314：二开仓基座包名 → 上游主仓。芋道/若依/Jeecg 系二开仓的洞常常是
+# 上游基座先公开过的；只按二开仓名查重会把上游旧洞当成"首杀"。
+UPSTREAM_BASES: dict[str, tuple[str, ...]] = {
+    "cn.iocoder.yudao": ("YunaiV/ruoyi-vue-pro", "yudao"),
+    "org.jeecg": ("jeecgboot/JeecgBoot", "jeecg"),
+    "com.ruoyi": ("yangzongzhuan/RuoYi", "ruoyi"),
+    "com.baomidou": ("baomidou/mybatis-plus", "mybatis-plus"),
+}
+_UPSTREAM_PKG_RE = re.compile(
+    r"package\s+(cn\.iocoder\.yudao|org\.jeecg|com\.ruoyi|com\.baomidou)\b")
+
+
+def detect_upstream_aliases(repo_root: str | Path | None,
+                            max_files: int = 400) -> list[str]:
+    """扫源码里的基座包名，返回上游主仓别名（M314）。"""
+    if not repo_root:
+        return []
+    root = Path(repo_root)
+    if not root.exists():
+        return []
+    seen: set[str] = set()
+    aliases: list[str] = []
+    scanned = 0
+    for p in root.rglob("*.java"):
+        if any(part in (".git", "target", "build", "node_modules")
+               for part in p.parts):
+            continue
+        scanned += 1
+        if scanned > max_files:
+            break
+        try:
+            head = p.read_text(encoding="utf-8", errors="replace")[:4000]
+        except OSError:
+            continue
+        m = _UPSTREAM_PKG_RE.search(head)
+        if not m:
+            continue
+        base = m.group(1)
+        if base in seen:
+            continue
+        seen.add(base)
+        aliases.extend(UPSTREAM_BASES.get(base, ()))
+    # 包名被二开方改掉时（LZ-litchi 用 com.lz、yshop 用 co.yixiang），
+    # 退到 pom.xml 的 artifactId / parent 里找基座指纹。
+    for pom in list(root.rglob("pom.xml"))[:20]:
+        try:
+            text = pom.read_text(encoding="utf-8", errors="replace")[:8000].lower()
+        except OSError:
+            continue
+        for token, repos in (("yudao", ("YunaiV/ruoyi-vue-pro", "yudao")),
+                             ("ruoyi", ("yangzongzhuan/RuoYi", "ruoyi")),
+                             ("jeecg", ("jeecgboot/JeecgBoot", "jeecg"))):
+            if f"<artifactId>{token}" in text or f">{token}-" in text:
+                aliases.extend(repos)
+    return list(dict.fromkeys(a for a in aliases if a))
 
 
 def load_signatures(path: Path = CONFIG) -> list[dict]:
@@ -243,6 +301,84 @@ def query_github_advisories(slug: str) -> dict:
     return res
 
 
+def query_github_issues_global(class_name: str, method_name: str) -> dict:
+    """全网跨仓搜索 `"类名" "方法名"`（M314）。
+
+    不锁 `repo:{slug}`：仓库改名（yshop-crm → yshop-oa-crm）、白帽把 PoC
+    发到独立仓（W000i/vuln、LinYuanyi1/cve-request-poc）时，只有去掉 repo:
+    才能搜到。
+    """
+    if not class_name or not method_name:
+        return {"ok": True, "total": 0, "ids": [], "url": "",
+                "error": "not_applicable"}
+    term = f'"{class_name}" "{method_name}"'
+    q = urllib.parse.quote(term)
+    url = f"{GH_API}/search/issues?q={q}&per_page=5"
+    ok, data, err = _get_json(url, headers={
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "nexus-audit/1.3"})
+    if not ok or not isinstance(data, dict):
+        return {"ok": False, "total": 0, "ids": [], "url": url, "error": err}
+    items = data.get("items") or []
+    ids = []
+    for it in items:
+        repo_url = str(it.get("repository_url") or "")
+        repo = "/".join(repo_url.rstrip("/").split("/")[-2:]) if repo_url else ""
+        ids.append(f"{repo}#{it.get('number')} {it.get('title', '')[:60]}")
+    return {"ok": True, "total": int(data.get("total_count") or len(items)),
+            "ids": ids[:5], "url": url, "error": ""}
+
+
+def query_github_global_advisories(slug: str, unit: str = "",
+                                   file: str = "", pages: int = 3) -> dict:
+    """GitHub 全局漏洞库 `GET /advisories`（M314）。
+
+    `/repos/{slug}/security-advisories` 只返回作者手动发布的公告（国内仓几乎
+    永远为空）；真正的 GHSA 在全局库里。该接口没有 repo 过滤参数，按仓库名
+    在 summary/description/source_code_location 里匹配，命中后再用方法名
+    收窄，避免"仓里有公告"连坐。
+    """
+    memo_key = ("global_advisories", slug.lower())
+    if memo_key in _REPO_MEMO:
+        return _REPO_MEMO[memo_key]
+    name = (slug.split("/")[-1] if slug else "").lower()
+    ids: list[str] = []
+    items: list[dict] = []
+    ok_any = False
+    err = ""
+    url = f"{GH_API}/advisories?per_page=100&page=1"
+    for page in range(1, max(1, pages) + 1):
+        url = f"{GH_API}/advisories?per_page=100&page={page}"
+        ok, data, e = _get_json(url, headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "nexus-audit/1.3"})
+        if not ok or not isinstance(data, list):
+            err = e or "non_list_response"
+            break
+        ok_any = True
+        for adv in data:
+            if not isinstance(adv, dict):
+                continue
+            text = " ".join(str(adv.get(k) or "") for k in
+                            ("summary", "description", "source_code_location"))
+            low = text.lower()
+            if name and name not in low:
+                continue
+            if unit and not _unit_in_text(unit, file, text):
+                continue
+            # CVE 优先：判重时 CVE 命中要压过 GHSA（[300] 也按 CVE 断言）
+            aid = adv.get("cve_id") or adv.get("ghsa_id") or ""
+            if aid:
+                ids.append(aid)
+                items.append({"id": aid, "text": text})
+        if len(data) < 100:
+            break
+    res = {"ok": ok_any, "total": len(ids), "ids": ids[:5], "url": url,
+           "items": items, "error": err}
+    _REPO_MEMO[memo_key] = res
+    return res
+
+
 def _unit_in_text(unit: str, file: str, text: str) -> bool:
     """CVE 描述是否精确提到这个方法；不能因为同文件别的 CVE 连坐。"""
     key = unit.split(".")[-1].split("#")[0].strip().lower()
@@ -255,9 +391,15 @@ def _unit_in_text(unit: str, file: str, text: str) -> bool:
 
 def dedup(slug: str, category: str, unit: str, *,
           file: str = "", aliases: list[str] | None = None,
-          allow_online: bool = True, use_cache: bool = True) -> dict:
+          allow_online: bool = True, use_cache: bool = True,
+          repo_root: str | Path | None = None,
+          class_name: str = "") -> dict:
     """四态查重。allow_online=False 时最多只能判 DUPLICATE_*，绝不 FRESH。"""
-    aliases = aliases or []
+    aliases = list(aliases or [])
+    # M314：二开仓自动挂上游主仓别名（cn.iocoder.yudao → ruoyi-vue-pro …）
+    if repo_root:
+        aliases += detect_upstream_aliases(repo_root)
+    aliases = list(dict.fromkeys(a for a in aliases if a))
     cpath = _cache_path(slug, category, unit)
     # 离线模式绝不读在线缓存：缓存里可能是上次联网查到的 FRESH，
     # 直接复用会把“这次没查”伪装成“这次查过且 0 命中”。
@@ -304,8 +446,14 @@ def dedup(slug: str, category: str, unit: str, *,
         cve_src = circl
     issues = query_github_issues(slug, unit, category)
     ghsa = query_github_advisories(slug)
+    _cls = class_name or (unit.split(".")[0] if "." in unit else "")
+    _meth = unit.split(".")[-1].split("#")[0] if unit else ""
+    global_issues = query_github_issues_global(_cls, _meth)
+    global_adv = query_github_global_advisories(slug, unit, file)
     sources = {"nvd": nvd, "circl": circl, "github_issues": issues,
                "github_advisories": ghsa,
+               "github_global_issues": global_issues,
+               "github_global_advisories": global_adv,
                "cve_org": {"ok": nvd.get("ok", False) or circl.get("ok", False),
                            "note": "CVE.org records via NVD/CIRCL"}}
     matched: list[str] = []
@@ -328,8 +476,17 @@ def dedup(slug: str, category: str, unit: str, *,
             cve_hit = True
             matched += cve_src.get("ids") or []
             evidence.append(cve_src.get("url", ""))
+    _gadv_items = [x for x in (global_adv.get("items") or []) if x.get("id")]
+    _gadv_cve = [x for x in _gadv_items
+                 if str(x.get("id", "")).upper().startswith("CVE-")]
+    _gissue_hit = bool(global_issues.get("ok")
+                       and global_issues.get("total", 0) > 0)
     if cve_hit:
         status = STATUS_CVE
+    elif _gadv_cve:
+        status = STATUS_CVE
+        matched += [x["id"] for x in _gadv_cve]
+        evidence.append(global_adv.get("url", ""))
     elif ghsa.get("ok") and ghsa.get("total", 0) > 0:
         # M290：仓库级公告列表不能连坐——只有公告文本真的命中方法/文件名
         # 才判重复；否则转 UNKNOWN 并注明"仓有公告但无方法级命中"。
@@ -344,11 +501,20 @@ def dedup(slug: str, category: str, unit: str, *,
             status = STATUS_UNKNOWN
             rec_reason = ("repo_advisories_no_unit_match: 仓库存在安全公告，"
                           "但均未命中本方法/文件，需人工查重后定性")
+    elif _gadv_items:
+        status = STATUS_ISSUE
+        matched += [x["id"] for x in _gadv_items]
+        evidence.append(global_adv.get("url", ""))
+    elif _gissue_hit:
+        status = STATUS_ISSUE
+        matched += global_issues.get("ids") or []
+        evidence.append(global_issues.get("url", ""))
     elif issues.get("ok") and issues.get("total", 0) > 0:
         status = STATUS_ISSUE
         matched += issues.get("ids") or []
         evidence.append(issues.get("url", ""))
-    elif not (cve_src.get("ok") and issues.get("ok") and ghsa.get("ok")):
+    elif not (cve_src.get("ok") and issues.get("ok") and ghsa.get("ok")
+              and global_issues.get("ok") and global_adv.get("ok")):
         status = STATUS_UNKNOWN
     else:
         status = STATUS_FRESH
@@ -367,6 +533,10 @@ def dedup(slug: str, category: str, unit: str, *,
             "github_issues": "checked" if issues.get("ok") else "failed",
             "github_advisories": ("checked" if ghsa.get("ok")
                                   else "failed"),
+            "github_global_issues": ("checked" if global_issues.get("ok")
+                                     else "failed"),
+            "github_global_advisories": ("checked" if global_adv.get("ok")
+                                         else "failed"),
             "cve_org": "via_nvd" if nvd.get("ok") else
                        "via_circl" if circl.get("ok") else "unchecked",
         },

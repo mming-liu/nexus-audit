@@ -1,6 +1,6 @@
 {
   "template_version": "1.0",
-  "updated_at": "2026-10-28",
+  "updated_at": "2026-11-01",
   "note": "Conservative seed list. A match means DUPLICATE_*; a miss does NOT mean fresh unless online sources were actually queried.",
   "signatures": [
     {
@@ -202,6 +202,146 @@
       "unit": "midjourney",
       "url": "https://github.com/advisories/GHSA-v372-v7rj-cgvj",
       "note": "imagine referImageUrl"
+    },
+    {
+      "repo": "guchengwuyue/yshop-oa-crm",
+      "aliases": [
+        "yshop-crm",
+        "yshop",
+        "yshop-oa-crm"
+      ],
+      "id": "CVE-2026-92462",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "CrmFlowController.deleteFlowStep",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-92462"
+    },
+    {
+      "repo": "guchengwuyue/yshop-oa-crm",
+      "aliases": [
+        "yshop-crm",
+        "yshop",
+        "yshop-oa-crm"
+      ],
+      "id": "CVE-2026-92461",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "CrmFlowController.getFlowUserIds",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-92461"
+    },
+    {
+      "repo": "guchengwuyue/yshop-oa-crm",
+      "aliases": [
+        "yshop-crm",
+        "yshop",
+        "yshop-oa-crm"
+      ],
+      "id": "CVE-2026-92458",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-92458"
+    },
+    {
+      "repo": "guchengwuyue/yshop-oa-crm",
+      "aliases": [
+        "yshop-crm",
+        "yshop",
+        "yshop-oa-crm"
+      ],
+      "id": "CVE-2026-92459",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-92459"
+    },
+    {
+      "repo": "guchengwuyue/yshop-oa-crm",
+      "aliases": [
+        "yshop-crm",
+        "yshop",
+        "yshop-oa-crm"
+      ],
+      "id": "CVE-2026-92463",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-92463"
+    },
+    {
+      "repo": "guchengwuyue/yshop-oa-crm",
+      "aliases": [
+        "yshop-crm",
+        "yshop",
+        "yshop-oa-crm"
+      ],
+      "id": "GHSA-h7m8-pw8h-m438",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://github.com/advisories/GHSA-h7m8-pw8h-m438"
+    },
+    {
+      "repo": "guchengwuyue/yshop-oa-crm",
+      "aliases": [
+        "yshop-crm",
+        "yshop",
+        "yshop-oa-crm"
+      ],
+      "id": "CVE-2026-109171",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-109171"
+    },
+    {
+      "repo": "guchengwuyue/yshop-oa-crm",
+      "aliases": [
+        "yshop-crm",
+        "yshop",
+        "yshop-oa-crm"
+      ],
+      "id": "CVE-2026-111703",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-111703"
+    },
+    {
+      "repo": "SpringSunYY/LZ-litchi",
+      "aliases": [
+        "lz-litchi",
+        "litchi"
+      ],
+      "id": "CVE-2026-71805",
+      "kind": "cve",
+      "category": "pathtraver",
+      "unit": "FileController.getFileContent",
+      "url": "https://github.com/advisories/GHSA-gvv2-7gf7-286x"
+    },
+    {
+      "repo": "YunaiV/ruoyi-vue-pro",
+      "aliases": [
+        "ruoyi-vue-pro",
+        "yudao"
+      ],
+      "id": "Issue #1146",
+      "kind": "issue",
+      "category": "pathtraver",
+      "unit": "FileController.getFileContent",
+      "url": "https://github.com/YunaiV/ruoyi-vue-pro/issues/1146"
+    },
+    {
+      "repo": "YunaiV/ruoyi-vue-pro",
+      "aliases": [
+        "ruoyi-vue-pro",
+        "yudao"
+      ],
+      "id": "Issue #1188",
+      "kind": "issue",
+      "category": "pathtraver",
+      "unit": "FileController.getFileContent",
+      "url": "https://github.com/YunaiV/ruoyi-vue-pro/issues/1188"
     }
   ]
 }
