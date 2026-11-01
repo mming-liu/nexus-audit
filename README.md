@@ -71,6 +71,13 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.13 `--refresh-advisories` 开关（M318）
+
+- 默认仍走 24h 全局 advisory 缓存（挂机巡猎不撞配额）；
+- `python cli.py daily-hunt --refresh-advisories` 会清掉
+  `.cache/cve_dedup/_global_advisories.json` 与进程内 memo，强制重新拉取，
+  适合人工复核或怀疑刚有新 CVE 发布时使用。
+
 ### v1.3.12 查重省流：全局缓存 + 短路 + 泛化词跳过（M317）
 
 - **全局 advisory 整轮共用**：`GET /advisories` 落盘缓存 24h

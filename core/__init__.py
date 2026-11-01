@@ -1,3 +1,3 @@
 # nexus-audit Python 包根
 
-__version__ = "1.3.12"
+__version__ = "1.3.13"

@@ -333,6 +333,21 @@ GLOBAL_ADV_CACHE = CACHE / "_global_advisories.json"
 _GLOBAL_ADV_MEMO: dict = {"ok": None, "items": [], "error": ""}
 
 
+def set_refresh_advisories(enabled: bool = True) -> None:
+    """M318：`--refresh-advisories` —— 强制下一轮重新拉全局公告。
+
+    默认 24h 缓存保证挂机巡猎不撞配额；人工复核时用这个开关把
+    `.cache/cve_dedup/_global_advisories.json` 与进程内 memo 一起清掉。
+    """
+    if not enabled:
+        return
+    _GLOBAL_ADV_MEMO.update(ok=None, items=[], error="")
+    try:
+        GLOBAL_ADV_CACHE.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def _github_token() -> str:
     return (os.getenv("GITHUB_TOKEN") or os.getenv("NEXUS_GITHUB_TOKEN")
             or os.getenv("GH_TOKEN") or "").strip()

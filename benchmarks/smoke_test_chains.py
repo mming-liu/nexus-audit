@@ -11371,6 +11371,36 @@ finally:
     Path(".cache/cve_dedup/_global_advisories.json").unlink(missing_ok=True)
 check("M317：已执行断言数 >= 1810", COUNTS["n"] >= 1810, True)
 
+print("\n[302] M318：--refresh-advisories 强制刷新全局公告缓存")
+_cd314._GLOBAL_ADV_MEMO.update(ok=True, items=[{"id": "CACHED"}], error="")
+_cd318_cache = Path(".cache/cve_dedup/_global_advisories.json")
+_cd318_cache.parent.mkdir(parents=True, exist_ok=True)
+_cd318_cache.write_text('{"_cached_at": 9999999999, "items": []}',
+                        encoding="utf-8")
+_cd314.set_refresh_advisories(True)
+check("M318：刷新后 memo 清空", _cd314._GLOBAL_ADV_MEMO["ok"], None)
+check("M318：刷新后缓存文件删除", _cd318_cache.exists(), False)
+_orig_get318 = _cd314._get_json
+_calls318 = []
+
+
+def _fake318(url, headers=None, timeout=20.0):
+    _calls318.append(url)
+    return True, [{"ghsa_id": "GHSA-r", "cve_id": "CVE-2026-0002",
+                   "summary": "acme/demo x"}], ""
+
+
+_cd314._get_json = _fake318
+try:
+    _cd314._GLOBAL_ADV_MEMO.update(ok=None, items=[], error="")
+    _cd314.load_global_advisories()
+    check("M318：刷新后重新拉取", len(_calls318) >= 1, True)
+finally:
+    _cd314._get_json = _orig_get318
+    _cd314._GLOBAL_ADV_MEMO.update(ok=None, items=[], error="")
+    Path(".cache/cve_dedup/_global_advisories.json").unlink(missing_ok=True)
+check("M318：已执行断言数 >= 1814", COUNTS["n"] >= 1814, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

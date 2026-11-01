@@ -6063,6 +6063,8 @@ def cmd_daily_hunt(args) -> int:
     from core.text_utils import ensure_utf8_stdio
     ensure_utf8_stdio()
     langs = [x.strip() for x in (args.languages or "").split(",") if x.strip()]
+    from core.context import cve_dedup as _cd318
+    _cd318.set_refresh_advisories(getattr(args, "refresh_advisories", False))
     res = daily_hunt.run(
         languages=langs or ["java", "python", "solidity"],
         days=args.days, limit=args.limit, min_stars=args.min_stars,
@@ -6403,6 +6405,8 @@ def main():
                          help="完全离线：只用 .cache/upstream 里已有克隆")
     p_daily.add_argument("--offline-dedup", action="store_true",
                          help="不联网查 CVE/Issue（此时不可能判 FRESH）")
+    p_daily.add_argument("--refresh-advisories", action="store_true",
+                         help="强制刷新全局 GitHub Advisory 缓存（默认 24h 复用）")
     p_daily.add_argument("--dry-run", action="store_true")
     p_client = sub.add_parser("client-audit",
                               help="M274/M290：客户离线交付五件套 / 售前预览单")
