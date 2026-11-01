@@ -71,6 +71,20 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.9 选靶富矿词池与跨语言配额（M311 → M312）
+
+- **跨语言 Round-Robin**：`scout_daily()` 不再把所有语言按 `pushed_at` 全局混排截断
+  （2026-11-01 出现 13 Python : 1 Java，Java 全被挤出前 10）。现在按语言分桶、
+  桶内 `有 Issues → 最近 push → stars` 排序，再按 java → python → solidity
+  轮流交替抽（各语言 #1、#2…），前 N 个名额语言均衡。
+- **富矿词池**：Java 聚焦 `mybatis-plus / sa-token / shiro / "spring-boot" admin /
+  erp / crm / mall / oa / cms / mes / wms`；Python 改为"框架 + 业务"组合词
+  （`fastapi admin`、`django erp`、`django mall`、`rag admin` …），不再裸搜框架名。
+- **星级下探**：默认 `--min-stars 150 --max-stars 10000`，每语言 `per_page` 提到 30。
+- **组件库过滤**：补 `stubs/djlint/linter/auditlog/graphql/huey/celery/defectdojo/
+  spring-boot-admin`，以及"名字以 django-/flask-/fastapi-/spring- 开头且描述含
+  library/plugin/extension/middleware/reusable/package/adapter"的第三方组件。
+
 ### v1.3.8 pathtraver 大小写与压缩包 sink 收口（M310）
 
 - **Paths.get 大小写敏感**：Python 的 paths.get(key)（dict 方法）不再被 re.I

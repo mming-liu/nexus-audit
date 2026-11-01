@@ -10663,8 +10663,11 @@ print("\n[286] M298：Python 限定词去 panel")
 from core.context import target_scout as _ts298                   # noqa: E402
 _py298 = _ts298.BUSINESS_QUALIFIERS["python"]
 check("M298：panel 已移出 Python 词表", "panel" not in _py298, True)
-check("M298：业务词 cms/saas/erp 就位",
-      {"cms", "saas", "erp"} <= set(_py298), True)
+check("M311：Python 词池改为框架+业务组合词",
+      {"fastapi admin", "django erp", "django mall"} <= set(_py298), True)
+check("M311：Java 富矿词池就位",
+      {"mybatis-plus", "sa-token", "shiro"} <= set(_ts298.BUSINESS_QUALIFIERS["java"]),
+      True)
 check("M298：轮询按天稳定",
       _ts298.next_qualifier("python", 7) == _ts298.next_qualifier("python", 7),
       True)
@@ -11112,6 +11115,45 @@ check("M310：dramaclaw 两条 pathtraver 不再判 True",
            '        zf.write(project_dir / "a.mp4", "a.mp4")\n') is not True),
       (True, True))
 check("M310：已执行断言数 >= 1765", COUNTS["n"] >= 1765, True)
+
+print("\n[297] M311/M312：跨语言轮转混排 + 组件库过滤")
+_ts311 = _ts298
+
+
+def _mk311(prefix, n, lang="python"):
+    return [{"slug": f"{prefix}/{i}", "stars": 100, "language": lang,
+             "pushed_at": "2026-10-30T00:00:00Z", "has_issues": True}
+            for i in range(n)]
+
+
+_m311 = _ts311._merge_round_robin(
+    {"java": _mk311("j", 4, "java"), "python": _mk311("p", 4),
+     "solidity": _mk311("s", 4, "solidity")},
+    ["java", "python", "solidity"])
+check("M311：轮转顺序 java→python→solidity",
+      [x["slug"] for x in _m311[:6]],
+      ["j/0", "p/0", "s/0", "j/1", "p/1", "s/1"])
+check("M311：候选不丢", len(_m311), 12)
+_m311b = _ts311._merge_round_robin(
+    {"java": _mk311("j", 2, "java"), "python": _mk311("p", 10)},
+    ["java", "python"])
+check("M311：Python 爆量时前 4 名仍 java/python 各半",
+      [x["slug"] for x in _m311b[:4]], ["j/0", "p/0", "j/1", "p/1"])
+for _slug311, _desc311 in [
+        ("jazzband/django-stubs", "type stubs for django"),
+        ("Riverside-Healthcare/djLint", "template linter"),
+        ("jazzband/django-auditlog", "audit log app"),
+        ("codecentric/spring-boot-admin", "admin ui for spring boot"),
+        ("DefectDojo/django-DefectDojo", "vulnerability management"),
+        ("strawberry-graphql/strawberry", "graphql library")]:
+    check(f"M312：{_slug311} 被剔除", _ts311.is_tool_lib(_slug311, _desc311), True)
+check("M312：业务后台不误杀",
+      _ts311.is_tool_lib("acme/erp", "ERP backend"), False)
+check("M312：框架本身不误杀",
+      _ts311.is_tool_lib("spring-projects/spring-boot", "Spring Boot framework"), False)
+check("M312：django- 前缀 + library 描述被剔除",
+      _ts311.is_tool_lib("acme/django-layout", "reusable layout library"), True)
+check("M312：已执行断言数 >= 1775", COUNTS["n"] >= 1775, True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

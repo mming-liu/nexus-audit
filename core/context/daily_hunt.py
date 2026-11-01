@@ -321,7 +321,7 @@ def _header(ledger: list[dict], scout: dict, *, days: int,
 
 
 def run(*, languages=("java", "python", "solidity"), days: int = 14,
-        limit: int = 10, min_stars: int = 300, max_stars: int = 30000,
+        limit: int = 10, min_stars: int = 150, max_stars: int = 10000,
         max_roots: int = 0, state_path: Path | str | None = None,
         report: Path | str | None = None, json_path: Path | str | None = None,
         packs_dir: Path | str | None = None, evict_cache: bool = False,

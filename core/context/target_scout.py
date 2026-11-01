@@ -64,11 +64,14 @@ def is_tutorial(slug: str, description: str = "",
 # M293：业务限定词。裸搜 language+pushed 抓回来的大半是驱动/插件/桌面工具，
 # 按语言轮询注入一个业务词，把候选拉回“有 Web 路由的业务后台”。
 BUSINESS_QUALIFIERS: dict[str, tuple[str, ...]] = {
-    "java": ("spring-boot", "admin", "cms", "erp", "crm", "mall"),
-    # M298：`panel` 实测只捞到桌面/UI panel（holoviz-panel、nwg-panel、
-    # SpiderPanel…），一半扫出 0；换成业务后台词。
-    "python": ("fastapi", "django", "flask", "admin", "backend", "cms",
-               "saas", "erp"),
+    # M311：Java 富矿词池 —— 真实企业后台/脚手架（mybatis-plus / sa-token /
+    # shiro 是出洞率最高的一批），不再只写一个裸 "spring-boot"。
+    "java": ("mybatis-plus", "sa-token", "shiro", '"spring-boot" admin', "erp",
+             "crm", "mall", "oa", "cms", "mes", "wms"),
+    # M311：Python 用"框架 + 业务"组合词，裸 django/fastapi 会捞回一堆
+    # 类型桩/Linter/插件库（django-stubs、djLint、django-auditlog…）。
+    "python": ("fastapi admin", "fastapi cms", "django erp", "django crm",
+               "django mall", "flask admin", "rag admin"),
     "solidity": ("vault", "staking", "lending", "swap"),
 }
 
@@ -82,15 +85,27 @@ _TOOL_LIB_RE = re.compile(
     r"(?:^|[^a-z0-9])(?:(?:driver|drivers|sdk|plugin|plugins|sphinx|cli|desktop|"
     r"eval|evaluat\w*|benchmark|generator|generators|codegen|datamodel|"
     r"telemetry|observability|logfire|spring-tools|citrus|test-framework|"
-    r"testing-framework|testcontainers)(?:[^a-z0-9]|$)"
+    r"testing-framework|testcontainers|stubs|djlint|linter|auditlog|graphql|"
+    r"huey|celery|defectdojo|spring-boot-admin)(?:[^a-z0-9]|$)"
     r"|(?:ide|vscode|intellij|eclipse)-)", re.I)
+
+# M312：名字以框架前缀开头、描述又是"库/插件/中间件/可复用包"的第三方组件，
+# 不是端到端业务后台（如 django-layout、fastapi-utils 这类）。
+_COMPONENT_NAME_RE = re.compile(r"^(?:django|flask|fastapi|spring)-", re.I)
+_COMPONENT_DESC_RE = re.compile(
+    r"\b(?:library|plugin|extension|middleware|reusable|package|adapter)\b",
+    re.I)
 
 
 def is_tool_lib(slug: str, description: str = "",
                 topics: list[str] | tuple[str, ...] = ()) -> bool:
-    """仓库名/描述/topics 命中工具库标记即丢（M293）。"""
+    """仓库名/描述/topics 命中工具库标记即丢（M293/M312）。"""
     text = " ".join([slug or "", description or "", " ".join(topics or [])])
-    return bool(_TOOL_LIB_RE.search(text))
+    if _TOOL_LIB_RE.search(text):
+        return True
+    name = (slug or "").split("/")[-1]
+    return bool(_COMPONENT_NAME_RE.match(name)
+                and _COMPONENT_DESC_RE.search(description or ""))
 
 
 def next_qualifier(language: str, day_index: int) -> str:
@@ -202,22 +217,68 @@ def scout(language: str = "java", min_stars: int = 300,
     return _offline(language, min_stars, max_stars, limit)
 
 
+def _merge_round_robin(buckets: dict[str, list[dict]],
+                       langs: list[str]) -> list[dict]:
+    """按语言分桶排序后轮转交织（M311）。
+
+    桶内：有 Issues 优先 → 最近 push → stars；桶间按 langs 顺序轮流取
+    （java #1 → python #1 → solidity #1 → java #2 …），保证前 N 个候选里
+    每种语言都有份，不再被单语言爆量挤占。
+    """
+    prepared: dict[str, list[dict]] = {}
+    for lang in langs:
+        uniq: dict[str, dict] = {}
+        for it in buckets.get(lang) or []:
+            cur = uniq.get(it["slug"])
+            if (cur is None
+                    or int(it.get("stars") or 0) > int(cur.get("stars") or 0)):
+                uniq[it["slug"]] = it
+        vals = sorted(uniq.values(),
+                      key=lambda x: (x.get("pushed_at") or "",
+                                     int(x.get("stars") or 0)),
+                      reverse=True)
+        vals.sort(key=lambda x: not x.get("has_issues"))
+        prepared[lang] = vals
+
+    ordered: list[dict] = []
+    seen: set[str] = set()
+    idx = 0
+    while True:
+        added = False
+        for lang in langs:
+            vals = prepared.get(lang) or []
+            if idx >= len(vals):
+                continue
+            added = True
+            it = vals[idx]
+            if it["slug"] in seen:
+                continue
+            seen.add(it["slug"])
+            ordered.append(it)
+        if not added:
+            break
+        idx += 1
+    return ordered
+
+
 def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                                                           "solidity"),
-                days: int = 14, limit: int = 10, min_stars: int = 300,
-                max_stars: int = 30000, allow_online: bool = True,
+                days: int = 14, limit: int = 10, min_stars: int = 150,
+                max_stars: int = 10000, allow_online: bool = True,
                 today: _dt.date | None = None) -> dict:
-    """M285：每日动态抓新仓。
+    """M285/M311：每日动态抓新仓（跨语言 Round-Robin 混排）。
 
-    每个语言各查一次，合并去重后按“有 Issues → 最近 push → stars”排序。
-    在线查询全部失败时整体回退离线种子，source 明确标注 offline_seed。
+    每个语言各查一次；**先按语言分桶各自排序**（有 Issues → 最近 push →
+    stars），再按 java → python → solidity 轮流交替抽（各语言 #1、#2…）。
+    2026-11-01 的 13 Python : 1 Java 就是全局按 pushed_at 混排截断造成的。
+    在线查询全部失败时整体回退离线种子，同样轮转混排。
     """
     langs = [str(x).strip() for x in (languages or []) if str(x).strip()]
     today = today or _dt.date.today()
     since = (today - _dt.timedelta(days=max(1, int(days)))).isoformat()
-    per_page = min(max(int(limit) * 2, 10), 50)
+    per_page = min(max(int(limit) * 3, 30), 50)
 
-    items: list[dict] = []
+    buckets: dict[str, list[dict]] = {lang: [] for lang in langs}
     queries: list[str] = []
     errors: list[str] = []
     dropped = 0
@@ -239,35 +300,21 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             continue
         online_ok += 1
         parsed, drop, drop_tool = _parse_search(data, lang)
-        items += parsed
+        buckets[lang] += parsed
         dropped += drop
         dropped_tool += drop_tool
 
     if online_ok == 0:
-        seeds: list[dict] = []
+        seeds: dict[str, list[dict]] = {}
         for lang in langs:
-            seeds += _offline(lang, min_stars, max_stars, per_page)["items"]
-        # 去重后仍按“有 Issues / stars”排序，保持调用方一致。
-        merged = {it["slug"]: it for it in seeds}
-        ordered = sorted(merged.values(),
-                         key=lambda x: (not x.get("has_issues"),
-                                        -int(x.get("stars") or 0)))
+            seeds[lang] = _offline(lang, min_stars, max_stars, per_page)["items"]
+        ordered = _merge_round_robin(seeds, langs)
         return {"ok": bool(ordered), "source": "offline_seed",
                 "queries": queries, "items": ordered[:max(1, limit)],
                 "dropped": 0, "dropped_tool": 0,
                 "error": "; ".join(errors)[:400]}
 
-    merged: dict[str, dict] = {}
-    for it in items:
-        cur = merged.get(it["slug"])
-        if cur is None or int(it["stars"]) > int(cur["stars"]):
-            merged[it["slug"]] = it
-    # 稳定排序两遍：先按最近 push 倒序，再把有 Issues 的仓提到前面。
-    ordered = sorted(merged.values(),
-                     key=lambda x: (x.get("pushed_at") or "",
-                                    int(x.get("stars") or 0)),
-                     reverse=True)
-    ordered.sort(key=lambda x: not x.get("has_issues"))
+    ordered = _merge_round_robin(buckets, langs)
     return {"ok": bool(ordered), "source": "github_search",
             "queries": queries, "items": ordered,
             "dropped": dropped, "dropped_tool": dropped_tool,
