@@ -33,10 +33,27 @@
 
 | 项 | 结果 |
 | --- | --- |
-| smoke_test_chains.py | PASS ✔ **1,783 项**（新增 [297] 10 项） |
+| smoke_test_chains.py | PASS ✔ **1,784 项**（新增 [297] 11 项） |
 | cli.py doctor | PASS（12 段全绿） |
 | 单测抽查 | 轮转顺序 java→python→solidity；Python 爆量时前 4 名各半；6 个组件库全部剔除、ERP/框架本身不误杀 |
 
 ## 五、实盘重跑
 
-TBD
+第一次实跑（10:00）：候选只有 **2** 个、实扫 0（两个都在 7 天冷却期）。
+原因是"每语言只查 1 个轮换词"，而当天恰好轮到：
+
+- Java：`mall` —— 与 `stars:150..10000 pushed:>2026-10-18` 的交集为 **0**
+  （`mall language:java stars:150..10000` 有 38 个，但最近 push 都早于 10-18）；
+- Python：`fastapi admin` —— 只有 2 个，且都在冷却期。
+
+修正：`terms_per_language=2`（同一天查两个相邻轮换词）。重跑 scout 得到 **10** 个候选：
+
+~~~text
+dromara/skyeye (Java 1239)            getrebuild/rebuild (Java 1094)
+w8123/EnterpriseAgentFramework (Java) guchengwuyue/yshop-oa-crm (Java 1872)
+strimzi/strimzi-kafka-oauth (Java)    SpringSunYY/LZ-litchi (Java 205)
+apache/jackrabbit-oak (Java)          yujian0815/fnmedia-ext (Python)
+jowilf/starlette-admin (Python)       insistence/RuoYi-FastAPI (Python)
+~~~
+
+Java : Python = 7 : 3（旧结构下是 1 : 13）。

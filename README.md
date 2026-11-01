@@ -81,6 +81,9 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
   erp / crm / mall / oa / cms / mes / wms`；Python 改为"框架 + 业务"组合词
   （`fastapi admin`、`django erp`、`django mall`、`rag admin` …），不再裸搜框架名。
 - **星级下探**：默认 `--min-stars 150 --max-stars 10000`，每语言 `per_page` 提到 30。
+- **每语言查 2 个轮换词**：单日只查一个词会撞上"该词与 14 天窗口交集为 0"
+  （实盘 11-01 的 `mall` 就是 0 命中），默认 `terms_per_language=2`，
+  一次查询两个相邻轮换词。
 - **组件库过滤**：补 `stubs/djlint/linter/auditlog/graphql/huey/celery/defectdojo/
   spring-boot-admin`，以及"名字以 django-/flask-/fastapi-/spring- 开头且描述含
   library/plugin/extension/middleware/reusable/package/adapter"的第三方组件。

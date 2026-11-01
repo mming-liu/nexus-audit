@@ -11153,6 +11153,21 @@ check("M312：框架本身不误杀",
       _ts311.is_tool_lib("spring-projects/spring-boot", "Spring Boot framework"), False)
 check("M312：django- 前缀 + library 描述被剔除",
       _ts311.is_tool_lib("acme/django-layout", "reusable layout library"), True)
+_orig_get311 = _ts311._get
+_calls311 = []
+
+
+def _fake_get311(url, timeout=20.0):
+    _calls311.append(url)
+    return False, None, "test"
+
+
+_ts311._get = _fake_get311
+try:
+    _ts311.scout_daily(languages=["java", "python"], allow_online=True)
+finally:
+    _ts311._get = _orig_get311
+check("M311：每语言默认查 2 个轮换词", len(_calls311), 4)
 check("M312：已执行断言数 >= 1775", COUNTS["n"] >= 1775, True)
 
 check("M148：失败清单为空", len(FAILS), 0)

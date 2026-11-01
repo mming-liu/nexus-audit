@@ -265,7 +265,8 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                                                           "solidity"),
                 days: int = 14, limit: int = 10, min_stars: int = 150,
                 max_stars: int = 10000, allow_online: bool = True,
-                today: _dt.date | None = None) -> dict:
+                today: _dt.date | None = None,
+                terms_per_language: int = 2) -> dict:
     """M285/M311：每日动态抓新仓（跨语言 Round-Robin 混排）。
 
     每个语言各查一次；**先按语言分桶各自排序**（有 Issues → 最近 push →
@@ -286,23 +287,27 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
     online_ok = 0
     day_index = today.toordinal()
 
+    terms = max(1, int(terms_per_language))
     for lang in langs:
-        qualifier = next_qualifier(lang, day_index)
-        q = search_query(lang, min_stars, max_stars, since, limit, qualifier)
-        queries.append(q)
-        if not allow_online:
-            continue
-        url = (f"{GH_API}/search/repositories?q={urllib.parse.quote(q)}"
-               f"&sort=updated&order=desc&per_page={per_page}")
-        ok, data, err = _get(url)
-        if not ok or not isinstance(data, dict):
-            errors.append(f"{lang}: {err}")
-            continue
-        online_ok += 1
-        parsed, drop, drop_tool = _parse_search(data, lang)
-        buckets[lang] += parsed
-        dropped += drop
-        dropped_tool += drop_tool
+        # M311：同一天查多个轮换词（默认 2 个），避免恰好轮到"mall"这种
+        # 与 14 天窗口交集为 0 的词就整天颗粒无收。
+        for k in range(terms):
+            qualifier = next_qualifier(lang, day_index + k)
+            q = search_query(lang, min_stars, max_stars, since, limit, qualifier)
+            queries.append(q)
+            if not allow_online:
+                continue
+            url = (f"{GH_API}/search/repositories?q={urllib.parse.quote(q)}"
+                   f"&sort=updated&order=desc&per_page={per_page}")
+            ok, data, err = _get(url)
+            if not ok or not isinstance(data, dict):
+                errors.append(f"{lang}: {err}")
+                continue
+            online_ok += 1
+            parsed, drop, drop_tool = _parse_search(data, lang)
+            buckets[lang] += parsed
+            dropped += drop
+            dropped_tool += drop_tool
 
     if online_ok == 0:
         seeds: dict[str, list[dict]] = {}
