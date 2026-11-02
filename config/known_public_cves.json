@@ -390,6 +390,121 @@
       "category": "",
       "unit": "",
       "url": "https://github.com/advisories/GHSA-6phq-6cxr-q574"
+    },
+    {
+      "repo": "201206030/novel-plus",
+      "aliases": [
+        "novel-plus",
+        "novelplus"
+      ],
+      "id": "CVE-2026-90939",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "SysUserController.list",
+      "url": "https://www.sentinelone.com/vulnerability-database/cve-2026-90939/"
+    },
+    {
+      "repo": "201206030/novel-plus",
+      "aliases": [
+        "novel-plus",
+        "novelplus"
+      ],
+      "id": "CVE-2026-90941",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "BookController.download",
+      "url": "https://www.sentinelone.com/vulnerability-database/cve-2026-90941/"
+    },
+    {
+      "repo": "201206030/novel-plus",
+      "aliases": [
+        "novel-plus",
+        "novelplus"
+      ],
+      "id": "CVE-2025-4017",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "LogController.list",
+      "url": "https://www.sentinelone.com/vulnerability-database/cve-2025-4017/"
+    },
+    {
+      "repo": "201206030/novel-plus",
+      "aliases": [
+        "novel-plus",
+        "novelplus"
+      ],
+      "id": "CVE-2025-4015",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-4015"
+    },
+    {
+      "repo": "201206030/novel-plus",
+      "aliases": [
+        "novel-plus",
+        "novelplus"
+      ],
+      "id": "CVE-2026-90940",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-90940"
+    },
+    {
+      "repo": "dromara/ujcms",
+      "aliases": [
+        "ujcms"
+      ],
+      "id": "CVE-2026-93961",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://vuldb.com/cve/CVE-2026-93961"
+    },
+    {
+      "repo": "dromara/ujcms",
+      "aliases": [
+        "ujcms"
+      ],
+      "id": "CVE-2026-78140",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://www.sentinelone.com/vulnerability-database/cve-2026-78140/"
+    },
+    {
+      "repo": "dromara/ujcms",
+      "aliases": [
+        "ujcms"
+      ],
+      "id": "CVE-2026-2954",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-2954"
+    },
+    {
+      "repo": "xnx3/wangmarket",
+      "aliases": [
+        "wangmarket"
+      ],
+      "id": "CVE-2025-15415",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://github.com/advisories/GHSA-rm9v-363r-mcp3"
+    },
+    {
+      "repo": "xnx3/wangmarket",
+      "aliases": [
+        "wangmarket"
+      ],
+      "id": "CVE-2025-15416",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2025-15416"
     }
   ]
 }

@@ -52,6 +52,9 @@ LOW_SEVERITY_LOG_INJECTION = "LOW_SEVERITY_LOG_INJECTION"
 # M307：入口文件里根本没有命令执行调用，cmdi 根因来自切片里未被入口
 # 调用的辅助函数（`.run()` 这类通用方法名被跨模块贴进来）。
 NO_CMD_SINK = "NO_CMD_SINK"
+# M318：超管专属入口（haveSuperAdminAuth() 或 /superadmin/ 路径）——
+# 超管本就拥有全部权限，这类"路径拼接/缺注解"按厂商惯例不立项。
+SUPERADMIN_ONLY = "SUPERADMIN_ONLY"
 
 _PY_SQL_SINK_RE = re.compile(r"\.\s*(?:execute|executemany|executescript)\s*\(")
 _CMD_SINK_RE = re.compile(
@@ -153,6 +156,14 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
                     "reason": ("入口文件无任何 SQL 执行语句"
                                "（.execute/.executemany/.executescript），"
                                "sqli 来自切片里未被入口调用的辅助函数")}
+
+    if record.get("category") in ("authz", "pathtraver",
+                                  "arbitrary_file_delete", "unrestricted_upload"):
+        src = _read(repo_root, str(record.get("file") or ""))
+        if (src and "haveSuperAdminAuth(" in src) or "/superadmin/" in "/" + file:
+            return {"blocked": True, "code": SUPERADMIN_ONLY,
+                    "reason": ("超管专属入口（haveSuperAdminAuth / superadmin 路径），"
+                               "超管信任边界内的路径拼接不立项")}
 
     if record.get("category") == "authz":
         path = "/" + file.lstrip("/")

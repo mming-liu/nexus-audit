@@ -11401,6 +11401,39 @@ finally:
     Path(".cache/cve_dedup/_global_advisories.json").unlink(missing_ok=True)
 check("M318：已执行断言数 >= 1814", COUNTS["n"] >= 1814, True)
 
+print("\n[303] M318：SUPERADMIN_ONLY + Hop 段路径守卫 + M319 种子")
+_ws318 = Path(_ws_mkdtemp("smoke_m318_"))
+(_ws318 / "SuperAdminController.java").write_text(
+    "public class SuperAdminController {\n"
+    "  public void exportPlugin() {\n"
+    "    if (haveSuperAdminAuth() == false) { return; }\n"
+    "  }\n}\n", encoding="utf-8")
+from core.context import wild_noise as _wn318
+check("M318：超管专属入口进 B",
+      _wn318.classify({"category": "pathtraver",
+                       "unit": "SuperAdminController.exportPlugin",
+                       "file": "SuperAdminController.java"}, _ws318)["code"],
+      "SUPERADMIN_ONLY")
+_hop318 = ('public void download(String name) {\n    helper(name);\n}\n'
+           '// ---- 跨文件辅助方法 ----\n'
+           'public void helper(String name) {\n'
+           '    Path p = Paths.get(name);\n'
+           '    if (new File(name).getCanonicalPath().startsWith(BASE)) {\n'
+           '        Files.readAllBytes(p);\n'
+           '    }\n}\n')
+check("M318：守卫写在 Hop 段也判 False",
+      _rd307.pathtraver_verdict(_hop318), False)
+check("M319：novel-plus 已公开 CVE 拦为 DUPLICATE_CVE",
+      _cd314.dedup("201206030/novel-plus", "authz",
+                   "AiAssistantController.initPlan",
+                   allow_online=False, use_cache=False)["status"],
+      "DUPLICATE_CVE")
+check("M319：ujcms 已公开 CVE 拦为 DUPLICATE_CVE",
+      _cd314.dedup("dromara/ujcms", "authz", "CommentController.remove",
+                   allow_online=False, use_cache=False)["status"],
+      "DUPLICATE_CVE")
+check("M318：已执行断言数 >= 1819", COUNTS["n"] >= 1819, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

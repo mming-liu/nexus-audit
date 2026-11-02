@@ -46,8 +46,8 @@ CVE-2026-112294 / 112295 / 112296（GHSA-6phq-6cxr-q574）补进
 
 - 状态：`open`，**0 条评论**，最后更新 2026-10-30T14:03:29Z；
 - 维护者未开私密通道、未回复；
-- 已在 #27079 发布礼貌追问（2026-11-02T13:13:02Z）：
-  https://github.com/metasfresh/metasfresh/issues/27079#issuecomment-6578023978
+- 已在 #27079 发布零细节追问（2026-11-02T13:31:24Z；原评论误带类名/路径已删除）：
+  https://github.com/metasfresh/metasfresh/issues/27079#issuecomment-6578455241
 - 后续：若 11-06 前仍无回应，凭该公开记录转投 MITRE CNA-LR。
 
 ## 四、门禁

@@ -5135,6 +5135,10 @@ def pathtraver_verdict(source: str) -> bool | None:
     #
     # 反例保护：java-sec-code 的 `return getImgBase64(filepath);` 入口体里有
     # `filepath`，与 sink 行交集非空 ⇒ 不受本早退影响（回归门禁盯着这条）。
+    # M318：防护可能写在 Hop 段（DbBackupService.safeResolve 这类），
+    # 只在入口体里找 PATH_SAFE 会漏。
+    if sink_in is not body and PATH_SAFE_RE.search(sink_in):
+        return False
     if sink_in is not body:
         _sink_ids = _path_sink_identifiers(sink_in)
         if _sink_ids and not (_sink_ids & _path_sink_identifiers(body)):

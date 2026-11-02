@@ -71,6 +71,16 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.15 超管入口降噪与 Hop 段路径守卫（M318 → M319）
+
+- **`SUPERADMIN_ONLY`**：入口文件含 `haveSuperAdminAuth(` 或路径带 `/superadmin/`
+  时，authz/pathtraver/file_delete/upload 类根因压进板块 B（超管信任边界）。
+- **pathtraver Hop 守卫**：`PATH_SAFE_RE` 现在也扫跨文件辅助段（`sink_in`），
+  `DbBackupService.safeResolve` 这类写在 Hop 里的 `getCanonicalPath().startsWith`
+  能直接判 False。
+- **种子库**：补入 novel-plus（CVE-2026-90939/90941/90940、CVE-2025-4015/4017）、
+  ujcms（CVE-2026-93961/78140/2954）、wangmarket（CVE-2025-15415/15416）。
+
 ### v1.3.13 `--refresh-advisories` 开关（M318）
 
 - 默认仍走 24h 全局 advisory 缓存（挂机巡猎不撞配额）；
