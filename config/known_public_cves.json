@@ -1,6 +1,6 @@
 {
   "template_version": "1.0",
-  "updated_at": "2026-11-01",
+  "updated_at": "2026-11-02",
   "note": "Conservative seed list. A match means DUPLICATE_*; a miss does NOT mean fresh unless online sources were actually queried.",
   "signatures": [
     {
@@ -342,6 +342,54 @@
       "category": "pathtraver",
       "unit": "FileController.getFileContent",
       "url": "https://github.com/YunaiV/ruoyi-vue-pro/issues/1188"
+    },
+    {
+      "repo": "sunkaifei/FlyCms",
+      "aliases": [
+        "FlyCms",
+        "flycms"
+      ],
+      "id": "CVE-2026-112294",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "ActionService.counter",
+      "url": "https://www.rapid7.com/db/vulnerabilities/cve-2026-112294/"
+    },
+    {
+      "repo": "sunkaifei/FlyCms",
+      "aliases": [
+        "FlyCms",
+        "flycms"
+      ],
+      "id": "CVE-2026-112295",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "",
+      "url": "https://www.tenable.com/cve/CVE-2026-112295"
+    },
+    {
+      "repo": "sunkaifei/FlyCms",
+      "aliases": [
+        "FlyCms",
+        "flycms"
+      ],
+      "id": "CVE-2026-112296",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://github.com/advisories/GHSA-6phq-6cxr-q574"
+    },
+    {
+      "repo": "sunkaifei/FlyCms",
+      "aliases": [
+        "FlyCms",
+        "flycms"
+      ],
+      "id": "GHSA-6phq-6cxr-q574",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://github.com/advisories/GHSA-6phq-6cxr-q574"
     }
   ]
 }
