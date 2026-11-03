@@ -71,6 +71,15 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.18 占位符拼接去误报 + 同包鉴权基线（M322）
+
+- **sqli**：`StringBuilder/StringBuffer` 的动态段全部是含 `?` 的字符串字面量、
+  且存在 `parameters.add / bind / setString` 时判 False（Mestudy 的
+  `userWhere` 形态），append 里真拼值仍判 True。
+- **authz**：`AUTHZ_PACKAGE_GUARD` —— 同文件无兄弟注解反差时，看同目录
+  ≥2 个 Controller 是否带 `@PreAuthorize/@RequiresPermissions`；当前类整类无注解
+  且**无身份校验**（getUserDetails/checkAuthor/...）→ HIGH 提拔进 A。
+
 ### v1.3.17 Django 响应回显 XSS 判据（M321）
 
 - `python_xss_verdict` 新增 `HttpResponse / make_response` 原样回显检测：

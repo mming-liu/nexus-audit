@@ -39,6 +39,10 @@ from pathlib import Path
 DEMO_CONTROLLER = "DEMO_CONTROLLER"
 PUBLIC_READONLY_ENDPOINT = "PUBLIC_READONLY_ENDPOINT"
 AUTHZ_SIBLING_GUARD = "AUTHZ_SIBLING_GUARD"
+# M322：同文件没有"兄弟注解反差"时（新写的 Controller 整类漏注解），
+# 退到同目录其它 Controller 的鉴权基线；但当前文件若已有身份校验
+# （JWT/session/checkAuthor）则不算漏鉴权，避免把作者 API 打成假阳。
+AUTHZ_PACKAGE_GUARD = "AUTHZ_PACKAGE_GUARD"
 LOCAL_UNIX_SOCKET_SERVER = "LOCAL_UNIX_SOCKET_SERVER"
 UNVERIFIED_WILD_AUTHZ = "UNVERIFIED_WILD_AUTHZ"
 ZERO_ENTRY_LIB = "ZERO_ENTRY_LIB"
@@ -271,6 +275,38 @@ def _python_promote(path: Path, lines: list[str], meth: str) -> dict:
                          f"唯 {meth} 无（{path.name}:{target['line']}）")}
 
 
+_IDENTITY_GUARD_RE = re.compile(
+    r"\b(?:getUserDetails|checkAuthor|getCurrentUser|getLoginUser|"
+    r"SecurityUtils\s*\.\s*get|StpUtil\s*\.\s*(?:check|get)|"
+    r"request\s*\.\s*user\s*\.\s*is_authenticated|@login_required|"
+    r"get_current_user|current_user\b)")
+
+
+def _package_guard(path: Path, lines: list[str]) -> dict:
+    """同目录 >=2 个 Controller 有鉴权注解，当前文件整类没有（M322）。"""
+    text = "\n".join(lines)
+    if _IDENTITY_GUARD_RE.search(text):
+        return {"level": "", "code": "", "evidence": ""}
+    if any(a in text for a in GUARD_ANNOTATIONS):
+        return {"level": "", "code": "", "evidence": ""}
+    peers = 0
+    for p in sorted(path.parent.glob("*.java")):
+        if p == path:
+            continue
+        try:
+            t = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if any(a in t for a in GUARD_ANNOTATIONS):
+            peers += 1
+    if peers >= 2:
+        return {"level": "HIGH", "code": AUTHZ_PACKAGE_GUARD,
+                "evidence": (f"同目录 {peers} 个 Controller 带 "
+                             f"@PreAuthorize/@RequiresPermissions，"
+                             f"{path.name} 整类无鉴权注解且无身份校验")}
+    return {"level": "", "code": "", "evidence": ""}
+
+
 def promote(record: dict, repo_root: Path | None = None) -> dict:
     """authz 高置信度提拔：同文件其它写接口都被注解守卫，唯独当前写接口漏加。"""
     if record.get("category") != "authz" or repo_root is None:
@@ -298,6 +334,9 @@ def promote(record: dict, repo_root: Path | None = None) -> dict:
         return {"level": "", "code": "", "evidence": ""}
     guarded = [m for m in methods if m["guarded"] and m["name"] != meth]
     if not guarded:
+        pkg = _package_guard(path, lines)
+        if pkg:
+            return pkg
         return {"level": "", "code": "", "evidence": ""}
     names = sorted({a for m in guarded for a in m["annotations"]
                     if a in GUARD_ANNOTATIONS})

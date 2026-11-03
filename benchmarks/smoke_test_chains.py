@@ -11488,6 +11488,50 @@ check("M321：make_response(可控值) 判 True",
                      '    return make_response(request.args.get("x"))\n'), True)
 check("M321：已执行断言数 >= 1830", COUNTS["n"] >= 1830, True)
 
+print("\n[306] M322：? 占位符拼接假阳 + 同包鉴权基线")
+_sql522 = ('@Path("/x")\n'
+           'public String f(@QueryParam("name") String name) {\n'
+           '    List<Object> parameters = new ArrayList<Object>();\n'
+           '    StringBuilder where = new StringBuilder("1 = 1");\n'
+           '    where.append(" and name like ?");\n'
+           '    parameters.add("%" + name.trim() + "%");\n'
+           '    String sql = "select * from t where " + where;\n'
+           '    PreparedStatement ps = connection.prepareStatement(sql);\n'
+           '    bind(ps, parameters);\n'
+           '    return ok(ps.executeQuery());\n'
+           '}\n')
+check("M322：StringBuilder 纯 ? 片段 + bind 判 False",
+      _rd307.sqli_verdict(_sql522), False)
+check("M322：append 里真拼值仍判 True",
+      _rd307.sqli_verdict(
+          'public String f(String name) {\n'
+          '    StringBuilder w = new StringBuilder("1 = 1");\n'
+          '    w.append(" and name = \'" + name + "\'");\n'
+          '    String sql = "select * from t where " + w;\n'
+          '    PreparedStatement ps = connection.prepareStatement(sql);\n'
+          '    return ok(ps.executeQuery());\n'
+          '}\n'), True)
+_pkg522 = Path(_ws_mkdtemp("smoke_pkg322_"))
+(_pkg522 / "A.java").write_text(
+    "public class A {\n    public void saveX() {\n        doIt();\n    }\n}\n",
+    encoding="utf-8")
+(_pkg522 / "B.java").write_text(
+    'public class B {\n    @PreAuthorize("x")\n    public void list() {}\n}\n',
+    encoding="utf-8")
+(_pkg522 / "C.java").write_text(
+    'public class C {\n    @RequiresPermissions("y")\n    public void add() {}\n}\n',
+    encoding="utf-8")
+_rec522 = {"category": "authz", "unit": "A.saveX", "file": "A.java"}
+check("M322：同目录 2 个有注解、本类无 → HIGH 提拔",
+      _wn318.promote(_rec522, _pkg522)["code"], "AUTHZ_PACKAGE_GUARD")
+(_pkg522 / "A.java").write_text(
+    "public class A {\n    public void saveX() {\n"
+    "        UserDetails u = getUserDetails(request);\n    }\n}\n",
+    encoding="utf-8")
+check("M322：有身份校验（getUserDetails）不提拔",
+      _wn318.promote(_rec522, _pkg522)["level"], "")
+check("M322：已执行断言数 >= 1835", COUNTS["n"] >= 1835, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

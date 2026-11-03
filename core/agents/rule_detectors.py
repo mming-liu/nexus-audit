@@ -1108,6 +1108,29 @@ def _java_numeric_expr(expr: str, source: str) -> bool:
     return all(n in int_vars or n in int_methods or n in allowed for n in names)
 
 
+def _sql_builder_placeholder_only(source: str) -> bool:
+    """SQL 由 StringBuilder 拼"纯 ? 字面量片段"构成（M322）。
+
+    Mestudy 的 NetPortalRepository.userWhere 形态：
+        where.append(" and name like ?"); parameters.add("%" + name + "%");
+        String sql = "select ... where " + where;
+        PreparedStatement ps = connection.prepareStatement(sql); bind(ps, parameters);
+    动态段里只有占位符，值走参数绑定 —— 不是拼接注入。
+    """
+    for m in re.finditer(r"\b(?:StringBuilder|StringBuffer)\s+(\w+)\s*=", source):
+        var = m.group(1)
+        args: list[str] = []
+        for mm in re.finditer(rf"\b{re.escape(var)}\s*\.\s*append\s*\(", source):
+            arg = _balanced_cond(source, mm.end())
+            if arg is not None:
+                args.append(arg.strip())
+        if not args or not any("?" in a for a in args):
+            continue
+        if all(re.fullmatch(r'"[^"]*"|\'[^\']*\'', a) for a in args):
+            return True
+    return False
+
+
 def sqli_verdict(source: str) -> bool | None:
     body = entry_body(source)
     impl = _impl_segment(source)
@@ -1126,6 +1149,14 @@ def sqli_verdict(source: str) -> bool | None:
     #     放在 MyBatis 之前：Mapper 接口与 Repository 接口都只有声明，
     #     但只有后者能靠 extends 子句给出确定性答案。
     if _jpa_derived_query_safe(source):
+        return False
+
+    # M322：动态段全由 "?" 字面量拼成 + 参数绑定 → 参数化，不是注入。
+    if (_sql_builder_placeholder_only(source)
+            and re.search(r"\b(?:prepareStatement|setString|setObject|"
+                          r"setInt|bind)\s*\(", source)
+            and re.search(r"parameters\s*\.\s*add\s*\(|\bbind\s*\(",
+                          source)):
         return False
 
     # C3) MyBatis-Plus 条件构造器（Module 29，eladmin-mp 靶场形态）：
