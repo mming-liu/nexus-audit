@@ -18,7 +18,7 @@
 | uniswap-v3-core (Solidity DEX) | 67 | 66 | 66 | 0 | 0 | 99% |
 | FastAPI (Python 异步真实模板) | 9 | 9 | 9 | 0 | 0 | 100% |
 | compound-finance/comet (Solidity 0.8.x) | 435 | 432 | 432 | 0 | 0 | 99% |
-| DjanGoat (Django urls.py 路由表) | 36 | 12 | 12 | 0 | 0 | 33% |
+| DjanGoat (Django urls.py 路由表) | 36 | 15 | 15 | 0 | 0 | 42% |
 
 **计分板靶场合计：误报 0 · 判反 0（A/B 方向错误 = 0）**
 

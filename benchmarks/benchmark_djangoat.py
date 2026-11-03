@@ -73,8 +73,13 @@ TRUTH = {
     ("app/views/admin/views.py", "admin_delete_user"): "authz",
     ("app/views/admin/views.py", "admin_update_user"): "authz",
     ("app/views/admin/views.py", "admin_analytics"): "sqli",
-    ("app/views/users/pay/views.py", "user_pay"): "authz",
-    ("app/views/users/views.py", "user_view"): "authz",
+    # M321：这些单元除了原有类目外，还有 HttpResponse("User " + str(user_id))
+    # 的未转义回显（URL 路径参数直达 text/html）—— 多标签真值。
+    ("app/views/users/pay/views.py", "user_pay"): ("authz", "xss"),
+    ("app/views/users/views.py", "user_view"): ("authz", "xss"),
+    ("app/views/dashboard/views.py", "dashboard_view"): "xss",
+    ("app/views/users/views.py", "account_settings"): "xss",
+    ("app/views/users/paid_time_off/views.py", "index"): "xss",
     # M90 的 Python redir 支上线后才判得出的真阳：`path = request.POST['path']`
     # → `HttpResponseRedirect(path)`，登录后跳转目标整条由外部决定。
     ("app/views/sessions/views.py", "sessions_index"): "redir",
@@ -139,19 +144,23 @@ def main() -> int:
         rel = _rel(repo, u.file_path)
         meth = u.unit_name.split("#")[0]
         truth_cat = TRUTH.get((rel, meth))
+        truth_cats = (truth_cat if isinstance(truth_cat, tuple)
+                      else (truth_cat,) if truth_cat else ())
         hits = [c for c in CATS if rule_verdict(c, u.source_code) is True]
         n_decided += sum(1 for c in CATS
                          if rule_verdict(c, u.source_code) is not None)
-        if truth_cat:
+        if truth_cats:
             hit_keys.add((rel, meth))
-            if truth_cat not in hits:
+            if any(c not in hits for c in truth_cats):
                 fn += 1
-                rows.append({"file": rel, "unit": meth, "truth": truth_cat,
+                rows.append({"file": rel, "unit": meth,
+                             "truth": "/".join(truth_cats),
                              "got": None, "kind": "miss"})
         for c in hits:
-            if c != truth_cat:
+            if c not in truth_cats:
                 fp += 1
-                rows.append({"file": rel, "unit": meth, "truth": truth_cat,
+                rows.append({"file": rel, "unit": meth,
+                             "truth": "/".join(truth_cats) or None,
                              "got": c, "kind": "fp"})
 
     # 真值表里可能有单元根本没被切出来（路由通道失效的强信号）

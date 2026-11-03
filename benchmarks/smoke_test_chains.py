@@ -6366,10 +6366,10 @@ if _dg124.exists():
                   errors="replace")
     _j124 = json.loads((ROOT / "benchmarks" / "results" / "djangoat.json")
                        .read_text(encoding="utf-8"))
-    check("M124：DjanGoat --strict 通过（真值 12/12 / 零误报）",
+    check("M124：DjanGoat --strict 通过（真值 15/15 / 零误报）",
           (_r124.returncode, _j124["fp"], _j124["reverse_fn"],
            _j124["truth_n"], _j124["django_routed"] >= 20),
-          (0, 0, 0, 12, True))
+          (0, 0, 0, 15, True))
 else:
     print("  -- DjanGoat 不在 reference_repos，跳过 E2E（M88 安装步骤）")
 
@@ -11461,6 +11461,32 @@ check("M320：reverse() 固定路由不判开放重定向",
                      '    return HttpResponseRedirect(reverse("site:tasks_task_changelist"))\n'),
       False)
 check("M320：已执行断言数 >= 1825", COUNTS["n"] >= 1825, True)
+
+print("\n[305] M321：HttpResponse/make_response 反射型 XSS")
+check("M321：HttpResponse(可控值) 判 True",
+      _rd307.verdict("xss",
+                     'def get(request):\n'
+                     '    return HttpResponse(request.GET.get("x"))\n'), True)
+check("M321：显式 text/plain 判 False",
+      _rd307.verdict("xss",
+                     'def get(request):\n'
+                     '    return HttpResponse(request.GET.get("x"), "text/plain")\n'),
+      False)
+check("M321：escape() 包裹判 False",
+      _rd307.verdict("xss",
+                     'def get(request):\n'
+                     '    return HttpResponse(escape(request.GET.get("x")))\n'),
+      False)
+check("M321：空 content_type 不硬判 True",
+      _rd307.verdict("xss",
+                     'def get(request):\n'
+                     '    return HttpResponse(request.GET.get("zd_echo"), "")\n'),
+      None)
+check("M321：make_response(可控值) 判 True",
+      _rd307.verdict("xss",
+                     'def get():\n'
+                     '    return make_response(request.args.get("x"))\n'), True)
+check("M321：已执行断言数 >= 1830", COUNTS["n"] >= 1830, True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

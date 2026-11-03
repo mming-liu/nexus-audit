@@ -71,6 +71,13 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.17 Django 响应回显 XSS 判据（M321）
+
+- `python_xss_verdict` 新增 `HttpResponse / make_response` 原样回显检测：
+  首参可控且未 `escape()`、未指定非 HTML `content_type` → True；
+  显式 `text/plain` / `application/json` 或已转义 → False；
+  空 `content_type`（是否嗅探取决于 nosniff）→ None，不硬判。
+
 ### v1.3.16 粘连练习仓过滤与 DjangoCRM 复核（M320）
 
 - **粘连 study/learn 命名**：`Mestudy` / `javastudy` / `mylearn` 这类词根粘连的
@@ -373,7 +380,7 @@ python benchmarks/benchmark_vulpy.py --strict
 | Solidity | OZ Upgradeable（可升级基元库） | M143 initializer / onlyInitializing / onlyProxy 语义边界 | 2,017 入口 / 五类 0 True |
 | Java | My-Blog-layui（Layui 后台） | M144 与 My-Blog 双生对照 | 64 入口 / 真值 3 条全中 / 计划外 0 |
 | Solidity | compound-finance/comet（Compound V3） | M87 0.8.15 unchecked + 自定义错误 | 435 入口 / 0 True / 四锚点 False |
-| Python | DjanGoat（OWASP RailsGoat 的 Django 版） | M88 urls.py 路由表真值 11 条 + M90 redir 1 条 | 36 入口 / 23 路由证据 / 真值 12/12 / 0 误报 |
+| Python | DjanGoat（OWASP RailsGoat 的 Django 版） | M88 urls.py 路由表真值 11 条 + M90 redir 1 条 | 36 入口 / 23 路由证据 / 真值 15/15 / 0 误报 |
 | Solidity | OpenZeppelin 标准安全基元库 | M95 零误报极限压测（**反向门禁**） | 576 生产入口 / 0 True / 全库 2558 也 0 True |
 | Solidity | Aave V3（逻辑库委托 + ACL 角色表） | M96 身份函数形态 + 反向锚点 | 275 生产入口 / 0 True / mocks 真漏洞仍判 True |
 | Java | waynboot-mall（Sa-Token 双端商城） | M97 Sa-Token 语义 + 全局 CORS 折叠 | 163 入口 / 163 命中折叠成 1 根因 / cors 外零 True |

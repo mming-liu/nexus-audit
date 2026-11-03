@@ -6718,6 +6718,69 @@ _PY_TPL_STRING_RE = re.compile(r"\brender_template_string\s*\(|\bMarkup\s*\(|\bm
 _PY_TPL_SAFE_RE = re.compile(r"\brender_template\s*\(")
 
 
+# M321：Django / Flask 的"原样回显"响应 —— `HttpResponse(x)` 默认
+# text/html 且不做转义；`make_response(x)` 同理。
+_PY_ECHO_SINK_RE = re.compile(
+    r"(?<![\w.])(?:HttpResponse|HttpResponseBadRequest|HttpResponseNotFound|"
+    r"make_response)\s*\(")
+_PY_ECHO_ESCAPE_RE = re.compile(
+    r"\b(?:escape|html\s*\.\s*escape|markupsafe\s*\.\s*escape|"
+    r"conditional_escape)\s*\(")
+_PY_ECHO_SAFE_CTYPE_RE = re.compile(
+    r"""["'](?:text/plain|application/json|application/xml|text/xml)""")
+
+
+def _py_echo_xss(source: str) -> bool | None:
+    """`HttpResponse(可控值[, content_type])` 反射型 XSS（M321）。"""
+    body = entry_body(source)
+    if not body:
+        return None
+    verdicts: list[bool | None] = []
+    for m in _PY_ECHO_SINK_RE.finditer(body):
+        args = _balanced_cond(body, m.end())
+        if not args:
+            continue
+        parts = [p.strip() for p in _split_args(args) if p.strip()]
+        if not parts:
+            continue
+        first = parts[0]
+        if _PY_ECHO_ESCAPE_RE.search(first):
+            verdicts.append(False)
+            continue
+        # Jinja 文件模板的渲染结果已经自动转义；jsonify 也不是 HTML。
+        if re.match(r"\s*(?:render_template|render|jsonify|JsonResponse|"
+                    r"HttpResponseRedirect)\s*\(", first):
+            verdicts.append(False)
+            continue
+        nature = _py_value_text_capable(first, source)
+        if nature is False:
+            verdicts.append(False)
+            continue
+        if nature is None:
+            verdicts.append(None)
+            continue
+        ctype = None
+        for p in parts[1:]:
+            if p.startswith("content_type="):
+                ctype = p.split("=", 1)[1].strip()
+            elif not re.match(r"\w+\s*=", p):
+                ctype = p
+        if ctype is None:
+            verdicts.append(True)          # 默认 text/html
+        elif _PY_ECHO_SAFE_CTYPE_RE.search(ctype):
+            verdicts.append(False)         # 显式非 HTML 类型
+        elif ctype.strip() in ('""', "''", "None"):
+            # 空 content-type：是否被嗅探取决于 nosniff，规则不表态
+            verdicts.append(None)
+        else:
+            verdicts.append(True)          # 显式 text/html 等
+    if any(v is True for v in verdicts):
+        return True
+    if verdicts and all(v is False for v in verdicts):
+        return False
+    return None
+
+
 def python_xss_verdict(source: str) -> bool | None:
     """Python XSS（Module 11）：Jinja2 模板机制的确定性判定。
 
@@ -6730,8 +6793,12 @@ def python_xss_verdict(source: str) -> bool | None:
         SSTI/XSS 双漏洞），实参可携带外部输入 → True
     三态：无 sink → None；sink 实参全常量/数值 → False；任一可达 → True。
     """
+    # M321：先看 Django/Flask 的 HttpResponse / make_response 原样回显
+    _echo = _py_echo_xss(source)
+    if _echo is True:
+        return True
     if not (_PY_TPL_STRING_RE.search(source) or _PY_TPL_SAFE_RE.search(source)):
-        return None
+        return _echo
     saw_safe = False
     for m in _PY_TPL_STRING_RE.finditer(source):
         args = _balanced_cond(source, m.end())
@@ -6754,7 +6821,9 @@ def python_xss_verdict(source: str) -> bool | None:
         parts = [p for p in _split_args(args) if p.strip()]
         if len(parts) >= 2 and not parts[0].strip().startswith(("f", 'f"')):
             saw_safe = True              # 文件模板 + 显式变量 → 自动转义
-    return False if saw_safe else None
+    if saw_safe:
+        return False
+    return _echo
 
 
 _PY_CMDSINK_RE = re.compile(

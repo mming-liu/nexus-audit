@@ -4,12 +4,12 @@
   "total_units": 36,
   "django_routed": 50,
   "django_marked_units": 0,
-  "decided": 12,
-  "rule_evaluations": 122,
-  "correct": 12,
+  "decided": 15,
+  "rule_evaluations": 134,
+  "correct": 15,
   "fp": 0,
   "reverse_fn": 0,
-  "truth_n": 12,
+  "truth_n": 15,
   "secret_ok": true,
   "rows": []
 }
