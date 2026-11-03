@@ -54,11 +54,21 @@ _TUTORIAL_RE = re.compile(
     r"homework|book|books|playground)(?:[^a-z0-9]|$)", re.I)
 
 
+# M320：粘连命名的个人练习仓（Mestudy / javastudy / mylearn）——
+# `study`/`learn` 前面没有分隔符，词边界正则抓不到。
+_GLUED_STUDY_RE = re.compile(
+    r"(?:^|my|me|java|py|web|test|code)(?:study|learn|practice|homework)$",
+    re.I)
+
+
 def is_tutorial(slug: str, description: str = "",
                 topics: list[str] | tuple[str, ...] = ()) -> bool:
     """仓库名 / 描述 / topics 命中教学标记即判教学仓。"""
     text = " ".join([slug or "", description or "", " ".join(topics or [])])
-    return bool(_TUTORIAL_RE.search(text))
+    if _TUTORIAL_RE.search(text):
+        return True
+    name = (slug or "").split("/")[-1]
+    return bool(_GLUED_STUDY_RE.match(name))
 
 
 # M293：业务限定词。裸搜 language+pushed 抓回来的大半是驱动/插件/桌面工具，

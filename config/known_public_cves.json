@@ -1,6 +1,6 @@
 {
   "template_version": "1.0",
-  "updated_at": "2026-11-02",
+  "updated_at": "2026-11-03",
   "note": "Conservative seed list. A match means DUPLICATE_*; a miss does NOT mean fresh unless online sources were actually queried.",
   "signatures": [
     {
@@ -505,6 +505,54 @@
       "category": "",
       "unit": "",
       "url": "https://www.cve.org/CVERecord?id=CVE-2025-15416"
+    },
+    {
+      "repo": "DjangoCRM/django-crm",
+      "aliases": [
+        "django-crm",
+        "djangocrm"
+      ],
+      "id": "CVE-2026-90806",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "BulkUpdateCasesView",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-90806"
+    },
+    {
+      "repo": "DjangoCRM/django-crm",
+      "aliases": [
+        "django-crm",
+        "djangocrm"
+      ],
+      "id": "CVE-2026-71240",
+      "kind": "cve",
+      "category": "redir",
+      "unit": "toggle_default_sorting",
+      "url": "https://github.com/advisories/GHSA-q389-cg45-h4hc"
+    },
+    {
+      "repo": "DjangoCRM/django-crm",
+      "aliases": [
+        "django-crm",
+        "djangocrm"
+      ],
+      "id": "CVE-2026-71239",
+      "kind": "cve",
+      "category": "ssti",
+      "unit": "massmail",
+      "url": "https://github.com/advisories/GHSA-qwf5-72hq-pg7x"
+    },
+    {
+      "repo": "DjangoCRM/django-crm",
+      "aliases": [
+        "django-crm",
+        "djangocrm"
+      ],
+      "id": "CVE-2026-71238",
+      "kind": "cve",
+      "category": "",
+      "unit": "",
+      "url": "https://github.com/advisories/GHSA-qc6p-hvpv-4f8h"
     }
   ]
 }

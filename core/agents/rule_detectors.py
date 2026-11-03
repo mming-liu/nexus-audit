@@ -4068,6 +4068,8 @@ REDIR_CONST_TARGET_RE = re.compile(
     # M313：Spring 的 `new RedirectView("/", true, false)` 也是编译期常量
     # （skyeye/xxl-job 的 toLogin 被判 True 就是漏了这条）。
     r"new\s+RedirectView\s*\(\s*\"[^\"]*\"\s*[,)]|"
+    # M320：Django 的 reverse() 目标是固定路由名，不是外部可控 URL。
+    r"(?:HttpResponseRedirect|redirect)\s*\(\s*reverse\s*\(|"
     r"(?:setHeader|addHeader)\s*\(\s*\"[Ll]ocation\"\s*,\s*\"[^\"]*\"\s*\)", re.I)
 
 
@@ -4346,6 +4348,21 @@ def ssrf_verdict(source: str) -> bool | None:
         if nat is not None:
             return nat
         return None
+    # M320：请求目标来自配置（settings.VOIP_FORWARD_URL / config.*），
+    # 不是请求入参 —— 这是正向转发，不是 SSRF。
+    _url_args = re.findall(
+        r"(?:requests|httpx)\s*\.\s*(?:get|post|put|delete|head|request)\s*"
+        r"\(\s*([A-Za-z_][\w.]*)", body)
+    def _config_url(a: str) -> bool:
+        if a.startswith(("settings.", "config.", "app.config.")):
+            return True
+        # 局部变量再上溯一层：url = settings.VOIP_FORWARD_URL
+        return bool(re.search(
+            rf"\b{re.escape(a)}\s*=\s*(?:settings|config|app\.config)\.",
+            body))
+
+    if _url_args and all(_config_url(a) for a in _url_args):
+        return False
     return True
 
 

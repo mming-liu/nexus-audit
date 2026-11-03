@@ -71,6 +71,13 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.16 粘连练习仓过滤与 DjangoCRM 复核（M320）
+
+- **粘连 study/learn 命名**：`Mestudy` / `javastudy` / `mylearn` 这类词根粘连的
+  个人练习仓，正则 `(?:^|my|me|java|py|web|test|code)(?:study|learn|practice|homework)$`
+  直接判教学仓；`case-study` 这类正常英文名不误杀。
+- **种子库**：补入 DjangoCRM 的 CVE-2026-90806 / 71240 / 71239 / 71238（46 条）。
+
 ### v1.3.15 超管入口降噪与 Hop 段路径守卫（M318 → M319）
 
 - **`SUPERADMIN_ONLY`**：入口文件含 `haveSuperAdminAuth(` 或路径带 `/superadmin/`

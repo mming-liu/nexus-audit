@@ -11434,6 +11434,34 @@ check("M319：ujcms 已公开 CVE 拦为 DUPLICATE_CVE",
       "DUPLICATE_CVE")
 check("M318：已执行断言数 >= 1819", COUNTS["n"] >= 1819, True)
 
+print("\n[304] M320：粘连 study/learn 仓库过滤 + DjangoCRM 种子")
+from core.context import target_scout as _ts320
+check("M320：Mestudy 判练习仓",
+      _ts320.is_tutorial("zengyunhua/Mestudy"), True)
+check("M320：javastudy 判练习仓",
+      _ts320.is_tutorial("acme/javastudy"), True)
+check("M320：case-study 不误杀",
+      _ts320.is_tutorial("acme/case-study"), False)
+check("M320：spring-boot-erp 不误杀",
+      _ts320.is_tutorial("acme/spring-boot-erp"), False)
+check("M320：DjangoCRM 已公开 CVE 拦为 DUPLICATE_CVE",
+      _cd314.dedup("DjangoCRM/django-crm", "redir",
+                   "toggle_default_sorting",
+                   allow_online=False, use_cache=False)["status"],
+      "DUPLICATE_CVE")
+check("M320：settings 配置 URL 不判 SSRF",
+      _rd307.verdict("ssrf",
+                     'def post(request):\n'
+                     '    url = settings.VOIP_FORWARD_URL\n'
+                     '    requests.post(url, data=request.POST)\n'),
+      False)
+check("M320：reverse() 固定路由不判开放重定向",
+      _rd307.verdict("redir",
+                     'def f(request):\n'
+                     '    return HttpResponseRedirect(reverse("site:tasks_task_changelist"))\n'),
+      False)
+check("M320：已执行断言数 >= 1825", COUNTS["n"] >= 1825, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
