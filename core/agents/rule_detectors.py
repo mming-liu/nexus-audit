@@ -1070,6 +1070,10 @@ def _sql_stmt_whole_user_controlled(source: str) -> bool | None:
         ty = ptypes.get(arg, "")
         if _NUMERIC_JAVA_TYPE_RE.search(ty):
             return False             # 数字型形参：注入不了
+        # 整句 SQL 的实参必须是字符串；`xxxQryExe.execute(qry)` 里的
+        # DTO 不是 SQL 文本（KCloud 的 3 条 sqli 就是被 .execute( 误伤）。
+        if ty and not re.search(r"\b(?:String|CharSequence)\b", ty):
+            continue
         if hname == entry_name:
             if arg in entry_user_params:
                 return True
@@ -2137,8 +2141,18 @@ def _db_writer_takes_value(body: str) -> bool:
     存储型 XSS —— 这正是"看见仓储调用就报漏洞"的那种廉价误报。
     """
     for m in re.finditer(
-            r"\.\s*(?P<verb>[A-Za-z_]\w*)\s*\((?P<args>[^)]*)\)", body):
+            r"(?P<recv>[A-Za-z_]\w*)\s*\.\s*(?P<verb>[A-Za-z_]\w*)"
+            r"\s*\((?P<args>[^)]*)\)", body):
+        recv = m.group("recv")
         verb = m.group("verb").lower()
+        # 仓储字段（Mapper/Dao/Repository）一律算；Service 层只认
+        # insert/add/save/update/persist —— createExportTask / createImportTask
+        # 这类是提交异步任务，不是把内容写进库（hrm 4 条假阳的根因）。
+        if not re.search(r"(?i)(?:mapper|dao|repository|repo)$", recv):
+            if not re.search(r"(?i)service$", recv):
+                continue
+            if re.match(r"create(?:export|import)task$", verb):
+                continue          # 异步任务，不是写内容
         if not re.match(r"(?:insert|add|save|update|create|persist|batch|merge)", verb):
             continue
         args = m.group("args")
@@ -3871,8 +3885,14 @@ def xss_verdict(source: str) -> bool | None:
     _ret = _ret_m.group(1) if _ret_m else ""
     _json_type = bool(_ret and _ret not in (
         "String", "CharSequence", "byte[]", "void", "Object"))
+    # 返回类型本身是 JSON 包装器（ResponseDTO/Result/R/RestResp…）时，
+    # 即使切片没带类级 @RestController 标记，也是 JSON 序列化不是 HTML 回显。
+    _json_wrapper = bool(_ret and re.match(
+        r"(?i)^(?:response|result|restresp|rest|api|ajax|commonresult|r|"
+        r"page|ipage|json)\w*", _ret))
     _rest_json = bool(
-        ("Controller-Kind: @RestController" in source or "@ResponseBody" in source)
+        ("Controller-Kind: @RestController" in source or "@ResponseBody" in source
+         or _json_wrapper)
         and _json_type
         and not re.search(r"getWriter\s*\(|getOutputStream\s*\(|"
                           r"produces\s*=\s*\"text/html\"", body))

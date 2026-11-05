@@ -11532,6 +11532,23 @@ check("M322：有身份校验（getUserDetails）不提拔",
       _wn318.promote(_rec522, _pkg522)["level"], "")
 check("M322：已执行断言数 >= 1835", COUNTS["n"] >= 1835, True)
 
+print("\n[307] M323：DTO 执行器与异步任务的判据收口（今日巡检去误报）")
+check("M323：xxxQryExe.execute(qry) 不判 sqli",
+      _rd307.sqli_verdict(
+          'public class C {\n'
+          '  public Object page(DevicePageQry qry) {\n'
+          '    return devicePageQryExe.execute(qry);\n'
+          '  }\n'
+          '}\n'), None)
+check("M323：Service.createExportTask 不判存储型 XSS",
+      _rd307.verdict("xss",
+                     'public class C {\n'
+                     '  public ResponseDTO createExportTask(String month, String filename) {\n'
+                     '    return this.salaryService.createExportTask(month, filename);\n'
+                     '  }\n'
+                     '}\n'), None)
+check("M323：已执行断言数 >= 1840", COUNTS["n"] >= 1840, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
