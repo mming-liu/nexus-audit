@@ -1,6 +1,6 @@
 {
   "template_version": "1.0",
-  "updated_at": "2026-11-03",
+  "updated_at": "2026-11-05",
   "note": "Conservative seed list. A match means DUPLICATE_*; a miss does NOT mean fresh unless online sources were actually queried.",
   "signatures": [
     {
@@ -553,6 +553,97 @@
       "category": "",
       "unit": "",
       "url": "https://github.com/advisories/GHSA-qc6p-hvpv-4f8h"
+    },
+    {
+      "repo": "yzcheng90/X-SpringBoot",
+      "aliases": [
+        "x-springboot",
+        "X-SpringBoot"
+      ],
+      "id": "CVE-2025-6731",
+      "kind": "cve",
+      "category": "",
+      "unit": "TbApkVersionController.uploadApk",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-6731",
+      "note": "VulDB; CWE-22; /sys/oss/upload/apk (5.0) -> /apk/version/upload/apk (6.0); unauthenticated file write/delete"
+    },
+    {
+      "repo": "yzcheng90/X-SpringBoot",
+      "aliases": [
+        "x-springboot",
+        "X-SpringBoot"
+      ],
+      "id": "CVE-2026-97060",
+      "kind": "cve",
+      "category": "",
+      "unit": "SysUserController.update",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-97060",
+      "note": "CWE-639 object-level authz in /sys/user/update; same advisory covers /sys/user/delete"
+    },
+    {
+      "repo": "yzcheng90/X-SpringBoot",
+      "aliases": [
+        "x-springboot",
+        "X-SpringBoot"
+      ],
+      "id": "CVE-2026-97060",
+      "kind": "cve",
+      "category": "",
+      "unit": "SysUserController.delete",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-97060",
+      "note": "CWE-639 object-level authz in /sys/user/delete"
+    },
+    {
+      "repo": "yzcheng90/X-SpringBoot",
+      "aliases": [
+        "x-springboot",
+        "X-SpringBoot"
+      ],
+      "id": "CVE-2026-97063",
+      "kind": "cve",
+      "category": "",
+      "unit": "SysLoginController.mobileCode",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-97063",
+      "note": "CWE-287; /sys/mobile/code echoes verification code; emailCode is the same root cause"
+    },
+    {
+      "repo": "yzcheng90/X-SpringBoot",
+      "aliases": [
+        "x-springboot",
+        "X-SpringBoot"
+      ],
+      "id": "CVE-2026-97063",
+      "kind": "cve",
+      "category": "",
+      "unit": "SysLoginController.emailCode",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-97063",
+      "note": "CWE-287; /sys/email/code echoes verification code"
+    },
+    {
+      "repo": "yzcheng90/X-SpringBoot",
+      "aliases": [
+        "x-springboot",
+        "X-SpringBoot"
+      ],
+      "id": "CVE-2026-97064",
+      "kind": "cve",
+      "category": "",
+      "unit": "SysLoginController.emailOrMobileLogin",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-97064",
+      "note": "CWE-1392; default master verification code 172839"
+    },
+    {
+      "repo": "yzcheng90/X-SpringBoot",
+      "aliases": [
+        "x-springboot",
+        "X-SpringBoot"
+      ],
+      "id": "CVE-2026-100192",
+      "kind": "cve",
+      "category": "",
+      "unit": "XApplicationController.select",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-100192",
+      "note": "CWE-306; unauthenticated /application/manager/select exposes appKey/appSecret, enabling /api/msg/service/send"
     }
   ]
 }

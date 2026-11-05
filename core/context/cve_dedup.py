@@ -30,6 +30,8 @@ CONFIG = ROOT / "config" / "known_public_cves.json"
 CACHE = ROOT / ".cache" / "cve_dedup"
 NVD_API = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 CIRCL_API = "https://cve.circl.lu/api/search"
+# CIRCL 固定 10 条/页；历史 CVE 会被新号挤到后续页（M323）。
+CIRCL_MAX_PAGES = 3
 GH_API = "https://api.github.com"
 
 STATUS_FRESH = "ZERO_RECORD_FRESH"
@@ -212,8 +214,37 @@ def query_nvd(keyword: str) -> dict:
             "ids": ids[:5], "url": url, "error": ""}
 
 
+def _circl_parse(data: dict) -> tuple[int, list[str], list[dict]]:
+    """CIRCL 单页 -> (total_count, 去重 ids, items)。"""
+    total = int(data.get("total_count") or 0)
+    ids: list[str] = []
+    items: list[dict] = []
+    results = data.get("results") or {}
+    for key in ("nvd", "cvelistv5"):
+        for item in results.get(key) or []:
+            if not (isinstance(item, list) and item):
+                continue
+            cid = str(item[0]).upper()
+            if cid in ids:
+                continue
+            ids.append(cid)
+            items.append({"id": cid,
+                          "text": json.dumps(item[1],
+                                             ensure_ascii=False)[:6000]})
+    return total, ids, items
+
+
 def query_circl(slug: str) -> dict:
-    """CIRCL CVE Search（NVD 在此网络被 TLS 阻断时的只读兜底）。"""
+    """CIRCL CVE Search（NVD 在此网络被 TLS 阻断时的只读兜底）。
+
+    M323 修两处漏判：
+      1) 旧实现只要某 URL 返回 HTTP 200 就 return，哪怕 total_count == 0；
+         于是 /owner/repo 的"0 命中"会吞掉 /repo 兜底。现在 0 结果必须
+         continue 到下一个 URL。
+      2) CIRCL 固定 10 条/页，旧实现只读第 1 页。x-springboot 的
+         CVE-2025-6731 已被 2026 年的新 CVE 挤到第 2 页，只翻首页必然漏。
+         现在按 total_count 翻页（最多 CIRCL_MAX_PAGES 页）。
+    """
     memo_key = ("circl", slug)
     if memo_key in _REPO_MEMO:
         return _REPO_MEMO[memo_key]
@@ -225,29 +256,45 @@ def query_circl(slug: str) -> dict:
     if parts:
         urls.append(f"{CIRCL_API}/{urllib.parse.quote(parts[-1])}")
     last_err = ""
+    zero: dict | None = None
     for url in urls:
-        ok, data, err = _get_json(url)
-        if not ok or not isinstance(data, dict):
-            last_err = err
+        all_ids: list[str] = []
+        all_items: list[dict] = []
+        total = 0
+        ok_any = False
+        page_err = ""
+        for page in range(1, CIRCL_MAX_PAGES + 1):
+            page_url = url if page == 1 else f"{url}?page={page}"
+            ok, data, err = _get_json(page_url)
+            if not ok or not isinstance(data, dict):
+                page_err = err
+                break
+            ok_any = True
+            total, ids, page_items = _circl_parse(data)
+            before = len(all_ids)
+            for item in page_items:
+                if item["id"] in all_ids:
+                    continue
+                all_ids.append(item["id"])
+                all_items.append(item)
+            # 空页 / 本页无新 ID / 已覆盖 total（total 是去重前计数，可能
+            # 大于唯一 ID 数，三者任一满足即停，避免死循环）。
+            if not ids or len(all_ids) == before or len(all_ids) >= total:
+                break
+        if not ok_any:
+            last_err = page_err
             continue
-        total = int(data.get("total_count") or 0)
-        ids: list[str] = []
-        items: list[dict] = []
-        results = data.get("results") or {}
-        for key in ("nvd", "cvelistv5"):
-            for item in (results.get(key) or [])[:20]:
-                if isinstance(item, list) and item:
-                    cid = str(item[0]).upper()
-                    ids.append(cid)
-                    items.append({"id": cid,
-                                  "text": json.dumps(item[1],
-                                                     ensure_ascii=False)[:6000]})
-        res = {"ok": True, "total": total, "ids": ids[:5], "items": items,
-               "url": url, "error": ""}
-        _REPO_MEMO[memo_key] = res
-        return res
-    res = {"ok": False, "total": 0, "ids": [],
-           "url": urls[0] if urls else "", "error": last_err or "no_url"}
+        res = {"ok": True, "total": total, "ids": all_ids[:5],
+               "items": all_items, "url": url,
+               "error": "" if not page_err else f"partial: {page_err}"}
+        if total > 0 or all_ids or all_items:
+            _REPO_MEMO[memo_key] = res
+            return res
+        if zero is None:
+            zero = res
+    res = zero or {"ok": False, "total": 0, "ids": [], "items": [],
+                   "url": urls[0] if urls else "",
+                   "error": last_err or "no_url"}
     _REPO_MEMO[memo_key] = res
     return res
 
@@ -301,32 +348,57 @@ def query_github_advisories(slug: str) -> dict:
     return res
 
 
-def query_github_issues_global(class_name: str, method_name: str) -> dict:
-    """全网跨仓搜索 `"类名" "方法名"`（M314）。
+def query_github_issues_global(class_name: str, method_name: str,
+                                 repo_name: str = "") -> dict:
+    """全网跨仓搜索 `"类名" "方法名"`（M314），并支持仓库名兜底（M323）。
 
     不锁 `repo:{slug}`：仓库改名（yshop-crm → yshop-oa-crm）、白帽把 PoC
     发到独立仓（W000i/vuln、LinYuanyi1/cve-request-poc）时，只有去掉 repo:
     才能搜到。
+
+    M323：公开 CVE 报告常常只写 `"项目名" "方法名"`，不写 Java 控制器类名
+    （CVE-2025-6731 只写 X-SpringBoot + uploadApk）。类名查询 0 命中时，
+    再用 `"{repo_name}" "{method_name}"` 补一枪。
     """
     if not class_name or not method_name:
         return {"ok": True, "total": 0, "ids": [], "url": "",
                 "error": "not_applicable"}
-    term = f'"{class_name}" "{method_name}"'
-    q = urllib.parse.quote(term)
-    url = f"{GH_API}/search/issues?q={q}&per_page=5"
-    ok, data, err = _get_json(url, headers={
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "nexus-audit/1.3"})
-    if not ok or not isinstance(data, dict):
-        return {"ok": False, "total": 0, "ids": [], "url": url, "error": err}
-    items = data.get("items") or []
-    ids = []
-    for it in items:
-        repo_url = str(it.get("repository_url") or "")
-        repo = "/".join(repo_url.rstrip("/").split("/")[-2:]) if repo_url else ""
-        ids.append(f"{repo}#{it.get('number')} {it.get('title', '')[:60]}")
-    return {"ok": True, "total": int(data.get("total_count") or len(items)),
-            "ids": ids[:5], "url": url, "error": ""}
+    terms = [f'"{class_name}" "{method_name}"']
+    name = (repo_name or "").strip().split("/")[-1]
+    if name and name.lower() not in class_name.lower():
+        terms.append(f'"{name}" "{method_name}"')
+    last_err = ""
+    zero: dict | None = None
+    for term in terms:
+        q = urllib.parse.quote(term)
+        url = f"{GH_API}/search/issues?q={q}&per_page=5"
+        ok, data, err = _get_json(url, headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "nexus-audit/1.3"})
+        if not ok or not isinstance(data, dict):
+            last_err = err
+            continue
+        items = data.get("items") or []
+        ids = []
+        for it in items:
+            repo_url = str(it.get("repository_url") or "")
+            repo = ("/".join(repo_url.rstrip("/").split("/")[-2:])
+                    if repo_url else "")
+            ids.append(f"{repo}#{it.get('number')} {it.get('title', '')[:60]}")
+        res = {"ok": True,
+               "total": int(data.get("total_count") or len(items)),
+               "ids": ids[:5], "url": url, "error": "", "query": term}
+        if res["total"] > 0 or ids:
+            return res
+        if zero is None:
+            zero = res
+    if zero is not None:
+        # 有一个查询失败就不能宣称"全网已查且 0 命中"。
+        if last_err:
+            zero = dict(zero, ok=False, error=last_err)
+        return zero
+    return {"ok": False, "total": 0, "ids": [], "url": "",
+            "error": last_err or "no_url"}
 
 
 GLOBAL_ADV_CACHE = CACHE / "_global_advisories.json"
@@ -397,14 +469,59 @@ def load_global_advisories() -> tuple[bool, list[dict], str]:
     return ok_any, items, err
 
 
+def query_github_advisories_affects(repo_name: str) -> dict:
+    """M323：`GET /advisories?affects={repo_name}` 按包名拉历史 GHSA。
+
+    裸 `/advisories` 只返回最近 100 条全网公告（Linux 内核 / WordPress
+    插件），目标仓的历史公告早就被冲掉。affects 由 GitHub 服务端按
+    package 过滤，能直接取到该包名下的公告。
+
+    注意：Java 仓大多没有 package ecosystem 元数据，返回空**不代表**
+    没公告，所以它只是增量来源，不替代全局列表。
+    """
+    name = (repo_name or "").strip()
+    if not name:
+        return {"ok": True, "total": 0, "ids": [], "url": "",
+                "items": [], "error": "not_applicable"}
+    memo_key = ("advisories_affects", name.lower())
+    if memo_key in _REPO_MEMO:
+        return _REPO_MEMO[memo_key]
+    url = (f"{GH_API}/advisories?affects={urllib.parse.quote(name)}"
+           f"&per_page=30")
+    ok, data, err = _get_json(url, headers={
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "nexus-audit/1.3"})
+    if not ok or not isinstance(data, list):
+        res = {"ok": False, "total": 0, "ids": [], "items": [], "url": url,
+               "error": err or "non_list_response"}
+        _REPO_MEMO[memo_key] = res
+        return res
+    items = []
+    for adv in data:
+        if not isinstance(adv, dict):
+            continue
+        aid = adv.get("cve_id") or adv.get("ghsa_id") or ""
+        if not aid:
+            continue
+        text = " ".join(str(adv.get(k) or "") for k in
+                        ("summary", "description", "source_code_location"))
+        items.append({"id": aid, "text": text})
+    ids = list(dict.fromkeys(x["id"] for x in items))
+    res = {"ok": True, "total": len(ids), "ids": ids[:5], "items": items,
+           "url": url, "error": ""}
+    _REPO_MEMO[memo_key] = res
+    return res
+
+
 def query_github_global_advisories(slug: str, unit: str = "",
                                    file: str = "", pages: int = 0) -> dict:
-    """GitHub 全局漏洞库 `GET /advisories`（M314）。
+    """GitHub 全局漏洞库 `GET /advisories` + `?affects=`（M314/M323）。
 
     `/repos/{slug}/security-advisories` 只返回作者手动发布的公告（国内仓几乎
-    永远为空）；真正的 GHSA 在全局库里。该接口没有 repo 过滤参数，按仓库名
-    在 summary/description/source_code_location 里匹配，命中后再用方法名
-    收窄，避免"仓里有公告"连坐。
+    永远为空）；真正的 GHSA 在全局库里。全局列表只覆盖最近 100 条，因此
+    先按仓库名在 summary/description/source_code_location 里匹配，再用
+    `?affects=<包名>` 补拉该包历史公告；两者都过方法名收窄，避免"仓里有
+    公告"连坐。
     """
     # 注意：memo 必须带 unit/file —— 同一仓库不同方法命中不同公告，
     # 只按 slug 缓存会把上一个方法的结果连坐给下一个（M317 修）。
@@ -430,8 +547,25 @@ def query_github_global_advisories(slug: str, unit: str = "",
         if aid:
             ids.append(aid)
             items.append({"id": aid, "text": text})
+    # M323：再按 affects=<包名> 拉一次该仓历史公告。裸 /advisories 只有最近
+    # 100 条，历史 GHSA 翻不到；affects 是服务端过滤，不要求文本里出现仓库名。
+    aff = {"ok": True, "total": 0, "ids": [], "url": "",
+           "items": [], "error": "not_applicable"}
+    if name:
+        aff = query_github_advisories_affects(name)
+        for adv in aff.get("items") or []:
+            aid = str(adv.get("id") or "")
+            adv_text = str(adv.get("text") or "")
+            if not aid or aid in ids:
+                continue
+            if unit and not _unit_in_text(unit, file, adv_text):
+                continue
+            ids.append(aid)
+            items.append({"id": aid, "text": adv_text})
     res = {"ok": ok_any, "total": len(ids), "ids": ids[:5],
-           "url": f"{GH_API}/advisories", "items": items, "error": err}
+           "url": f"{GH_API}/advisories", "items": items, "error": err,
+           "affects": {"ok": aff.get("ok"), "total": aff.get("total"),
+                       "url": aff.get("url"), "error": aff.get("error")}}
     _REPO_MEMO[memo_key] = res
     return res
 
@@ -581,7 +715,9 @@ def dedup(slug: str, category: str, unit: str, *,
     if not status:
         global_adv = query_github_global_advisories(slug, unit, file)
         if _is_distinctive(_cls, _meth):
-            global_issues = query_github_issues_global(_cls, _meth)
+            global_issues = query_github_issues_global(
+                _cls, _meth,
+                repo_name=(slug.split("/")[-1] if slug else ""))
         else:
             global_issues = {"ok": True, "total": 0, "ids": [], "url": "",
                              "error": "skipped_generic"}
