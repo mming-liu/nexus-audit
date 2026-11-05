@@ -11316,6 +11316,8 @@ _calls317 = []
 
 def _fake_get317(url, headers=None, timeout=20.0):
     _calls317.append(url)
+    if "affects=" in url:
+        return True, [], ""
     if "/advisories" in url:
         return True, [{"ghsa_id": "GHSA-cache-1", "cve_id": "CVE-2026-0001",
                        "summary": "acme/demo path traversal in Foo.deleteFlowStep"}], ""
@@ -11338,13 +11340,16 @@ try:
                                                   "Foo.deleteFlowStep")
     _b301 = _cd314.query_github_global_advisories("acme/other",
                                                   "Foo.deleteFlowStep")
-    check("M317：两次查询只发 1 次 /advisories 请求",
-          len([u for u in _calls317 if "/advisories" in u]), 1)
+    check("M317：全局列表只拉 1 次（affects 另计）",
+          len([u for u in _calls317
+               if "/advisories" in u and "affects=" not in u]), 1)
+    check("M323：affects 每个仓库各 1 次",
+          len([u for u in _calls317 if "affects=" in u]), 2)
     check("M317：第二个仓库复用缓存（未新增 HTTP）", _b301["total"], 0)
     _seen301 = []
     _orig_gi317 = _cd314.query_github_issues_global
     _cd314.query_github_issues_global = (
-        lambda c, m: _seen301.append((c, m)) or
+        lambda c, m, repo_name="": _seen301.append((c, m)) or
         {"ok": True, "total": 0, "ids": [], "url": "", "error": ""})
     try:
         _r301 = _cd314.dedup("guchengwuyue/yshop-oa-crm", "authz",
@@ -11548,6 +11553,92 @@ check("M323：Service.createExportTask 不判存储型 XSS",
                      '  }\n'
                      '}\n'), None)
 check("M323：已执行断言数 >= 1840", COUNTS["n"] >= 1840, True)
+
+print("\n[308] M323/M324：CIRCL 分页/回退 + affects + 仓库名方法名 + x-springboot 归零")
+_orig_get308 = _cd314._get_json
+_calls308 = []
+
+
+def _fake308(url, headers=None, timeout=20.0):
+    _calls308.append(url)
+    if "cve.circl.lu" in url:
+        if "/owner/zero-hit" in url:
+            return True, {"total_count": 0, "results": {}}, ""
+        if url.rstrip("/").endswith("/zero-hit"):
+            return True, {"total_count": 1, "results": {"nvd": [
+                ["cve-2099-0001",
+                 {"descriptions": [{"value": "uploadApk path traversal"}]}]]}}, ""
+        if "x-springboot" in url:
+            if "page=2" in url:
+                return True, {"total_count": 12, "results": {"nvd": [
+                    ["cve-2025-6731",
+                     {"descriptions": [{"value": "uploadApk path traversal"}]}]]}}, ""
+            return True, {"total_count": 12, "results": {"nvd": [
+                ["cve-2026-97064", {}], ["cve-2026-97063", {}],
+                ["cve-2026-97060", {}], ["cve-2026-100192", {}],
+                ["cve-2025-55948", {}]]}}, ""
+        return True, {"total_count": 0, "results": {}}, ""
+    if "affects=" in url:
+        return True, [{"ghsa_id": "GHSA-m323",
+                       "cve_id": "CVE-2099-0002",
+                       "summary": "demo uploadApk path traversal"}], ""
+    if "/advisories" in url:
+        return True, [], ""
+    if "/search/issues" in url:
+        if "x-springboot" in url.lower():
+            return True, {"total_count": 1, "items": [
+                {"number": 7, "title": "uploadApk PoC",
+                 "repository_url": "https://api.github.com/repos/W000i/vuln"}]}, ""
+        return True, {"total_count": 0, "items": []}, ""
+    return True, {"totalResults": 0, "vulnerabilities": []}, ""
+
+
+_cd314._get_json = _fake308
+try:
+    _cd314._REPO_MEMO.clear()
+    _q308 = _cd314.query_circl("owner/zero-hit")
+    check("M323：CIRCL 首 URL total=0 仍回退第二个 URL",
+          ("CVE-2099-0001" in _q308["ids"],
+           sum(1 for u in _calls308
+               if u.rstrip("/").endswith("/zero-hit")
+               and "/owner/" not in u)),
+          (True, 1))
+    _cd314._REPO_MEMO.clear()
+    _q308b = _cd314.query_circl("yzcheng90/x-springboot")
+    check("M323：CIRCL 翻到第 2 页命中 CVE-2025-6731",
+          ("CVE-2025-6731" in [x["id"] for x in _q308b["items"]],
+           any("page=2" in u for u in _calls308)),
+          (True, True))
+    _cd314._REPO_MEMO.clear()
+    _cd314._GLOBAL_ADV_MEMO.update(ok=None, items=[], error="")
+    Path(".cache/cve_dedup/_global_advisories.json").unlink(missing_ok=True)
+    _g308 = _cd314.query_github_global_advisories("acme/demo", "Foo.uploadApk")
+    check("M323：/advisories?affects= 命中历史公告",
+          "CVE-2099-0002" in _g308["ids"], True)
+    check("M323：affects 请求确实带上仓库名",
+          any("affects=demo" in u for u in _calls308), True)
+    _gi308 = _cd314.query_github_issues_global(
+        "TbApkVersionController", "uploadApk", "x-springboot")
+    check("M323：类名 0 命中后用仓库名+方法名补搜",
+          "W000i/vuln#7" in (_gi308["ids"] or [""])[0], True)
+    _r308 = _cd314.dedup("yzcheng90/X-SpringBoot", "pathtraver",
+                         "TbApkVersionController.uploadApk",
+                         allow_online=False, use_cache=False)
+    check("M324：x-springboot uploadApk 拦为 DUPLICATE_CVE",
+          _r308["status"], "DUPLICATE_CVE")
+    check("M324：命中 CVE-2025-6731",
+          "CVE-2025-6731" in _r308["matched_ids"], True)
+    _r308b = _cd314.dedup("yzcheng90/X-SpringBoot", "authz",
+                          "SysUserController.update",
+                          allow_online=False, use_cache=False)
+    check("M324：CVE-2026-97060 用户越权已入库",
+          "CVE-2026-97060" in _r308b["matched_ids"], True)
+finally:
+    _cd314._get_json = _orig_get308
+    _cd314._REPO_MEMO.clear()
+    _cd314._GLOBAL_ADV_MEMO.update(ok=None, items=[], error="")
+    Path(".cache/cve_dedup/_global_advisories.json").unlink(missing_ok=True)
+check("M324：已执行断言数 >= 1850", COUNTS["n"] >= 1850, True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 
