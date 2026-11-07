@@ -9382,10 +9382,10 @@ _r206 = subprocess.run(
      "--strict"], capture_output=True, text=True, encoding="utf-8",
     errors="replace")
 check("M167：benchmark_springboot_demo --strict exit 0", _r206.returncode, 0)
-check("M167：19 入口 / 7 类目 0 True",
-      ("19 入口 / 7 类目 0 True" in (_r206.stdout or "")), True)
-check("M167：SecurityConfig 全局标记 19/19",
-      ("全局标记 19/19" in (_r206.stdout or "")), True)
+check("M167：23 入口 / 7 类目 0 True",
+      ("23 入口 / 7 类目 0 True" in (_r206.stdout or "")), True)
+check("M167：SecurityConfig 全局标记 23/23",
+      ("全局标记 23/23" in (_r206.stdout or "")), True)
 
 print("\n[207] M170：xxl-job 36 入口 / authz+deserial 0 True")
 _r207 = subprocess.run(
@@ -9393,8 +9393,8 @@ _r207 = subprocess.run(
      "--strict"], capture_output=True, text=True, encoding="utf-8",
     errors="replace")
 check("M170：benchmark_xxl_job --strict exit 0", _r207.returncode, 0)
-check("M170：36 入口 / authz+deserial 0 True",
-      ("36 入口 / authz+deserial 0 True" in (_r207.stdout or "")), True)
+check("M170：41 入口 / authz+deserial 0 True",
+      ("41 入口 / authz+deserial 0 True" in (_r207.stdout or "")), True)
 check("M170：@XxlSso 管理员门 False / 匿名门 None",
       ("管理员门（应 False）  ：False" in (_r207.stdout or "")
        and "匿名门（应 None）     ：None" in (_r207.stdout or "")), True)
@@ -11725,6 +11725,75 @@ check("M327：create 作为独立词仍命中",
       _cd314._unit_in_text("SysGenController.create", "GenUtils.java",
                            "function create"), True)
 check("M328：已执行断言数 >= 1860", COUNTS["n"] >= 1860, True)
+
+print("\n[311] M329：单段 @PathVariable 豁免 + 其他来源保真")
+_PATHVAR311 = '''// Full-Route: /file/static/{uniqueFileName}
+public void f(@PathVariable("uniqueFileName") String uniqueFileName,
+              HttpServletRequest request, HttpServletResponse response) {
+    String filePath = BASE + "/" + uniqueFileName;
+    File f = new File(filePath);
+    byte[] b = FileUtils.readFileToByteArray(f);
+}
+'''
+check("M329：单段 @PathVariable 判 None（容器不可达）",
+      _rd307.pathtraver_verdict(_PATHVAR311), None)
+check("M329：@RequestParam 仍判 True",
+      _rd307.pathtraver_verdict(
+          '// Full-Route: /file\n'
+          'public void f(@RequestParam("uniqueFileName") String uniqueFileName) {\n'
+          '    String filePath = BASE + "/" + uniqueFileName;\n'
+          '    byte[] b = FileUtils.readFileToByteArray(new File(filePath));\n'
+          '}\n'), True)
+check("M329：@RequestBody DTO 仍判 True",
+      _rd307.pathtraver_verdict(
+          '// Full-Route: /gen\n'
+          'public void f(@RequestBody MakerConfigEntity cfg) {\n'
+          '    String filePath = cfg.getFilePath();\n'
+          '    FileWriter w = new FileWriter(filePath + "/x.java");\n'
+          '    w.write("x");\n'
+          '}\n'), True)
+check("M329：URLDecoder.decode 路径保持 True",
+      _rd307.pathtraver_verdict(
+          '// Full-Route: /file/static/{uniqueFileName}\n'
+          'public void f(@PathVariable("uniqueFileName") String uniqueFileName) {\n'
+          '    String filePath = BASE + "/" + URLDecoder.decode(uniqueFileName, "UTF-8");\n'
+          '    byte[] b = FileUtils.readFileToByteArray(new File(filePath));\n'
+          '}\n'), True)
+check("M329：{*path} 通配路径保持 True",
+      _rd307.pathtraver_verdict(
+          '// Full-Route: /file/static/{*path}\n'
+          'public void f(@PathVariable("path") String path) {\n'
+          '    String filePath = BASE + "/" + path;\n'
+          '    byte[] b = FileUtils.readFileToByteArray(new File(filePath));\n'
+          '}\n'), True)
+
+print("\n[312] M330：无括号 @GetMapping/@PostMapping 路由切片")
+from core.slicer.java_servlet import JavaSlicer as _JS312
+_ws312 = Path(_ws_mkdtemp("smoke_bare330_"))
+(_ws312 / "BareController.java").write_text(
+    'package x;\n'
+    '@RestController\n'
+    '@RequestMapping("/api")\n'
+    'public class BareController {\n'
+    '    @GetMapping\n'
+    '    public R list() { return R.ok(); }\n'
+    '    @PostMapping\n'
+    '    public R save() { return R.ok(); }\n'
+    '    @GetMapping("/x")\n'
+    '    public R x() { return R.ok(); }\n'
+    '}\n', encoding="utf-8")
+_units312 = {u.unit_name: u for u in _JS312(_ws312).extract_entry_units()}
+check("M330：裸 @GetMapping 继承类前缀 /api",
+      _units312.get("BareController.list").route_path
+      if _units312.get("BareController.list") else "", "/api")
+check("M330：裸 @PostMapping 继承类前缀 /api",
+      _units312.get("BareController.save").route_path
+      if _units312.get("BareController.save") else "", "/api")
+check("M330：带参 @GetMapping 仍是 /api/x",
+      _units312.get("BareController.x").route_path
+      if _units312.get("BareController.x") else "", "/api/x")
+check("M330：三个方法都切出单元", len(_units312), 3)
+check("M332：已执行断言数 >= 1875", COUNTS["n"] >= 1875, True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

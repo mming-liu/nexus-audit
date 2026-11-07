@@ -24,6 +24,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+# Windows GBK stdout 遇到 ✔ 会 UnicodeEncodeError，门禁应因数据而非编码转红。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, OSError):
+    pass
+
 from core.agents.rule_detectors import verdict as rule_verdict  # noqa: E402
 from core.agents.rule_detectors import _looks_solidity          # noqa: E402
 
