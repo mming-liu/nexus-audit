@@ -44,6 +44,9 @@ AUTHZ_SIBLING_GUARD = "AUTHZ_SIBLING_GUARD"
 # （JWT/session/checkAuthor）则不算漏鉴权，避免把作者 API 打成假阳。
 AUTHZ_PACKAGE_GUARD = "AUTHZ_PACKAGE_GUARD"
 LOCAL_UNIX_SOCKET_SERVER = "LOCAL_UNIX_SOCKET_SERVER"
+# M337：显式只允许 loopback 的单机工作台（LocalAccessMiddleware / 127.0.0.1
+# 客户端校验）。这类应用没有远程攻击面，不能占板块 A 的交单席位。
+LOCAL_LOOPBACK_ONLY = "LOCAL_LOOPBACK_ONLY"
 UNVERIFIED_WILD_AUTHZ = "UNVERIFIED_WILD_AUTHZ"
 ZERO_ENTRY_LIB = "ZERO_ENTRY_LIB"
 RULE_LANGUAGE_MISMATCH = "RULE_LANGUAGE_MISMATCH"
@@ -116,6 +119,26 @@ def looks_local_socket(text: str) -> bool:
                                    "socket_path", "uds=", ".bind("))
 
 
+def looks_local_loopback(text: str) -> bool:
+    """入口文件是否显式把访问限制为本机 loopback。
+
+    `LocalAccessMiddleware` 是强信号（creatorhub 的 local_access.py 要求
+    client.host 与 Host 都是 loopback）；否则必须同时看到 loopback 字面量
+    和客户端地址校验，避免把只在注释里写 localhost 的业务仓误杀。
+    """
+    if not text:
+        return False
+    if "LocalAccessMiddleware" in text:
+        return True
+    if not re.search(r"127\.0\.0\.1|::1|\bloopback\b|\blocalhost\b",
+                     text, re.I):
+        return False
+    return bool(re.search(
+        r"request\s*\.\s*client\s*\.\s*host|remote_addr|getRemoteAddr|"
+        r"client_address|is_loopback|\bloopback\s*\(",
+        text, re.I))
+
+
 def classify(record: dict, repo_root: Path | None = None) -> dict:
     """判定一条 FRESH 根因是否属于“陌生野仓噪音”。
 
@@ -134,10 +157,16 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
                 "reason": (f"{record.get('category')} 是 Solidity 类目，"
                            f"入口文件是 {Path(file).suffix or '未知类型'}")}
 
-    if looks_local_socket(_read(repo_root, str(record.get("file") or ""))):
+    src = _read(repo_root, str(record.get("file") or ""))
+    if looks_local_socket(src):
         return {"blocked": True, "code": LOCAL_UNIX_SOCKET_SERVER,
                 "reason": ("AF_UNIX 本地控制通道（0700/0600 + 对端 UID 校验），"
                            "设计上不可从网络到达")}
+    if looks_local_loopback(src):
+        return {"blocked": True, "code": LOCAL_LOOPBACK_ONLY,
+                "reason": ("显式仅允许 loopback 客户端的单机工作台"
+                           "（LocalAccessMiddleware / 127.0.0.1 校验），"
+                           "无远程攻击面")}
 
     if record.get("category") == "cmdi" and file.endswith(".py"):
         src = _read(repo_root, str(record.get("file") or ""))

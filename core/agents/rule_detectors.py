@@ -2122,7 +2122,8 @@ _DB_FETCH_CALL_RE = re.compile(
 # 按命名机制收口：任意 w*Result / w*Response / w*Resp 的统一 JSON 包装
 # 都属于"结构固定、前端渲染"，Java 侧看不到不转义输出 → 退回 None。
 _DB_WRAPPED_ECHO_RE = re.compile(
-    r"return\s+(?:R|ResponseEntity|\w*Result|\w*Response|\w*Resp)\s*\."
+    r"return\s+(?:R|ResponseEntity|ServerResponseEntity|\w*Result|"
+    r"\w*Response|\w*Resp)\s*\."
     r"\s*(?:ok|success|error|fail|data|of)\s*\(", re.I)
 
 
@@ -3884,12 +3885,13 @@ def xss_verdict(source: str) -> bool | None:
         r"\b(?:public|protected|private)\s+([\w<>\[\],.?]+)\s+\w+\s*\(", body)
     _ret = _ret_m.group(1) if _ret_m else ""
     _json_type = bool(_ret and _ret not in (
-        "String", "CharSequence", "byte[]", "void", "Object"))
+        "String", "CharSequence", "byte[]", "void", "Object",
+        "ModelAndView", "ModelMap", "View"))
     # 返回类型本身是 JSON 包装器（ResponseDTO/Result/R/RestResp…）时，
     # 即使切片没带类级 @RestController 标记，也是 JSON 序列化不是 HTML 回显。
     _json_wrapper = bool(_ret and re.match(
-        r"(?i)^(?:response|result|restresp|rest|api|ajax|commonresult|r|"
-        r"page|ipage|json)\w*", _ret))
+        r"(?i)^(?:response|serverresponse|serverresponseentity|result|"
+        r"restresp|rest|api|ajax|commonresult|r|page|ipage|json)\w*", _ret))
     _rest_json = bool(
         ("Controller-Kind: @RestController" in source or "@ResponseBody" in source
          or _json_wrapper)
@@ -3983,6 +3985,10 @@ def xss_verdict(source: str) -> bool | None:
         # 自己只是"按主键删/按主键取单条"这类操作：没有把外部字符串写进库，
         # 不可能构成存储型 XSS 的写入端。判 None（交模型核对意图），不判 True。
         if _db_writer_takes_value(body):
+            # M338：@RestController 返回非字符串实体（User / CompletableFuture<User> /
+            # ServerResponseEntity<Void>）由 Jackson 序列化成 JSON，不是 HTML 回显。
+            if _rest_json:
+                return False
             readers = _db_render_points(_db_readers(source))
             if readers:
                 joined = "\n".join(readers)
@@ -3992,6 +3998,8 @@ def xss_verdict(source: str) -> bool | None:
         # 切片器已经把那层实现体贴进 `// ---- 跨文件证据：insertOne() 的接口实现类
         # 方法体 ----`。读到它，就是可逐行核对的事实 —— 值确实落库了。
         if _repo_write_in_evidence(source):
+            if _rest_json:
+                return False
             readers = _db_render_points(_db_readers(source))
             if readers:
                 joined = "\n".join(readers)
@@ -4115,6 +4123,11 @@ REDIR_WHITELIST_RE = re.compile(
 #   response.sendRedirect("/fixed/page")      → 常量
 REDIR_CONST_TARGET_RE = re.compile(
     r"return\s+\"redirect:[^\"$]{0,200}\"\s*;|"
+    # M337a：同源固定路径前缀 + 变量（JavaClaw 的
+    # `return "redirect:/onboarding/" + nextId;`）。必须是单斜杠 + 固定段，
+    # `"redirect:/" + url` / `"redirect:" + url` 仍可构造 `//evil.com`，不在此列。
+    r"return\s+\"redirect:/[A-Za-z0-9_.-]+/[^\"\n]*\"\s*\+|"
+    r"(?:sendRedirect|RedirectView)\s*\(\s*\"/[A-Za-z0-9_.-]+/[^\"\n]*\"\s*\+|"
     r"(?:sendRedirect|sendError)\s*\(\s*\"[^\"]*\"\s*\)|"
     # M313：Spring 的 `new RedirectView("/", true, false)` 也是编译期常量
     # （skyeye/xxl-job 的 toLogin 被判 True 就是漏了这条）。
@@ -4944,7 +4957,8 @@ PATH_SAFE_RE = re.compile(
     # 或 os.path.realpath(p).startswith(base)，旧词表只认 Java 形态。
     r"os\s*\.\s*path\s*\.\s*(?:realpath|abspath)\s*\([^)]*\)\s*"
     r"\.\s*startswith\s*\(|"
-    r"\.\s*resolve\s*\(\s*\)\s*\.\s*(?:is_relative_to|startswith)\s*\(",
+    r"\.\s*resolve\s*\(\s*\)\s*\.\s*(?:is_relative_to|startswith)\s*\(|"
+    r"\.\s*(?:is_)?relative_to\s*\(",
     re.I)
 # 疑似防护调用（含黑名单），只用于决定"是否退回模型"
 _PATH_GUARD_RE = re.compile(
@@ -11645,6 +11659,9 @@ _FILE_DELETE_SAFE_RE = re.compile(
     r"toRealPath\s*\([^)]*\)\s*\.\s*startsWith|"
     r"realpath\s*\([^)]*\)\s*\.\s*startswith|"
     r"os\s*\.\s*path\s*\.\s*basename\s*\(|"
+    # M337b：Python pathlib 的标准目录包含校验；creatorhub 的
+    # `candidate.relative_to(profiles_dir)` 就是这条。
+    r"\.\s*(?:is_)?relative_to\s*\(|"
     r"deleteFileCheck\s*\(|checkResult\s*\.\s*isFailure\s*\(")
 # M309：删除目标是本函数刚创建的临时文件（mkstemp/NamedTemporaryFile）时，
 # 路径不是外部输入 —— send_image 的 finally: os.remove(temp_path) 就是这种。
@@ -11672,6 +11689,10 @@ def arbitrary_file_delete_verdict(source: str) -> bool | None:
         return True
     if re.fullmatch(r"\"[^\"]*\"|'[^']*'", arg):
         return False
+    params = (_py_func_params(source) if py
+              else set(_bare_params(_entry_signature(source))))
+    if arg in params:
+        return True
     if re.fullmatch(r"[A-Za-z_]\w*", arg):
         # 删除的是本函数自己 mkstemp 出来的临时文件 → 不是任意文件删除。
         # 取 sink 之前**最后一次**赋值（先 temp_path = None、后 mkstemp 是常见写法）。
@@ -11680,9 +11701,20 @@ def arbitrary_file_delete_verdict(source: str) -> bool | None:
             body) if am.start() < m.start()]
         if assigns and _TEMP_FILE_ORIGIN_RE.search(assigns[-1].group(0)):
             return False
-    params = set(_bare_params(_entry_signature(source)))
-    if (re.fullmatch(r"[A-Za-z_]\w*", arg) or "request" in arg
-            or any(re.search(rf"\b{re.escape(p)}\b", arg) for p in params)):
+        # M337b：裸局部变量不再无条件判 True。只有该变量在入口里被赋成
+        # 入口形参 / request 读取（或一跳别名）时才成立；否则证据不足 → None。
+        rhs = _last_assign_rhs(body, arg)
+        linked = bool(rhs and ("request" in rhs or any(
+            re.search(rf"\b{re.escape(p)}\b", rhs) for p in params)))
+        if not linked and rhs:
+            alias = re.fullmatch(r"[A-Za-z_]\w*", rhs.strip())
+            if alias:
+                rhs2 = _last_assign_rhs(body, alias.group(0))
+                linked = bool(rhs2 and ("request" in rhs2 or any(
+                    re.search(rf"\b{re.escape(p)}\b", rhs2) for p in params)))
+        return True if linked else None
+    if "request" in arg or any(
+            re.search(rf"\b{re.escape(p)}\b", arg) for p in params):
         return True
     return None
 
