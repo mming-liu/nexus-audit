@@ -5194,14 +5194,73 @@ def _path_sink_identifiers(text: str) -> set[str]:
     return out
 
 
+_PATHVAR_PARAM_RE = re.compile(
+    r"@PathVariable\s*(?:\([^)]*\))?\s*"
+    r"(?:@\w+\s*(?:\([^)]*\))?\s*)*"
+    r"(?:final\s+)?[\w.<>\[\],?]+\s+(\w+)")
+_ROUTE_DECL_RE = re.compile(
+    r"^//\s*(?:Full-Route|Alias-Route):\s*(.+)$", re.M)
+_ROUTE_PLACEHOLDER_RE = re.compile(r"\{([^}]*)\}")
+
+
+def _single_segment_pathvar_params(source: str) -> set[str]:
+    """单段 @PathVariable 形参（M329）。
+
+    oinone 容器实测：Spring MVC 6.1 + Tomcat 10.1 默认配置下，单段
+    `{uniqueFileName}` 的 @PathVariable 拿不到 `/` 或 `..` —— 字面 `../`
+    被容器归一化，`%2f/%5c` 被 400 拒绝，双重编码经容器解一层后 Spring
+    PathPatternParser 不做二次解码。因此这类形参不构成路径穿越污染源。
+
+    只在以下条件全部成立时豁免：
+      · 路由里的每个 `{...}` 都是纯单段名（不含 `*` / `:` 正则）；
+      · 切片里没有 URLDecoder.decode / AntPathMatcher 等二次解码或通配；
+      · 入口签名里确实有 @PathVariable 形参。
+
+    否则返回空集，保持原判（宁可多查，不可漏判）。
+    """
+    if ("URLDecoder.decode" in source or "AntPathMatcher" in source
+            or "PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE" in source):
+        return set()
+    routes: list[str] = []
+    for line in _ROUTE_DECL_RE.findall(source):
+        routes.extend(x.strip() for x in line.split(",") if x.strip())
+    if not routes:
+        for m in re.finditer(
+                r"@(?:RequestMapping|GetMapping|PostMapping|PutMapping|"
+                r"DeleteMapping|PatchMapping)\s*\(([^)]*)\)", source):
+            routes.extend(re.findall(r'"([^"]*)"', m.group(1)))
+    if not routes:
+        return set()
+    placeholders: list[str] = []
+    for route in routes:
+        for ph in _ROUTE_PLACEHOLDER_RE.findall(route):
+            placeholders.append(ph)
+            # {*path} / {path:.*} / {id:[0-9]+} 一律不豁免。
+            if not re.fullmatch(r"[A-Za-z_][\w-]*", ph):
+                return set()
+    if not placeholders:
+        return set()
+    sig = _entry_signature(source)
+    if not sig:
+        return set()
+    return set(_PATHVAR_PARAM_RE.findall(sig))
+
+
 def pathtraver_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not body:
         return None
     # M327：入口 DTO 类型在 Hop 方法里的形参也算污染源（同名形参不成立时
     # 唯一能连上 create -> generatorCode -> maker 的锚点）。
-    _entry_params = set(_bare_params(_entry_signature(source)))
+    _entry_params_all = set(_bare_params(_entry_signature(source)))
+    # M329：单段 @PathVariable 在容器/框架层拿不到 "/" 与 ".."，从污染源剔除。
+    _single_pathvars = _single_segment_pathvar_params(source)
+    _entry_params = _entry_params_all - _single_pathvars
     _hop_params = _hop_param_names(source)
+    # 只有单段 @PathVariable（没有 @RequestParam/@RequestBody/Hop DTO）时，
+    # 源码拼接仍是缺陷，但不可达 ⇒ None，而不是 True。
+    if _single_pathvars and not (_entry_params or _hop_params):
+        return None
     # M313：classpath 常量资源（`getResourceAsStream("stencilset.json")`）没有
     # 外部输入面，不是路径穿越（skyeye 的 getStencilset 被判 True 就是这条）。
     _sink_all = [m for m in PATH_SINK_RE.finditer(body)
