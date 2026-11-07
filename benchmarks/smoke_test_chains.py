@@ -7225,8 +7225,8 @@ check("M138：输出含四维表头（--fix / --emit-poc / CVSS）",
 # Java/Python、delegatecall=Solidity），每个都会在不适用的语言上留一个
 # (类目, 语言) 空格 —— 41 → 47 是设计使然，不是判据退步。真正该锁的不变量
 # 在 [184]：**每个新类目至少有一门语言判得出来**，不允许整类空着。
-check("M139：覆盖缺口有界（≤68；M171 两新类目各留不适用的语言空格）",
-      _m138["gap_count"] <= 68, True)
+check("M139：覆盖缺口有界（≤69；M338 移除 example-only 探针后基线）",
+      _m138["gap_count"] <= 69, True)
 check("M139：补丁器映射与 doctor 单一事实源一致（31 个补丁器 / 29 类目）",
       (_m138["patchers"], len(_m138["fix_map"])), (35, 29))
 
@@ -9387,14 +9387,14 @@ check("M167：23 入口 / 7 类目 0 True",
 check("M167：SecurityConfig 全局标记 23/23",
       ("全局标记 23/23" in (_r206.stdout or "")), True)
 
-print("\n[207] M170：xxl-job 36 入口 / authz+deserial 0 True")
+print("\n[207] M170：xxl-job 37 入口 / authz+deserial 0 True")
 _r207 = subprocess.run(
     [sys.executable, str(ROOT / "benchmarks" / "benchmark_xxl_job.py"),
      "--strict"], capture_output=True, text=True, encoding="utf-8",
     errors="replace")
 check("M170：benchmark_xxl_job --strict exit 0", _r207.returncode, 0)
-check("M170：41 入口 / authz+deserial 0 True",
-      ("41 入口 / authz+deserial 0 True" in (_r207.stdout or "")), True)
+check("M170：37 入口 / authz+deserial 0 True",
+      ("37 入口 / authz+deserial 0 True" in (_r207.stdout or "")), True)
 check("M170：@XxlSso 管理员门 False / 匿名门 None",
       ("管理员门（应 False）  ：False" in (_r207.stdout or "")
        and "匿名门（应 None）     ：None" in (_r207.stdout or "")), True)
@@ -11857,6 +11857,146 @@ check("M335：Python 新生代 query 实际带框架词",
           and any(fw in s["query"] for fw in ("fastapi", "django", "flask"))
           for s in _r314["query_specs"]), True)
 check("M336：已执行断言数 >= 1885", COUNTS["n"] >= 1885, True)
+
+print("\n[315] M337/M338：同源前缀 / relative_to / loopback / JSON 实体 / example 过滤")
+from core.slicer.java_servlet import JavaSlicer as _JS315
+from core.context import wild_noise as _wn315
+_redir_ok315 = '@PostMapping("/x")\npublic String x(String next) { return "redirect:/onboarding/" + next; }'
+_redir_bad315 = '@PostMapping("/x")\npublic String x(String url) { return "redirect:/" + url; }'
+check("M337a：固定前缀 + nextId 判 False",
+      _rd307.redir_verdict(_redir_ok315), False)
+check("M337a：redirect:/ + url 仍判 True",
+      _rd307.redir_verdict(_redir_bad315), True)
+_del315 = ('def del_account(account_id):\n'
+           '    candidate = Path(pdir).resolve()\n'
+           '    candidate.relative_to(ROOT)\n'
+           '    shutil.rmtree(candidate)\n')
+check("M337b：pathlib relative_to 判 False",
+      _rd307.arbitrary_file_delete_verdict(_del315), False)
+check("M337b：局部变量直接来自形参仍判 True",
+      _rd307.arbitrary_file_delete_verdict(
+          'def f(path):\n    target = path\n    os.remove(target)\n'), True)
+check("M337b：局部变量与入口无关退 None",
+      _rd307.arbitrary_file_delete_verdict(
+          'def f(path):\n    target = "/tmp/x"\n    os.remove(target)\n'), None)
+_upload315 = ('async def publish_upload(file: UploadFile = File(...)):\n'
+              '    filename = file.filename\n'
+              '    name = f"{uuid.uuid4().hex}{Path(filename).suffix}"\n'
+              '    with open(UPLOAD_DIR / name, "wb") as out:\n'
+              '        shutil.copyfileobj(file.file, out)\n')
+check("M337c：UUID + 原始后缀仍判 True（未把后缀固定）",
+      _rd307.unrestricted_upload_verdict(_upload315), True)
+_ws315 = Path(_ws_mkdtemp("smoke_loopback315_"))
+(_ws315 / "app.py").write_text(
+    "from .local_access import LocalAccessMiddleware\n"
+    "app.add_middleware(LocalAccessMiddleware)\n", encoding="utf-8")
+check("M337c：LocalAccessMiddleware 归 LOCAL_LOOPBACK_ONLY",
+      _wn315.classify({"category": "unrestricted_upload",
+                       "unit": "publish_upload", "file": "app.py"},
+                      _ws315)["code"], "LOCAL_LOOPBACK_ONLY")
+_xss315a = ('// Controller-Kind: @RestController\n'
+            '@PostMapping("/x")\n'
+            'public ServerResponseEntity<Void> x(@RequestBody Long id) {\n'
+            '  service.save(id);\n'
+            '  return ServerResponseEntity.success();\n}')
+check("M338：ServerResponseEntity<Void> 不判 XSS",
+      _rd307.xss_verdict(_xss315a), False)
+_xss315b = ('// Controller-Kind: @RestController\n'
+            '@PutMapping("/u")\n'
+            'public CompletableFuturePath<User> u(@RequestParam String email) {\n'
+            '  return service.update(email);\n}')
+check("M338：CompletableFuture<User> 不判 XSS",
+      _rd307.xss_verdict(_xss315b), False)
+_ws315j = Path(_ws_mkdtemp("smoke_demo315_"))
+(_ws315j / "src").mkdir()
+(_ws315j / "src" / "A.java").write_text(
+    '@RestController\npublic class A {\n'
+    '  @GetMapping("/a")\n'
+    '  public String a() { return "a"; }\n}\n', encoding="utf-8")
+(_ws315j / "example").mkdir()
+(_ws315j / "example" / "B.java").write_text(
+    '@RestController\npublic class B {\n'
+    '  @GetMapping("/b")\n'
+    '  public String b() { return "b"; }\n}\n', encoding="utf-8")
+_units315 = list(_JS315(_ws315j).extract_entry_units())
+_names315 = [u.unit_name for u in _units315]
+check("M338：example 子模块被忽略、扫描根 demo 不被误杀",
+      _names315, ["A.a"])
+check("M338：example 内 B.b 未进入切片", "B.b" in _names315, False)
+
+print("\n[316] M339：单业务词回退 + min_units 不占实扫名额")
+_ts316 = _ts309
+check("M339：回退词全部是业务系统词",
+      all(w in ("admin", "cms", "erp", "crm", "mall", "oa", "rbac",
+                "portal", "workflow", "knowledge", "rag", "lowcode",
+                "mes", "wms", "iot")
+          for w in _ts316.NEW_GEN_FALLBACK_WORDS), True)
+check("M339：回退窗口 created>2024-01-01 / stars 60..5000",
+      (_ts316.NEW_GEN_FALLBACK_CREATED_SINCE,
+       _ts316.NEW_GEN_FALLBACK_STARS), ("2024-01-01", (60, 5000)))
+from urllib.parse import unquote as _unquote316                  # noqa: E402
+_orig_get316 = _ts316._get
+
+
+def _get316(url, timeout=20.0):
+    q = _unquote316(str(url))
+    if any(fw in q for fw in ("fastapi", "django", "flask",
+                              "spring-boot", "mybatis-plus")):
+        return True, {"total_count": 0, "items": []}, ""
+    return True, {"total_count": 1, "items": [{
+        "full_name": "acme/admin", "description": "business admin",
+        "has_issues": True, "stargazers_count": 100,
+        "pushed_at": "2026-11-01", "topics": [], "language": "java"}]}, ""
+
+
+_ts316._get = _get316
+try:
+    _r316 = _ts316.scout_daily(["java"], allow_online=True,
+                               today=_dt309.date(2026, 11, 7), limit=2,
+                               terms_per_language=1)
+finally:
+    _ts316._get = _orig_get316
+check("M339：框架词全干后回退到业务词并拿到候选",
+      (len(_r316["items"]), _r316["query_specs"][0].get("fallback")),
+      (1, "business_word"))
+check("M339：回退 query 不含裸框架名",
+      any(fw in _r316["query_specs"][0]["query"]
+          for fw in ("fastapi", "django", "flask",
+                     "spring-boot", "mybatis-plus")), False)
+
+from core.context import daily_hunt as _dh316                     # noqa: E402
+_ws316 = Path(_ws_mkdtemp("smoke_minunits316_"))
+_old_proc316 = _dh316.process_repo
+
+
+def _proc316(slug, repo, entry, **kw):
+    units = 3 if slug == "acme/low" else 12
+    return {"skipped_unchanged": False, "head_sha": "a" * 40,
+            "entry": {"last_scanned_sha": "a" * 40,
+                      "last_scanned_at": "2026-11-07T00:00:00"},
+            "total_units": units, "records": []}
+
+
+_dh316.process_repo = _proc316
+try:
+    _res316 = _dh316.run(
+        limit=1, state_path=_ws316 / "s.json",
+        report=_ws316 / "R.md", json_path=_ws316 / "R.json",
+        packs_dir=_ws316 / "packs",
+        scout_fn=lambda **kw: {"ok": True, "source": "test", "items": [
+            {"slug": "acme/low"}, {"slug": "acme/high"}]},
+        sync_fn=lambda s: {"status": "OK", "path": str(_ws316)},
+        dedup_fn=lambda *a, **k: {"status": "UNKNOWN"})
+finally:
+    _dh316.process_repo = _old_proc316
+check("M339：低密度仓记 low_units_3 且不占名额",
+      _res316["ledger"][0].get("reason"), "low_units_3")
+check("M339：低密度被跳过后仍扫到高密度仓",
+      (_res316["ledger"][1]["result"], _res316["daily"]["scanned"]),
+      ("SCANNED", 1))
+check("M339：daily meta 暴露 min_units",
+      _res316["daily"].get("min_units"), 8)
+check("M340：已执行断言数 >= 1900", COUNTS["n"] >= 1900, True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

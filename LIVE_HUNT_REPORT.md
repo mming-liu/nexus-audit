@@ -2,99 +2,114 @@
 
 > 机器事实源：benchmarks/results/daily_hunt.json。本报告的 A/B 行数必须与 JSON 计数一致；ZERO_RECORD_FRESH 只代表四个来源**实际查过且 0 命中**，不代表漏洞一定成立，更不代表人工已核验。
 
-- 生成时间：2026-11-07 22:02:04
-- 总条数：52 ｜ 板块 A：**4** ｜ 板块 B：**48**
-- 状态计数：ZERO_RECORD_FRESH 4 / DUPLICATE_CVE 0 / DUPLICATE_ISSUE_OR_GHSA 0 / PATCHED_UPSTREAM 0 / STALE_REPO 0 / UNKNOWN 48
+- 生成时间：2026-11-08 00:53:51
+- 总条数：60 ｜ 板块 A：**5** ｜ 板块 B：**55**
+- 状态计数：ZERO_RECORD_FRESH 5 / DUPLICATE_CVE 0 / DUPLICATE_ISSUE_OR_GHSA 0 / PATCHED_UPSTREAM 0 / STALE_REPO 0 / UNKNOWN 55
 
-<!-- live_hunt_counts: {"BOARD_A": 4, "BOARD_B": 48, "DUPLICATE_CVE": 0, "DUPLICATE_ISSUE_OR_GHSA": 0, "PATCHED_UPSTREAM": 0, "STALE_REPO": 0, "UNKNOWN": 48, "ZERO_RECORD_FRESH": 4} -->
+<!-- live_hunt_counts: {"BOARD_A": 5, "BOARD_B": 55, "DUPLICATE_CVE": 0, "DUPLICATE_ISSUE_OR_GHSA": 0, "PATCHED_UPSTREAM": 0, "STALE_REPO": 0, "UNKNOWN": 55, "ZERO_RECORD_FRESH": 5} -->
 
 ## 今日巡猎（daily-hunt）
 
-> 自动流水线：近 21 天有提交的 java/python 仓 → 同 HEAD 直接跳过 → 只报新引入或尚未导出的 ZERO_RECORD_FRESH 根因；本次即扫即焚 9 个缓存。
+> 自动流水线：近 21 天有提交的 java/python 仓 → 同 HEAD 直接跳过 → 只报新引入或尚未导出的 ZERO_RECORD_FRESH 根因；本次即扫即焚 16 个缓存。
 
-- 候选仓：10 ｜ 实扫：8 ｜ 跳过：1 ｜ 失败：1 ｜ 候选来源：github_search
-- 本次新增根因：52 ｜ 板块 A：4 ｜ 拦截进 B：48
-- 冷却期免克隆：0 个（--cooldown-days 7：距上次扫描不足 7 天的仓直接 0 秒顺延）
+- 候选仓：17 ｜ 实扫：8 ｜ 跳过：9 ｜ 失败：0 ｜ 候选来源：github_search
+- 本次新增根因：60 ｜ 板块 A：5 ｜ 拦截进 B：55
+- 冷却期免克隆：1 个（--cooldown-days 7：距上次扫描不足 7 天的仓直接 0 秒顺延）
 
 | 仓库 | HEAD | 结果 | 新增 |
 |---|---|---|---|
-| higher-kinded-j/higher-kinded-j | 56a28c1f0f09 | SCANNED | 5 |
-| 3441293738/creatorhub | b96ee378d92d | SCANNED | 4 |
-| grimmory-tools/grimmory | c03164ce2213 | SCANNED | 0 |
-| vstorm-co/agenticos | 0306cad25cb5 | SCANNED | 9 |
-| ClawRunr/JavaClaw | 1f1ab317a297 | SCANNED | 1 |
-| antiv/mate |  | FAILED | 0 |
-| axelixlabs/axelix | 276ef9148860 | SCANNED | 0 |
-| ikeda042/PhenoPixel | 1e2ca9004f47 | SCANNED | 5 |
-| sivaprasadreddy/spring-modular-monolith | 52435a0c60a1 | SKIPPED | 0 |
-| geolens-io/geolens | e7f2ebdb8121 | SCANNED | 28 |
+| langgraph4j/langgraph4j | 23aef94c1755 | SKIPPED | 0 |
+| microsoft/intelligence-toolkit | f6ee0f21e571 | SKIPPED | 0 |
+| holdmyspot-com/cat | 1d282487738b | SKIPPED | 0 |
+| Francis1998/scholar-rag-agent | d693d46b15bf | SCANNED | 4 |
+| Swayingleaves/novanova-studio | 0269e4856fc0 | SCANNED | 4 |
+| WenyuChiou/ai-research-skills | b649037b02b8 | SKIPPED | 0 |
+| quarkiverse/quarkus-flow | dedd3568b556 | SKIPPED | 0 |
+| xorbitsai/xagent | 7dc47a883769 | SCANNED | 41 |
+| boommanpro/gaia-workflow-engine | c45955256913 | SCANNED | 3 |
+| Zzz1phyrf/ComfyUI-H3-LongVideo | 2e12b50d8fdd | SCANNED | 0 |
+| w8123/EnterpriseAgentFramework | 1f1230d50db0 | SKIPPED | 0 |
+| willmiao/ComfyUI-Lora-Manager | f4ea2551a89c | SKIPPED | 0 |
+| tmseidel/ai-git-bot | cdfd192ca8c6 | SCANNED | 1 |
+| iha2/superlite | 9747f27e49ed | SKIPPED | 0 |
+| taishan666/MaxKB4j | e008b2be340f | SCANNED | 4 |
+| KbWen/agentic-os | 82203b5c0689 | SKIPPED | 0 |
+| risesoft-y9/WorkFlow-Engine | e91293ca1db4 | SCANNED | 3 |
 
 ## 板块 A｜🟢 可直接交单的 ZERO_RECORD_FRESH
 
 | # | 仓库 | 类目 | 根因 | 置信度 | HEAD 提交日期 | HEAD | 源码行 | 提单入口 | 本地手册 |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | JavaClaw | redir | OnboardingController.postStep | — | 2026-11-07 (0.1d) | 1f1ab317a297 | [app/src/main/java/ai/javaclaw/onboarding/OnboardingController.java:71](https://github.com/ClawRunr/JavaClaw/blob/1f1ab317a2975e4c44948f25693296194f927097/app/src/main/java/ai/javaclaw/onboarding/OnboardingController.java#L71) | [Advisory](https://github.com/ClawRunr/JavaClaw/security/advisories/new) · [Issue](https://github.com/ClawRunr/JavaClaw/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/JavaClaw_redir_postStep/SUBMISSION_PLAYBOOK.md) |
-| 2 | creatorhub | arbitrary_file_delete | del_account | — | 2026-11-04 (3.1d) | b96ee378d92d | [app/main.py:3263](https://github.com/3441293738/creatorhub/blob/b96ee378d92d4228c1503d69987e1df9678d6e32/app/main.py#L3263) | [Advisory](https://github.com/3441293738/creatorhub/security/advisories/new) · [Issue](https://github.com/3441293738/creatorhub/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/creatorhub_arbitrary_file_delete_del_account/SUBMISSION_PLAYBOOK.md) |
-| 3 | creatorhub | unrestricted_upload | publish_upload | — | 2026-11-04 (3.1d) | b96ee378d92d | [app/main.py:10128](https://github.com/3441293738/creatorhub/blob/b96ee378d92d4228c1503d69987e1df9678d6e32/app/main.py#L10128) | [Advisory](https://github.com/3441293738/creatorhub/security/advisories/new) · [Issue](https://github.com/3441293738/creatorhub/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/creatorhub_unrestricted_upload_publish_upload/SUBMISSION_PLAYBOOK.md) |
-| 4 | higher-kinded-j | xss | AsyncController.updateEmailAsync | — | 2026-11-07 (0.1d) | 56a28c1f0f09 | [hkj-spring/example/src/main/java/org/higherkindedj/spring/example/controller/AsyncController.java:113](https://github.com/higher-kinded-j/higher-kinded-j/blob/56a28c1f0f0944cec9af0159495079b923e25d54/hkj-spring/example/src/main/java/org/higherkindedj/spring/example/controller/AsyncController.java#L113) | [Advisory](https://github.com/higher-kinded-j/higher-kinded-j/security/advisories/new) · [Issue](https://github.com/higher-kinded-j/higher-kinded-j/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/higher-kinded-j_xss_updateEmailAsync/SUBMISSION_PLAYBOOK.md) |
+| 1 | WorkFlow-Engine | sqli | DoingRestController.doingList4All | — | 2026-11-06 (1.4d) | e91293ca1db4 | [y9-module-flowableui/risenet-y9boot-support-flowableui/src/main/java/net/risesoft/controller/worklist/DoingRestController.java:51](https://github.com/risesoft-y9/WorkFlow-Engine/blob/e91293ca1db478fd4e692a23e9f263bbe61dd4d9/y9-module-flowableui/risenet-y9boot-support-flowableui/src/main/java/net/risesoft/controller/worklist/DoingRestController.java#L51) | [Advisory](https://github.com/risesoft-y9/WorkFlow-Engine/security/advisories/new) · [Issue](https://github.com/risesoft-y9/WorkFlow-Engine/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/WorkFlow-Engine_sqli_doingList4All/SUBMISSION_PLAYBOOK.md) |
+| 2 | WorkFlow-Engine | sqli | DoingRestController.doingList4Dept | — | 2026-11-06 (1.4d) | e91293ca1db4 | [y9-module-flowableui/risenet-y9boot-support-flowableui/src/main/java/net/risesoft/controller/worklist/DoingRestController.java:66](https://github.com/risesoft-y9/WorkFlow-Engine/blob/e91293ca1db478fd4e692a23e9f263bbe61dd4d9/y9-module-flowableui/risenet-y9boot-support-flowableui/src/main/java/net/risesoft/controller/worklist/DoingRestController.java#L66) | [Advisory](https://github.com/risesoft-y9/WorkFlow-Engine/security/advisories/new) · [Issue](https://github.com/risesoft-y9/WorkFlow-Engine/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/WorkFlow-Engine_sqli_doingList4Dept/SUBMISSION_PLAYBOOK.md) |
+| 3 | WorkFlow-Engine | sqli | DoingRestController.doingList4DuBan | — | 2026-11-06 (1.4d) | e91293ca1db4 | [y9-module-flowableui/risenet-y9boot-support-flowableui/src/main/java/net/risesoft/controller/worklist/DoingRestController.java:81](https://github.com/risesoft-y9/WorkFlow-Engine/blob/e91293ca1db478fd4e692a23e9f263bbe61dd4d9/y9-module-flowableui/risenet-y9boot-support-flowableui/src/main/java/net/risesoft/controller/worklist/DoingRestController.java#L81) | [Advisory](https://github.com/risesoft-y9/WorkFlow-Engine/security/advisories/new) · [Issue](https://github.com/risesoft-y9/WorkFlow-Engine/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/WorkFlow-Engine_sqli_doingList4DuBan/SUBMISSION_PLAYBOOK.md) |
+| 4 | gaia-workflow-engine | deserial | AgentObservabilityController.asServiceSession | — | 2026-11-07 (0.2d) | c45955256913 | [apps/api/gaia-workflow/gaia-workflow-app/src/main/java/cn/boommanpro/gaia/workflow/app/controller/system/AgentObservabilityController.java:471](https://github.com/boommanpro/gaia-workflow-engine/blob/c45955256913faaeef643faac53d839632954070/apps/api/gaia-workflow/gaia-workflow-app/src/main/java/cn/boommanpro/gaia/workflow/app/controller/system/AgentObservabilityController.java#L471) | [Advisory](https://github.com/boommanpro/gaia-workflow-engine/security/advisories/new) · [Issue](https://github.com/boommanpro/gaia-workflow-engine/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/gaia-workflow-engine_deserial_asServiceSession/SUBMISSION_PLAYBOOK.md) |
+| 5 | gaia-workflow-engine | sqli | ModelConfigController.setSessionModel | — | 2026-11-07 (0.2d) | c45955256913 | [apps/api/gaia-workflow/gaia-workflow-app/src/main/java/cn/boommanpro/gaia/workflow/app/controller/api/ModelConfigController.java:213](https://github.com/boommanpro/gaia-workflow-engine/blob/c45955256913faaeef643faac53d839632954070/apps/api/gaia-workflow/gaia-workflow-app/src/main/java/cn/boommanpro/gaia/workflow/app/controller/api/ModelConfigController.java#L213) | [Advisory](https://github.com/boommanpro/gaia-workflow-engine/security/advisories/new) · [Issue](https://github.com/boommanpro/gaia-workflow-engine/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/gaia-workflow-engine_sqli_setSessionModel/SUBMISSION_PLAYBOOK.md) |
 
 ## 板块 B｜🔴 自动拦截 / 不可交单
 
 | # | 仓库 | 类目 | 根因 | 状态 | 命中证据 | 拦截原因 | 官方链接 |
 |---|---|---|---|---|---|---|---|
-| 1 | PhenoPixel | authz | get_cell_areas | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 2 | PhenoPixel | authz | get_cell_contour_endpoint | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 3 | PhenoPixel | authz | get_cell_ids_by_label_endpoint | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 4 | PhenoPixel | authz | get_cell_ids_endpoint | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 5 | PhenoPixel | authz | get_manual_labels_endpoint | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 6 | agenticos | authz | list_project_chats | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 7 | agenticos | cmdi | run_trigger_now | **UNKNOWN** | — | NO_CMD_SINK: 入口文件无任何命令执行调用（os.system/subprocess/asyncio.create_subprocess），cmdi 来自切片里未被入口调用的辅助函数 | — |
-| 8 | agenticos | log_injection | hosted_logo | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 9 | agenticos | log_injection | kerberos_login | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 10 | agenticos | log_injection | mattermost_action | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 11 | agenticos | log_injection | provider_callback | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 12 | agenticos | log_injection | teams_messages | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 13 | agenticos | sqli | get_user_detail | **UNKNOWN** | — | NO_SQL_SINK: 入口文件无任何 SQL 执行语句（.execute/.executemany/.executescript），sqli 来自切片里未被入口调用的辅助函数 | — |
-| 14 | agenticos | sqli | list_background_jobs | **UNKNOWN** | — | NO_SQL_SINK: 入口文件无任何 SQL 执行语句（.execute/.executemany/.executescript），sqli 来自切片里未被入口调用的辅助函数 | — |
-| 15 | creatorhub | authz | login_channels_start | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 16 | creatorhub | authz | login_tiktok_start | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 17 | geolens | log_injection | add_column_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 18 | geolens | log_injection | alter_column_type_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 19 | geolens | log_injection | cancel_job | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 20 | geolens | log_injection | commit_fan_out | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 21 | geolens | log_injection | create_layer_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 22 | geolens | log_injection | delete_features_batch | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 23 | geolens | log_injection | delete_single_feature | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 24 | geolens | log_injection | discover_connector_resources_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 25 | geolens | log_injection | dispatch_connector_ingest_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 26 | geolens | log_injection | download_cog | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 27 | geolens | log_injection | drop_column_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 28 | geolens | log_injection | export_dataset_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 29 | geolens | log_injection | get_collection_item | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 30 | geolens | log_injection | oauth_callback | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 31 | geolens | log_injection | oauth_login | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 32 | geolens | log_injection | preview_service_layer | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 33 | geolens | log_injection | rename_column_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 34 | geolens | log_injection | stac_collections | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 35 | geolens | log_injection | stac_import | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 36 | geolens | log_injection | upload_og_image | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 37 | geolens | log_injection | upload_thumbnail | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 38 | geolens | sqli | add_column_endpoint | **UNKNOWN** | — | NO_SQL_SINK: 入口文件无任何 SQL 执行语句（.execute/.executemany/.executescript），sqli 来自切片里未被入口调用的辅助函数 | — |
-| 39 | geolens | sqli | alter_column_type_endpoint | **UNKNOWN** | — | NO_SQL_SINK: 入口文件无任何 SQL 执行语句（.execute/.executemany/.executescript），sqli 来自切片里未被入口调用的辅助函数 | — |
-| 40 | geolens | sqli | drop_column_endpoint | **UNKNOWN** | — | NO_SQL_SINK: 入口文件无任何 SQL 执行语句（.execute/.executemany/.executescript），sqli 来自切片里未被入口调用的辅助函数 | — |
-| 41 | geolens | sqli | get_shared_map_endpoint | **UNKNOWN** | — | NO_SQL_SINK: 入口文件无任何 SQL 执行语句（.execute/.executemany/.executescript），sqli 来自切片里未被入口调用的辅助函数 | — |
-| 42 | geolens | sqli | list_all_datasets | **UNKNOWN** | — | NO_SQL_SINK: 入口文件无任何 SQL 执行语句（.execute/.executemany/.executescript），sqli 来自切片里未被入口调用的辅助函数 | — |
-| 43 | geolens | sqli | list_map_stories_endpoint | **UNKNOWN** | — | NO_SQL_SINK: 入口文件无任何 SQL 执行语句（.execute/.executemany/.executescript），sqli 来自切片里未被入口调用的辅助函数 | — |
-| 44 | geolens | sqli | rename_column_endpoint | **UNKNOWN** | — | NO_SQL_SINK: 入口文件无任何 SQL 执行语句（.execute/.executemany/.executescript），sqli 来自切片里未被入口调用的辅助函数 | — |
-| 45 | higher-kinded-j | authz | AsyncController.getEnrichedUserAsync | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 46 | higher-kinded-j | authz | AsyncController.getUserAsync | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 47 | higher-kinded-j | authz | AsyncController.getUserByEmailAsync | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 48 | higher-kinded-j | authz | AsyncController.updateEmailAsync | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 1 | MaxKB4j | authz | ApplicationController.playDemoText | **UNKNOWN** | — | DEMO_CONTROLLER: demo/示例入口（非生产代码） | — |
+| 2 | MaxKB4j | authz | AuthController.login | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 3 | MaxKB4j | authz | ChatApiController.auth | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 4 | MaxKB4j | authz | ChatApiController.handleMcpRequest | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 5 | ai-git-bot | authz | UsageController.usage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 6 | gaia-workflow-engine | authz | AgentSessionRunController.run | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 7 | novanova-studio | authz | AdminCreditController.getCreditOverview | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 8 | novanova-studio | authz | AdminCreditController.listCreditCards | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 9 | novanova-studio | authz | AdminCreditController.listCreditTransactions | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 10 | novanova-studio | authz | AdminCreditController.listTaskRecords | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 11 | scholar-rag-agent | authz | create_annotation | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 12 | scholar-rag-agent | authz | explore_context | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 13 | scholar-rag-agent | authz | explore_document | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 14 | scholar-rag-agent | authz | list_reviews | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 15 | xagent | authz | bind_agent_preview_task | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 16 | xagent | authz | get_agent_preview_task | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 17 | xagent | log_injection | connect_mcp_app | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 18 | xagent | log_injection | create_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 19 | xagent | log_injection | create_mcp_server | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 20 | xagent | log_injection | create_model | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 21 | xagent | log_injection | create_task | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 22 | xagent | log_injection | delete_chat_task | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 23 | xagent | log_injection | delete_installed | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 24 | xagent | log_injection | delete_task | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 25 | xagent | log_injection | demote_agent_to_personal | **UNKNOWN** | — | DEMO_CONTROLLER: demo/示例入口（非生产代码） | — |
+| 26 | xagent | log_injection | disable_agent_share_link | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 27 | xagent | log_injection | edit_installed | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 28 | xagent | log_injection | enable_agent_share_link | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 29 | xagent | log_injection | generate_agent_api_key | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 30 | xagent | log_injection | get_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 31 | xagent | log_injection | get_agent_api_key | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 32 | xagent | log_injection | get_agent_share_link | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 33 | xagent | log_injection | get_agent_widget_key | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 34 | xagent | log_injection | get_available_tools | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 35 | xagent | log_injection | get_task_output_files | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 36 | xagent | log_injection | get_task_progress | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 37 | xagent | log_injection | get_task_workspace_files | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 38 | xagent | log_injection | get_tasks | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 39 | xagent | log_injection | get_user_default_models | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 40 | xagent | log_injection | progress_websocket_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 41 | xagent | log_injection | promote_agent_to_team | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 42 | xagent | log_injection | publish_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 43 | xagent | log_injection | regenerate_agent_api_key | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 44 | xagent | log_injection | revoke_agent_api_key | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 45 | xagent | log_injection | rotate_agent_share_link | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 46 | xagent | log_injection | rotate_agent_widget_key | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 47 | xagent | log_injection | test_model_connection | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 48 | xagent | log_injection | unpublish_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 49 | xagent | log_injection | update_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 50 | xagent | log_injection | update_mcp_server | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 51 | xagent | log_injection | update_task | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 52 | xagent | log_injection | upload_agent_logo | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 53 | xagent | log_injection | websocket_build_preview_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 54 | xagent | log_injection | websocket_builder_chat_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 55 | xagent | log_injection | websocket_chat_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
 
 ## 对账
 
 | 板块 | 行数 |
 |---|---|
-| A（ZERO_RECORD_FRESH） | 4 |
-| B（其余状态） | 48 |
-| 合计 | 52 |
+| A（ZERO_RECORD_FRESH） | 5 |
+| B（其余状态） | 55 |
+| 合计 | 60 |
