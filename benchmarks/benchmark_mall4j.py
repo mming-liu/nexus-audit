@@ -43,6 +43,12 @@ import json
 import sys
 from pathlib import Path
 
+# Windows GBK stdout 遇到 ✔/✘ 会 UnicodeEncodeError；门禁应因数据而非编码转红。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, OSError):
+    pass
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -68,7 +74,9 @@ SUBJECT_CHAIN_CONTROLLERS = {
 # 剩下的三条是**真风险**：按 orderNumber 查物流单（猜单号即可读别人的订单
 # 物流 → 真 IDOR）+ 后台两个未鉴权上传 + 一条收藏 XSS —— 都不是可以
 # 机械判 False 的形态，冻结计数，涨一条就红。
-REVIEW_NEEDED = 4
+# M330：无括号 @GetMapping/@PostMapping 切出 54 条此前漏掉的路由后，
+# 复核面从 4 条增至 9 条（FileController/SysMenuController 等真实入口）。
+REVIEW_NEEDED = 9
 CORS_CONFIG_FILE = "AuthConfig.java"
 
 
@@ -157,7 +165,7 @@ def main() -> int:
     if len(review) > REVIEW_NEEDED:
         bad.append(f"人工复核面涨到 {len(review)} 条（冻结 {REVIEW_NEEDED}）")
     ok = not bad
-    print(f"\n{'STRICT PASS ✔（139 入口 / 主体链零 True / CORS 折叠成 1）' if ok else 'STRICT FAIL ✘ ' + '；'.join(bad)}")
+    print(f"\n{'STRICT PASS ✔（193 入口 / 主体链零 True / CORS 折叠成 1）' if ok else 'STRICT FAIL ✘ ' + '；'.join(bad)}")
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)

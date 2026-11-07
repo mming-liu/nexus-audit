@@ -7,10 +7,10 @@
     "demo-oauth",
     "demo-actuator"
   ],
-  "total_units": 19,
-  "decided": 37,
+  "total_units": 23,
+  "decided": 45,
   "true": 0,
-  "global_authz_marked": 19,
+  "global_authz_marked": 23,
   "anchor": true,
   "fp": 0,
   "reverse_fn": 0,

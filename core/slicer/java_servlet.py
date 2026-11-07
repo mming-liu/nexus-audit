@@ -49,7 +49,14 @@ CTRL_KIND_RE = re.compile(r"@(RestController|Controller)\b")
 # @WebServlet(value = "/path") 或 @WebServlet("/path")
 WEBSERVLET_RE = re.compile(r"@WebServlet\s*\(\s*(?:value\s*=\s*)?\"([^\"]*)\"")
 # Spring / JAX-RS 方法级路由注解
-SPRING_ROUTE_RE = re.compile(r"@(RequestMapping|GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping)\s*\(([^)]*)\)")
+# M330：方法级映射允许**不带括号**（Spring Boot 3 常见写法）：
+#     @GetMapping
+#     public R list() { ... }
+# 此时路由后缀为空，继承类级 @RequestMapping 前缀。group(2) 为 None，
+# 所有消费方必须用 `or ""` 归一化。
+SPRING_ROUTE_RE = re.compile(
+    r"@(RequestMapping|GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping)"
+    r"(?:\s*\(([^)]*)\))?")
 JAXRS_ROUTE_RE = re.compile(r"@(GET|POST|PUT|DELETE|PATCH)\b")
 JAXRS_PATH_RE = re.compile(r"@Path\s*\(\s*\"([^\"]*)\"\s*\)")
 
@@ -1227,7 +1234,7 @@ class JavaSlicer:
             # 都是一条真实别名路径。路径本身取第一个（route_path 只能存一个），
             # 但"这条路由受不受全局拦截器保护"必须对**所有**别名取交集 ——
             # 攻击者只会走没有被拦的那一个。
-            class_prefixes = self._all_string_literals(cp.group(2))
+            class_prefixes = self._all_string_literals(cp.group(2) or "")
             class_prefix = class_prefixes[0] if class_prefixes else ""
         elif JAXRS_PATH_RE.search(head):
             class_prefix = JAXRS_PATH_RE.search(head).group(1)
@@ -1368,7 +1375,7 @@ class JavaSlicer:
                 if not m:
                     continue
                 decorators.append(ann)
-                _subs = self._all_string_literals(m.group(2))
+                _subs = self._all_string_literals(m.group(2) or "")
                 if not _subs:
                     _subs = [""]
                 subs = subs or _subs          # 以第一处映射注解为准

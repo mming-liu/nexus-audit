@@ -1,7 +1,7 @@
 {
   "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\xxl-job",
-  "total_units": 36,
-  "decided": 15,
+  "total_units": 41,
+  "decided": 18,
   "true": 0,
   "admin_guard": false,
   "anon_guard": null,
