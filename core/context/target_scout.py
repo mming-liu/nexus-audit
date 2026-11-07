@@ -85,6 +85,25 @@ BUSINESS_QUALIFIERS: dict[str, tuple[str, ...]] = {
     "solidity": ("vault", "staking", "lending", "swap"),
 }
 
+# M325：新生代赛道。2024-06 之后新建、2026-09 之后仍有 push 的仓，
+# 传统猎手还没扫过；用 created/pushed 双时间窗把它们从“第 1 页老仓”里捞出来。
+NEW_GEN_CREATED_SINCE = "2024-06-01"
+NEW_GEN_PUSHED_SINCE = "2026-09-01"
+NEW_GEN_STARS = (80, 5000)
+NEW_GEN_KEYWORDS: dict[str, tuple[str, ...]] = {
+    # 短词/缩写必须加引号：裸 mes 会捞回 meshcore/messages，裸 bi 会捞回
+    # binary 之类；GitHub 的 quoted phrase 才按词匹配。
+    "java": ('"rag"', '"agent"', '"mcp"', '"workflow"', '"text2sql"',
+             '"chatbi"', '"knowledge-base"', '"lowcode"', '"iot"', '"wms"',
+             '"mes"', '"his"', '"lims"', '"report"', '"bi"'),
+    "python": ('"rag"', '"agent"', '"mcp"', '"workflow"', '"text2sql"',
+               '"chatbi"', '"knowledge-base"', '"lowcode"', '"iot"', '"wms"',
+               '"mes"', '"his"', '"lims"', '"report"', '"bi"'),
+}
+# 传统业务词也按星标分桶；80..450 抓新锐小仓，451..2000 抓中型业务仓。
+TRADITIONAL_STAR_BUCKETS = ((80, 450), (451, 2000))
+
+
 # M293/M300：纯工具库/驱动/插件/CLI/桌面/评测框架/开发工具/测试框架，
 # 没有业务路由，直接丢。2026-10-31 实盘里 datamodel-code-generator（代码生成器）、
 # logfire（日志 SDK）、citrus（测试框架）、spring-tools（IDE 工具）各占掉一个
@@ -126,11 +145,34 @@ def next_qualifier(language: str, day_index: int) -> str:
 
 def search_query(language: str, min_stars: int, max_stars: int,
                  pushed_since: str, limit: int = 20,
-                 qualifier: str = "") -> str:
-    """GitHub Search 限定串（M285 口径 + M293 业务限定词）。"""
-    base = (f"language:{language} stars:{min_stars}..{max_stars} "
-            f"pushed:>{pushed_since} archived:false fork:false")
+                 qualifier: str = "", created_since: str = "",
+                 star_range: tuple[int, int] | None = None) -> str:
+    """GitHub Search 限定串（M285 口径 + M293 业务词 + M325 新生代窗口）。"""
+    lo, hi = star_range if star_range else (min_stars, max_stars)
+    base = (f"language:{language} stars:{int(lo)}..{int(hi)} "
+            f"pushed:>{pushed_since}")
+    if created_since:
+        base += f" created:>{created_since}"
+    base += " archived:false fork:false"
     return f"{qualifier} {base}".strip() if qualifier else base
+
+
+def search_url(query: str, page: int = 1, per_page: int = 30) -> str:
+    """GitHub 搜索 URL（M325：显式 page，不再永远第 1 页）。"""
+    per_page = min(max(int(per_page), 1), 50)
+    url = (f"{GH_API}/search/repositories?q={urllib.parse.quote(query)}"
+           f"&sort=updated&order=desc&per_page={per_page}")
+    if int(page) > 1:
+        url += f"&page={int(page)}"
+    return url
+
+
+def _bounded_star_range(min_stars: int, max_stars: int,
+                        bucket: tuple[int, int]) -> tuple[int, int]:
+    """把分桶夹在调用方给的 min/max 内；夹空了就退回全局区间。"""
+    lo = max(int(min_stars), int(bucket[0]))
+    hi = min(int(max_stars), int(bucket[1]))
+    return (lo, hi) if lo <= hi else (int(min_stars), int(max_stars))
 
 
 def _headers() -> dict:
@@ -277,11 +319,13 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                 max_stars: int = 10000, allow_online: bool = True,
                 today: _dt.date | None = None,
                 terms_per_language: int = 2) -> dict:
-    """M285/M311：每日动态抓新仓（跨语言 Round-Robin 混排）。
+    """M285/M311/M325：每日动态抓新仓（跨语言 Round-Robin 混排）。
 
-    每个语言各查一次；**先按语言分桶各自排序**（有 Issues → 最近 push →
-    stars），再按 java → python → solidity 轮流交替抽（各语言 #1、#2…）。
-    2026-11-01 的 13 Python : 1 Java 就是全局按 pushed_at 混排截断造成的。
+    每个语言分两条轨：
+      · 新生代（约一半名额）：created:>2024-06-01 + pushed:>2026-09-01，
+        关键词走 RAG/Agent/MES/WMS/HIS 等 2024-2026 新场景；
+      · 传统业务：保留 erp/crm/mall 等词，但按天轮转 page=1..4 和星标分桶，
+        避免每天都被第 1 页的 2018-2022 老仓占满。
     在线查询全部失败时整体回退离线种子，同样轮转混排。
     """
     langs = [str(x).strip() for x in (languages or []) if str(x).strip()]
@@ -290,6 +334,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
     per_page = min(max(int(limit) * 3, 30), 50)
 
     buckets: dict[str, list[dict]] = {lang: [] for lang in langs}
+    specs: list[dict] = []
     queries: list[str] = []
     errors: list[str] = []
     dropped = 0
@@ -298,39 +343,100 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
     day_index = today.toordinal()
 
     terms = max(1, int(terms_per_language))
-    for lang in langs:
-        # M311：同一天查多个轮换词（默认 2 个），避免恰好轮到"mall"这种
-        # 与 14 天窗口交集为 0 的词就整天颗粒无收。
-        for k in range(terms):
-            qualifier = next_qualifier(lang, day_index + k)
-            q = search_query(lang, min_stars, max_stars, since, limit, qualifier)
-            queries.append(q)
-            if not allow_online:
-                continue
-            url = (f"{GH_API}/search/repositories?q={urllib.parse.quote(q)}"
-                   f"&sort=updated&order=desc&per_page={per_page}")
-            ok, data, err = _get(url)
-            if not ok or not isinstance(data, dict):
-                errors.append(f"{lang}: {err}")
-                continue
-            online_ok += 1
-            parsed, drop, drop_tool = _parse_search(data, lang)
-            buckets[lang] += parsed
-            dropped += drop
-            dropped_tool += drop_tool
+    if terms == 1:
+        new_gen_terms, traditional_terms = 1, 0
+    else:
+        # 约 60% 名额给新生代；至少留 1 个传统词，避免完全丢掉老矿。
+        new_gen_terms = min(terms - 1, max(1, int(round(terms * 0.6))))
+        traditional_terms = terms - new_gen_terms
 
+    for lang in langs:
+        new_keywords = NEW_GEN_KEYWORDS.get(lang, ())
+        ng = new_gen_terms if new_keywords else 0
+        for k in range(ng):
+            keyword = new_keywords[(day_index + k) % len(new_keywords)]
+            q = search_query(
+                lang, NEW_GEN_STARS[0], NEW_GEN_STARS[1],
+                NEW_GEN_PUSHED_SINCE, limit, keyword,
+                created_since=NEW_GEN_CREATED_SINCE,
+                star_range=NEW_GEN_STARS)
+            specs.append({"language": lang, "track": "new_gen",
+                          "qualifier": keyword, "query": q, "page": 1})
+        for k in range(traditional_terms):
+            offset = day_index + ng + k
+            qualifier = next_qualifier(lang, offset)
+            bucket = TRADITIONAL_STAR_BUCKETS[
+                offset % len(TRADITIONAL_STAR_BUCKETS)]
+            star_range = _bounded_star_range(min_stars, max_stars, bucket)
+            page = (offset % 4) + 1
+            q = search_query(lang, min_stars, max_stars, since, limit,
+                             qualifier, star_range=star_range)
+            specs.append({"language": lang, "track": "traditional",
+                          "qualifier": qualifier, "query": q, "page": page})
+
+    for spec in specs:
+        queries.append(spec["query"])
+        if not allow_online:
+            continue
+        page = int(spec.get("page") or 1)
+        ok, data, err = _get(search_url(spec["query"], page, per_page))
+        if not ok or not isinstance(data, dict):
+            errors.append(f"{spec['language']}: {err}")
+            continue
+        # 新生代词太窄/当天该词没结果时，顺延 1..2 个词，避免整条轨道空手。
+        if (spec["track"] == "new_gen"
+                and int(data.get("total_count") or 0) == 0):
+            kws = NEW_GEN_KEYWORDS.get(spec["language"], ())
+            if kws and spec["qualifier"] in kws:
+                start = kws.index(spec["qualifier"])
+                for step in range(1, min(3, len(kws))):
+                    alt_kw = kws[(start + step) % len(kws)]
+                    alt_q = search_query(
+                        spec["language"], NEW_GEN_STARS[0], NEW_GEN_STARS[1],
+                        NEW_GEN_PUSHED_SINCE, limit, alt_kw,
+                        created_since=NEW_GEN_CREATED_SINCE,
+                        star_range=NEW_GEN_STARS)
+                    ok2, data2, err2 = _get(search_url(alt_q, 1, per_page))
+                    if (ok2 and isinstance(data2, dict)
+                            and int(data2.get("total_count") or 0) > 0):
+                        data = data2
+                        spec["query"] = alt_q
+                        spec["qualifier"] = alt_kw
+                        spec["fallback"] = True
+                        queries.append(alt_q)
+                        break
+        # 轮转到 page 2..4 但该页为空时回退第 1 页，避免空手而归。
+        if page > 1 and int(data.get("total_count") or 0) == 0:
+            ok, data, err = _get(search_url(spec["query"], 1, per_page))
+            if not ok or not isinstance(data, dict):
+                errors.append(f"{spec['language']}: {err}")
+                continue
+            spec["page_used"] = 1
+        else:
+            spec["page_used"] = page
+        online_ok += 1
+        parsed, drop, drop_tool = _parse_search(data, spec["language"])
+        buckets[spec["language"]] += parsed
+        dropped += drop
+        dropped_tool += drop_tool
+
+    new_gen_queries = sum(1 for s in specs if s["track"] == "new_gen")
     if online_ok == 0:
         seeds: dict[str, list[dict]] = {}
         for lang in langs:
             seeds[lang] = _offline(lang, min_stars, max_stars, per_page)["items"]
         ordered = _merge_round_robin(seeds, langs)
         return {"ok": bool(ordered), "source": "offline_seed",
-                "queries": queries, "items": ordered[:max(1, limit)],
+                "queries": queries, "query_specs": specs,
+                "new_gen_queries": new_gen_queries,
+                "items": ordered[:max(1, limit)],
                 "dropped": 0, "dropped_tool": 0,
                 "error": "; ".join(errors)[:400]}
 
     ordered = _merge_round_robin(buckets, langs)
     return {"ok": bool(ordered), "source": "github_search",
-            "queries": queries, "items": ordered,
+            "queries": queries, "query_specs": specs,
+            "new_gen_queries": new_gen_queries,
+            "items": ordered,
             "dropped": dropped, "dropped_tool": dropped_tool,
             "error": "; ".join(errors)[:400]}
