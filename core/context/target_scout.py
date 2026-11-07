@@ -110,6 +110,16 @@ NEW_GEN_KEYWORDS: dict[str, tuple[str, ...]] = {
                'django "his"', 'flask "iot"', 'fastapi "report"',
                'fastapi "bi"', 'django "erp"'),
 }
+# M339：新生代“框架+业务词”全干时的回退词。上一版回退到裸框架名，
+# 把函数式库/桌面包装器当成了 Web 业务系统；这次只搜真实系统级业务词，
+# 不再和框架硬 AND（靠 language/created/pushed/stars 自然筛）。
+NEW_GEN_FALLBACK_WORDS = (
+    "admin", "cms", "erp", "crm", "mall", "oa", "rbac", "portal",
+    "workflow", "knowledge", "rag", "lowcode", "mes", "wms", "iot",
+)
+NEW_GEN_FALLBACK_CREATED_SINCE = "2024-01-01"
+NEW_GEN_FALLBACK_STARS = (60, 5000)
+
 # 传统业务词也按星标分桶；80..450 抓新锐小仓，451..2000 抓中型业务仓。
 TRADITIONAL_STAR_BUCKETS = ((80, 450), (451, 2000))
 
@@ -416,26 +426,26 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                         spec["fallback"] = True
                         queries.append(alt_q)
                         break
-        # M335：框架+业务词全干时，退到“框架 only”新生代查询，保证 8 个
-        # 实扫名额有足够候选；仍保留 created/pushed/stars 窗口与 Web 框架限定。
+        # M339：框架+业务词全干时，退到**单业务系统词**（admin/cms/erp/...），
+        # 绝不再裸搜框架名；用 created:>2024-01-01 + stars:60..5000 保持新锐。
         if (spec["track"] == "new_gen"
                 and int(data.get("total_count") or 0) == 0):
-            frameworks = (("fastapi", "django", "flask")
-                          if spec["language"] == "python"
-                          else ('"spring-boot"', "mybatis-plus"))
-            for fw in frameworks:
+            words = NEW_GEN_FALLBACK_WORDS
+            start = day_index % len(words)
+            for step in range(min(5, len(words))):
+                word = words[(start + step) % len(words)]
                 alt_q = search_query(
-                    spec["language"], NEW_GEN_STARS[0], NEW_GEN_STARS[1],
-                    NEW_GEN_PUSHED_SINCE, limit, fw,
-                    created_since=NEW_GEN_CREATED_SINCE,
-                    star_range=NEW_GEN_STARS)
+                    spec["language"], NEW_GEN_FALLBACK_STARS[0],
+                    NEW_GEN_FALLBACK_STARS[1], NEW_GEN_PUSHED_SINCE, limit,
+                    word, created_since=NEW_GEN_FALLBACK_CREATED_SINCE,
+                    star_range=NEW_GEN_FALLBACK_STARS)
                 ok3, data3, err3 = _get(search_url(alt_q, 1, per_page))
                 if (ok3 and isinstance(data3, dict)
                         and int(data3.get("total_count") or 0) > 0):
                     data = data3
                     spec["query"] = alt_q
-                    spec["qualifier"] = fw
-                    spec["fallback"] = "framework_only"
+                    spec["qualifier"] = word
+                    spec["fallback"] = "business_word"
                     queries.append(alt_q)
                     break
         # 轮转到 page 2..4 但该页为空时回退第 1 页，避免空手而归。

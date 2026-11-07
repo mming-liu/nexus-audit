@@ -6076,7 +6076,8 @@ def cmd_daily_hunt(args) -> int:
         evict_cache=args.evict_cache, offline=args.offline,
         dedup_online=not args.offline_dedup, dry_run=args.dry_run,
         max_head_age_days=args.max_head_age_days,
-        repo_timeout=args.repo_timeout, cooldown_days=args.cooldown_days)
+        repo_timeout=args.repo_timeout, cooldown_days=args.cooldown_days,
+        min_units=args.min_units)
     d = res["daily"]
     tag = "（dry-run，未落盘）" if res.get("dry_run") else ""
     print(f"[daily-hunt]{tag} 候选 {d['candidates']} ｜ 实扫 {d['scanned']} ｜ "
@@ -6394,6 +6395,9 @@ def main():
     p_daily.add_argument("--cooldown-days", type=int, default=7,
                          help="克隆前冷却期：距上次扫描不足 N 天的仓免克隆顺延"
                               "（默认 7；0=关闭，每次有新提交都重扫）")
+    p_daily.add_argument("--min-units", type=int, default=8,
+                         help="最小路由密度：0<入口数<N 的迷你仓记 SKIPPED、"
+                              "不占实扫名额（默认 8；0=关闭，出现 A 根因时放行）")
     p_daily.add_argument("--state", default=None,
                          help="账本路径（默认 benchmarks/results/daily_hunt_state.json）")
     p_daily.add_argument("--report", default=None)

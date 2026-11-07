@@ -384,6 +384,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         offline: bool = False, dedup_online: bool = True,
         dry_run: bool = False, max_head_age_days: int = 180,
         repo_timeout: int = 900, cooldown_days: int = DEFAULT_COOLDOWN_DAYS,
+        min_units: int = 8,
         recent_boost: bool = True,
         scout_fn=None, sync_fn=None, dedup_fn=None) -> dict:
     """M286 主流程；scout_fn / sync_fn 可注入（冒烟测试不联网）。"""
@@ -460,12 +461,23 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
                                "reason": "unchanged_head"})
                 continue
 
-            if res.get("total_units") == 0:
+            units = int(res.get("total_units") or 0)
+            if units == 0:
                 # M293③：纯库/文档仓，没有任何入口 —— 记账但不占当天名额。
                 state["repos"][slug] = res["entry"]
                 ledger.append({"slug": slug, "result": "SKIPPED",
                                "head_sha": res["head_sha"],
                                "reason": wild_noise.ZERO_ENTRY_LIB})
+                continue
+            # M339：2–7 个路由的本地小包装器不占实扫名额；但已经出现
+            # ZERO_RECORD_FRESH 板块 A 根因的仓必须放行，不能把真洞一起跳掉。
+            if (0 < units < int(min_units or 0)
+                    and not any(r.get("status") == "ZERO_RECORD_FRESH"
+                                for r in (res.get("records") or []))):
+                state["repos"][slug] = res["entry"]
+                ledger.append({"slug": slug, "result": "SKIPPED",
+                               "head_sha": res["head_sha"],
+                               "reason": f"low_units_{units}"})
                 continue
 
             new: list[dict] = []
@@ -504,6 +516,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         "blocked": blocked, "evicted": evicted,
         "recent_90d_roots": sum(1 for r in records if r.get("recent_90d")),
         "cooldown_days": cooldown_days,
+        "min_units": int(min_units or 0),
         "cooldown_skipped": cooldown_skipped,
         "scout_source": scout.get("source", ""),
         "state_path": str(state_path),
