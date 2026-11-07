@@ -93,12 +93,22 @@ NEW_GEN_STARS = (80, 5000)
 NEW_GEN_KEYWORDS: dict[str, tuple[str, ...]] = {
     # 短词/缩写必须加引号：裸 mes 会捞回 meshcore/messages，裸 bi 会捞回
     # binary 之类；GitHub 的 quoted phrase 才按词匹配。
-    "java": ('"rag"', '"agent"', '"mcp"', '"workflow"', '"text2sql"',
-             '"chatbi"', '"knowledge-base"', '"lowcode"', '"iot"', '"wms"',
-             '"mes"', '"his"', '"lims"', '"report"', '"bi"'),
-    "python": ('"rag"', '"agent"', '"mcp"', '"workflow"', '"text2sql"',
-               '"chatbi"', '"knowledge-base"', '"lowcode"', '"iot"', '"wms"',
-               '"mes"', '"his"', '"lims"', '"report"', '"bi"'),
+    # M335：Python 必须绑 Web 框架，否则裸 "iot"/"agent" 会捞回 Home Assistant
+    # 插件与本地 CLI（v1.4.1 的 27 候选里 18 个因此白克隆）。
+    "java": ('"spring-boot" "rag"', '"spring-boot" "agent"',
+             '"spring-boot" "mcp"', 'mybatis-plus "workflow"',
+             'mybatis-plus "text2sql"', '"spring-boot" "chatbi"',
+             '"spring-boot" "knowledge-base"', 'mybatis-plus "lowcode"',
+             '"spring-boot" "iot"', 'mybatis-plus "wms"',
+             'mybatis-plus "mes"', '"spring-boot" "his"',
+             'mybatis-plus "lims"', '"spring-boot" "report"',
+             'mybatis-plus "bi"'),
+    "python": ('fastapi "rag"', 'fastapi "agent"', 'fastapi "mcp"',
+               'fastapi "workflow"', 'fastapi "text2sql"',
+               'fastapi "chatbi"', 'fastapi "knowledge-base"',
+               'fastapi "lowcode"', 'django "wms"', 'django "mes"',
+               'django "his"', 'flask "iot"', 'fastapi "report"',
+               'fastapi "bi"', 'django "erp"'),
 }
 # 传统业务词也按星标分桶；80..450 抓新锐小仓，451..2000 抓中型业务仓。
 TRADITIONAL_STAR_BUCKETS = ((80, 450), (451, 2000))
@@ -115,7 +125,8 @@ _TOOL_LIB_RE = re.compile(
     r"eval|evaluat\w*|benchmark|generator|generators|codegen|datamodel|"
     r"telemetry|observability|logfire|spring-tools|citrus|test-framework|"
     r"testing-framework|testcontainers|stubs|djlint|linter|auditlog|graphql|"
-    r"huey|celery|defectdojo|spring-boot-admin)(?:[^a-z0-9]|$)"
+    r"huey|celery|defectdojo|spring-boot-admin|home[-_]?assistant|"
+    r"hacs|custom_components|esphome)(?:[^a-z0-9]|$)"
     r"|(?:ide|vscode|intellij|eclipse)-)", re.I)
 
 # M312：名字以框架前缀开头、描述又是"库/插件/中间件/可复用包"的第三方组件，
@@ -405,6 +416,28 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                         spec["fallback"] = True
                         queries.append(alt_q)
                         break
+        # M335：框架+业务词全干时，退到“框架 only”新生代查询，保证 8 个
+        # 实扫名额有足够候选；仍保留 created/pushed/stars 窗口与 Web 框架限定。
+        if (spec["track"] == "new_gen"
+                and int(data.get("total_count") or 0) == 0):
+            frameworks = (("fastapi", "django", "flask")
+                          if spec["language"] == "python"
+                          else ('"spring-boot"', "mybatis-plus"))
+            for fw in frameworks:
+                alt_q = search_query(
+                    spec["language"], NEW_GEN_STARS[0], NEW_GEN_STARS[1],
+                    NEW_GEN_PUSHED_SINCE, limit, fw,
+                    created_since=NEW_GEN_CREATED_SINCE,
+                    star_range=NEW_GEN_STARS)
+                ok3, data3, err3 = _get(search_url(alt_q, 1, per_page))
+                if (ok3 and isinstance(data3, dict)
+                        and int(data3.get("total_count") or 0) > 0):
+                    data = data3
+                    spec["query"] = alt_q
+                    spec["qualifier"] = fw
+                    spec["fallback"] = "framework_only"
+                    queries.append(alt_q)
+                    break
         # 轮转到 page 2..4 但该页为空时回退第 1 页，避免空手而归。
         if page > 1 and int(data.get("total_count") or 0) == 0:
             ok, data, err = _get(search_url(spec["query"], 1, per_page))
