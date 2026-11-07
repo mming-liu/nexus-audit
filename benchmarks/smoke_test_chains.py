@@ -9338,13 +9338,13 @@ try:
 finally:
     shutil.rmtree(_d202, ignore_errors=True) if "_d202" in dir() else None
 
-print("\n[203] M168：flask-realworld 26 入口 / 0 True / 8 条 authz False")
+print("\n[203] M168：flask-realworld 18 入口 / 0 True / 8 条 authz False")
 _r203 = subprocess.run(
     [sys.executable, str(ROOT / "benchmarks" / "benchmark_flask_rw.py"),
      "--strict"], capture_output=True, text=True, encoding="utf-8",
     errors="replace")
 check("M168：benchmark_flask_rw --strict exit 0", _r203.returncode, 0)
-check("M168：26 入口 / 全类目 0 True", ("26 入口 / 全类目 0 True"
+check("M168：18 入口 / 全类目 0 True", ("18 入口 / 全类目 0 True"
                                         in (_r203.stdout or "")), True)
 check("M168：8 条 authz False + 反向锚点生效",
       ("8 条 authz False / 反向锚点生效" in (_r203.stdout or "")), True)
@@ -9636,19 +9636,19 @@ try:
 finally:
     shutil.rmtree(_d222, ignore_errors=True) if "_d222" in dir() else None
 
-print("\n[223] M199：django-oauth-toolkit 18 入口 / 0 True")
+print("\n[223] M199：django-oauth-toolkit 19 入口 / 0 True")
 _r223 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /
     "benchmark_django_oauth.py"), "--strict"], capture_output=True, text=True,
     encoding="utf-8", errors="replace")
 check("M199：benchmark_django_oauth --strict exit 0", _r223.returncode, 0)
-check("M199：18 入口 / 0 True", ("18 入口 / 0 True" in (_r223.stdout or "")), True)
+check("M199：19 入口 / 0 True", ("19 入口 / 0 True" in (_r223.stdout or "")), True)
 
-print("\n[224] M200：flask-admin 15 入口 / 0 True")
+print("\n[224] M200：flask-admin 25 入口 / 0 True")
 _r224 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /
     "benchmark_flask_admin.py"), "--strict"], capture_output=True, text=True,
     encoding="utf-8", errors="replace")
 check("M200：benchmark_flask_admin --strict exit 0", _r224.returncode, 0)
-check("M200：15 入口 / 0 True", ("15 入口 / 0 True" in (_r224.stdout or "")), True)
+check("M200：25 入口 / 0 True", ("25 入口 / 0 True" in (_r224.stdout or "")), True)
 
 print("\n[225] M201：Sentinel 56 入口 / 0 True")
 _r225 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /
@@ -9760,19 +9760,19 @@ check("M215：benchmark_halo --strict exit 0", _r233.returncode, 0)
 check("M215：RouterFunction 90 文件 / 0 注解入口",
       ("RouterFunction 90 文件" in (_r233.stdout or "")), True)
 
-print("\n[234] M216：sanic 15 入口 / 0 True")
+print("\n[234] M216：sanic 14 入口 / 0 True")
 _r234 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /
     "benchmark_sanic.py"), "--strict"], capture_output=True, text=True,
     encoding="utf-8", errors="replace")
 check("M216：benchmark_sanic --strict exit 0", _r234.returncode, 0)
-check("M216：15 入口 / 0 True", ("15 入口 / 0 True" in (_r234.stdout or "")), True)
+check("M216：14 入口 / 0 True", ("14 入口 / 0 True" in (_r234.stdout or "")), True)
 
 print("\n[235] M217：litestar 29 入口 / 0 True")
 _r235 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /
     "benchmark_litestar.py"), "--strict"], capture_output=True, text=True,
     encoding="utf-8", errors="replace")
 check("M217：benchmark_litestar --strict exit 0", _r235.returncode, 0)
-check("M217：33 入口 / 0 True", ("33 入口 / 0 True" in (_r235.stdout or "")), True)
+check("M217：34 入口 / 0 True", ("34 入口 / 0 True" in (_r235.stdout or "")), True)
 
 print("\n[236] M218：starlette Route+requires / 0 True")
 _r236 = subprocess.run([sys.executable, str(ROOT / "benchmarks" /
@@ -11794,6 +11794,69 @@ check("M330：带参 @GetMapping 仍是 /api/x",
       if _units312.get("BareController.x") else "", "/api/x")
 check("M330：三个方法都切出单元", len(_units312), 3)
 check("M332：已执行断言数 >= 1875", COUNTS["n"] >= 1875, True)
+
+print("\n[313] M334：装饰器末段精确匹配（CLI / targeting 不再误提）")
+from core.slicer.web_treesitter import WebTreeSitterSlicer as _WTS313
+_ws313 = Path(_ws_mkdtemp("smoke_routes334_"))
+(_ws313 / "routes.py").write_text(
+    'from flask import Flask\n'
+    'from rest_framework.decorators import api_view, require_http_methods\n'
+    'import click\n'
+    'app = Flask(__name__)\n'
+    '@app.get("/x")\n'
+    'def x(): return "x"\n'
+    '@router.post("/y")\n'
+    'def y(): return "y"\n'
+    '@api_view(["GET"])\n'
+    'def z(): return "z"\n'
+    '@require_http_methods(["GET"])\n'
+    'def w(): return "w"\n'
+    '@click.command()\n'
+    'def cli(): pass\n'
+    '@device_targeting_options\n'
+    'def devices(): pass\n'
+    '@post_init\n'
+    'def p(): pass\n'
+    '@input_validator\n'
+    'def inp(): pass\n', encoding="utf-8")
+_names313 = {u.unit_name for u in _WTS313(_ws313).extract_entry_units()}
+check("M334：真实 Flask/FastAPI/DRF 路由全部保留",
+      _names313, {"x", "y", "z", "w"})
+check("M334：@device_targeting_options 不再被当路由",
+      "devices" in _names313, False)
+check("M334：@click.command 不再被当路由", "cli" in _names313, False)
+check("M334：@post_init / @input_validator 不再命中",
+      ({"p", "inp"} & _names313), set())
+check("M334：use_case.execute(request) 不再判 SQLi",
+      _rd307.python_sqli_verdict(
+          'async def list_devices(targets):\n'
+          '    request = DeviceScanRequest(targets=list(targets))\n'
+          '    return await scan_use_case.execute(request)\n'), None)
+
+print("\n[314] M335：Python 新生代词绑 Web 框架 + Home Assistant 过滤")
+check("M335：Home Assistant 插件被剔除",
+      _ts309.is_tool_lib("lasswellt/govee-homeassistant",
+                         "Home Assistant integration"), True)
+check("M335：HACS / ESPHome 被剔除",
+      (_ts309.is_tool_lib("acme/hacs", "HACS custom component"),
+       _ts309.is_tool_lib("acme/esphome", "ESPHome firmware")),
+      (True, True))
+check("M335：FastAPI RAG 业务仓不误杀",
+      _ts309.is_tool_lib("acme/fastapi-rag", "FastAPI RAG backend"), False)
+check("M335：Python 新生代词全部带 Web 框架",
+      all(k.startswith(("fastapi", "django", "flask"))
+          for k in _ts309.NEW_GEN_KEYWORDS["python"]), True)
+check("M335：Java 新生代词全部带 Spring/MyBatis",
+      all(("spring-boot" in k or "mybatis-plus" in k)
+          for k in _ts309.NEW_GEN_KEYWORDS["java"]), True)
+_r314 = _ts309.scout_daily(["python"], allow_online=False,
+                           today=_dt309.date(2026, 11, 7), limit=6,
+                           terms_per_language=2)
+check("M335：Python 新生代 query 实际带框架词",
+      any(s["track"] == "new_gen"
+          and any(fw in s["query"] for fw in ("fastapi", "django", "flask"))
+          for s in _r314["query_specs"]), True)
+check("M336：已执行断言数 >= 1885", COUNTS["n"] >= 1885, True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 
