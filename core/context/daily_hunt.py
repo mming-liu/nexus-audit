@@ -36,6 +36,9 @@ DEFAULT_PACKS = ROOT / "benchmarks" / "results" / "daily_hunt_packs"
 MAX_LEDGER_ROWS = 40
 # M299：同一个仓默认 7 天内只完整克隆扫描一次（--cooldown-days 0 关闭）。
 DEFAULT_COOLDOWN_DAYS = 7
+# M326：浅克隆默认已是 50（比要求的 30 更深），最近提交窗口取 90 天/30 条。
+RECENT_DAYS = 90
+RECENT_LOG_DEPTH = 30
 _TIME_FMT = "%Y-%m-%d %H:%M:%S"
 
 
@@ -117,14 +120,60 @@ HIGH_VALUE_CATEGORIES = (
 _CATEGORY_RANK = {c: i for i, c in enumerate(HIGH_VALUE_CATEGORIES)}
 
 
-def root_priority(record: dict, confidence: str = "") -> tuple[int, int]:
-    """查重优先级：第一梯队 0，其余 1；同档按类目重要度、再按扫描顺序。"""
+def _is_recent_file(file: str, recent_files: set[str] | None) -> bool:
+    """记录文件是否落在最近 90 天改动集合里（容忍绝对/相对路径前缀）。"""
+    f = str(file or "").replace("\\", "/").lstrip("./")
+    if not f or not recent_files:
+        return False
+    for r in recent_files:
+        r = str(r or "").replace("\\", "/").lstrip("./")
+        if r and (f == r or f.endswith("/" + r) or r.endswith("/" + f)):
+            return True
+    return False
+
+
+def recent_files(repo: Path, days: int = RECENT_DAYS,
+                 depth: int = RECENT_LOG_DEPTH) -> set[str]:
+    """最近 N 天改动过的文件（相对仓库根，正斜杠）。
+
+    M326：`git log -n 30 --since="90 days ago" --name-only`。浅克隆默认
+    depth=50 已覆盖这 30 条；取不到（非 git 仓/超时）返回空集，绝不阻断扫描。
+    """
+    rc, out = upstream_sync._git(
+        ["log", "-n", str(max(1, int(depth))),
+         f"--since={max(1, int(days))} days ago",
+         "--name-only", "--pretty=format:"],
+        cwd=Path(repo), timeout=60)
+    if rc != 0:
+        return set()
+    files: set[str] = set()
+    for line in out.splitlines():
+        s = line.strip().strip('"').replace("\\", "/")
+        if s and not s.startswith(("fatal:", "warning:")):
+            files.add(s)
+    return files
+
+
+def root_priority(record: dict, confidence: str = "",
+                  recent_files: set[str] | None = None) -> tuple[int, int]:
+    """查重优先级：最近 90 天改动文件最高，其次第一梯队，最后其余。
+
+    M326：老仓的 5 年前 Controller 不应再挤掉开发者刚写完的新业务代码。
+    最近改动返回 (-1, 类目序)，在 `kept.sort()` 里永远排在 0 档之前。
+    """
     cat = str(record.get("category") or "")
     if cat in _CATEGORY_RANK:
-        return (0, _CATEGORY_RANK[cat])
-    if cat == "authz" and str(confidence or record.get("confidence") or "") == "HIGH":
-        return (0, len(_CATEGORY_RANK))
-    return (1, 0)
+        base = (0, _CATEGORY_RANK[cat])
+    elif (cat == "authz"
+          and str(confidence or record.get("confidence") or "") == "HIGH"):
+        base = (0, len(_CATEGORY_RANK))
+    else:
+        base = (1, 0)
+    if _is_recent_file(str(record.get("file") or ""), recent_files):
+        # 最近改动分两档：最近的高价值类目 (-2) 仍排在最近的普通类目 (-1)
+        # 之前；最近的低价值类目整体仍高于“陈旧的 sqli”(0)。
+        return (-2, base[1]) if base[0] == 0 else (-1, 0)
+    return base
 
 
 def _root_view(rc: dict, repo: Path) -> dict:
@@ -140,7 +189,8 @@ def _root_view(rc: dict, repo: Path) -> dict:
 def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
                  dedup_online: bool = False, max_roots: int = 0,
                  max_head_age_days: int = 180, dedup_fn=None,
-                 repo_timeout: int = 900) -> dict:
+                 repo_timeout: int = 900,
+                 recent_boost: bool = True) -> dict:
     """扫一个仓库，返回本次“新引入且未导出”的根因（含本地拦截的 B 项）。
 
     返回值：records / entry / skipped_unchanged / head_sha / raw_roots /
@@ -152,6 +202,9 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
     """
     repo = Path(repo)
     entry = dict(entry or {})
+    # M326：只对真 git 仓取最近改动；测试夹具/非 git 目录直接跳过。
+    recent = (recent_files(repo)
+              if recent_boost and (repo / ".git").is_dir() else set())
     head = upstream_sync.local_head(repo)
     head_sha = head.get("head_sha") or ""
     base = {"scans": int(entry.get("scans") or 0) + 1}
@@ -176,7 +229,8 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
             blocked_roots.append((rc, noise))
             continue
         promo = wild_noise.promote(view, repo)
-        kept.append((root_priority(view, promo.get("level", "")), rc, promo))
+        kept.append((root_priority(view, promo.get("level", ""), recent),
+                     rc, promo))
     kept.sort(key=lambda x: x[0])        # 稳定排序：同档保持扫描顺序
     if max_roots:
         kept = kept[:max_roots]
@@ -193,6 +247,7 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
         if promo.get("level"):
             rec["confidence"] = promo["level"]
             rec["authz_evidence"] = promo.get("evidence", "")
+        rec["recent_90d"] = _is_recent_file(rec.get("file", ""), recent)
 
     # 噪音项：0 网络请求、不占 --max-roots 名额，直接进板块 B 留证。
     for rc, noise in blocked_roots:
@@ -231,6 +286,7 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
     }
     return {"records": new, "entry": upd, "skipped_unchanged": False,
             "head_sha": head_sha, "raw_roots": len(roots),
+            "recent_files": len(recent),
             "total_units": int(scan.get("total_units") or 0)}
 
 
@@ -328,6 +384,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         offline: bool = False, dedup_online: bool = True,
         dry_run: bool = False, max_head_age_days: int = 180,
         repo_timeout: int = 900, cooldown_days: int = DEFAULT_COOLDOWN_DAYS,
+        recent_boost: bool = True,
         scout_fn=None, sync_fn=None, dedup_fn=None) -> dict:
     """M286 主流程；scout_fn / sync_fn 可注入（冒烟测试不联网）。"""
     started = _now()
@@ -394,7 +451,8 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
             res = process_repo(slug, repo, entry, dedup_online=dedup_online,
                                max_roots=max_roots,
                                max_head_age_days=max_head_age_days,
-                               dedup_fn=dedup_fn, repo_timeout=repo_timeout)
+                               dedup_fn=dedup_fn, repo_timeout=repo_timeout,
+                               recent_boost=recent_boost)
             if res["skipped_unchanged"]:
                 state["repos"][slug] = res["entry"]
                 ledger.append({"slug": slug, "result": "SKIPPED",
@@ -444,6 +502,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         "failed": sum(1 for x in ledger if x["result"] == "FAILED"),
         "new_roots": summary["total"], "board_a": summary["board_a"],
         "blocked": blocked, "evicted": evicted,
+        "recent_90d_roots": sum(1 for r in records if r.get("recent_90d")),
         "cooldown_days": cooldown_days,
         "cooldown_skipped": cooldown_skipped,
         "scout_source": scout.get("source", ""),
