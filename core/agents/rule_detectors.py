@@ -6649,6 +6649,12 @@ def python_sqli_verdict(source: str) -> bool | None:
         return False
     saw_safe = False
     for m in _PY_SQL_SINK_RE.finditer(source):
+        # M334：`scan_use_case.execute(request)` 是业务用例调用，不是 SQL。
+        # CLI/服务层常用 *UseCase.execute(...) 承载请求对象，裸 .execute 会把
+        # 它当 SQL 文本；先按接收者名排除（只排除 *use_case/*usecase）。
+        _prefix = source[max(0, m.start() - 64):m.start()]
+        if re.search(r"\b\w*use_?case\s*$", _prefix, re.I):
+            continue
         args = _balanced_cond(source, m.end())
         if args is None:
             continue

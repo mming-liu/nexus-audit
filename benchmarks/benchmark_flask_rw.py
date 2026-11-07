@@ -5,7 +5,7 @@ current_user.profile.id，直接写进 filter_by 查询条件；favorite 则把
 current_user.profile 传给 article.favourite(profile)。只认
 current_user.id 的规则会把这些判成 True。
 
-门禁（--strict）：26 个入口 / 全类目 0 True / 8 条 authz False /
+门禁（--strict）：18 个入口 / 全类目 0 True / 8 条 authz False /
 反向锚点（去掉归属条件 -> True，有归属 -> False）。
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ from core.text_utils import ensure_utf8_stdio                   # noqa: E402
 
 ensure_utf8_stdio()
 DEFAULT_TARGET = ROOT / "reference_repos" / "flask-realworld"
-MIN_UNITS = 20
+MIN_UNITS = 18
 AUTHZ_FALSE = ("update_article", "delete_article", "favorite_an_article",
                "unfavorite_an_article", "make_comment_on_article",
                "delete_comment_on_article", "follow_user", "get_profile")

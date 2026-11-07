@@ -1,7 +1,7 @@
 {
   "target": "C:\\myFloders\\git\\nexus-audit\\reference_repos\\flask-realworld",
-  "total_units": 26,
-  "decided": 83,
+  "total_units": 18,
+  "decided": 67,
   "true": 0,
   "authz": {
     "update_article": false,

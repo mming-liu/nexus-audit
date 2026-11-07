@@ -247,6 +247,32 @@ def _dj_resolve(parts: list[str], aliases: dict[str, str],
 
 
 
+_ROUTE_DECORATOR_NAMES = frozenset({
+    "route", "get", "post", "put", "patch", "delete", "head", "options",
+    "api_view", "api_route", "mapping", "websocket", "require_http_methods",
+    "detail_route", "list_route", "expose", "method_decorator",
+})
+_DECORATOR_IDENT_RE = re.compile(
+    r"^@\s*([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)")
+
+
+def _is_route_decorator(deco: str) -> bool:
+    """装饰器是否真是 HTTP 路由（M334）。
+
+    只看**末段标识符**：`@app.route` → route，`@router.get` → get，
+    `@device_targeting_options` → device_targeting_options（不在词表）。
+    `@click.command` / `@typer.command` 显式排除，防止 CLI 命令被当成
+    路由；`@post_init` / `@input_validator` / `@dataclass` 也不会命中。
+    """
+    m = _DECORATOR_IDENT_RE.match((deco or "").strip())
+    if not m:
+        return False
+    dotted = m.group(1).lower()
+    if dotted.startswith(("click.", "typer.")):
+        return False
+    return dotted.rsplit(".", 1)[-1] in _ROUTE_DECORATOR_NAMES
+
+
 class WebTreeSitterSlicer:
     language = "python_web"
 
@@ -306,10 +332,16 @@ class WebTreeSitterSlicer:
         indexer = SymbolIndexer(repo_path or self.repo_path)
         indexer.build()
         units = indexer.to_code_units()
-        # 只保留真正带路由标记的（decorators 含 route/get/post 等）
-        route_kw = ("route", "get", "post", "put", "patch", "delete", "api_view", "mapping")
+        # 只保留真正带路由标记的（M334）。
+        #
+        # 旧实现用 `any(k in d.lower() for k in route_kw)` 做裸子串匹配：
+        # `@device_targeting_options` 里的 "get"、`@post_init` 里的 "post"、
+        # `@input_validator` 里的 "put" 都会被当成 HTTP 路由，导致 Click CLI
+        # 命令被切片器收进来（v1.4.1 的 shelly-manager A 板假阳性）。
+        # 改为解析装饰器的**末段标识符**，按词表精确匹配；CLI 框架显式排除。
         filtered = [u for u in units
-                    if any(any(k in d.lower() for k in route_kw) for d in u.decorators_or_modifiers)]
+                    if any(_is_route_decorator(d)
+                           for d in u.decorators_or_modifiers)]
         for u in filtered:
             self._expand_helpers(indexer, u)
         if not filtered:
