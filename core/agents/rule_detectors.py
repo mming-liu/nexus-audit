@@ -4919,7 +4919,9 @@ PATH_SINK_RE = re.compile(
     # Java 的 `Paths.get(...)`（文件 API）。dramaclaw 的 sketch_grid_preview
     # 就是被这条 re.I 误伤的。
     r"(?-i:\bPaths\s*\.\s*get\s*\()|"
-    r"FileUtils\s*\.\s*(?:read|copy|writeFile|open)\w*\s*\(|"
+    # M327：FileUtils.writeStringToFile / writeByteArrayToFile / writeLines
+    # 即使不出现 new File(...) 也要算文件 sink。
+    r"FileUtils\s*\.\s*(?:read|copy|write|open)\w*\s*\(|"
     # M64 淬火⑨：IOUtils 读 `request.getInputStream()` 是读 **HTTP 请求体**
     # （litemall payNotify 微信回调解析），不是文件路径面 —— 排除。
     r"IOUtils\s*\.\s*(?:toByteArray|copy|toString)\s*\("
@@ -5128,6 +5130,55 @@ def _path_sink_param_linked(body: str, source: str,
     return False
 
 
+_SIMPLE_PARAM_TYPES = frozenset({
+    "String", "int", "long", "short", "byte", "char", "float", "double",
+    "boolean", "Integer", "Long", "Short", "Byte", "Character", "Float",
+    "Double", "Boolean", "Object", "Map", "List", "Set", "Collection",
+    "Optional", "Iterable", "Number", "BigDecimal", "BigInteger",
+})
+
+
+def _hop_param_names(source: str) -> set[str]:
+    """入口 DTO 类型在 Hop 方法形参里的同名形参（M327）。
+
+    x-springboot 的真实形态：
+
+        create(@RequestBody MakerConfigEntity makerConfigEntity)   // 入口
+          -> generatorCode(MakerConfigEntity config)               // Hop 1
+            -> maker(MakerConfigEntity makerConfig, ...)           // Hop 2
+                 new FileWriter(filePath + path);                  // sink
+
+    入口形参名 `makerConfigEntity` 与 sink 处的 `makerConfig` 不同名，旧的
+    `_path_sink_param_linked` 只认入口形参名，于是把这条任意文件写入判成
+    "路径与外部输入无关联" → None。这里按**类型**把同一切片里 Hop 方法接收
+    的同一 DTO 形参也记为污染源；是否真的连到 sink 仍由调用链赋值检查决定。
+    """
+    entry_sig = _entry_signature(source)
+    if not entry_sig:
+        return set()
+    tainted_types: set[str] = set()
+    for typ, _name in _PARAM_SEG_RE.findall(
+            re.sub(r"@\w+\s*(?:\([^)]*\))?", " ", entry_sig)):
+        if typ in FRAMEWORK_INJECTED_TYPES or typ in _SIMPLE_PARAM_TYPES:
+            continue
+        tainted_types.add(typ)
+    if not tainted_types:
+        return set()
+    evidence = _all_evidence(source)
+    names: set[str] = set()
+    for m in re.finditer(
+            r"(?:public|private|protected)\s+[\w<>\[\],.?\s]+\s+\w+\s*\(",
+            evidence):
+        sig = _balanced_cond(evidence, m.end())
+        if not sig:
+            continue
+        for typ, name in _PARAM_SEG_RE.findall(
+                re.sub(r"@\w+\s*(?:\([^)]*\))?", " ", sig)):
+            if typ in tainted_types:
+                names.add(name)
+    return names
+
+
 def _path_sink_identifiers(text: str) -> set[str]:
     """所有文件 sink 语句（所在行）上出现的标识符集合（M97）。
 
@@ -5147,6 +5198,10 @@ def pathtraver_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not body:
         return None
+    # M327：入口 DTO 类型在 Hop 方法里的形参也算污染源（同名形参不成立时
+    # 唯一能连上 create -> generatorCode -> maker 的锚点）。
+    _entry_params = set(_bare_params(_entry_signature(source)))
+    _hop_params = _hop_param_names(source)
     # M313：classpath 常量资源（`getResourceAsStream("stencilset.json")`）没有
     # 外部输入面，不是路径穿越（skyeye 的 getStencilset 被判 True 就是这条）。
     _sink_all = [m for m in PATH_SINK_RE.finditer(body)
@@ -5207,9 +5262,19 @@ def pathtraver_verdict(source: str) -> bool | None:
     # 只在入口体里找 PATH_SAFE 会漏。
     if sink_in is not body and PATH_SAFE_RE.search(sink_in):
         return False
+    # 只有“Hop 专属形参”才算跨跳污染证据：CommonFileController.uploadFile
+    # 的 helper 只是复用了入口的 MultipartFile file，且内部用
+    # encodingFilename/genNewFilename 重写了文件名 —— 不能因为它同名就
+    # 绕过“sink 与入口体零交集”的门。
+    _hop_only = _hop_params - _entry_params
+    # 空形参时 _path_sink_param_linked 返回 True（“不设门”），这是旧行为：
+    # 规范化/常量/零交集等前置闸门已经先跑过，不能在这里把它翻成 None。
+    _linked = _path_sink_param_linked(body, source,
+                                      _entry_params | _hop_only)
     if sink_in is not body:
         _sink_ids = _path_sink_identifiers(sink_in)
-        if _sink_ids and not (_sink_ids & _path_sink_identifiers(body)):
+        if (_sink_ids and not (_sink_ids & _path_sink_identifiers(body))
+                and not (_hop_only and _linked)):
             return None
 
     # 1) 规范化 + 前缀校验 / 只取文件名 → 目录逃逸被物理阻断
@@ -5245,8 +5310,7 @@ def pathtraver_verdict(source: str) -> bool | None:
     # 影响（My-Blog 上传的 new File(常量+Random文件名) 保持 False）；
     # 弱形态（new FileInputStream(file) 等）与形参无交集时不是本单元的
     # 遍历面 → 退 None 交模型。
-    if not _path_sink_param_linked(body, source,
-                                   set(_bare_params(_entry_signature(source)))):
+    if not _linked:
         return None
     return True
 

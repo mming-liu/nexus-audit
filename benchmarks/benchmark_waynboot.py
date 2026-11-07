@@ -49,6 +49,13 @@ import json
 import sys
 from pathlib import Path
 
+# Windows 默认 GBK stdout 遇到 ✔/✘ 会 UnicodeEncodeError（M328 实盘踩到），
+# 统一改成 UTF-8；失败也不阻断基准本身。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, OSError):
+    pass
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 

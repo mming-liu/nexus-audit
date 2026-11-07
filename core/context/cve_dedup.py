@@ -575,9 +575,14 @@ def _unit_in_text(unit: str, file: str, text: str) -> bool:
     key = unit.split(".")[-1].split("#")[0].strip().lower()
     stem = Path(file).stem.lower() if file else ""
     t = (text or "").lower()
+    # 必须按标识符边界匹配：CVE JSON 里的 "VulDB entry created" 曾把
+    # `create` 误判成命中（M327）。子串匹配会让 created/creator 连坐。
     if key and len(key) > 3:
-        return key in t
-    return bool(stem and len(stem) > 3 and stem in t)
+        return re.search(
+            rf"(?<![A-Za-z0-9_]){re.escape(key)}(?![A-Za-z0-9_])", t
+        ) is not None
+    return bool(stem and len(stem) > 3 and re.search(
+        rf"(?<![A-Za-z0-9_]){re.escape(stem)}(?![A-Za-z0-9_])", t))
 
 
 # M317：泛化方法名 / 通用控制器 —— 这类组合全网搜只会烧配额，跳过。
