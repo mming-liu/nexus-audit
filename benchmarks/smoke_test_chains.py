@@ -11640,6 +11640,92 @@ finally:
     Path(".cache/cve_dedup/_global_advisories.json").unlink(missing_ok=True)
 check("M324：已执行断言数 >= 1850", COUNTS["n"] >= 1850, True)
 
+print("\n[309] M325：新生代赛道 + 页码轮转 + 星标分桶")
+import datetime as _dt309
+from core.context import target_scout as _ts309
+_q309 = _ts309.search_query("java", 150, 10000, "2026-10-24", 10, "rag",
+                            created_since="2024-06-01",
+                            star_range=(80, 5000))
+check("M325：新生代查询带 created 窗口",
+      "created:>2024-06-01" in _q309, True)
+check("M325：新生代星标 80..5000",
+      "stars:80..5000" in _q309, True)
+_r309 = _ts309.scout_daily(["java", "python"], allow_online=False,
+                           today=_dt309.date(2026, 11, 7), limit=6,
+                           min_stars=150, max_stars=10000,
+                           terms_per_language=3)
+check("M325：新生代查询占一轮的 50% 以上",
+      _r309["new_gen_queries"] >= 2, True)
+check("M325：新生代 query 进入实际查询列表",
+      any("created:>2024-06-01" in q for q in _r309["queries"]), True)
+check("M325：传统词按天轮转到 page 2..4",
+      any(s["track"] == "traditional" and 2 <= int(s["page"]) <= 4
+          for s in _r309["query_specs"]), True)
+check("M325：传统词使用星标分桶",
+      any("stars:451..2000" in q or "stars:150..450" in q
+          for q in _r309["queries"]), True)
+check("M325：离线回退仍标注来源", _r309["source"], "offline_seed")
+
+print("\n[310] M326/M327：90 天新提交提权 + FileWriter/FileUtils 写入判据")
+from core.context import daily_hunt as _dh310
+_orig_git310 = _dh310.upstream_sync._git
+_seen310 = []
+
+
+def _fake_git310(args, cwd=None, timeout=120):
+    _seen310.append(list(args))
+    return 0, "src/new.java\nsrc/old.py\n"
+
+
+_dh310.upstream_sync._git = _fake_git310
+try:
+    _rf310 = _dh310.recent_files(Path("."), days=90, depth=30)
+finally:
+    _dh310.upstream_sync._git = _orig_git310
+check("M326：最近 90 天文件集合解析正确",
+      _rf310, {"src/new.java", "src/old.py"})
+check("M326：git log 带 90 天窗口且限 30 条",
+      (any("--since=90 days ago" in a for a in _seen310[0]),
+       "-n" in _seen310[0] and "30" in _seen310[0]), (True, True))
+check("M326：最近改动文件优先级最高",
+      _dh310.root_priority({"category": "xss", "file": "src/new.java"},
+                           recent_files=_rf310)[0], -1)
+check("M326：最近 xss 排在老 sqli 之前",
+      _dh310.root_priority({"category": "xss", "file": "src/new.java"},
+                           recent_files=_rf310)
+      < _dh310.root_priority({"category": "sqli", "file": "src/old.py"}),
+      True)
+check("M326：浅克隆默认 >= 30 条（实际 50）",
+      __import__("inspect").signature(
+          _dh310.upstream_sync.sync_repo).parameters["depth"].default >= 30,
+      True)
+_hop310 = '''
+public R create(@RequestBody MakerConfigEntity cfg) {
+    return service.make(cfg);
+}
+// ---- 同文件辅助方法 ----
+public void make(MakerConfigEntity makerConfig) {
+    String filePath = makerConfig.getFilePath();
+    String path = "/x.java";
+    FileWriter w = new FileWriter(filePath + path);
+    w.write("x");
+}
+'''
+check("M327：入口 DTO 类型经 Hop 形参传到 FileWriter 判 True",
+      _rd307.pathtraver_verdict(_hop310), True)
+check("M327：FileUtils.writeStringToFile 直接判 True",
+      _rd307.pathtraver_verdict(
+          'public void save(String destPath, String data) {\n'
+          '    FileUtils.writeStringToFile(destPath, data);\n'
+          '}\n'), True)
+check("M327：created 不再被 create 子串误命中",
+      _cd314._unit_in_text("SysGenController.create", "GenUtils.java",
+                           'VulDB entry created'), False)
+check("M327：create 作为独立词仍命中",
+      _cd314._unit_in_text("SysGenController.create", "GenUtils.java",
+                           "function create"), True)
+check("M328：已执行断言数 >= 1860", COUNTS["n"] >= 1860, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
