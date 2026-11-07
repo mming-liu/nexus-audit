@@ -59,8 +59,9 @@
       "id": "CVE-2026-102363",
       "kind": "cve",
       "category": "",
-      "unit": "",
-      "url": "https://www.cve.org/CVERecord?id=CVE-2026-102363"
+      "unit": "DeliveryController.checkDelivery",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-102363",
+      "note": "Unauthenticated shipment tracking disclosure via /delivery/check (M333)"
     },
     {
       "repo": "gz-yami/mall4j",
@@ -70,8 +71,21 @@
       "id": "CVE-2026-102366",
       "kind": "cve",
       "category": "",
-      "unit": "",
-      "url": "https://www.cve.org/CVERecord?id=CVE-2026-102366"
+      "unit": "FileController.uploadElementFile",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-102366",
+      "note": "Admin file upload XSS; /admin/file/upload/element (M333)"
+    },
+    {
+      "repo": "gz-yami/mall4j",
+      "aliases": [
+        "mall4j"
+      ],
+      "id": "CVE-2026-102366",
+      "kind": "cve",
+      "category": "",
+      "unit": "FileController.uploadTinymceEditorImages",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-102366",
+      "note": "Admin file upload XSS; /admin/file/upload/tinymceEditor (M333)"
     },
     {
       "repo": "elunez/eladmin",
