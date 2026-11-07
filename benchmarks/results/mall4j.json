@@ -6,14 +6,14 @@
   "correct": 193,
   "fp": 0,
   "reverse_fn": 0,
-  "rule_evaluations": 1306,
+  "rule_evaluations": 1323,
   "cors_route_hits": 193,
   "cors_root_causes": 1,
   "cors_config_file": "AuthConfig.java",
   "subject_chain_units": 25,
   "subject_chain_authz_true": 0,
-  "review_needed": 9,
-  "review_frozen": 9,
+  "review_needed": 8,
+  "review_frozen": 8,
   "review_rows": [
     {
       "file": "SysMenuController.java",
@@ -24,11 +24,6 @@
       "file": "DeliveryController.java",
       "unit": "DeliveryController.checkDelivery",
       "category": "authz"
-    },
-    {
-      "file": "UserCollectionController.java",
-      "unit": "UserCollectionController.addOrCancel",
-      "category": "xss"
     },
     {
       "file": "AreaController.java",

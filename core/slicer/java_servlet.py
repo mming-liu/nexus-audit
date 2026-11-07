@@ -24,7 +24,34 @@ from typing import Iterable, List
 from core.models import CodeUnit, Language
 from core.text_utils import strip_java_comments
 
-IGNORE_DIRS = {".git", "target", "build", "node_modules", "test", "tests"}
+IGNORE_DIRS = {".git", "target", "build", "node_modules", "test", "tests",
+               "example", "examples", "demo", "demos", "sample", "samples",
+               "docs"}
+# M338：示例/测试/基准子模块（hkj-spring/example、foo-demo、bar-tests）。
+# 只对 relative_to(repo_root) 的目录段生效 —— 扫描根目录本身叫 demo/test
+# 时不能被误杀（用户显式指定它就是要扫它）。
+_IGNORE_DIR_NAME_RE = re.compile(
+    r"(?:^|[-_])(?:examples?|demos?|samples?|tests?|benchmarks?|docs?)$", re.I)
+
+
+def _ignored_path(path: Path, root: Path) -> bool:
+    try:
+        parts = path.relative_to(root).parts
+    except ValueError:
+        parts = path.parts
+    dirs = parts[:-1]
+    # Java 包名里的 demo/example（src/main/java/demo）不是示例子模块；
+    # 只对 package root 之前的目录段做模块判定（M338）。
+    package_start = len(dirs)
+    for i in range(max(0, len(dirs) - 2)):
+        if dirs[i:i + 3] in (("src", "main", "java"), ("src", "test", "java")):
+            package_start = i + 3
+    for idx, part in enumerate(dirs):
+        if idx >= package_start:
+            break
+        if part.lower() in IGNORE_DIRS or _IGNORE_DIR_NAME_RE.search(part):
+            return True
+    return False
 
 # 接口头（含 extends 子句）。`_interface_index()` 靠它拿到「这个方法是框架
 # 派生查询」的唯一依据 —— `extends JpaRepository<Person, String>`。
@@ -705,7 +732,7 @@ class JavaSlicer:
         root = self.config_root if self.config_root != self.repo_path else self.repo_path
         idx: dict[str, tuple[str, int, str]] = {}
         for java in root.rglob("*.java"):
-            if any(part in IGNORE_DIRS for part in java.parts):
+            if _ignored_path(java, root):
                 continue
             from core.context.java_impl_resolver import _read_cached
             text = _read_cached(java)
@@ -749,7 +776,7 @@ class JavaSlicer:
         root = self.config_root if self.config_root != self.repo_path else self.repo_path
         idx: dict[str, tuple[str, str]] = {}
         for java in root.rglob("*.java"):
-            if any(part in IGNORE_DIRS for part in java.parts):
+            if _ignored_path(java, root):
                 continue
             from core.context.java_impl_resolver import _read_cached
             text = _read_cached(java)
@@ -831,7 +858,7 @@ class JavaSlicer:
 
     def _iter_java_files(self) -> Iterable[Path]:
         for p in self.repo_path.rglob("*.java"):
-            if any(part in IGNORE_DIRS for part in p.parts):
+            if _ignored_path(p, self.repo_path):
                 continue
             yield p
 
@@ -851,7 +878,7 @@ class JavaSlicer:
         out: List[CodeUnit] = []
         seen: set[tuple[str, str]] = set()
         for java in root.rglob("*.java"):
-            if any(part in IGNORE_DIRS for part in java.parts):
+            if _ignored_path(java, root):
                 continue
             text = _read_cached(java)
             if "RouterFunctions" not in text and "RouterFunction<" not in text:
@@ -1204,7 +1231,7 @@ class JavaSlicer:
     @staticmethod
     def _iter_under(root: Path):
         for p in root.rglob("*.java"):
-            if any(part in IGNORE_DIRS for part in p.parts):
+            if _ignored_path(p, root):
                 continue
             yield p
 

@@ -31,7 +31,7 @@ mall4j 是 5.3k Star 的企业级多模块商城：`yami-shop-api`（C 端）+ `
   `UserCollectionController` / `PayController` 五个 C 端"我的资源"控制器里
   `authz` **零 True**（这是 M98 要证的核心命题）；
 - 全局 CORS 缺陷必须判出并折叠成 1 个根因；
-- 人工复核面（`REVIEW_NEEDED`）冻结成清单：M104 的"公共目录只读查询"
+- 人工复核面（`REVIEW_NEEDED`）冻结成清单：M104 的"公共目录只读查询"（M338 后 8 条）
   豁免把 6 条公开查询（商品/公告/验证码/销量榜）转正为确定性 False；
   剩下的 3 条是**真风险**（按单号查物流的真 IDOR + 后台未鉴权上传 + 收藏 XSS）。
   计数冻结，涨一条就红 —— 不假装零误报。
@@ -76,7 +76,7 @@ SUBJECT_CHAIN_CONTROLLERS = {
 # 机械判 False 的形态，冻结计数，涨一条就红。
 # M330：无括号 @GetMapping/@PostMapping 切出 54 条此前漏掉的路由后，
 # 复核面从 4 条增至 9 条（FileController/SysMenuController 等真实入口）。
-REVIEW_NEEDED = 9
+REVIEW_NEEDED = 8
 CORS_CONFIG_FILE = "AuthConfig.java"
 
 
