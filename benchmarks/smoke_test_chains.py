@@ -12074,6 +12074,107 @@ check("M343：全噪仓不占名额、顺延扫到真仓",
       ("SCANNED", 1))
 check("M344：已执行断言数 >= 1920", COUNTS["n"] >= 1920, True)
 
+print("\n[319] M345：DatabaseMetaData / typed POJO / 参数化构造器降噪")
+_meta319 = ('public Y9Result<String> extractTable(String baseId, String tableName) {\n'
+            '  Connection c = DriverManager.getConnection(url, props);\n'
+            '  DatabaseMetaData m = c.getMetaData();\n'
+            '  ResultSet t = m.getTables(null, null, tableName, null);\n'
+            '  return Y9Result.success();\n}')
+check("M345：DatabaseMetaData.getTables 不判 sqli",
+      _rd307.sqli_verdict(_meta319), False)
+_deser319 = ('public Object save(String jsonData) {\n'
+            '  OpinionSignModel o = Y9JsonUtil.readValue(jsonData, OpinionSignModel.class);\n'
+            '  return o;\n}')
+check("M345：具体 POJO readValue 不判 deserial",
+      _rd307.deserial_verdict(_deser319), False)
+_ref319 = ('public Object resolve(byte[] body) {\n'
+           '  return objectMapper.readValue(body, new TypeReference<List<ExecutionReference>>() {});\n}')
+check("M345：TypeReference<List<Concrete>> 不判 deserial",
+      _rd307.deserial_verdict(_ref319), False)
+_build319 = ('public Object allTodoList(QueryParamModel q) {\n'
+             '  StringBuilder whereSql = new StringBuilder();\n'
+             '  List<Object> params = new ArrayList<>();\n'
+             '  buildQueryConditions(q, whereSql, params);\n'
+             '  whereSql.append(" AND x = ?");\n'
+             '  params.add(1);\n'
+             '  String sql = "SELECT * FROM T WHERE 1=1 " + whereSql;\n'
+             '  return jdbcTemplate.queryForList(sql, params.toArray());\n}')
+check("M345：buildQueryConditions + ? 参数列表不判 sqli",
+      _rd307.sqli_verdict(_build319), False)
+_mp319 = ('public Object claim() {\n'
+          '  return mapper.update(null, new UpdateWrapper<X>()\n'
+          '      .eq("id", 1).set("x", 2));\n}')
+check("M345：MyBatis-Plus update 不因裸 update( 判 sqli",
+      _rd307.sqli_verdict(_mp319), False)
+_real319 = ('public Object q(String id) {\n'
+            '  return jdbcTemplate.queryForObject("SELECT * FROM T WHERE id=" + id, Object.class);\n}')
+check("M345：真实 JDBC 拼接仍判 True",
+      _rd307.sqli_verdict(_real319), True)
+
+print("\n[320] M346：冷却感知翻页 / M347：org-hunt 离线注入")
+_dt320 = _dt309
+_orig_get320 = _ts309._get
+
+
+def _get320(url, timeout=20.0):
+    if "page=2" in str(url):
+        return True, {"total_count": 100, "items": [
+            {"full_name": "acme/new1", "description": "admin",
+             "has_issues": True, "stargazers_count": 600,
+             "pushed_at": "2026-11-01", "topics": [], "language": "java"},
+            {"full_name": "acme/new2", "description": "admin",
+             "has_issues": True, "stargazers_count": 600,
+             "pushed_at": "2026-11-01", "topics": [], "language": "java"}]}, ""
+    return True, {"total_count": 100, "items": [
+        {"full_name": "acme/old1", "description": "admin",
+         "has_issues": True, "stargazers_count": 600,
+         "pushed_at": "2026-11-01", "topics": [], "language": "java"},
+        {"full_name": "acme/old2", "description": "admin",
+         "has_issues": True, "stargazers_count": 600,
+         "pushed_at": "2026-11-01", "topics": [], "language": "java"}]}, ""
+
+
+_ts309._get = _get320
+try:
+    _r320 = _ts309.scout_daily(
+        ["java"], allow_online=True, today=_dt320.date(2026, 11, 8),
+        limit=2, terms_per_language=1, exclude_slugs={"acme/old1", "acme/old2"})
+finally:
+    _ts309._get = _orig_get320
+check("M346：冷却仓被剔除后自动翻到 page 2",
+      [x["slug"] for x in _r320["items"]], ["acme/new1", "acme/new2"])
+check("M346：翻页证据记录 cooldown_pages",
+      any(s.get("cooldown_pages") for s in _r320["query_specs"]), True)
+
+from core.context import org_hunt as _oh320                      # noqa: E402
+_orig_list320 = _oh320.list_org_repos
+_orig_dh_run320 = _oh320.daily_hunt.run
+_oh320.list_org_repos = lambda *a, **k: [
+    {"slug": "acme/erp", "stars": 800, "language": "java",
+     "pushed_at": "2026-11-01", "description": "erp"}]
+_captured320 = {}
+
+
+def _fake_run320(**kw):
+    _captured320.update(kw)
+    return {"ok": True, "records": [], "daily": {"scanned": 1, "new_roots": 0,
+                                                "board_a": 0}}
+
+
+_oh320.daily_hunt.run = _fake_run320
+try:
+    _res320 = _oh320.run(orgs=["acme"], languages=["java"],
+                         max_roots=25, min_units=5)
+finally:
+    _oh320.list_org_repos = _orig_list320
+    _oh320.daily_hunt.run = _orig_dh_run320
+check("M347：org-hunt 注入 max_roots=25 / min_units=5",
+      (_captured320.get("max_roots"), _captured320.get("min_units")),
+      (25, 5))
+check("M347：org-hunt 只保留业务仓",
+      _res320["repos"], ["acme/erp"])
+check("M348：已执行断言数 >= 1930", COUNTS["n"] >= 1930, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
