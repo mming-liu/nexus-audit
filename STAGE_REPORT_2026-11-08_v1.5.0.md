@@ -12,7 +12,7 @@ static/cve5sw.js。
 
 | 操作 | 方法与路径 | 说明 |
 |---|---|---|
-| Reserve CAN | POST /api/cve-id | body: amount, cve_year, short_name |
+| Reserve CAN | POST /api/cve-id?amount=...&cve_year=...&short_name=... | 参数在 query string |
 | Load record | GET /api/cve/{id} | 404 时回退 GET /api/cve-id/{id} |
 | Submit create | POST /api/cve/{id}/cna | body: {cnaContainer: ...} |
 | Submit update | PUT /api/cve/{id}/cna | 已有记录时更新 |
@@ -63,17 +63,42 @@ delete，服务端根据 CAN 元数据补 cveMetadata。客户端按此实现，
 - triage_fallbacks.py --check-floor：16/16
 - cli.py doctor：PASS
 
-## 五、Token 验证与安全
+## 五、首次真实提交（metasfresh）
 
-用用户提供的示例 token 探测 GET /api/me：HTTP 401 unauthorized，证明
-base URL 与认证头可达；该 token 已过期（remaining -1043s），未发任何
-reserve / submit 写请求。
+2026-11-08 10:00 UTC 用新 token 执行：
 
-Token 不落盘、不写日志；提交响应落盘目录已 gitignore。
+    python cli.py cve-submit --target metasfresh --reserve-and-submit --token "<line>"
 
-## 六、拿到新 token 后只需一条命令
+结果：
 
-    python cli.py cve-submit --target metasfresh --reserve-and-submit --token "<整行 login success>"
+- 预留成功：**CAN-2026-2042689**
+- 提交成功：HTTP 200，state=PUBLISHED
+- 服务端 message：CAN-2026-2042689 submission was successfully created
+  （会邮件通知后续 activity）
+- 证据：benchmarks/results/cna_submissions/CAN-2026-2042689_20261108T100342Z.json
+
+首次提交踩到 3 个契约细节，均已回写客户端：
+
+1. reserve 参数在 query string，不在 JSON body
+   （前端 post('cve-id', args) 的 args 是 query）；
+2. cnaContainer 必须有 providerMetadata.orgId，orgId 从
+   GET /api/org/{short_name} 的 UUID 取；
+3. problemTypes[].descriptions[] 必须有 lang。
+
+另修 submit_record：400 schema 错误不再被 PUT 重试掩盖；只有 404 /
+CVE_RECORD_DNE 才回退 PUT。
+
+## 六、Token 验证与安全
+
+- 旧 token 探测 GET /api/me：HTTP 401 unauthorized，确认过期。
+- 新 token 提交成功；token 不落盘、不写日志。
+- 提交响应落盘目录已 gitignore。
+
+## 七、下一单
+
+metasfresh 已交，其他 5 单待新 token。下一单建议 WorkFlow：
+
+    python cli.py cve-submit --target workflow-engine --reserve-and-submit --token "<整行 login success>"
 
 先查第 1 单状态：
 
