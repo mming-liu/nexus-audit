@@ -4,6 +4,7 @@
 > HEAD：e91293ca1db478fd4e692a23e9f263bbe61dd4d9（2026-11-06）
 > GitHub Issue #4 已提：https://github.com/risesoft-y9/WorkFlow-Engine/issues/4
 > 结论：CWE-89，PR:L，CVSS 3.1 8.8 High；九条路由合并 1 单。
+> **CAN：CAN-2026-2042690（2026-11-08 已提交，PUBLISHED）**
 
 ## Step 1：点哪个网址
 

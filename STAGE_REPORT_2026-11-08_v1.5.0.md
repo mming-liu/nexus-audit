@@ -106,3 +106,7 @@ CVE_RECORD_DNE 才回退 PUT。
 如果某单需要更新描述/版本范围：
 
     python cli.py cve-submit --target metasfresh --can CAN-2026-2042689 --submit --token "<line>"
+
+完整自动提交结果、API 契约、6 个 CAN 与证据路径：
+
+- [cve_submission_kit/CVE_AUTO_SUBMIT_2026-11-08.md](cve_submission_kit/CVE_AUTO_SUBMIT_2026-11-08.md)

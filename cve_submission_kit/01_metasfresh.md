@@ -4,6 +4,7 @@
 > HEAD：a962d77698039c378ec457ac76fe7e64defffeac（2026-10-29）
 > GitHub Issue #27079 已提；厂商超 8 天未回应。
 > 结论：CWE-89，CVSS 3.1 待定；单路由。
+> **CAN：CAN-2026-2042689（2026-11-08 已提交，PUBLISHED）**
 
 ## Step 1：点哪个网址
 

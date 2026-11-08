@@ -4,6 +4,7 @@
 > HEAD：646c58c30f2e9aecf998b054f05f4d9ba0008995（2026-11-02）
 > GitHub Issue #926 已提：https://github.com/elunez/eladmin/issues/926
 > 结论：CWE-862，PR:L，CVSS 3.1 6.5-8.1；与 CVE-2026-108706 / Issue #903 严格区分。
+> **CAN：CAN-2026-2042692（2026-11-08 已提交，PUBLISHED）**
 
 ## Step 1：点哪个网址
 

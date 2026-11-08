@@ -4,6 +4,7 @@
 > HEAD：f4acf07c6b134af9ad3e6284d65b40997087b14f（2026-10-30）
 > GitHub Issue #47 已提：https://github.com/yzcheng90/x-springboot/issues/47
 > 结论：CWE-22 / CWE-73；默认 PR:H，CVSS 3.1 7.2；若授权低权角色则 PR:L 8.8。
+> **CAN：CAN-2026-2042693（2026-11-08 已提交，PUBLISHED）**
 
 ## Step 1：点哪个网址
 

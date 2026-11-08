@@ -4,6 +4,7 @@
 > HEAD：973d777c3e02756749dab3b3399859a9fb79a44e（2026-11-06）
 > GitHub Issue #2 已提：https://github.com/risesoft-y9/Network-Drive/issues/2
 > 结论：CWE-22，PR:L，CVSS 3.1 8.1 High；两个 endpoint 合并 1 单。
+> **CAN：CAN-2026-2042691（2026-11-08 已提交，PUBLISHED）**
 
 ## Step 1：点哪个网址
 
