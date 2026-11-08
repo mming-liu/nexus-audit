@@ -154,11 +154,24 @@ _COMPONENT_DESC_RE = re.compile(
     re.I)
 
 
+_BUSINESS_SIGNAL_RE = re.compile(
+    r"\b(?:platform|admin|management|erp|crm|mall|oa|workflow|"
+    r"low[- ]?code|business|enterprise|system)\b", re.I)
+
+
 def is_tool_lib(slug: str, description: str = "",
                 topics: list[str] | tuple[str, ...] = ()) -> bool:
-    """仓库名/描述/topics 命中工具库标记即丢（M293/M312）。"""
+    """仓库名/描述/topics 命中工具库标记即丢（M293/M312）。
+
+    M353：topics 里的 cli/codegenerator/mcp 不能单独否掉一个企业级低代码
+    主仓（JeecgBoot 的 topics 同时有 cli/codegenerator/low-code）。因此
+    slug+description 命中工具词仍直接丢；仅 topics 命中时，若同时存在
+    platform/admin/low-code/erp 等业务信号，则保留。
+    """
     text = " ".join([slug or "", description or "", " ".join(topics or [])])
-    if _TOOL_LIB_RE.search(text):
+    if _TOOL_LIB_RE.search(" ".join([slug or "", description or ""])):
+        return True
+    if _TOOL_LIB_RE.search(" ".join(topics or [])) and not _BUSINESS_SIGNAL_RE.search(text):
         return True
     name = (slug or "").split("/")[-1]
     return bool(_COMPONENT_NAME_RE.match(name)

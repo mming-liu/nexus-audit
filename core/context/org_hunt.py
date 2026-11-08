@@ -11,6 +11,16 @@ from pathlib import Path
 from core.context import target_scout
 from core.context import daily_hunt
 
+# M353：Monorepo 主仓名通常带这些词；org 外围常是低密度工具库。
+_MONOLITH_HINTS = ("boot", "admin", "server", "cloud", "system", "framework")
+
+
+def _repo_priority(repo: dict) -> tuple:
+    name = str(repo.get("slug") or "").split("/")[-1].lower()
+    monolith = any(h in name for h in _MONOLITH_HINTS)
+    return (1 if monolith else 0, int(repo.get("stars") or 0),
+            str(repo.get("pushed_at") or ""))
+
 
 def list_org_repos(org: str, languages: list[str] | None = None,
                    allow_online: bool = True, per_page: int = 100) -> list[dict]:
@@ -70,6 +80,9 @@ def run(*, orgs: list[str], languages: list[str] | None = None,
             if r["slug"] not in seen:
                 seen.add(r["slug"])
                 repos.append(r)
+    # M353：先排单体主仓（boot/admin/server/cloud/system/framework + 高星），
+    # 再排普通业务仓；避免 limit 被 MiniDao/autopoi 这类工具库吃掉。
+    repos.sort(key=_repo_priority, reverse=True)
     report_path = Path(report) if report else Path("ORG_HUNT_REPORT.md")
     json_file = Path(json_path) if json_path else Path("benchmarks/results/org_hunt.json")
     packs = Path(packs_dir) if packs_dir else Path("benchmarks/results/org_hunt_packs")
@@ -78,9 +91,11 @@ def run(*, orgs: list[str], languages: list[str] | None = None,
                 "report": str(report_path), "json": str(json_file)}
     cap = int(limit) if int(limit) > 0 else len(repos)
     items = repos[:cap]
+    # M353：选中主仓时自动抬到 35 根因，跨模块 Controller 不被 20 截断。
+    effective_roots = 35 if any(_repo_priority(x)[0] for x in items) else max_roots
     res = daily_hunt.run(
         languages=langs, days=3650, limit=len(items), min_stars=0,
-        max_stars=1_000_000, max_roots=max_roots,
+        max_stars=1_000_000, max_roots=max(effective_roots, max_roots),
         state_path=Path(".tmp") / "org_hunt_state.json",
         report=report_path, json_path=json_file, packs_dir=packs,
         evict_cache=evict_cache, offline=offline, dedup_online=dedup_online,
