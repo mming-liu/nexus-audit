@@ -121,17 +121,21 @@ EnterpriseAgentFramework（HEAD 5203cf7）：
 | 仓库 | 根因 | 机器 A | 人工结论 |
 | --- | ---: | ---: | --- |
 | Digital-Infrastructure | 6 | 3 | 3 条 deserial 假阳（@JsonTypeInfo NONE + 具体类型） |
-| WorkFlow-Engine | 6 | 6 | 6 条 SQLi，同一根因，CONFIRM |
+| WorkFlow-Engine | 20（深扫） | 10 | 9 条 SQLi，同一根因，CONFIRM |
 | DataFlow-Engine | 3 | 3 | 3 条 sqli 假阳（metadata/JPA） |
 | Network-Drive | 2 | 1 | 1 条 path traversal，CONFIRM |
 | Data-Labeling / Email / Code-Generator / Intelligent-Search / API-Platform | 7 | 0 | 均在 B 板或 0 根因 |
 
-### WorkFlow：从 3 条扩到 6 条
+### WorkFlow：从 3 条扩到 9 条
 
-新增 /vue/recycle 三条同根因路由：recycleList / recycleList4All /
-recycleList4Dept。调用链仍是 searchMapStr → WorkListServiceImpl →
-ItemRecycleApiImpl → Y9TableServiceImpl 的 LIKE/等值拼接。第 4 单应写成
-**1 个 CVE / 6 条 affected endpoints**，不拆单。
+新增 /vue/recycle 三条与 /vue/todo 三条同根因路由：recycleList /
+recycleList4All / recycleList4Dept、todoList / todoList4Other /
+todoList4TaskDefKey。调用链仍是 searchMapStr → WorkListServiceImpl →
+ItemRecycleApiImpl / ItemTodoApiImpl → Y9TableServiceImpl 的 LIKE/等值拼接。
+第 4 单应写成 **1 个 CVE / 9 条 affected endpoints**，不拆单。
+
+深扫另外两条 A 均降级：allTodoList 走 CommonUtils 参数化字段绑定；
+OpinionSign.save 是具体类型的 Y9JsonUtil.readValue，均非 SQLi/非 gadget。
 
 ### Network-Drive：新的真实路径穿越（第 5 单候选）
 

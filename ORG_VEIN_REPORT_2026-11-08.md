@@ -21,7 +21,7 @@
 合计：9 仓全扫，24 个根因，13 条机器 A 记录（WorkFlow 6 条同根因，
 Digital 3 条同型，DataFlow 3 条同型，Network 1 条）。
 
-## 二、WorkFlow-Engine：SQLi 从 3 条扩到 6 条
+## 二、WorkFlow-Engine：SQLi 从 3 条扩到 9 条
 
 新增同根因路由（/vue/recycle）：
 
@@ -34,8 +34,21 @@ RecycleRestController → WorkListServiceImpl.recycleList* →
 ItemRecycleApiImpl.buildSearchSqlComponents →
 Y9TableServiceImpl（LIKE '%" + value + "%' / ='" + value + "'）。
 
-因此第 4 单应写成 1 个 CVE / 6 条 affected endpoints，不要拆成 6 单。
+深扫 max_roots=30 又确认 /vue/todo 三条同根因路由：
+
+- TodoRestController.todoList:68
+- TodoRestController.todoList4Other:75
+- TodoRestController.todoList4TaskDefKey:90
+
+因此第 4 单应写成 1 个 CVE / 9 条 affected endpoints，不要拆单。
 鉴权仍为 /vue/* Servlet 前缀映射 → PR:L / 8.8。
+
+深扫同时发现两条非 SQLi A：
+
+- TodoRestController.allTodoList：走 CommonUtils.buildQueryConditions，
+  字段名是编译期 QueryParamModel 字段、值是 ? 绑定，**假阳**。
+- OpinionSignRestController.save：Y9JsonUtil.readValue(jsonData,
+  OpinionSignModel.class) 是具体类型，**假阳**。
 
 ## 三、Network-Drive：真实路径穿越 / 任意文件写入
 
@@ -95,8 +108,8 @@ AppJsonModel 明确标注 @JsonTypeInfo(use = JsonTypeInfo.Id.NONE)，
 
 ## 六、矿脉结论
 
-1. 同组织确实有复用：WorkFlow 的 searchMapStr 根因横向扩到 recycle 三条；
-   这是同一根因，不是三个新 CVE。
+1. 同组织确实有复用：WorkFlow 的 searchMapStr 根因横向扩到 recycle 三条
+   与 todo 三条，合计 9 条；这是同一根因，不是九个新 CVE。
 2. Network-Drive 的 Chunk 路径拼接是另一条真实根因，值得独立 1 单。
 3. Digital 的 typed JSON、DataFlow 的 metadata/JPA 说明“同组织”不等于
    “同漏洞”，仍要逐条看 sink。
