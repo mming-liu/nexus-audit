@@ -63,19 +63,22 @@ delete，服务端根据 CAN 元数据补 cveMetadata。客户端按此实现，
 - triage_fallbacks.py --check-floor：16/16
 - cli.py doctor：PASS
 
-## 五、首次真实提交（metasfresh）
+## 五、6 单全部有 CAN（2026-11-08）
 
-2026-11-08 10:00 UTC 用新 token 执行：
+| 单 | 标的 | CAN | 状态 |
+|---|---|---|---|
+| 1 | ruoyi-vue-pro | CAN-2026-2041058 | PUBLISHED（已有） |
+| 2 | metasfresh | CAN-2026-2042689 | PUBLISHED |
+| 3 | x-springboot | CAN-2026-2042693 | PUBLISHED |
+| 4 | workflow-engine | CAN-2026-2042690 | PUBLISHED |
+| 5 | network-drive | CAN-2026-2042691 | PUBLISHED |
+| 6 | eladmin | CAN-2026-2042692 | PUBLISHED |
 
-    python cli.py cve-submit --target metasfresh --reserve-and-submit --token "<line>"
+metasfresh / WorkFlow / Network / eladmin / x-springboot 均为：
 
-结果：
-
-- 预留成功：**CAN-2026-2042689**
-- 提交成功：HTTP 200，state=PUBLISHED
-- 服务端 message：CAN-2026-2042689 submission was successfully created
-  （会邮件通知后续 activity）
-- 证据：benchmarks/results/cna_submissions/CAN-2026-2042689_20261108T100342Z.json
+- HTTP 200，state=PUBLISHED；
+- 服务端 message：submission was successfully created（邮件通知后续 activity）；
+- 响应落盘 benchmarks/results/cna_submissions/。
 
 首次提交踩到 3 个契约细节，均已回写客户端：
 
@@ -91,15 +94,15 @@ CVE_RECORD_DNE 才回退 PUT。
 ## 六、Token 验证与安全
 
 - 旧 token 探测 GET /api/me：HTTP 401 unauthorized，确认过期。
-- 新 token 提交成功；token 不落盘、不写日志。
+- 新 token 连续提交 5 单成功；token 不落盘、不写日志。
 - 提交响应落盘目录已 gitignore。
 
-## 七、下一单
+## 七、当前状态
 
-metasfresh 已交，其他 5 单待新 token。下一单建议 WorkFlow：
-
-    python cli.py cve-submit --target workflow-engine --reserve-and-submit --token "<整行 login success>"
-
-先查第 1 单状态：
+6 单全部有 CAN，等待 MITRE 审核/分配正式 CVE。后续只需查状态：
 
     python cli.py cve-submit --status CAN-2026-2041058 --token "<整行 login success>"
+
+如果某单需要更新描述/版本范围：
+
+    python cli.py cve-submit --target metasfresh --can CAN-2026-2042689 --submit --token "<line>"
