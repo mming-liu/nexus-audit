@@ -479,6 +479,22 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
                                "head_sha": res["head_sha"],
                                "reason": f"low_units_{units}"})
                 continue
+            # M343：全噪仓退还实扫名额。若一个仓没有任何 FRESH 根因，且
+            # 所有根因都被 wild_noise 判为 LOCAL_LOOPBACK_ONLY / DEMO_CONTROLLER，
+            # 它本质上是本机桌面工具或纯演示工程 —— 记账防重扫，但不占名额。
+            raw_records = list(res.get("records") or [])
+            all_noise = bool(raw_records) and all(
+                str(r.get("noise_code") or "") in {
+                    wild_noise.LOCAL_LOOPBACK_ONLY,
+                    wild_noise.DEMO_CONTROLLER}
+                for r in raw_records)
+            if (int(res["entry"].get("fresh_total") or 0) == 0
+                    and all_noise):
+                state["repos"][slug] = res["entry"]
+                ledger.append({"slug": slug, "result": "SKIPPED",
+                               "head_sha": res["head_sha"],
+                               "reason": "all_local_or_demo"})
+                continue
 
             new: list[dict] = []
             for rec in res["records"]:
