@@ -57,6 +57,8 @@ _TUTORIAL_RE = re.compile(
 # M320：粘连命名的个人练习仓（Mestudy / javastudy / mylearn）——
 # `study`/`learn` 前面没有分隔符，词边界正则抓不到。
 _GLUED_STUDY_RE = re.compile(
+    # M342：带连字符/下划线的练习仓（Java-Agent-Study / foo_learn）。
+    r"(?:^|[-_])(?:study|learn|practice|homework)$|"
     r"(?:^|my|me|java|py|web|test|code)(?:study|learn|practice|homework)$",
     re.I)
 
@@ -68,7 +70,11 @@ def is_tutorial(slug: str, description: str = "",
     if _TUTORIAL_RE.search(text):
         return True
     name = (slug or "").split("/")[-1]
-    return bool(_GLUED_STUDY_RE.match(name))
+    # M320 的既有边界：case-study 是业务/案例仓，不是练习仓；M342 只拦
+    # Java-Agent-Study / foo_learn 这类后缀。
+    if name.lower() == "case-study" or name.lower().endswith("-case-study"):
+        return False
+    return bool(_GLUED_STUDY_RE.search(name))
 
 
 # M293：业务限定词。裸搜 language+pushed 抓回来的大半是驱动/插件/桌面工具，
@@ -89,7 +95,7 @@ BUSINESS_QUALIFIERS: dict[str, tuple[str, ...]] = {
 # 传统猎手还没扫过；用 created/pushed 双时间窗把它们从“第 1 页老仓”里捞出来。
 NEW_GEN_CREATED_SINCE = "2024-06-01"
 NEW_GEN_PUSHED_SINCE = "2026-09-01"
-NEW_GEN_STARS = (80, 5000)
+NEW_GEN_STARS = (150, 5000)
 NEW_GEN_KEYWORDS: dict[str, tuple[str, ...]] = {
     # 短词/缩写必须加引号：裸 mes 会捞回 meshcore/messages，裸 bi 会捞回
     # binary 之类；GitHub 的 quoted phrase 才按词匹配。
@@ -118,10 +124,10 @@ NEW_GEN_FALLBACK_WORDS = (
     "workflow", "knowledge", "rag", "lowcode", "mes", "wms", "iot",
 )
 NEW_GEN_FALLBACK_CREATED_SINCE = "2024-01-01"
-NEW_GEN_FALLBACK_STARS = (60, 5000)
+NEW_GEN_FALLBACK_STARS = (150, 5000)
 
 # 传统业务词也按星标分桶；80..450 抓新锐小仓，451..2000 抓中型业务仓。
-TRADITIONAL_STAR_BUCKETS = ((80, 450), (451, 2000))
+TRADITIONAL_STAR_BUCKETS = ((300, 1000), (1001, 5000))
 
 
 # M293/M300：纯工具库/驱动/插件/CLI/桌面/评测框架/开发工具/测试框架，
@@ -136,7 +142,8 @@ _TOOL_LIB_RE = re.compile(
     r"telemetry|observability|logfire|spring-tools|citrus|test-framework|"
     r"testing-framework|testcontainers|stubs|djlint|linter|auditlog|graphql|"
     r"huey|celery|defectdojo|spring-boot-admin|home[-_]?assistant|"
-    r"hacs|custom_components|esphome)(?:[^a-z0-9]|$)"
+    r"hacs|custom_components|esphome|comfyui|sd-webui|stable-diffusion|"
+    r"gradio|streamlit|jupyter|notebook|mcp-server)(?:[^a-z0-9]|$)"
     r"|(?:ide|vscode|intellij|eclipse)-)", re.I)
 
 # M312：名字以框架前缀开头、描述又是"库/插件/中间件/可复用包"的第三方组件，
@@ -336,7 +343,7 @@ def _merge_round_robin(buckets: dict[str, list[dict]],
 
 def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                                                           "solidity"),
-                days: int = 14, limit: int = 10, min_stars: int = 150,
+                days: int = 14, limit: int = 10, min_stars: int = 300,
                 max_stars: int = 10000, allow_online: bool = True,
                 today: _dt.date | None = None,
                 terms_per_language: int = 2) -> dict:

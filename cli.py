@@ -6385,8 +6385,8 @@ def main():
                          help="每天最多实扫多少个候选仓（默认 10）")
     p_daily.add_argument("--max-roots", type=int, default=0,
                          help="每仓最多复核多少条根因（0=全部）")
-    p_daily.add_argument("--min-stars", type=int, default=150,
-                         help="星级下限（默认 150，覆盖 150–10000 的腰部活跃仓）")
+    p_daily.add_argument("--min-stars", type=int, default=300,
+                         help="星级下限（默认 300，过滤个人练手玩具仓）")
     p_daily.add_argument("--max-stars", type=int, default=10000)
     p_daily.add_argument("--max-head-age-days", type=int, default=180,
                          help="HEAD 提交超过该天数即判 STALE_REPO")
