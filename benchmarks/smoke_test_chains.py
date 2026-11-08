@@ -12245,7 +12245,7 @@ _calls322 = []
 
 def _fake_request322(method, path, body=None):
     _calls322.append((method, path, body))
-    if path == "cve-id":
+    if path.startswith("cve-id"):
         return {"cve_ids": [{"cve_id": "CAN-2026-9999999"}]}
     if path.startswith("cve/CAN-2026-9999999") and method == "GET":
         raise _mc322.MitreCveError("HTTP 404")

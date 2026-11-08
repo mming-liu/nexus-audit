@@ -225,6 +225,7 @@ def build_cna_record(target_spec: dict, can_id: str, requester_id: str = "",
         "affected": [affected],
         "problemTypes": [{
             "descriptions": [{
+                "lang": "en",
                 "type": "CWE",
                 "description": spec.get("cwe") or "",
             }]
@@ -349,14 +350,17 @@ class CveFormClient:
     def org_info(self) -> dict:
         if not self.org:
             return {}
-        return self._request("GET", "org/" + urllib.parse.quote(self.org, safe=""))
+        return self._request("GET", "org/" + urllib.parse.quote(self.org, safe=":."))
 
     def reserve_can(self, year: int | None = None) -> str:
         y = int(year or datetime.now(timezone.utc).year)
         if not self.org:
             raise MitreCveError("org is required to reserve a CAN (parse email first)")
-        payload = self._request("POST", "cve-id", {
+        # The official front-end calls post('cve-id', args): the third
+        # argument is the body, so reserve parameters go in the query string.
+        qs = urllib.parse.urlencode({
             "amount": 1, "cve_year": y, "short_name": self.org})
+        payload = self._request("POST", "cve-id?" + qs)
         ids = payload.get("cve_ids") or []
         if isinstance(ids, list) and ids:
             first = ids[0]
@@ -405,8 +409,11 @@ class CveFormClient:
             use = "POST"
         try:
             return self._request(use, f"cve/{cid}/cna", body)
-        except MitreCveError:
-            if use == "POST":
+        except MitreCveError as exc:
+            # 404/CVE_RECORD_DNE means the record is not created yet; schema
+            # failures (400) must surface as-is, not be masked by a PUT retry.
+            msg = str(exc)
+            if use == "POST" and ("404" in msg or "CVE_RECORD_DNE" in msg):
                 return self._request("PUT", f"cve/{cid}/cna", body)
             raise
 
