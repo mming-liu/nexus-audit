@@ -12173,6 +12173,14 @@ check("M347：org-hunt 注入 max_roots=25 / min_units=5",
       (25, 5))
 check("M347：org-hunt 只保留业务仓",
       _res320["repos"], ["acme/erp"])
+check("M353：topics 的 cli/codegenerator 不否掉低代码主仓",
+      _ts309.is_tool_lib("jeecgboot/JeecgBoot", "企业级 AI 低代码平台",
+                         ["cli", "codegenerator", "low-code", "mcp"]), False)
+check("M353：driver 仍按工具库过滤",
+      _ts309.is_tool_lib("neo4j/neo4j-python-driver", "official driver"), True)
+check("M353：boot 单体主仓排在普通工具仓前",
+      _oh320._repo_priority({"slug": "x/jeecg-boot", "stars": 10}) >
+      _oh320._repo_priority({"slug": "x/autopoi", "stars": 9999}), True)
 check("M348：已执行断言数 >= 1930", COUNTS["n"] >= 1930, True)
 
 print("\n[321] M349：整类指名 CVE vs 单方法 CVE")
