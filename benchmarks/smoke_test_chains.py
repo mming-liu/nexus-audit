@@ -12175,6 +12175,37 @@ check("M347：org-hunt 只保留业务仓",
       _res320["repos"], ["acme/erp"])
 check("M348：已执行断言数 >= 1930", COUNTS["n"] >= 1930, True)
 
+print("\n[321] M349：整类指名 CVE vs 单方法 CVE")
+from core.context import cve_dedup as _cd321                      # noqa: E402
+_t770 = ("The impacted element is the function EmailController/"
+         "AliPayController/GeneratorController/GenConfigController. "
+         "The manipulation results in improper authorization.")
+_t108 = ("contains a missing authorization vulnerability in the "
+         "downloadS3Storage handler ... GET /api/s3Storage/download/{id}")
+check("M349：整类描述命中 AliPayController",
+      _cd321._unit_in_text("AliPayController.updateAliPayConfig",
+                           "AliPayController.java", _t770), True)
+check("M349：单方法描述不连坐 uploadS3Storage",
+      _cd321._unit_in_text("S3StorageController.uploadS3Storage",
+                           "S3StorageController.java", _t108), False)
+check("M349：单方法描述命中 downloadS3Storage",
+      _cd321._unit_in_text("S3StorageController.downloadS3Storage",
+                           "S3StorageController.java", _t108), True)
+_r321a = _cd321.dedup("elunez/eladmin", "authz",
+                      "AliPayController.updateAliPayConfig",
+                      file="AliPayController.java",
+                      allow_online=False, use_cache=False)
+check("M349：AliPay 本地种子判 CVE-2026-77036",
+      (_r321a["status"], "CVE-2026-77036" in _r321a["matched_ids"]),
+      ("DUPLICATE_CVE", True))
+_r321b = _cd321.dedup("elunez/eladmin", "authz",
+                      "S3StorageController.uploadS3Storage",
+                      file="S3StorageController.java",
+                      allow_online=False, use_cache=False)
+check("M349：uploadS3Storage 不被 download CVE 连坐",
+      _r321b["status"] != "DUPLICATE_CVE", True)
+check("M351：已执行断言数 >= 1935", COUNTS["n"] >= 1935, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
