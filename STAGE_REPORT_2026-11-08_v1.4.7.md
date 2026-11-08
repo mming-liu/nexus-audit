@@ -89,4 +89,20 @@ authz 是 SDK 设计边界。
    Controller 层的行业后台（ERP/CRM/医疗/物流），并用 live-hunt 精确锁仓。
 2. warm-flow 的 authz 只能作为集成方安全提示，不能当产品 CVE；若要做
    工作流 SQLi，应继续看 WorkFlow-Engine 同类 searchMapStr 拼接。
-3. 第 4/5/6 单仍未对外提交；第 2/3 单仍待你本人走 CNA/邮件流程。
+3. 第 4/5/6 单的 GitHub Issue 已于 2026-11-08 公开提交（见下节）；
+   CVE 仍待你本人走 CNA/邮件流程。第 2/3 单待你本人走 CNA/邮件流程。
+
+## 五、GitHub 披露记录（2026-11-08）
+
+| 单 | 仓库 | Issue | 建议 CWE / 定级 |
+|---|---|---|---|
+| 4 | risesoft-y9/WorkFlow-Engine | https://github.com/risesoft-y9/WorkFlow-Engine/issues/4 | CWE-89 / PR:L / 8.8 |
+| 5 | risesoft-y9/Network-Drive | https://github.com/risesoft-y9/Network-Drive/issues/2 | CWE-22 / PR:L / 8.1 |
+| 6 | elunez/eladmin | https://github.com/elunez/eladmin/issues/926 | CWE-862 / PR:L / 6.5-8.1 |
+| 3 | yzcheng90/x-springboot | https://github.com/yzcheng90/x-springboot/issues/47 | CWE-22/73 / PR:L / 7.2 |
+
+未重复提交：metasfresh 已有 Issue #27079；ruoyi-vue-pro 已有 Issue #1328
+且修复已合入；eladmin AliPay 已由 #903 / CVE-2026-77036 覆盖。
+
+Issue 正文只放最小复现与修复建议，没有公开武器化 payload；CVE 提交时可直接
+引用上表 URL。
