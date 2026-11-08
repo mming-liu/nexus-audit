@@ -398,13 +398,27 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
     lang_list = [str(x) for x in languages if str(x).strip()]
     cooldown_days = max(0, int(cooldown_days or 0))
 
-    scout = scout_fn(languages=lang_list, days=days, limit=limit,
-                     min_stars=min_stars, max_stars=max_stars,
-                     allow_online=not offline)
-    # M293：候选不再硬截断到 limit —— 纯库/无路由仓不占名额，顺延抓下一个。
-    items = list(scout.get("items") or [])
     state = load_state(state_path)
     state.setdefault("repos", {})
+    # M346：把仍在冷却期的仓传给侦察器，让它在当前页被冷却仓挤空时
+    # 自动翻到下一页；否则 --min-stars 500 会反复抓回同一批老面孔。
+    exclude: set[str] = set()
+    if cooldown_days > 0:
+        for _slug, _entry in state["repos"].items():
+            _age = last_scan_age_days(_entry)
+            if _age is not None and _age < cooldown_days:
+                exclude.add(str(_slug))
+    try:
+        scout = scout_fn(languages=lang_list, days=days, limit=limit,
+                         min_stars=min_stars, max_stars=max_stars,
+                         allow_online=not offline,
+                         exclude_slugs=exclude or None)
+    except TypeError:
+        scout = scout_fn(languages=lang_list, days=days, limit=limit,
+                         min_stars=min_stars, max_stars=max_stars,
+                         allow_online=not offline)
+    # M293：候选不再硬截断到 limit —— 纯库/无路由仓不占名额，顺延抓下一个。
+    items = list(scout.get("items") or [])
 
     records: list[dict] = []
     ledger: list[dict] = []

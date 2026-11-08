@@ -346,7 +346,8 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                 days: int = 14, limit: int = 10, min_stars: int = 300,
                 max_stars: int = 10000, allow_online: bool = True,
                 today: _dt.date | None = None,
-                terms_per_language: int = 2) -> dict:
+                terms_per_language: int = 2,
+                exclude_slugs: set[str] | list[str] | None = None) -> dict:
     """M285/M311/M325：每日动态抓新仓（跨语言 Round-Robin 混排）。
 
     每个语言分两条轨：
@@ -357,6 +358,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
     在线查询全部失败时整体回退离线种子，同样轮转混排。
     """
     langs = [str(x).strip() for x in (languages or []) if str(x).strip()]
+    excluded = {str(x) for x in (exclude_slugs or set())}
     today = today or _dt.date.today()
     since = (today - _dt.timedelta(days=max(1, int(days)))).isoformat()
     per_page = min(max(int(limit) * 3, 30), 50)
@@ -463,9 +465,34 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                 continue
             spec["page_used"] = 1
         else:
-            spec["page_used"] = page
+            spec.setdefault("page_used", page)
         online_ok += 1
         parsed, drop, drop_tool = _parse_search(data, spec["language"])
+        if excluded:
+            parsed = [x for x in parsed if x.get("slug") not in excluded]
+        # M346：当前页剔除冷却仓后不足 2 个，且还有下一页时，顺延 page+1/+2。
+        # 单查询最多多翻 2 页，避免把整轮变成无限分页。
+        try:
+            total_count = int(data.get("total_count") or 0)
+        except (TypeError, ValueError):
+            total_count = 0
+        extra = 0
+        while (excluded and len(parsed) < 2 and extra < 2
+               and total_count > (page + extra) * per_page):
+            nxt = page + extra + 1
+            okp, datap, errp = _get(search_url(spec["query"], nxt, per_page))
+            if not okp or not isinstance(datap, dict):
+                errors.append(f"{spec['language']}: {errp}")
+                break
+            more, d2, t2 = _parse_search(datap, spec["language"])
+            if excluded:
+                more = [x for x in more if x.get("slug") not in excluded]
+            parsed += more
+            dropped += d2
+            dropped_tool += t2
+            spec["page_used"] = nxt
+            spec["cooldown_pages"] = extra + 1
+            extra += 1
         buckets[spec["language"]] += parsed
         dropped += drop
         dropped_tool += drop_tool
