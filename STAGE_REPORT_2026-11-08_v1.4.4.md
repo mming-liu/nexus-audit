@@ -109,13 +109,50 @@ EnterpriseAgentFramework（HEAD 5203cf7）：
 | PlatformRunCenterConversationController.detail sqli | eq 参数化；last("limit 1") 常量 |
 | PlatformRunCenterConversationController.list sqli | like/eq 参数化；last("limit " + 常量) |
 
-因此本轮新增真实 A = 0。v1.4.3 的 WorkFlow-Engine SQLi 仍是唯一
-待披露的新根因（1 根因 / 3 路由）。
+因此本轮 daily-hunt 新增真实 A = 0。
 
-## 五、结论与下一步
+## 五、组织矿脉：risesoft-y9 全系（M341 延伸）
 
-1. 第 4 单证据链已封箱，鉴权为 PR:L/8.8；先走私密 Advisory/邮件，
-   不要按 9.8 报，也不要在公开 Issue 贴 payload。
+按“同团队/同架构复用错误”的假设，对 org 下 9 个公开仓做全扫
+（max_roots=8、min_units=8、cooldown=0）：
+
+    9 仓全扫 / 24 个根因 / 13 条机器 A 记录
+
+| 仓库 | 根因 | 机器 A | 人工结论 |
+| --- | ---: | ---: | --- |
+| Digital-Infrastructure | 6 | 3 | 3 条 deserial 假阳（@JsonTypeInfo NONE + 具体类型） |
+| WorkFlow-Engine | 6 | 6 | 6 条 SQLi，同一根因，CONFIRM |
+| DataFlow-Engine | 3 | 3 | 3 条 sqli 假阳（metadata/JPA） |
+| Network-Drive | 2 | 1 | 1 条 path traversal，CONFIRM |
+| Data-Labeling / Email / Code-Generator / Intelligent-Search / API-Platform | 7 | 0 | 均在 B 板或 0 根因 |
+
+### WorkFlow：从 3 条扩到 6 条
+
+新增 /vue/recycle 三条同根因路由：recycleList / recycleList4All /
+recycleList4Dept。调用链仍是 searchMapStr → WorkListServiceImpl →
+ItemRecycleApiImpl → Y9TableServiceImpl 的 LIKE/等值拼接。第 4 单应写成
+**1 个 CVE / 6 条 affected endpoints**，不拆单。
+
+### Network-Drive：新的真实路径穿越（第 5 单候选）
+
+- uploadChunk1:110 与 mergeFile:152 都把 Chunk.identifier / filename
+  直接交给 FileUtils.generatePath；后者拼接
+  uploadFolder + "/" + identifier + "/" + filename + "-" + chunkNumber，
+  没有 normalize/startsWith。
+- uploadChunk1 随后 Files.write(path, bytes)；mergeFile 同样
+  Files.createFile + 合并写盘。identifier=../../../../... 可逃出 upload 根。
+- 本地复现 ESCAPED=True；/vue/uploader 在 /vue/* 之下，PR:L。
+- dedup：ZERO_RECORD_FRESH；暂定 CVSS 8.1 High，按部署权限复核。
+- 与 WorkFlow 是不同仓、不同根因，分开提交。
+
+因此组织矿脉的真实新增是 **WorkFlow 扩到 6 路由 + Network-Drive 1 条新根因**；
+daily-hunt 的 5 条 EnterpriseAgentFramework A 仍全部是假阳。
+
+## 六、结论与下一步
+
+1. 第 4 单（WorkFlow）证据链已封箱，鉴权为 PR:L/8.8，合并 6 条路由；
+   先走私密 Advisory/邮件，不要按 9.8 报，也不要在公开 Issue 贴 payload。
+   Network-Drive 是第 5 单候选，独立提交，先复核写盘影响面。
 2. 星标 300/500 与 ComfyUI/Gradio/study 过滤生效；高星标池当前大部分在
    7 天冷却期，下一轮可等冷却或换 --cooldown-days 0 做补充，不要
    把“实扫 1”误读成名额算法坏了。
