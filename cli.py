@@ -6117,6 +6117,99 @@ def cmd_org_hunt(args) -> int:
     return 0
 
 
+def cmd_cve_submit(args) -> int:
+    """M356：MITRE CVE form API 直投。"""
+    from core.context import mitre_cna as mc
+    from core.text_utils import ensure_utf8_stdio
+    ensure_utf8_stdio()
+    if args.list_targets:
+        for key, spec in mc.CNA_TARGETS.items():
+            print(f"{key:18s} {spec['repo']:38s} {spec['cwe']:8s} "
+                  f"CVSS {spec['cvss']}")
+        return 0
+    token = args.token or ""
+    info = None
+    if token:
+        try:
+            info = mc.parse_login_blob(token)
+        except mc.MitreCveError as exc:
+            print(f"[cve-submit] token 解析失败：{exc}")
+            return 2
+        print(f"[cve-submit] token: {info['email'] or '?'} | "
+              f"sid={info['sid'][:8]} | remaining={info['remaining_sec']}s")
+        if info["expired"]:
+            print("[cve-submit] token 已过期（8 分钟窗口），请重新登录复制新的 login success 行")
+            if args.reserve_and_submit or args.submit:
+                return 2
+    if args.status:
+        client = mc.CveFormClient(
+            token=(info or {}).get("access_token", ""),
+            email=(args.email or (info or {}).get("email", "")),
+            org=(info or {}).get("org", ""))
+        try:
+            res = client.status(args.status)
+        except mc.MitreCveError as exc:
+            print(f"[cve-submit] 查询失败：{exc}")
+            return 1
+        print(json.dumps(res, ensure_ascii=False, indent=2))
+        return 0
+    if not args.target:
+        print("[cve-submit] 需要 --target，或 --status，或 --list")
+        return 2
+    spec = mc.CNA_TARGETS.get(args.target)
+    if not spec:
+        print(f"[cve-submit] 未知标的：{args.target}")
+        return 2
+    can_id = args.can or spec.get("can_id") or "CAN-2026-0000001"
+    record = mc.build_cna_record(
+        spec, can_id,
+        requester_id=(info or {}).get("sub", ""),
+        org=(info or {}).get("org", ""),
+        org_id="")
+    errors = mc.validate_cna_record(record)
+    if errors:
+        print("[cve-submit] 本地校验失败：")
+        for _e in errors:
+            print("  - " + _e)
+        return 1
+    if args.dry_run or (not args.reserve_and_submit and not args.submit):
+        text = json.dumps(record, ensure_ascii=False, indent=2)
+        print(text)
+        if args.json:
+            Path(args.json).write_text(text + chr(10), encoding="utf-8")
+            print(f"[cve-submit] 已写入 {args.json}")
+        return 0
+    if not info or info.get("expired"):
+        print("[cve-submit] 需要有效的 8 分钟 token")
+        return 2
+    client = mc.CveFormClient(
+        token=info["access_token"], email=(args.email or info["email"]),
+        org=info.get("org", ""))
+    try:
+        _org_id = ""
+        try:
+            _oi = client.org_info()
+            _org_id = str(_oi.get("UUID") or _oi.get("uuid") or "")
+        except mc.MitreCveError:
+            _org_id = ""
+        if args.reserve_and_submit:
+            can_id = client.reserve_can(args.year or 0 or None)
+            print(f"[cve-submit] 已预留 {can_id}")
+        record = mc.build_cna_record(
+            spec, can_id, requester_id=info.get("sub", ""),
+            org=info.get("org", ""), org_id=_org_id)
+        res = client.submit_record(can_id, record)
+        out = {"can_id": can_id, "target": args.target,
+               "response": res, "record": record}
+        path = client.save(can_id, out)
+        print(json.dumps({"ok": True, "can_id": can_id, "saved": str(path),
+                          "response": res}, ensure_ascii=False, indent=2))
+        return 0
+    except mc.MitreCveError as exc:
+        print(f"[cve-submit] 提交失败：{exc}")
+        return 1
+
+
 def cmd_client_audit(args) -> int:
     """M274/M290：客户离线交付五件套 / 售前预览单。"""
     import zipfile
@@ -6456,6 +6549,30 @@ def main():
     p_org.add_argument("--offline-dedup", action="store_true")
     p_org.add_argument("--evict-cache", action="store_true")
     p_org.add_argument("--repo-timeout", type=int, default=300)
+    p_cve = sub.add_parser(
+        "cve-submit",
+        help="M353-M356：MITRE CVE form API 直投（CAN 预留 + CVE 5.2 提交）")
+    p_cve.add_argument("--list", action="store_true", dest="list_targets",
+                       help="列出内置可投递标的")
+    p_cve.add_argument("--target", default=None,
+                       help="标的 key（metasfresh / workflow-engine / ...）")
+    p_cve.add_argument("--token", default=None,
+                       help="Login 弹窗整行文本 / {access_token} JSON / 裸 JWT")
+    p_cve.add_argument("--email", default=None,
+                       help="可选：覆盖 login blob 里的邮箱")
+    p_cve.add_argument("--status", default=None,
+                       help="查询 CAN/CVE 状态，例如 CAN-2026-2041058")
+    p_cve.add_argument("--can", default=None,
+                       help="已知 CAN/CVE 编号（配合 --submit）")
+    p_cve.add_argument("--dry-run", action="store_true",
+                       help="离线生成并校验 CVE 5.2 JSON，不发请求")
+    p_cve.add_argument("--reserve-and-submit", action="store_true",
+                       help="预留新 CAN 并立即提交")
+    p_cve.add_argument("--submit", action="store_true",
+                       help="配合 --can 提交已有记录")
+    p_cve.add_argument("--year", type=int, default=0)
+    p_cve.add_argument("--json", default=None,
+                       help="dry-run 输出 JSON 文件")
     p_client = sub.add_parser("client-audit",
                               help="M274/M290：客户离线交付五件套 / 售前预览单")
     p_client.add_argument("target", help="目录 / zip / 单文件")
@@ -6518,6 +6635,8 @@ def main():
         sys.exit(cmd_daily_hunt(args))
     elif args.command == "org-hunt":
         sys.exit(cmd_org_hunt(args))
+    elif args.command == "cve-submit":
+        sys.exit(cmd_cve_submit(args))
     elif args.command == "client-audit":
         sys.exit(cmd_client_audit(args))
     elif args.command == "export-packs":

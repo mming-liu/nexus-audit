@@ -12214,6 +12214,63 @@ check("M349：uploadS3Storage 不被 download CVE 连坐",
       _r321b["status"] != "DUPLICATE_CVE", True)
 check("M351：已执行断言数 >= 1935", COUNTS["n"] >= 1935, True)
 
+print("\n[322] M356：MITRE CVE form API 直投客户端")
+from core.context import mitre_cna as _mc322                     # noqa: E402
+_blob322 = ('login success - this additional data is needed ONLY if you have '
+            'your own client: mmliu0804@gmail.com {"access_token":'
+            '"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.'
+            'eyJzdWIiOiI2YWUyMGVmMTIwMDhiMjBkNGNmNDBkMTMiLCJzaWQiOiJiYWUyMTBmMS05'
+            'ZTZhLTQ2ZTgtOTNjZS04Zjg3ZjVkYTFjZGYiLCJzY29wZSI6ImFwaSIsImlzcyI6'
+            'Imh0dHBzOi8vY3ZlZm9ybS1hcGkubWl0cmUub3JnIiwiYXVkIjoiYXBpIiwiaWF0'
+            'IjoxNzk0MTI4OTY0LCJleHAiOjE3OTQxMjk0NDR9.'
+            'NJDwxYQYYy61Ij4WCuHPagsyaUGkBkfRpOv_f_JRkj0"}')
+_info322 = _mc322.parse_login_blob(_blob322)
+check("M356：整行 login blob 解析邮箱",
+      _info322["email"], "mmliu0804@gmail.com")
+check("M356：JWT sub/sid 提取",
+      (_info322["sub"], _info322["sid"][:8]),
+      ("6ae20ef12008b20d4cf40d13", "bae210f1"))
+check("M356：过期判断与 iss",
+      (_info322["expired"], _info322["iss"]),
+      (True, "https://cveform-api.mitre.org"))
+_errors322 = []
+for _key, _spec in _mc322.CNA_TARGETS.items():
+    _rec = _mc322.build_cna_record(
+        _spec, _spec.get("can_id") or "CAN-2026-0000001",
+        requester_id=_info322["sub"], org=_info322["org"])
+    _errors322 += [f"{_key}: {e}" for e in _mc322.validate_cna_record(_rec)]
+check("M356：6 个内置标的 CVE 5.2 零红标", _errors322, [])
+_calls322 = []
+
+
+def _fake_request322(method, path, body=None):
+    _calls322.append((method, path, body))
+    if path == "cve-id":
+        return {"cve_ids": [{"cve_id": "CAN-2026-9999999"}]}
+    if path.startswith("cve/CAN-2026-9999999") and method == "GET":
+        raise _mc322.MitreCveError("HTTP 404")
+    if path == "cve/CAN-2026-9999999/cna":
+        return {"ok": True, "state": "PUBLISHED"}
+    raise _mc322.MitreCveError("unexpected " + method + " " + path)
+
+
+_c322 = _mc322.CveFormClient(
+    "dummy", email="mmliu0804@gmail.com",
+    org="mmliu0804:gmail.com..0")
+_c322._request = _fake_request322
+_can322 = _c322.reserve_can(2026)
+check("M356：reserve_can 解析 cve_ids", _can322, "CAN-2026-9999999")
+_spec322 = _mc322.CNA_TARGETS["metasfresh"]
+_rec322 = _mc322.build_cna_record(
+    _spec322, _can322, requester_id=_info322["sub"],
+    org=_info322["org"])
+_sub322 = _c322.submit_record(_can322, _rec322)
+check("M356：mock 提交闭环", _sub322.get("ok"), True)
+check("M356：提交 body 是 cnaContainer",
+      any(c[0] == "POST" and c[1].endswith("/cna")
+          and "cnaContainer" in (c[2] or {}) for c in _calls322), True)
+check("M356：已执行断言数 >= 1950", COUNTS["n"] >= 1950, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
