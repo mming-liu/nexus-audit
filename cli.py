@@ -6092,6 +6092,31 @@ def cmd_daily_hunt(args) -> int:
     return 0 if res.get("ok") else 1
 
 
+def cmd_org_hunt(args) -> int:
+    """M347：组织矿脉深扫。"""
+    from pathlib import Path as _Path
+    from core.context import org_hunt
+    from core.text_utils import ensure_utf8_stdio
+    ensure_utf8_stdio()
+    orgs = [x.strip() for x in (args.orgs or "").split(",") if x.strip()]
+    langs = [x.strip() for x in (args.languages or "").split(",") if x.strip()]
+    res = org_hunt.run(
+        orgs=orgs, languages=langs, max_roots=args.max_roots,
+        min_units=args.min_units, limit=args.limit,
+        report=_Path(args.report), json_path=_Path(args.json),
+        packs_dir=_Path(args.packs_dir), offline=args.offline,
+        dedup_online=not args.offline_dedup,
+        evict_cache=args.evict_cache, repo_timeout=args.repo_timeout)
+    if not res.get("ok"):
+        print(f"[org-hunt] 失败：{res.get('error') or 'no repos'}")
+        return 1
+    print(f"[org-hunt] 组织 {len(orgs)} ｜ 业务仓 {len(res['repos'])} ｜ "
+          f"实扫 {res['scanned']} ｜ 根因 {res['new_roots']} ｜ "
+          f"A {res['board_a']}")
+    print(f"[org-hunt] 报告 → {res['report']}；JSON → {res['json']}")
+    return 0
+
+
 def cmd_client_audit(args) -> int:
     """M274/M290：客户离线交付五件套 / 售前预览单。"""
     import zipfile
@@ -6412,6 +6437,25 @@ def main():
     p_daily.add_argument("--refresh-advisories", action="store_true",
                          help="强制刷新全局 GitHub Advisory 缓存（默认 24h 复用）")
     p_daily.add_argument("--dry-run", action="store_true")
+    p_org = sub.add_parser(
+        "org-hunt",
+        help="M347：组织矿脉深扫（GitHub org → 业务仓 → 大深度根因）")
+    p_org.add_argument("--orgs", required=True,
+                       help="逗号分隔组织/用户（如 risesoft-y9,jeecgboot）")
+    p_org.add_argument("--languages", default="java,python")
+    p_org.add_argument("--max-roots", type=int, default=25,
+                       help="每仓最多复核多少条根因（默认 25）")
+    p_org.add_argument("--min-units", type=int, default=5,
+                       help="最小路由密度（默认 5）")
+    p_org.add_argument("--limit", type=int, default=0,
+                       help="最多扫描多少个仓（0=组织内全部业务仓）")
+    p_org.add_argument("--report", default="ORG_HUNT_REPORT.md")
+    p_org.add_argument("--json", default="benchmarks/results/org_hunt.json")
+    p_org.add_argument("--packs-dir", default="benchmarks/results/org_hunt_packs")
+    p_org.add_argument("--offline", action="store_true")
+    p_org.add_argument("--offline-dedup", action="store_true")
+    p_org.add_argument("--evict-cache", action="store_true")
+    p_org.add_argument("--repo-timeout", type=int, default=300)
     p_client = sub.add_parser("client-audit",
                               help="M274/M290：客户离线交付五件套 / 售前预览单")
     p_client.add_argument("target", help="目录 / zip / 单文件")
@@ -6472,6 +6516,8 @@ def main():
         sys.exit(cmd_live_hunt(args))
     elif args.command == "daily-hunt":
         sys.exit(cmd_daily_hunt(args))
+    elif args.command == "org-hunt":
+        sys.exit(cmd_org_hunt(args))
     elif args.command == "client-audit":
         sys.exit(cmd_client_audit(args))
     elif args.command == "export-packs":
