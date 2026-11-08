@@ -11998,6 +11998,26 @@ check("M339：daily meta 暴露 min_units",
       _res316["daily"].get("min_units"), 8)
 check("M340：已执行断言数 >= 1900", COUNTS["n"] >= 1900, True)
 
+print("\n[309] M323/M324：标量 find 与 :name 绑定（今日去误报）")
+check("M323：refmods.find(request.query.get) 不判 nosqli",
+      _rd307.nosqli_verdict(
+          'async def refmod_preview(request):\n'
+          '    item = refmods.find(request.query.get("name") or "")\n'
+          '    return item\n'), None)
+check("M323：where.append(:name)+addValue 判 False",
+      _rd307.sqli_verdict(
+          'public ApiResponse list(@RequestParam(required = false) String source) {\n'
+          '    StringBuilder where = new StringBuilder(" WHERE 1 = 1 ");\n'
+          '    MapSqlParameterSource params = new MapSqlParameterSource();\n'
+          '    if (source != null) {\n'
+          '        where.append(" AND i.source = :source");\n'
+          '        params.addValue("source", source);\n'
+          '    }\n'
+          '    Long total = jdbc.queryForObject("SELECT count(*) FROM invocations i " + where, params, Long.class);\n'
+          '    return ApiResponse.success(total);\n'
+          '}\n'), False)
+check("M323：已执行断言数 >= 1850", COUNTS["n"] >= 1850, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

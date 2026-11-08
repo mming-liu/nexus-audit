@@ -1128,7 +1128,7 @@ def _sql_builder_placeholder_only(source: str) -> bool:
             arg = _balanced_cond(source, mm.end())
             if arg is not None:
                 args.append(arg.strip())
-        if not args or not any("?" in a for a in args):
+        if not args or not any("?" in a or re.search(r":\w+", a) for a in args):
             continue
         if all(re.fullmatch(r'"[^"]*"|\'[^\']*\'', a) for a in args):
             return True
@@ -1159,7 +1159,8 @@ def sqli_verdict(source: str) -> bool | None:
     if (_sql_builder_placeholder_only(source)
             and re.search(r"\b(?:prepareStatement|setString|setObject|"
                           r"setInt|bind)\s*\(", source)
-            and re.search(r"parameters\s*\.\s*add\s*\(|\bbind\s*\(",
+            and re.search(r"parameters\s*\.\s*add\s*\(|\bbind\s*\(|"
+                          r"\.\s*addValue\s*\(|\bsetParameter\s*\(",
                           source)):
         return False
 
@@ -1291,6 +1292,12 @@ def sqli_verdict(source: str) -> bool | None:
             or SQLI_JDBC_SINK_RE.search(body)):
         hv = _helper_concat_sql(source)
         if hv is True:
+            # 下一跳的"拼接"只是 where.append(" AND x = :name")，值走
+            # params.addValue 绑定（funchole 形态）→ 参数化，不是注入。
+            if _sql_builder_placeholder_only(source) and re.search(
+                    r"\.\s*addValue\s*\(|\bsetParameter\s*\(|"
+                    r"parameters\s*\.\s*add\s*\(", source):
+                return False
             return True
         if hv is False:
             # 值域锁死（`List<Long>` / `Integer`）—— 与入口体里的
@@ -1308,6 +1315,12 @@ def sqli_verdict(source: str) -> bool | None:
         #   3) 拼接的操作数是**没见过的清洗函数** ——
         #      那是"不确定"，不是"有把握"。
         if SQLI_CONCAT_RE.search(body):
+            # M323：动态段全是 ?/:name 占位符 + 参数绑定（funchole 的
+            # where.append(" AND i.source = :source") + params.addValue）。
+            if _sql_builder_placeholder_only(source) and re.search(
+                    r"\.\s*addValue\s*\(|\bsetParameter\s*\(|"
+                    r"parameters\s*\.\s*add\s*\(", body):
+                return False
             if _concat_params_all_numeric(body):
                 return False
             # 1b) 拼接进来的每个局部变量都能上溯到常量 —— 容器覆盖、恒真分支、
@@ -11393,6 +11406,12 @@ def nosqli_verdict(source: str) -> bool | None:
         elif not re.search(r"\.\s*(?:find|find_one|find_one_and_\w+|update_one"
                            r"|update_many|delete_one|delete_many|aggregate"
                            r"|count_documents)\s*\(\s*request\s*\.", body):
+            return None
+        # 纯标量查名不是 Mongo 查询文档：`refmods.find(request.query.get("name"))`
+        # 是列表里的等值查找，攻击者控制的是"名字"，不是操作符。
+        if re.search(r"\.\s*(?:find|find_one|find_one_and_\w+)\s*\(\s*"
+                     r"request\s*\.\s*(?:query|args|form)\s*\.\s*get\s*\(",
+                     body):
             return None
         if _MONGO_DOLLAR_GUARD_RE.search(body) and _MONGO_ABORT_RE.search(body):
             return False

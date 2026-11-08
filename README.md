@@ -71,6 +71,13 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.20 标量查找与命名参数绑定去误报（M323/M324 续）
+
+- **nosqli**：`x.find(request.query.get("name"))` 这类**标量查名**不再判 Mongo 注入
+  （参数是名字不是查询文档）。
+- **sqli**：`where.append(" AND x = :name")` + `params.addValue(...)` 的命名参数
+  绑定，在 JDBC/helper 两条分支都判 False（funchole 形态）。
+
 ### v1.3.18 占位符拼接去误报 + 同包鉴权基线（M322）
 
 - **sqli**：`StringBuilder/StringBuffer` 的动态段全部是含 `?` 的字符串字面量、
