@@ -11662,7 +11662,7 @@ check("M325：传统词按天轮转到 page 2..4",
       any(s["track"] == "traditional" and 2 <= int(s["page"]) <= 4
           for s in _r309["query_specs"]), True)
 check("M325：传统词使用星标分桶",
-      any("stars:451..2000" in q or "stars:150..450" in q
+      any("stars:1001..5000" in q or "stars:300..1000" in q
           for q in _r309["queries"]), True)
 check("M325：离线回退仍标注来源", _r309["source"], "offline_seed")
 
@@ -11931,9 +11931,9 @@ check("M339：回退词全部是业务系统词",
                 "portal", "workflow", "knowledge", "rag", "lowcode",
                 "mes", "wms", "iot")
           for w in _ts316.NEW_GEN_FALLBACK_WORDS), True)
-check("M339：回退窗口 created>2024-01-01 / stars 60..5000",
+check("M339：回退窗口 created>2024-01-01 / stars 150..5000",
       (_ts316.NEW_GEN_FALLBACK_CREATED_SINCE,
-       _ts316.NEW_GEN_FALLBACK_STARS), ("2024-01-01", (60, 5000)))
+       _ts316.NEW_GEN_FALLBACK_STARS), ("2024-01-01", (150, 5000)))
 from urllib.parse import unquote as _unquote316                  # noqa: E402
 _orig_get316 = _ts316._get
 
@@ -12017,6 +12017,62 @@ check("M323：where.append(:name)+addValue 判 False",
           '    return ApiResponse.success(total);\n'
           '}\n'), False)
 check("M323：已执行断言数 >= 1850", COUNTS["n"] >= 1850, True)
+
+print("\n[317] M342：星标门槛 + ComfyUI/Gradio + *-study 过滤")
+check("M342：Java-Agent-Study 判教学仓",
+      _ts309.is_tutorial("acme/Java-Agent-Study"), True)
+check("M342：foo_learn 判教学仓",
+      _ts309.is_tutorial("acme/foo_learn"), True)
+check("M342：ComfyUI 插件判工具库",
+      _ts309.is_tool_lib("acme/MiniMax-H3-Prompt-Rewriter-ComfyUI"), True)
+check("M342：Gradio 应用判工具库",
+      _ts309.is_tool_lib("acme/gradio-ui", "gradio app"), True)
+check("M342：新生代星标下限 150",
+      _ts309.NEW_GEN_STARS[0], 150)
+check("M342：传统分桶从 300 起",
+      _ts309.TRADITIONAL_STAR_BUCKETS,
+      ((300, 1000), (1001, 5000)))
+import inspect as _inspect317                                   # noqa: E402
+check("M342：scout_daily 默认 min_stars=300",
+      _inspect317.signature(_ts309.scout_daily).parameters["min_stars"].default,
+      300)
+
+print("\n[318] M343：全 LOCAL/DEMO 仓退还实扫名额")
+_dh318 = _dh316
+_ws318 = Path(_ws_mkdtemp("smoke_refund318_"))
+_old_proc318 = _dh318.process_repo
+
+
+def _proc318(slug, repo, entry, **kw):
+    if slug == "acme/local":
+        return {"skipped_unchanged": False, "head_sha": "a" * 40,
+                "entry": {"last_scanned_sha": "a" * 40, "fresh_total": 0},
+                "total_units": 20,
+                "records": [{"category": "authz",
+                             "noise_code": "LOCAL_LOOPBACK_ONLY"}]}
+    return {"skipped_unchanged": False, "head_sha": "b" * 40,
+            "entry": {"last_scanned_sha": "b" * 40, "fresh_total": 1},
+            "total_units": 20, "records": []}
+
+
+_dh318.process_repo = _proc318
+try:
+    _res318 = _dh318.run(
+        limit=1, state_path=_ws318 / "s.json",
+        report=_ws318 / "R.md", json_path=_ws318 / "R.json",
+        packs_dir=_ws318 / "packs",
+        scout_fn=lambda **kw: {"ok": True, "source": "test", "items": [
+            {"slug": "acme/local"}, {"slug": "acme/real"}]},
+        sync_fn=lambda s: {"status": "OK", "path": str(_ws318)},
+        dedup_fn=lambda *a, **k: {"status": "UNKNOWN"})
+finally:
+    _dh318.process_repo = _old_proc318
+check("M343：全噪仓记 all_local_or_demo",
+      _res318["ledger"][0].get("reason"), "all_local_or_demo")
+check("M343：全噪仓不占名额、顺延扫到真仓",
+      (_res318["ledger"][1]["result"], _res318["daily"]["scanned"]),
+      ("SCANNED", 1))
+check("M344：已执行断言数 >= 1920", COUNTS["n"] >= 1920, True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 
