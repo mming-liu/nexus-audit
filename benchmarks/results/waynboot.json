@@ -6,7 +6,7 @@
   "correct": 205,
   "fp": 0,
   "reverse_fn": 0,
-  "rule_evaluations": 1096,
+  "rule_evaluations": 1099,
   "global_cors_hit": true,
   "sa_token_anchors": {
     "@SaCheckPermission": true,

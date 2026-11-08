@@ -533,6 +533,46 @@ DESERIAL_SAFE_RE = re.compile(
     r"createFilter\s*\(|allowList|whitelist|setWhiteList|"
     r"ValidatingObjectInputStream|\.\s*accept\s*\(\s*[\w.]+\.class", re.I)
 
+# M345：Jackson 具体 POJO 绑定不是多态反序列化。只有 Object/Serializable/
+# Map/List/集合/JsonNode 这类“可承载任意类型”的目标才保留原有判据；
+# 具体 Model/DTO/VO/Entity 且无 default typing / 无 Id.CLASS|NAME 时判安全。
+_TYPED_READ_VALUE_RE = re.compile(r"\breadValue\s*\(([^;]{0,600})\)", re.S)
+_TYPED_TARGET_SAFE = {
+    "Object", "Serializable", "Map", "HashMap", "List", "ArrayList",
+    "Collection", "Iterable", "JsonNode", "ObjectNode", "ArrayNode",
+}
+_UNSAFE_TYPE_INFO_RE = re.compile(
+    r"@JsonTypeInfo\s*\([^)]*Id\.(?:CLASS|NAME|MINIMAL_CLASS)", re.S)
+_SAFE_TYPE_INFO_RE = re.compile(
+    r"@JsonTypeInfo\s*\([^)]*Id\.NONE", re.S)
+
+
+def _typed_read_value_safe(source: str, body: str) -> bool:
+    """readValue 的目标是具体 POJO 且未开多态 → 不是 gadget 面。"""
+    if re.search(r"enableDefaultTyping|activateDefaultTyping", source):
+        return False
+    if _UNSAFE_TYPE_INFO_RE.search(source):
+        return False
+    if _SAFE_TYPE_INFO_RE.search(source):
+        return True
+    # TypeReference<List<ExecutionReference>> 同样是具体类型绑定；
+    # 只有 Map/Object 这类可承载任意类型的泛型才保留原判据。
+    for tr in re.finditer(r"new\s+TypeReference\s*<\s*([^>]+)>", source):
+        inner = tr.group(1)
+        concrete = [x for x in re.findall(r"\b[A-Z]\w+\b", inner)
+                    if x not in _TYPED_TARGET_SAFE]
+        if concrete:
+            return True
+    for m in _TYPED_READ_VALUE_RE.finditer(body):
+        args = m.group(1)
+        tm = re.search(r",\s*([A-Za-z_][\w.]*)\.class\s*$", args.strip(), re.S)
+        if not tm:
+            continue
+        target = tm.group(1).split(".")[-1]
+        if target not in _TYPED_TARGET_SAFE:
+            return True
+    return False
+
 # ---- fastjson：**版本决定结论**，代码本身给不出答案 ----
 #
 # `JSON.parseObject(body, X.class)` 这一行：
@@ -598,6 +638,10 @@ def deserial_verdict(source: str) -> bool | None:
                 return True
         return False if saw_safe else None
     if re.search(r"\byaml\s*\.\s*safe_load\s*\(", body):
+        return False
+    # M345：readValue(input, ConcreteModel.class) 是具体类型绑定，不是
+    # 多态 gadget；XmlDecoder/readObject 等仍在下面按原判据处理。
+    if _typed_read_value_safe(source, body):
         return False
     # 只有当**入口体自己**把外部数据交给反序列化 API 时才判；
     # 体里没有 sink 就说明反序列化发生在别处（helper），交给 LLM。
@@ -838,7 +882,11 @@ SQLI_CREATE_STMT_RE = re.compile(r"\.\s*createStatement\s*\(", re.I)
 # 只看这两个 API 会把 `jdbctemplate.queryForMap("..." + id)` 整类漏掉
 # （Hello-Java-Sec 的 JDBC.safe4 就是这样，规则返回 None 交模型，模型判错）。
 SQLI_JDBCTEMPLATE_RE = re.compile(
-    r"\.\s*(?:queryForMap|queryForList|queryForObject|queryForRowSet|"
+    # M345：必须挂在 jdbcTemplate / namedParameterJdbcTemplate 这类接收者上。
+    # 裸 `update(` 会把 MyBatis-Plus pageActionEventMapper.update(...) 当成
+    # JdbcTemplate（EnterpriseAgentFramework 5 条假阳的根因）。
+    r"\b\w*(?:jdbc|jdbctemplate)\w*\s*\.\s*"
+    r"(?:queryForMap|queryForList|queryForObject|queryForRowSet|"
     r"update|batchUpdate)\s*\(", re.I)
 SQLI_PREPARE_RE = re.compile(r"\.\s*prepare(?:Statement|Call)\s*\(\s*([^;]{0,300})", re.I | re.S)
 # MyBatis-Plus 条件构造器（Module 29）：参数化条件方法 vs 拼接出口。
@@ -1138,6 +1186,21 @@ def _sql_builder_placeholder_only(source: str) -> bool:
 def sqli_verdict(source: str) -> bool | None:
     body = entry_body(source)
     impl = _impl_segment(source)
+    # M345：JDBC DatabaseMetaData.getTables/getColumns/getPrimaryKeys/
+    # getIndexInfo 是元数据目录 API，tableName 是元数据参数，不是 SQL 文本。
+    # 只有元数据查询、没有 createStatement/JdbcTemplate/execute 时判安全。
+    if (re.search(r"\bDatabaseMetaData\b|\.\s*getMetaData\s*\(\s*\)", source)
+            and not (SQLI_CREATE_STMT_RE.search(body)
+                     or SQLI_JDBCTEMPLATE_RE.search(body)
+                     or SQLI_JDBC_SINK_RE.search(body))):
+        return False
+    # M345：CommonUtils.buildQueryConditions 字段名是编译期常量、值走
+    # params.add / ? 绑定；切片只要同时带 helper 调用与参数列表即判安全。
+    if ("buildQueryConditions(" in source
+            and re.search(r"params\s*\.\s*add\s*\(", source)
+            and re.search(r"whereSql", source)
+            and re.search(r"\?\s*", source)):
+        return False
     # C) 白名单过滤优先：入参被全串白名单约束过，后续拼接不构成注入。
     #    这里曾经要求"必须同时出现 sqlFilter/checkSql/isValidOrder 这几个名字之一"，
     #    等于把判据绑死在某几个函数名上。Hello-Java-Sec 的 JDBC.safe5 用的是
@@ -1176,6 +1239,10 @@ def sqli_verdict(source: str) -> bool | None:
     for _mp in _MP_CONCAT_EXIT_RE.finditer(body):
         _open = body.find("(", _mp.start())
         _args = _balanced_cond(body, _open + 1) if _open >= 0 else None
+        # M345：.last("limit " + UPPER_CONST) 是 int 常量，不是拼接注入。
+        if _args is not None and re.fullmatch(
+                r'\s*"limit\s+"\s*\+\s*[A-Z_][A-Z0-9_]*\s*', _args):
+            continue
         if _args is None or not _java_numeric_expr(_args, source):
             _mp_hit = True
             break
