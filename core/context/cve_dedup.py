@@ -190,7 +190,10 @@ def _local_match(slug: str, aliases: list[str], category: str,
             # 同文件的 getFollowUpRecordPage（后者仍是未修复入口）。
             norm = lambda s: s.split("#")[0].strip().lower()
             if norm(uni) != norm(unit):
-                continue
+                # M349：seed 的 unit 只写类名（CVE 描述只点名整类）时，
+                # 允许匹配该类的任意方法；单方法 seed 仍精确匹配。
+                if ("." in uni or not norm(unit).startswith(norm(uni) + ".")):
+                    continue
         out.append(sig)
     return out
 
@@ -570,6 +573,36 @@ def query_github_global_advisories(slug: str, unit: str = "",
     return res
 
 
+def _class_wide_match(unit: str, file: str, text: str) -> bool:
+    """CVE 只点名 Controller 类、未点名方法 → 整类命中。
+
+    CVE-2026-77036 的官方描述只写
+    EmailController/AliPayController/GeneratorController/GenConfigController，
+    没有方法名；这类描述对类内任意方法都应判重号。反之，CVE-2026-108706
+    明确写 downloadS3Storage handler / GET .../download/{id}，只能拦下载方法，
+    不能连坐同文件的 uploadS3Storage。
+    """
+    raw = text or ""
+    t = raw.lower()
+    cls = (unit.rsplit(".", 1)[0] if "." in unit else Path(file).stem).strip()
+    cls = cls.split(".")[-1]
+    if len(cls) < 8 or cls.lower() in {c.lower() for c in _GENERIC_CLASSES}:
+        return False
+    if not re.search(rf"(?<![A-Za-z0-9_]){re.escape(cls)}(?![A-Za-z0-9_])",
+                     t, re.I):
+        return False
+    # 明确点名了另一个 lowerCamel 方法（downloadS3Storage handler）→ 不整类。
+    # 有些 GHSA 只写 downloadS3Storage、不带 handler 后缀；因此按 lowerCamel
+    # token 判断，并排除 URL 段（/api/s3Storage/...）与类名自身后缀。
+    for tok in re.findall(r"(?<![A-Za-z0-9_])[a-z][A-Za-z0-9]*[A-Z][A-Za-z0-9]*(?![A-Za-z0-9_])", raw):
+        if tok.lower() in cls.lower():
+            continue
+        if f"/{tok}" in raw or f"{tok}/" in raw:
+            continue
+        return False
+    return True
+
+
 def _unit_in_text(unit: str, file: str, text: str) -> bool:
     """CVE 描述是否精确提到这个方法；不能因为同文件别的 CVE 连坐。"""
     key = unit.split(".")[-1].split("#")[0].strip().lower()
@@ -577,11 +610,12 @@ def _unit_in_text(unit: str, file: str, text: str) -> bool:
     t = (text or "").lower()
     # 必须按标识符边界匹配：CVE JSON 里的 "VulDB entry created" 曾把
     # `create` 误判成命中（M327）。子串匹配会让 created/creator 连坐。
-    if key and len(key) > 3:
-        return re.search(
-            rf"(?<![A-Za-z0-9_]){re.escape(key)}(?![A-Za-z0-9_])", t
-        ) is not None
-    return bool(stem and len(stem) > 3 and re.search(
+    if key and len(key) > 3 and re.search(
+            rf"(?<![A-Za-z0-9_]){re.escape(key)}(?![A-Za-z0-9_])", t):
+        return True
+    if _class_wide_match(unit, file, text):
+        return True
+    return bool(not key and stem and len(stem) > 3 and re.search(
         rf"(?<![A-Za-z0-9_]){re.escape(stem)}(?![A-Za-z0-9_])", t))
 
 

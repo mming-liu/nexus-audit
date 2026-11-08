@@ -97,8 +97,59 @@
       "id": "CVE-2026-77036",
       "kind": "cve",
       "category": "authz",
-      "unit": "VerifyController.resetPass",
-      "url": "https://www.cve.org/CVERecord?id=CVE-2026-77036"
+      "unit": "EmailController",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-77036",
+      "note": "CVE 只点名整类 Email/AliPay/Generator/GenConfig，未点名方法"
+    },
+    {
+      "repo": "elunez/eladmin",
+      "aliases": ["eladmin", "eladmin-mp", "eladmin-JPA"],
+      "id": "CVE-2026-77036",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "AliPayController",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-77036",
+      "note": "整类指名；AliPayController 下任意方法均重号"
+    },
+    {
+      "repo": "elunez/eladmin",
+      "aliases": ["eladmin", "eladmin-mp", "eladmin-JPA"],
+      "id": "CVE-2026-77036",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "GeneratorController",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-77036",
+      "note": "整类指名"
+    },
+    {
+      "repo": "elunez/eladmin",
+      "aliases": ["eladmin", "eladmin-mp", "eladmin-JPA"],
+      "id": "CVE-2026-77036",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "GenConfigController",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2026-77036",
+      "note": "整类指名"
+    },
+    {
+      "repo": "elunez/eladmin",
+      "aliases": ["eladmin", "eladmin-mp", "eladmin-JPA"],
+      "id": "CVE-2026-108706",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "S3StorageController.downloadS3Storage",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-108706",
+      "note": "单方法：GET /api/s3Storage/download/{id}；不得连坐 uploadS3Storage"
+    },
+    {
+      "repo": "elunez/eladmin",
+      "aliases": ["eladmin", "eladmin-mp", "eladmin-JPA"],
+      "id": "CVE-2025-10084",
+      "kind": "cve",
+      "category": "authz",
+      "unit": "SysLogController.queryErrorLogDetail",
+      "url": "https://www.cve.org/CVERecord?id=CVE-2025-10084",
+      "note": "单方法：/api/logs/error/1"
     },
     {
       "repo": "xuxueli/xxl-job",
