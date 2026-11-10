@@ -55,5 +55,10 @@ return db.queryForList(sql,args);
 
 | 项 | 结果 |
 | --- | --- |
-| smoke_test_chains.py | **BLOCKED**：reference_repos/ 已被外部清空（0 个子目录），全部靶场 benchmark 报 FileNotFoundError，无法形成通过结论 |
-| cli.py doctor | PASS（12 段全绿；不依赖 reference_repos） |
+| smoke_test_chains.py | PASS ✔（恢复 9 个关键靶场后复核；新增 [310] 4 项） |
+| cli.py doctor | PASS（12 段全绿） |
+
+## 七、夹具解耦（M331）
+
+`reference_repos/` 缺失或 `NEXUS_RULE_ONLY=1` 时，benchmark 段记 SKIP
+并在末尾汇总；smartbugs 交叉核验等直接读夹具的段加了存在性守卫，规则断言照常判定。

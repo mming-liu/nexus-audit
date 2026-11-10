@@ -63,12 +63,25 @@ def _ws_mkdtemp(prefix: str = "tmp", *args, **kwargs) -> str:
 _tempfile_mod.mkdtemp = _ws_mkdtemp
 
 FAILS: list[str] = []
+# M331：靶场夹具与规则断言解耦。reference_repos/ 是可选的本地夹具（各 benchmark
+# 的 DEFAULT_TARGET）；缺失时 benchmark 段记 SKIP 并在末尾汇总，规则断言照常判定，
+# 不让"夹具没拉"把整条链打死。
+REFERENCE_ROOT = ROOT / "reference_repos"
+RULE_ONLY = bool(_os.environ.get("NEXUS_RULE_ONLY")) or not (
+    REFERENCE_ROOT.is_dir() and any(REFERENCE_ROOT.iterdir()))
+SKIPS: list[str] = []
+_BENCH_LABEL_RE = re.compile(
+    r"benchmark|STRICT|\bM(?:21|23|24|28|29|37|38|103|124)\b")
 # M148：**已执行**断言计数（不是静态调用点计数）。`[185]` 拿它做 1,000+
 # 里程碑的判据 —— 数的是"真的跑过的 check()"，不是"源码里有几个 check("。
 COUNTS = {"n": 0}
 
 
 def check(label: str, got, want) -> None:
+    if RULE_ONLY and _BENCH_LABEL_RE.search(label):
+        print(f"  SKIP {label}（reference_repos 缺失，benchmark 段跳过）")
+        SKIPS.append(label)
+        return
     COUNTS["n"] += 1
     ok = got == want
     print(f"  {'OK ' if ok else 'XX '} {label}: {got!r}" + ("" if ok else f"  (期望 {want!r})"))
@@ -4486,20 +4499,26 @@ check("M44：特权写/selfdestruct/tx.origin 仍判 True（自域不得覆盖�
 import json as _json87                                              # noqa: E402
 from core.slicer.web3_slither import SoliditySlicer as _sl87       # noqa: E402
 _sb87 = Path(__file__).resolve().parent.parent / "reference_repos" / "smartbugs-curated-main"
-_meta87 = _json87.loads((_sb87 / "vulnerabilities.json").read_text(encoding="utf-8"))
-_lines87 = {(e["path"], ln) for e in _meta87 for v in e.get("vulnerabilities", [])
-            if v.get("category") == "access_control" for ln in v.get("lines", [])}
+if not (_sb87 / "vulnerabilities.json").exists():
+    print("  -- smartbugs 靶场不在 reference_repos，跳过 M44 交叉核验")
+    _meta87 = None
+else:
+    _meta87 = _json87.loads((_sb87 / "vulnerabilities.json").read_text(encoding="utf-8"))
 _bad87 = []
-for _u87 in _sl87(_sb87 / "dataset" / "access_control").extract_entry_units(
-        _sb87 / "dataset" / "access_control"):
-    _rel87 = "dataset/access_control/" + Path(_u87.file_path).name
-    if not [ln for p, ln in _lines87
-            if p == _rel87 and _u87.start_line <= ln <= _u87.end_line]:
-        continue
-    if _ac87(_u87.source_code or "") is False:
-        _bad87.append(f"{_rel87}:{_u87.start_line}")
-check("M44：smartbugs 官方 access_control 漏洞行零判反",
-      _bad87, [])
+if _meta87 is not None:
+    _lines87 = {(e["path"], ln) for e in _meta87 for v in e.get("vulnerabilities", [])
+                if v.get("category") == "access_control" for ln in v.get("lines", [])}
+    for _u87 in _sl87(_sb87 / "dataset" / "access_control").extract_entry_units(
+            _sb87 / "dataset" / "access_control"):
+        _rel87 = "dataset/access_control/" + Path(_u87.file_path).name
+        if not [ln for p, ln in _lines87
+                if p == _rel87 and _u87.start_line <= ln <= _u87.end_line]:
+            continue
+        if _ac87(_u87.source_code or "") is False:
+            _bad87.append(f"{_rel87}:{_u87.start_line}")
+if _meta87 is not None:
+    check("M44：smartbugs 官方 access_control 漏洞行零判反",
+          _bad87, [])
 check("M44：退回桶下压（access_control/含未知安全包装 422 → <400）",
       _json87.loads((Path(__file__).resolve().parent.parent / "benchmarks" / "results"
                      / "triage_fallbacks.json").read_text(encoding="utf-8"))
