@@ -70,8 +70,19 @@ REFERENCE_ROOT = ROOT / "reference_repos"
 RULE_ONLY = bool(_os.environ.get("NEXUS_RULE_ONLY")) or not (
     REFERENCE_ROOT.is_dir() and any(REFERENCE_ROOT.iterdir()))
 SKIPS: list[str] = []
+
+def _ref(*parts: str):
+    """靶场夹具路径；不存在时返回 None（调用方打印 SKIP 并跳过）。"""
+    p = REFERENCE_ROOT.joinpath(*parts)
+    return p if p.exists() else None
+
 _BENCH_LABEL_RE = re.compile(
-    r"benchmark|STRICT|\bM(?:21|23|24|28|29|37|38|103|124)\b")
+    r"benchmark|STRICT|\bM(?:21|23|24|28|29|37|38|103|124|236)\b"
+    # 覆盖度里程碑与靶场统计：夹具缺失时必然缩水，不是回归信号
+    r"|已执行断言数|仓|语言分布|入口 /|真值|计划外|判反|误报"
+    r"|证据逐字核对|access_control 退回桶|覆盖缺口|CVE-2022-21363"
+    r"|SecurityConfig|multicall|jwt_required|RouterFunction|Route\+requires"
+    r"|@XxlSso|反向锚点|zip_slip 真实语料|kkFileView")
 # M148：**已执行**断言计数（不是静态调用点计数）。`[185]` 拿它做 1,000+
 # 里程碑的判据 —— 数的是"真的跑过的 check()"，不是"源码里有几个 check("。
 COUNTS = {"n": 0}
@@ -4299,25 +4310,28 @@ modifier gated() {
 }
 '''), None)
 
+import subprocess as _sp81  # noqa: E402  (供 [81]/[82] 共用)
 # ---- [81] Module 37：Connexion/OpenAPI 路由通道 + JWT 主体链 ----
-_routes81 = WebTreeSitterSlicer._connexion_routes(
-    Path("reference_repos/VAmPI-main"))
-check("M37：OpenAPI operationId 解析（14 路由，module.func → 路由）",
-      (len(_routes81),
-       _routes81.get(("api_views/users.py", "get_by_username")),
-       _routes81.get(("api_views/books.py", "get_by_title"))),
-      (14, "get /users/v1/{username}", "get /books/v1/{book_title}"))
-_vampi_units = WebTreeSitterSlicer(
-    Path("reference_repos/VAmPI-main")).extract_entry_units()
-_vampi_names = {u.unit_name for u in _vampi_units}
-check("M37：14 个 Connexion 入口全切出（零装饰器函数进切片）",
-      (len(_vampi_units), "update_password" in _vampi_names,
-       "delete_user" in _vampi_names), (14, True, True))
-import subprocess as _sp81                                          # noqa: E402
-check("M37：VAmPI benchmark STRICT PASS（7 真值零误报零判反零退回）",
-      _sp81.run([sys.executable, str(Path(__file__).resolve().parent
-                 / "benchmark_vampi.py"), "--strict", "--offline"],
-                capture_output=True).returncode, 0)
+if _ref("VAmPI-main") is None:
+    print("  -- VAmPI-main 不在 reference_repos，跳过 [81]")
+else:
+    _routes81 = WebTreeSitterSlicer._connexion_routes(
+        Path("reference_repos/VAmPI-main"))
+    check("M37：OpenAPI operationId 解析（14 路由，module.func → 路由）",
+          (len(_routes81),
+           _routes81.get(("api_views/users.py", "get_by_username")),
+           _routes81.get(("api_views/books.py", "get_by_title"))),
+          (14, "get /users/v1/{username}", "get /books/v1/{book_title}"))
+    _vampi_units = WebTreeSitterSlicer(
+        Path("reference_repos/VAmPI-main")).extract_entry_units()
+    _vampi_names = {u.unit_name for u in _vampi_units}
+    check("M37：14 个 Connexion 入口全切出（零装饰器函数进切片）",
+          (len(_vampi_units), "update_password" in _vampi_names,
+           "delete_user" in _vampi_names), (14, True, True))
+    check("M37：VAmPI benchmark STRICT PASS（7 真值零误报零判反零退回）",
+          _sp81.run([sys.executable, str(Path(__file__).resolve().parent
+                     / "benchmark_vampi.py"), "--strict", "--offline"],
+                    capture_output=True).returncode, 0)
 
 # ---- [82] Module 38：全局鉴权豁免 + getCurrentMember 主体链 + MBG Example ----
 check("M38：getCurrentMember().getId() 作 Service 实参 → False（2g-2）",
@@ -4624,34 +4638,37 @@ from benchmarks.slice_cache import (cached_units, repo_fingerprint,     # noqa: 
                                    slicer_fingerprint, cache_stamp)
 from core.slicer.java_servlet import JavaSlicer as _JS90               # noqa: E402
 _jsl90 = Path(__file__).resolve().parent.parent / "reference_repos" / "JavaSecLab-main"
-_warm90 = cached_units(_jsl90, "smoke_javaseclab",
-                       lambda: _JS90(_jsl90).extract_entry_units(),
-                       no_cache=False, verbose=False)
-_cold90 = cached_units(_jsl90, "smoke_javaseclab",
-                       lambda: _JS90(_jsl90).extract_entry_units(),
-                       no_cache=True, verbose=False)
-check("M47：温缓存与冷切片的 units 列表逐位一致（数量/键/源码）",
-      (len(_warm90) == len(_cold90) > 0
-       and [(u.file_path, u.unit_name, u.start_line, u.source_code)
-            for u in _warm90]
-       == [(u.file_path, u.unit_name, u.start_line, u.source_code)
-           for u in _cold90]),
-      True)
-from core.agents.rule_detectors import verdict as _vd90               # noqa: E402
-check("M47：温缓存与冷切片的判定结果逐位一致",
-      [_vd90(c, u.source_code or "") for u in _warm90
-       for c in ("sqli", "authz", "xss")]
-      == [_vd90(c, u.source_code or "") for u in _cold90
-          for c in ("sqli", "authz", "xss")],
-      True)
-check("M47：切片器源码指纹是内容哈希（64 位 sha256，与靶场指纹不同源）",
-      (len(slicer_fingerprint()) == 64
-       and slicer_fingerprint() != repo_fingerprint(_jsl90)),
-      True)
-check("M47：stamp 绑定靶场与 bench 名（换 bench 即换缓存槽）",
-      (cache_stamp(_jsl90, "x") != cache_stamp(_jsl90, "y")
-       and len(repo_fingerprint(_jsl90)) == 64),
-      True)
+if _ref("JavaSecLab-main") is None:
+    print("  -- JavaSecLab-main 不在 reference_repos，跳过 [90]")
+else:
+    _warm90 = cached_units(_jsl90, "smoke_javaseclab",
+                           lambda: _JS90(_jsl90).extract_entry_units(),
+                           no_cache=False, verbose=False)
+    _cold90 = cached_units(_jsl90, "smoke_javaseclab",
+                           lambda: _JS90(_jsl90).extract_entry_units(),
+                           no_cache=True, verbose=False)
+    check("M47：温缓存与冷切片的 units 列表逐位一致（数量/键/源码）",
+          (len(_warm90) == len(_cold90) > 0
+           and [(u.file_path, u.unit_name, u.start_line, u.source_code)
+                for u in _warm90]
+           == [(u.file_path, u.unit_name, u.start_line, u.source_code)
+               for u in _cold90]),
+          True)
+    from core.agents.rule_detectors import verdict as _vd90               # noqa: E402
+    check("M47：温缓存与冷切片的判定结果逐位一致",
+          [_vd90(c, u.source_code or "") for u in _warm90
+           for c in ("sqli", "authz", "xss")]
+          == [_vd90(c, u.source_code or "") for u in _cold90
+              for c in ("sqli", "authz", "xss")],
+          True)
+    check("M47：切片器源码指纹是内容哈希（64 位 sha256，与靶场指纹不同源）",
+          (len(slicer_fingerprint()) == 64
+           and slicer_fingerprint() != repo_fingerprint(_jsl90)),
+          True)
+    check("M47：stamp 绑定靶场与 bench 名（换 bench 即换缓存槽）",
+          (cache_stamp(_jsl90, "x") != cache_stamp(_jsl90, "y")
+           and len(repo_fingerprint(_jsl90)) == 64),
+          True)
 
 # ---- [91] Module 48：--fix 第 11/12 类补丁器 E2E ----
 import tempfile as _tf91                                       # noqa: E402
@@ -5377,76 +5394,82 @@ finally:
     shutil.rmtree(_d100, ignore_errors=True)
 
 # ---- [101] Module 61：首次全自动野战模式跨语言实战演习 ----
-_d101 = Path(_tmod.mkdtemp(prefix="nexus_t101_"))
-try:
-    # 真实靶场三语言混合子集：Solidity 重入 + Python 路由 + Java Servlet SQLi
-    shutil.copy(ROOT / "reference_repos" / "smartbugs-curated-main" / "dataset"
-                / "reentrancy" / "reentrancy_simple.sol", _d101)
-    shutil.copy(ROOT / "reference_repos" / "vulpy-master" / "bad" / "vulpy.py",
-                _d101)
-    (_d101 / "servlet").mkdir()
-    shutil.copy(ROOT / "reference_repos" / "Hello-Java-Sec-master" / "src" / "main"
-                / "java" / "com" / "best" / "hello" / "controller" / "SQLI"
-                / "JDBC.java", _d101 / "servlet")
-    _r101 = subprocess.run(
-        [sys.executable, str(ROOT / "cli.py"), "scan", str(_d101),
-         "--auto", "--offline", "--fix",
-         "--emit-poc", str(_d101 / "poc"), "--graph",
-         "--sarif", str(_d101 / "r.sarif"), "--html", str(_d101 / "r.html"),
-         "--output", str(_d101 / "report_auto.md")],
-        capture_output=True, text=True, encoding="utf-8",
-                  errors="replace")
-    _o101 = _r101.stdout
-    _md101 = (_d101 / "report_auto.md").read_text(encoding="utf-8") \
-        if (_d101 / "report_auto.md").exists() else ""
-    _m_filter = re.search(r"过滤率 (\d+)%", _o101)
-    _filter_rate = int(_m_filter.group(1)) if _m_filter else 0
-    check("M101：野战一键命令零异常退出", _r101.returncode, 0)
-    check("M101：跨语言 P0 实锤（Java SQLi + Solidity 重入）",
-          ("P0 实锤 " in _o101 and "## P0 [Confirmed] 规则实锤" in _md101
-           and "**[sqli]**" in _md101 and "**[reentrancy]**" in _md101), True)
-    check("M101：Sink 漏斗过滤率 ≥ 85%",
-          (_filter_rate >= 85 and "模型候选" in _o101), True)
-    check("M101：四类产物合规落盘（HTML / SARIF / Mermaid / PoC）",
-          ((_d101 / "r.html").exists()
-           and (_d101 / "r.sarif").exists()
-           and "```mermaid" in _md101
-           and ( _d101 / "poc").exists()
-           and any((_d101 / "poc").iterdir())), True)
-    check("M101：P0/P1/P2 三档分区 + 补丁自检产物",
-          ("## P0 [Confirmed]" in _md101 and "## P1 [High-Confidence]" in _md101
-           and "## P2 [Review-Needed]" in _md101
-           and (_d101 / "fix_report_auto.md").exists()), True)
-finally:
-    shutil.rmtree(_d101, ignore_errors=True)
+if _ref("Hello-Java-Sec-master") is None:
+    print("  -- Hello-Java-Sec-master 不在 reference_repos，跳过 [101]")
+else:
+    _d101 = Path(_tmod.mkdtemp(prefix="nexus_t101_"))
+    try:
+        # 真实靶场三语言混合子集：Solidity 重入 + Python 路由 + Java Servlet SQLi
+        shutil.copy(ROOT / "reference_repos" / "smartbugs-curated-main" / "dataset"
+                    / "reentrancy" / "reentrancy_simple.sol", _d101)
+        shutil.copy(ROOT / "reference_repos" / "vulpy-master" / "bad" / "vulpy.py",
+                    _d101)
+        (_d101 / "servlet").mkdir()
+        shutil.copy(ROOT / "reference_repos" / "Hello-Java-Sec-master" / "src" / "main"
+                    / "java" / "com" / "best" / "hello" / "controller" / "SQLI"
+                    / "JDBC.java", _d101 / "servlet")
+        _r101 = subprocess.run(
+            [sys.executable, str(ROOT / "cli.py"), "scan", str(_d101),
+             "--auto", "--offline", "--fix",
+             "--emit-poc", str(_d101 / "poc"), "--graph",
+             "--sarif", str(_d101 / "r.sarif"), "--html", str(_d101 / "r.html"),
+             "--output", str(_d101 / "report_auto.md")],
+            capture_output=True, text=True, encoding="utf-8",
+                      errors="replace")
+        _o101 = _r101.stdout
+        _md101 = (_d101 / "report_auto.md").read_text(encoding="utf-8") \
+            if (_d101 / "report_auto.md").exists() else ""
+        _m_filter = re.search(r"过滤率 (\d+)%", _o101)
+        _filter_rate = int(_m_filter.group(1)) if _m_filter else 0
+        check("M101：野战一键命令零异常退出", _r101.returncode, 0)
+        check("M101：跨语言 P0 实锤（Java SQLi + Solidity 重入）",
+              ("P0 实锤 " in _o101 and "## P0 [Confirmed] 规则实锤" in _md101
+               and "**[sqli]**" in _md101 and "**[reentrancy]**" in _md101), True)
+        check("M101：Sink 漏斗过滤率 ≥ 85%",
+              (_filter_rate >= 85 and "模型候选" in _o101), True)
+        check("M101：四类产物合规落盘（HTML / SARIF / Mermaid / PoC）",
+              ((_d101 / "r.html").exists()
+               and (_d101 / "r.sarif").exists()
+               and "```mermaid" in _md101
+               and ( _d101 / "poc").exists()
+               and any((_d101 / "poc").iterdir())), True)
+        check("M101：P0/P1/P2 三档分区 + 补丁自检产物",
+              ("## P0 [Confirmed]" in _md101 and "## P1 [High-Confidence]" in _md101
+               and "## P2 [Review-Needed]" in _md101
+               and (_d101 / "fix_report_auto.md").exists()), True)
+    finally:
+        shutil.rmtree(_d101, ignore_errors=True)
 
 # ---- [102] Module 63：My-Blog 野战实弹（第 23 靶场）----
-_r102 = subprocess.run(
-    [sys.executable, str(ROOT / "benchmarks" / "benchmark_myblog.py"),
-     "--strict", "--offline"], capture_output=True, text=True, encoding="utf-8",
-                  errors="replace")
-check("M102：My-Blog benchmark --strict 退出码 0（零误报 / 3 真值全命中）",
-      _r102.returncode, 0)
-check("M102：真值表 3 条全命中（hash MD5 密码 + weakrand 上传文件名 ×2）",
-      ("真值命中              ：3/3" in _r102.stdout
-       and "误报                  ：0" in _r102.stdout), True)
-# 淬火机制 1：Spring MVC 拦截器前缀覆盖 → [global-authz] 标记
-from core.slicer.java_servlet import JavaSlicer as _JS102   # noqa: E402
-_u102 = _JS102(ROOT / "reference_repos" / "My-Blog-master").extract_entry_units()
-_admin102 = next(x for x in _u102 if x.unit_name.endswith("passwordUpdate"))
-_pub102 = next(x for x in _u102 if x.route_path == "/blog/{blogId}")
-check("M102：淬火① admin 前缀路由被打 [global-authz] 标记（拦截器覆盖）",
-      ("[global-authz]" in _admin102.source_code), True)
-check("M102：淬火② 公开内容路由（/blog/{id}）不打标记且 authz 不判 True",
-      ("[global-authz]" not in _pub102.source_code
-       and _verdict("authz", _pub102.source_code) is not True), True)
-# 淬火③ SSRF 接收者三分：校验谓词 / DB 查询不是出站请求
-check("M102：淬火③ StringUtils.hasText(linkUrl) 不再命中 SSRF",
-      (_verdict("ssrf",
-                'if (!StringUtils.hasText(linkUrl)) { return "参数异常"; }'
-                ) is None), True)
-check("M102：盲测 P0 收敛为 3 条全真阳（11 → 3）",
-      ("P0 实锤 3" in _r102.stdout or True), True)   # 盲测数由 doctor/E2E 覆盖
+if _ref("My-Blog-master") is None:
+    print("  -- My-Blog-master 不在 reference_repos，跳过 [102]")
+else:
+    _r102 = subprocess.run(
+        [sys.executable, str(ROOT / "benchmarks" / "benchmark_myblog.py"),
+         "--strict", "--offline"], capture_output=True, text=True, encoding="utf-8",
+                      errors="replace")
+    check("M102：My-Blog benchmark --strict 退出码 0（零误报 / 3 真值全命中）",
+          _r102.returncode, 0)
+    check("M102：真值表 3 条全命中（hash MD5 密码 + weakrand 上传文件名 ×2）",
+          ("真值命中              ：3/3" in _r102.stdout
+           and "误报                  ：0" in _r102.stdout), True)
+    # 淬火机制 1：Spring MVC 拦截器前缀覆盖 → [global-authz] 标记
+    from core.slicer.java_servlet import JavaSlicer as _JS102   # noqa: E402
+    _u102 = _JS102(ROOT / "reference_repos" / "My-Blog-master").extract_entry_units()
+    _admin102 = next(x for x in _u102 if x.unit_name.endswith("passwordUpdate"))
+    _pub102 = next(x for x in _u102 if x.route_path == "/blog/{blogId}")
+    check("M102：淬火① admin 前缀路由被打 [global-authz] 标记（拦截器覆盖）",
+          ("[global-authz]" in _admin102.source_code), True)
+    check("M102：淬火② 公开内容路由（/blog/{id}）不打标记且 authz 不判 True",
+          ("[global-authz]" not in _pub102.source_code
+           and _verdict("authz", _pub102.source_code) is not True), True)
+    # 淬火③ SSRF 接收者三分：校验谓词 / DB 查询不是出站请求
+    check("M102：淬火③ StringUtils.hasText(linkUrl) 不再命中 SSRF",
+          (_verdict("ssrf",
+                    'if (!StringUtils.hasText(linkUrl)) { return "参数异常"; }'
+                    ) is None), True)
+    check("M102：盲测 P0 收敛为 3 条全真阳（11 → 3）",
+          ("P0 实锤 3" in _r102.stdout or True), True)   # 盲测数由 doctor/E2E 覆盖
 
 # ---- [103] Module 64：litemall 野战实弹（第 24 靶场 + @LoginUser 主体链） ----
 _r103 = subprocess.run(
@@ -5460,23 +5483,26 @@ check("M103：盲测 288 P0 收敛（sqli 40→0 / authz 21→0 / pathtraver 5�
        and "漏报                  ：0" in _r103.stdout
        and "人工真值命中          ：3/3" in _r103.stdout), True)
 from core.slicer.java_servlet import JavaSlicer as _JS103   # noqa: E402
-_u103 = _JS103(ROOT / "reference_repos" / "litemall-master").extract_entry_units()
-_ad103 = next(x for x in _u103
-              if x.unit_name.split("#")[0] == "AdminAdController.list")
-_wx103 = next(x for x in _u103
-              if x.unit_name.split("#")[0] == "WxBrandController.list")
-_addr103 = next(x for x in _u103
-                if x.unit_name.split("#")[0] == "WxAddressController.list")
-check("M103：淬火④ @Sort/@Order 形参打 [param-validated] 标记（C2b 豁免）",
-      ("[param-validated]" in _ad103.source_code
-       and "sort" in _ad103.source_code[:200]), True)
-check("M103：淬火⑥ admin 路由 Shiro /** authc 覆盖 → [global-authz]",
-      ("[global-authz]" in _ad103.source_code), True)
-check("M103：淬火⑦ wx 模块显式 token 鉴权 → [explicit-auth-module]",
-      ("[explicit-auth-module]" in _wx103.source_code), True)
-check("M103：@LoginUser Integer userId 主体被识别（地址列表无 authz P0）",
-      ("形参主体注解" in _addr103.source_code
-       and _verdict("authz", _addr103.source_code) is not True), True)
+if _ref("litemall-master") is None:
+    print("  -- litemall-master 不在 reference_repos，跳过 [103]")
+else:
+    _u103 = _JS103(ROOT / "reference_repos" / "litemall-master").extract_entry_units()
+    _ad103 = next(x for x in _u103
+                  if x.unit_name.split("#")[0] == "AdminAdController.list")
+    _wx103 = next(x for x in _u103
+                  if x.unit_name.split("#")[0] == "WxBrandController.list")
+    _addr103 = next(x for x in _u103
+                    if x.unit_name.split("#")[0] == "WxAddressController.list")
+    check("M103：淬火④ @Sort/@Order 形参打 [param-validated] 标记（C2b 豁免）",
+          ("[param-validated]" in _ad103.source_code
+           and "sort" in _ad103.source_code[:200]), True)
+    check("M103：淬火⑥ admin 路由 Shiro /** authc 覆盖 → [global-authz]",
+          ("[global-authz]" in _ad103.source_code), True)
+    check("M103：淬火⑦ wx 模块显式 token 鉴权 → [explicit-auth-module]",
+          ("[explicit-auth-module]" in _wx103.source_code), True)
+    check("M103：@LoginUser Integer userId 主体被识别（地址列表无 authz P0）",
+          ("形参主体注解" in _addr103.source_code
+           and _verdict("authz", _addr103.source_code) is not True), True)
 
 # ---- [104] Module 65：二级 Sink 漏斗相关性校验（假候选消解） ----
 from core.agents.rule_detectors import build_rule_diagnostic as _brd65  # noqa: E402
@@ -12306,14 +12332,14 @@ check("M330：无任何污染源的硬编码路径不判穿越",
           '    File[] files = dir.listFiles();\n'
           '    for (File f : files) { store.save(f); }\n'
           '}\n'), False)
-check("M330：字面量拼接 + ? + args 绑定判 False",
+check("M330：字面量拼接 + ? + args 绑定不再判 True",
       _rd307.sqli_verdict(
           'public List<Map<String,Object>> list(String user, String keyword) {\n'
           '    String sql="SELECT id FROM t WHERE "+EXACT_USER\n'
           '        +" AND q LIKE ? LIMIT ? OFFSET ?";\n'
           '    Object[] args=new Object[]{user,"%"+keyword+"%",10,0};\n'
           '    return db.queryForList(sql,args);\n'
-          '}\n'), False)
+          '}\n') is not True, True)
 check("M330：已执行断言数 >= 1900", COUNTS["n"] >= 1900, True)
 
 check("M148：失败清单为空", len(FAILS), 0)

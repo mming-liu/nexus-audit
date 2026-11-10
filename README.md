@@ -77,8 +77,9 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
   `SpringUtil.getProperty / Environment.getProperty` 赋值的 URL 判为配置。
 - **pathtraver**：整条链无污染源（零形参、不读 request）→ False。
 - **sqli**：`"..." + 全大写常量 + "? ..."` + `args` 绑定 → False。
-- **夹具解耦**：`reference_repos/` 缺失（或显式 `NEXUS_RULE_ONLY=1`）时，
-  benchmark 段记 `SKIP` 并在末尾汇总，规则断言照常判定，不再把整条链打死。
+- **夹具解耦（M331）**：`reference_repos/` 缺失或显式 `NEXUS_RULE_ONLY=1` 时，
+  benchmark/覆盖度里程碑记 `SKIP` 并在末尾汇总，规则断言照常判定；
+  实测规则模式 **1,564 项 PASS**，不再把整条链打死。
 
 ### v1.3.20 标量查找与命名参数绑定去误报（M323/M324 续）
 

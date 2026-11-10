@@ -62,3 +62,11 @@ return db.queryForList(sql,args);
 
 `reference_repos/` 缺失或 `NEXUS_RULE_ONLY=1` 时，benchmark 段记 SKIP
 并在末尾汇总；smartbugs 交叉核验等直接读夹具的段加了存在性守卫，规则断言照常判定。
+
+## 八、M331 第二阶段（夹具解耦）
+
+- VAmPI / JavaSecLab / My-Blog / litemall / [101] 三语言子集 / smartbugs M44 等段
+  加 `_ref()` 存在性守卫：缺目录打印 SKIP，不再抛异常；
+- `NEXUS_RULE_ONLY=1`（或 `reference_repos/` 为空时自动）下，benchmark、
+  覆盖度里程碑、靶场统计类断言统一记 SKIP；
+- 实测：规则模式 **1,564 项 PASS**（全量模式需 50 个靶场，当前仅恢复 9 个）。
