@@ -1365,6 +1365,15 @@ def sqli_verdict(source: str) -> bool | None:
                     r"\.\s*addValue\s*\(|\bsetParameter\s*\(|"
                     r"parameters\s*\.\s*add\s*\(", source):
                 return False
+            # 字面量拼接 + ? 占位 + args 绑定（tagent 的 EXACT_USER 形态）
+            _bsql2 = re.search(r"String\s+sql\s*=\s*([^;]{0,1500});", source)
+            if _bsql2 and "?" in _bsql2.group(1):
+                _ids2 = re.findall(r"\+\s*([A-Za-z_]\w*)", _bsql2.group(1))
+                if _ids2 and all(re.fullmatch(r"[A-Z][A-Z0-9_]*", i)
+                                 for i in _ids2) and re.search(
+                        r"\.\s*(?:queryForList|queryForObject|query|update|"
+                        r"execute)\s*\(\s*sql\s*,", source):
+                    return False
             return True
         if hv is False:
             # 值域锁死（`List<Long>` / `Integer`）—— 与入口体里的
@@ -1390,6 +1399,16 @@ def sqli_verdict(source: str) -> bool | None:
                 return False
             if _concat_params_all_numeric(body):
                 return False
+            # 字面量拼接 + `?` 占位 + args 绑定：拼接项全是全大写常量
+            # （tagent 的 EXACT_USER），用户值走 like() → ? → 参数化。
+            _bsql = re.search(r"String\s+sql\s*=\s*([^;]{0,1500});", body)
+            if _bsql and "?" in _bsql.group(1):
+                _ids = re.findall(r"\+\s*([A-Za-z_]\w*)", _bsql.group(1))
+                if _ids and all(re.fullmatch(r"[A-Z][A-Z0-9_]*", i)
+                                for i in _ids) and re.search(
+                        r"\.\s*(?:queryForList|queryForObject|query|update|"
+                        r"execute)\s*\(\s*sql\s*,", body):
+                    return False
             # 1b) 拼接进来的每个局部变量都能上溯到常量 —— 容器覆盖、恒真分支、
             #     helper 返回字面量。OWASP 的 sqli 把这三类机制整套放进了
             #     同文件的 `private class Test` 里，入口体只剩一句
@@ -4382,7 +4401,7 @@ SSRF_WEAK_SCHEME_RE = re.compile(
 # 判据退一步用「把 URL 变量作为实参传给一个 Http* / *Service 方法」——
 # 这个形态在 ssrf 语境下足够特异（传 URL 给方法，且方法名带 Http 语义）。
 SSRF_SINK_RE = re.compile(
-    r"\.\s*openConnection\s*\(|\.\s*openStream\s*\(|new\s+URL\s*\(|"
+    r"\.\s*openConnection\s*\(|new\s+URL\s*\(|"
     r"\.\s*execute\s*\(\s*(?:new\s+)?Http\w*|\.\s*execute\s*\(\s*url|"
     r"HttpUtil\s*\.\s*(?:get|post|createGet|createPost)\s*\(|"
     r"Jsoup\s*\.\s*connect\s*\(|"
@@ -4412,6 +4431,8 @@ SSRF_SINK_RE = re.compile(
 # 什么都不是。
 SSRF_WEAK_SINK_RE = re.compile(
     r"ImageIO\s*\.\s*read\s*\(|\.\s*getInputStream\s*\(\s*\)"
+    # 对象存储的 openStream(bucketKey) 不是网络 URL 读取（Nubase/ragent 实测）。
+    r"|\.\s*openStream\s*\("
     # 非 HTTP 客户端的 *Service/*Utils/*Request 接收者 + url 形参 —— **弱
     # sink**：`StringUtils.hasText(linkUrl)`（空值校验）、
     # `blogService.getBlogDetailBySubUrl(subUrl)`（DB 查询）都命中这个宽
@@ -4506,6 +4527,16 @@ def ssrf_verdict(source: str) -> bool | None:
             body))
 
     if _url_args and all(_config_url(a) for a in _url_args):
+        return False
+    # Java：URL 变量由配置读取器赋值（SpringUtil.getProperty / Environment /
+    # @Value / properties.get*），同样不是请求入参 —— qKnow 的 flow.url 形态。
+    _cfg_assign = re.search(
+        r"\b(\w+)\s*=\s*(?:SpringUtil\s*\.\s*getProperty|"
+        r"environment\s*\.\s*getProperty|properties\s*\.\s*get\w*|"
+        r"\w+Properties\s*\.\s*get\w*)\s*\(", body)
+    if _cfg_assign and not re.search(
+            rf"\b{re.escape(_cfg_assign.group(1))}\s*=\s*[^;]*"
+            rf"(?:request|getParameter|@RequestParam)", body):
         return False
     return True
 
@@ -5420,6 +5451,13 @@ def pathtraver_verdict(source: str) -> bool | None:
     # encodingFilename/genNewFilename 重写了文件名 —— 不能因为它同名就
     # 绕过“sink 与入口体零交集”的门。
     _hop_only = _hop_params - _entry_params
+    # M330：整条链上没有任何污染源（无入口形参、无 Hop 专属形参、也不直接读
+    # request）时，路径不可能由用户控制 —— hardcoded `new File("F:\\...").listFiles()`
+    # 这类"把本地数据目录写死的工具方法"不应判路径穿越。
+    if not (_entry_params | _hop_only) and not re.search(
+            r"request\s*\.\s*(?:getParameter|getHeader|getPathInfo|"
+            r"getQueryString|getInputStream)", body):
+        return False
     # 空形参时 _path_sink_param_linked 返回 True（“不设门”），这是旧行为：
     # 规范化/常量/零交集等前置闸门已经先跑过，不能在这里把它翻成 None。
     _linked = _path_sink_param_linked(body, source,

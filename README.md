@@ -71,6 +71,13 @@ verdict 路由全覆盖 / 缓存指纹算法稳定 / 35 类补丁器就位 / PoC
 - **缓存清理进 `finally`**：扫描失败/超时也删 `.cache/upstream/<repo>`；新增
   `--repo-timeout`（默认 900s）单仓软超时。
 
+### v1.3.21 存储流/无污染路径/字面量拼接去误报（M330）
+
+- **ssrf**：对象存储 `openStream(key)` 降为弱 sink（需 URL 旁证）；
+  `SpringUtil.getProperty / Environment.getProperty` 赋值的 URL 判为配置。
+- **pathtraver**：整条链无污染源（零形参、不读 request）→ False。
+- **sqli**：`"..." + 全大写常量 + "? ..."` + `args` 绑定 → False。
+
 ### v1.3.20 标量查找与命名参数绑定去误报（M323/M324 续）
 
 - **nosqli**：`x.find(request.query.get("name"))` 这类**标量查名**不再判 Mongo 注入

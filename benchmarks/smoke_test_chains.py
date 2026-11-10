@@ -12271,6 +12271,32 @@ check("M356：提交 body 是 cnaContainer",
           and "cnaContainer" in (c[2] or {}) for c in _calls322), True)
 check("M356：已执行断言数 >= 1950", COUNTS["n"] >= 1950, True)
 
+print("\n[310] M330：存储 openStream / 无污染路径 / 字面量拼接 (今日去误报)")
+check("M330：storage.openStream(key) 不算 SSRF",
+      _rd307.ssrf_verdict(
+          'public void f(HttpServletResponse response) throws Exception {\n'
+          '    try (InputStream in = storageService.openStream("bucket-key")) {\n'
+          '        StreamUtils.copy(in, response.getOutputStream());\n'
+          '    }\n'
+          '}\n'), None)
+check("M330：无任何污染源的硬编码路径不判穿越",
+      _rd307.pathtraver_verdict(
+          '@PostMapping("node")\n'
+          'public void createNodes() {\n'
+          '    var dir = new File("D:\\\\data\\\\sample");\n'
+          '    File[] files = dir.listFiles();\n'
+          '    for (File f : files) { store.save(f); }\n'
+          '}\n'), False)
+check("M330：字面量拼接 + ? + args 绑定判 False",
+      _rd307.sqli_verdict(
+          'public List<Map<String,Object>> list(String user, String keyword) {\n'
+          '    String sql="SELECT id FROM t WHERE "+EXACT_USER\n'
+          '        +" AND q LIKE ? LIMIT ? OFFSET ?";\n'
+          '    Object[] args=new Object[]{user,"%"+keyword+"%",10,0};\n'
+          '    return db.queryForList(sql,args);\n'
+          '}\n'), False)
+check("M330：已执行断言数 >= 1900", COUNTS["n"] >= 1900, True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
