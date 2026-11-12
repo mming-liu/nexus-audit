@@ -139,6 +139,101 @@ def looks_local_loopback(text: str) -> bool:
         text, re.I))
 
 
+# M359：同仓级 loopback 继承。主服务入口（server.py 里
+# `uvicorn.run(app, host="127.0.0.1")`）或全局 LocalAccessMiddleware 已经
+# 证明整套服务只对本机开放时，同仓其它子路由文件（dashboard/app.py）不该
+# 因为自己文件里没有 loopback 字面量就被判成"可远程"——否则同一个仓会
+# 分类撕裂：server.py 的路由进 B，dashboard 的路由进 A。
+_LOOPBACK_BIND_RE = re.compile(
+    r"\b(?:uvicorn\s*\.\s*run|app\s*\.\s*run|hypercorn\s*\.\s*run|serve)\s*"
+    r"\([^)]*?host\s*=\s*[\"'](?:127\.0\.0\.1|localhost|::1)[\"']",
+    re.I | re.S)
+_PUBLIC_BIND_RE = re.compile(
+    r"\b(?:uvicorn\s*\.\s*run|app\s*\.\s*run|hypercorn\s*\.\s*run|serve)\s*"
+    r"\([^)]*?host\s*=\s*[\"'](?:0\.0\.0\.0|::)[\"']",
+    re.I | re.S)
+# Dockerfile / Procfile / compose 的 --host 0.0.0.0 是公网绑定。
+_PUBLIC_CLI_HOST_RE = re.compile(
+    r"(?:--host|--bind|-b)[ =][\"']?(?:0\.0\.0\.0|::)\b", re.I)
+# compose 端口映射：`127.0.0.1:8080:8080` 是回环，裸 `8080:8080` 是公网。
+_PORT_MAP_RE = re.compile(
+    r"^\s*-\s*[\"']?([0-9A-Za-z_.:\[\]-]*?):(\d+):(\d+)[\"']?\s*$", re.M)
+_SCAN_SKIP_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__",
+                   "site-packages", "dist", "build", "tests", "test",
+                   "docs", "examples", "example"}
+_REPO_LOOPBACK_MEMO: dict[str, tuple[bool, str]] = {}
+
+
+def _repo_loopback_only(repo_root: Path | None) -> tuple[bool, str]:
+    """整仓是否只监听本机回环（M359）。
+
+    返回 (True, 证据文件)；只要仓内任何地方显式绑定 0.0.0.0 / 公网端口映射，
+    就判 False —— 宁可漏拦一个单机工具，也不能把真远程服务整仓放过。
+    """
+    if repo_root is None:
+        return False, ""
+    root = Path(repo_root)
+    try:
+        key = str(root.resolve())
+    except OSError:
+        key = str(root)
+    if key in _REPO_LOOPBACK_MEMO:
+        return _REPO_LOOPBACK_MEMO[key]
+
+    loop_hit = ""
+    public_hit = ""
+    scanned = 0
+    for p in root.rglob("*.py"):
+        if any(part in _SCAN_SKIP_DIRS for part in p.parts):
+            continue
+        scanned += 1
+        if scanned > 400:
+            break
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        rel = p.relative_to(root).as_posix()
+        if not loop_hit:
+            if _LOOPBACK_BIND_RE.search(text):
+                loop_hit = rel
+            elif "LocalAccessMiddleware" in text:
+                loop_hit = f"{rel}（LocalAccessMiddleware）"
+        if _PUBLIC_BIND_RE.search(text):
+            public_hit = f"{rel} 绑定 0.0.0.0"
+            break
+
+    if not public_hit:
+        for name in ("Dockerfile", "Procfile", "docker-compose.yml",
+                     "docker-compose.yaml", "compose.yml", "compose.yaml"):
+            for p in list(root.rglob(name))[:8]:
+                if any(part in _SCAN_SKIP_DIRS for part in p.parts):
+                    continue
+                try:
+                    text = p.read_text(encoding="utf-8", errors="ignore")
+                except OSError:
+                    continue
+                rel = p.relative_to(root).as_posix()
+                if _PUBLIC_CLI_HOST_RE.search(text):
+                    public_hit = f"{rel} --host 0.0.0.0"
+                    break
+                for m in _PORT_MAP_RE.finditer(text):
+                    host_ip = m.group(1)
+                    if host_ip in ("127.0.0.1", "::1", "localhost"):
+                        loop_hit = loop_hit or f"{rel} 端口映射 {host_ip}"
+                    elif not host_ip:
+                        public_hit = f"{rel} 端口映射 {m.group(2)}:{m.group(3)}"
+                        break
+                if public_hit:
+                    break
+            if public_hit:
+                break
+
+    res = (bool(loop_hit) and not public_hit, loop_hit if not public_hit else "")
+    _REPO_LOOPBACK_MEMO[key] = res
+    return res
+
+
 def classify(record: dict, repo_root: Path | None = None) -> dict:
     """判定一条 FRESH 根因是否属于“陌生野仓噪音”。
 
@@ -167,6 +262,13 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
                 "reason": ("显式仅允许 loopback 客户端的单机工作台"
                            "（LocalAccessMiddleware / 127.0.0.1 校验），"
                            "无远程攻击面")}
+    # M359：文件本身没写 loopback，但同仓主服务入口已经证明整仓只监听
+    # 本机时，子路由继承 LOCAL_LOOPBACK_ONLY（消除同仓分类撕裂）。
+    _repo_loop, _repo_ev = _repo_loopback_only(repo_root)
+    if _repo_loop:
+        return {"blocked": True, "code": LOCAL_LOOPBACK_ONLY,
+                "reason": (f"同仓主服务仅绑定回环（{_repo_ev}），"
+                           f"子路由继承单机边界，无远程攻击面")}
 
     if record.get("category") == "cmdi" and file.endswith(".py"):
         src = _read(repo_root, str(record.get("file") or ""))

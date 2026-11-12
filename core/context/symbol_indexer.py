@@ -15,8 +15,12 @@ from pathlib import Path
 from core.models import CodeUnit
 
 # 对齐 vulnhuntr 的噪声目录策略
+# M358：knowledge / prompts / corpus 是**知识库与语料**目录，里面是给模型看的
+# 漏洞示例（AutoCVE 的 knowledge/frameworks/fastapi.py 就是一段 `@app.get` +
+# `def get_user` 的示例代码），不是可路由的业务入口。整目录排除。
 IGNORE_DIRS = {".git", "node_modules", "tests", "test", "docs", "examples",
-               "example", "venv", ".venv", "__pycache__", "dist", "build"}
+               "example", "venv", ".venv", "__pycache__", "dist", "build",
+               "knowledge", "prompts", "corpus"}
 
 # Python 顶层定义：def/class（带缩进捕获以区分类方法）。
 # 缩进只允许行内空白 —— `\s*` 会跨行吞空行，m.start() 落到空行处
@@ -33,6 +37,30 @@ ROUTE_DECORATOR_RE = re.compile(r"^(\s*)@(\w[\w.]*)\.?(route|get|post|put|patch|
 # M137：**无括号**装饰器（`@admin_required` / `@login_required`）。带参数的
 # 路由装饰器由上面那条收；这条只补"名字即声明"的守卫装饰器。
 _BARE_DECORATOR_RE = re.compile(r"^[ \t]*@[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*[ \t]*$", re.M)
+
+# M358：三引号字符串遮蔽。知识库/示例文件把漏洞样例整段写进 docstring ——
+# AutoCVE 的 knowledge/frameworks/fastapi.py:57 里就有
+# `@app.get("/file")` + `def get_file(...)` 的示例代码。旧实现直接对全文跑
+# DEF_RE / ROUTE_DECORATOR_RE，示例代码被当成真路由切出来：同一行同时命中
+# hardcoded_secret / jwt_weakness / sqli 三个类目，整条链全是假的。
+_TRIPLE_QUOTE_RE = re.compile(r'("""|\'\'\')(.*?)\1', re.S)
+
+
+def _mask_multiline_strings(text: str) -> str:
+    """把三引号字符串**内部**的字符替换为空格，换行符原样保留。
+
+    关键约束：替换后长度与原文逐字符相等（引号也保留），因此
+    `text[:m.start()].count("\\n")` 得到的行号、以及按行切片取到的函数体
+    都 100% 不变 —— 遮蔽只影响"匹配到什么"，不影响"行号落在哪"。
+    """
+    if '"""' not in text and "'''" not in text:
+        return text
+
+    def _blank(m: "re.Match[str]") -> str:
+        quote, body = m.group(1), m.group(2)
+        return quote + "".join("\n" if ch == "\n" else " " for ch in body) + quote
+
+    return _TRIPLE_QUOTE_RE.sub(_blank, text)
 
 
 class SymbolIndexer:
@@ -79,16 +107,20 @@ class SymbolIndexer:
 
     def _index_definitions(self, file: Path, text: str) -> None:
         lines = text.splitlines()
-        matches = list(DEF_RE.finditer(text))
+        # M358：所有**结构匹配**都跑在遮蔽后的文本上（三引号字符串内部被
+        # 换成空格），函数体仍从原文按行切。遮蔽逐字符保长，行号不变。
+        masked = _mask_multiline_strings(text)
+        matches = list(DEF_RE.finditer(masked))
         for i, m in enumerate(matches):
-            indent, kind, name = len(m.group(1)), m.group(2), m.group(3)
+            indent = len(m.group(1))
+            kind, name = m.group(2), m.group(3)
             # 符号结束：下一个同级或更浅缩进的定义/文件末尾
-            start_line = text[: m.start()].count("\n") + 1
+            start_line = masked[: m.start()].count("\n") + 1
             end_line = len(lines)
             for m2 in matches[i + 1:]:
                 indent2 = len(m2.group(1))
                 if indent2 <= indent:
-                    end_line = text[: m2.start()].count("\n")
+                    end_line = masked[: m2.start()].count("\n")
                     break
             # 装饰器
             #
@@ -118,9 +150,9 @@ class SymbolIndexer:
                         _j -= 1
                 break
             decorators = []
-            for dm in ROUTE_DECORATOR_RE.finditer(text[: m.start()]):
+            for dm in ROUTE_DECORATOR_RE.finditer(masked[: m.start()]):
                 deco_anchor = dm.start() + len(dm.group(1))
-                d_start = text[:deco_anchor].count("\n") + 1
+                d_start = masked[:deco_anchor].count("\n") + 1
                 if _blk_start <= d_start <= start_line:
                     decorators.append(dm.group(0).strip())
             # M137：**无括号装饰器**（`@admin_required` / `@login_required`）。
@@ -129,8 +161,8 @@ class SymbolIndexer:
             # 丢了 `@admin_required`（守卫证据头里自然也没有它）。
             # 只收**装饰器块内**的行（`_blk_start..start_line`），不会把兄弟
             # 函数的装饰器算进来。
-            for dm in _BARE_DECORATOR_RE.finditer(text[: m.start()]):
-                d_start = text[:dm.start()].count("\n") + 1
+            for dm in _BARE_DECORATOR_RE.finditer(masked[: m.start()]):
+                d_start = masked[:dm.start()].count("\n") + 1
                 if _blk_start <= d_start <= start_line:
                     token = dm.group(0).strip()
                     if token not in decorators:

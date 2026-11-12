@@ -143,7 +143,10 @@ _TOOL_LIB_RE = re.compile(
     r"testing-framework|testcontainers|stubs|djlint|linter|auditlog|graphql|"
     r"huey|celery|defectdojo|spring-boot-admin|home[-_]?assistant|"
     r"hacs|custom_components|esphome|comfyui|sd-webui|stable-diffusion|"
-    r"gradio|streamlit|jupyter|notebook|mcp-server)(?:[^a-z0-9]|$)"
+    r"gradio|streamlit|jupyter|notebook|mcp-server|"
+    # M358：安全工具/漏洞库/靶场本体（AutoCVE、vuln-scanner、exploit-db、
+    # honeypot 等）不是业务系统，扫它们只会把知识库示例当漏洞报。
+    r"autocve|vuln-scanner|pentest|exploit-db|honeypot)(?:[^a-z0-9]|$)"
     r"|(?:ide|vscode|intellij|eclipse)-)", re.I)
 
 # M312：名字以框架前缀开头、描述又是"库/插件/中间件/可复用包"的第三方组件，

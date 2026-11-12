@@ -217,6 +217,32 @@ def query_nvd(keyword: str) -> dict:
             "ids": ids[:5], "url": url, "error": ""}
 
 
+# M359：判 FRESH 前的 NVD 单独重试。NVD 在部分网络被 TLS 阻断，
+# 逐候选重试会把 8s 超时乘上候选数；每进程最多补查 3 次，
+# 用尽后直接返回失败（调用方把该候选压进 B 板）。
+_NVD_RETRY_BUDGET = 3
+_NVD_RETRIES_LEFT = _NVD_RETRY_BUDGET
+
+
+def _query_nvd_retry(keyword: str) -> dict:
+    """熔断状态下对**单个候选**强制补查一次 NVD（M359）。
+
+    只用于"本来就要判 ZERO_RECORD_FRESH"的极少数候选：不能凭 CIRCL
+    0 命中就宣称 NVD 查过。重试失败后恢复熔断，避免逐条撞 8s 超时。
+    """
+    global _NVD_FAILS, _NVD_RETRIES_LEFT
+    if _NVD_RETRIES_LEFT <= 0:
+        return {"ok": False, "total": 0, "ids": [], "url": "",
+                "error": "nvd_retry_budget_exhausted"}
+    _NVD_RETRIES_LEFT -= 1
+    saved = _NVD_FAILS
+    _NVD_FAILS = 0
+    res = query_nvd(keyword)
+    if not res.get("ok"):
+        _NVD_FAILS = max(saved, 2)
+    return res
+
+
 def _circl_parse(data: dict) -> tuple[int, list[str], list[dict]]:
     """CIRCL 单页 -> (total_count, 去重 ids, items)。"""
     total = int(data.get("total_count") or 0)
@@ -351,6 +377,27 @@ def query_github_advisories(slug: str) -> dict:
     return res
 
 
+def _search_global_issues(term: str) -> dict:
+    """单次全网 Issue 搜索（M359 抽出：方法名 / 文件名两种查询共用）。"""
+    q = urllib.parse.quote(term)
+    url = f"{GH_API}/search/issues?q={q}&per_page=5"
+    ok, data, err = _get_json(url, headers={
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "nexus-audit/1.3"})
+    if not ok or not isinstance(data, dict):
+        return {"ok": False, "total": 0, "ids": [], "url": url, "error": err}
+    items = data.get("items") or []
+    ids = []
+    for it in items:
+        repo_url = str(it.get("repository_url") or "")
+        repo = ("/".join(repo_url.rstrip("/").split("/")[-2:])
+                if repo_url else "")
+        ids.append(f"{repo}#{it.get('number')} {it.get('title', '')[:60]}")
+    return {"ok": True,
+            "total": int(data.get("total_count") or len(items)),
+            "ids": ids[:5], "url": url, "error": "", "query": term}
+
+
 def query_github_issues_global(class_name: str, method_name: str,
                                  repo_name: str = "") -> dict:
     """全网跨仓搜索 `"类名" "方法名"`（M314），并支持仓库名兜底（M323）。
@@ -373,25 +420,11 @@ def query_github_issues_global(class_name: str, method_name: str,
     last_err = ""
     zero: dict | None = None
     for term in terms:
-        q = urllib.parse.quote(term)
-        url = f"{GH_API}/search/issues?q={q}&per_page=5"
-        ok, data, err = _get_json(url, headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "nexus-audit/1.3"})
-        if not ok or not isinstance(data, dict):
-            last_err = err
+        res = _search_global_issues(term)
+        if not res.get("ok"):
+            last_err = str(res.get("error") or "")
             continue
-        items = data.get("items") or []
-        ids = []
-        for it in items:
-            repo_url = str(it.get("repository_url") or "")
-            repo = ("/".join(repo_url.rstrip("/").split("/")[-2:])
-                    if repo_url else "")
-            ids.append(f"{repo}#{it.get('number')} {it.get('title', '')[:60]}")
-        res = {"ok": True,
-               "total": int(data.get("total_count") or len(items)),
-               "ids": ids[:5], "url": url, "error": "", "query": term}
-        if res["total"] > 0 or ids:
+        if res["total"] > 0 or res["ids"]:
             return res
         if zero is None:
             zero = res
@@ -402,6 +435,22 @@ def query_github_issues_global(class_name: str, method_name: str,
         return zero
     return {"ok": False, "total": 0, "ids": [], "url": "",
             "error": last_err or "no_url"}
+
+
+def query_github_issues_global_file(repo_name: str, file_stem: str) -> dict:
+    """泛化方法名的退化检索：`"<repo_name>" "<file_stem>"`（M359）。
+
+    `get_file` / `get_user` / `download` 这类方法名全网搜等于烧配额，
+    旧实现直接 `skipped_generic`；但 file 的 stem 若是非泛化的业务文件名
+    （assets / backup / export …），公开报告通常写 `"<项目名>" "<文件名>"`。
+    用它补一枪，比"没查"多一层证据。
+    """
+    name = (repo_name or "").strip().split("/")[-1]
+    stem = (file_stem or "").strip()
+    if not name or not stem:
+        return {"ok": True, "total": 0, "ids": [], "url": "",
+                "error": "not_applicable"}
+    return _search_global_issues(f'"{name}" "{stem}"')
 
 
 GLOBAL_ADV_CACHE = CACHE / "_global_advisories.json"
@@ -632,17 +681,87 @@ _GENERIC_CLASSES = frozenset({
 })
 
 
+# M359：泛化方法名判定。旧实现只认 `_GENERIC_METHODS` 里的单词动词，
+# `get_file` / `get_user` 这类「动词_通用名词」漏网 —— 它们被当成独特方法名
+# 发全网搜索（AutoCVE 知识库示例正是这么混进证据链的）。
+_GENERIC_VERBS = frozenset({
+    "get", "list", "query", "page", "search", "find", "select", "fetch",
+    "count", "export", "download", "upload", "view", "show", "load",
+    "detail", "info", "create", "update", "delete", "save", "add",
+    "remove", "edit", "import", "run", "execute", "handle", "main",
+    "init", "apply", "test", "index", "login", "logout",
+})
+
+
+def _is_generic_method(method_name: str) -> bool:
+    """方法名是否泛化：`get` / `get_file` / `get_user` / `download`。
+
+    两段式「动词_通用名词」一律算泛化；camelCase（`getUserDetails`）与
+    三段以上（`list_audit_session_messages`）仍保留精确搜索。
+    """
+    m = (method_name or "").strip().lower()
+    if not m:
+        return True
+    if m in _GENERIC_METHODS:
+        return True
+    parts = re.split(r"[_\-]", m)
+    return len(parts) == 2 and parts[0] in _GENERIC_VERBS and len(parts[1]) <= 12
+
+
 def _is_distinctive(class_name: str, method_name: str) -> bool:
     """类名 + 方法名是否足够独特，值得发一次全网 Issue 搜索（M317）。"""
     cls = (class_name or "").strip()
     meth = (method_name or "").strip()
     if not cls or not meth or len(meth) < 6:
         return False
-    if meth.lower() in _GENERIC_METHODS:
+    if _is_generic_method(meth):
         return False
     if cls in _GENERIC_CLASSES:
         return False
     return True
+
+
+# M359：框架同名文件 —— 它们的 stem 就是框架名，拿来当检索词只会命中
+# 全世界的教程与示例（AutoCVE 的 knowledge/frameworks/fastapi.py 正是
+# 靠这一条挡住，不能因为"文件名独特"就去搜 "autocve" "fastapi"）。
+_GENERIC_FILE_STEMS = frozenset({
+    "fastapi", "flask", "django", "views", "routes", "api", "app",
+    "main", "index",
+})
+
+
+def _distinctive_file_stem(file: str) -> str:
+    """文件名是否足够独特，可作为泛化方法名的退化检索词（M359）。"""
+    stem = Path(file).stem.lower() if file else ""
+    if len(stem) < 4 or stem in _GENERIC_FILE_STEMS:
+        return ""
+    if stem in _GENERIC_METHODS:
+        return ""
+    return stem
+
+
+# M359：这些"错误"是**设计上不查**，不算证据缺口。
+_EVIDENCE_OK_ERRORS = frozenset({"not_needed", "skipped_short_circuit"})
+
+
+def _evidence_gaps(sources: dict) -> list[str]:
+    """列出没查成/被跳过的来源（M359）。
+
+    `evidence_complete` 的定义：六个来源都实际查过（或设计上不需要查）。
+    NVD 熔断、全网 Issue 泛化跳过、CIRCL 失败都会让 FRESH 的"四来源
+    0 命中"变成一句空话，所以逐条记进 evidence_gaps。
+    """
+    gaps: list[str] = []
+    for key in ("nvd", "circl", "github_issues", "github_advisories",
+                "github_global_issues", "github_global_advisories"):
+        src = sources.get(key) or {}
+        err = str(src.get("error") or "")
+        if err in _EVIDENCE_OK_ERRORS:
+            continue
+        if src.get("ok") and not err.startswith("skipped"):
+            continue
+        gaps.append(f"{key}:{err or 'failed'}")
+    return gaps
 
 
 def dedup(slug: str, category: str, unit: str, *,
@@ -662,6 +781,19 @@ def dedup(slug: str, category: str, unit: str, *,
     if use_cache and allow_online:
         cached = _cache_get(cpath)
         if cached and cached.get("status") in ALL_STATUSES:
+            # M359：旧缓存没有 evidence_* 字段，且可能带着"NVD 熔断时判的
+            # FRESH"。读缓存时按同一口径回填/降级，避免绕过新门禁。
+            if "evidence_complete" not in cached:
+                _gaps = _evidence_gaps(cached.get("sources") or {})
+                cached["evidence_gaps"] = _gaps
+                cached["evidence_complete"] = not _gaps
+            if (cached.get("status") == STATUS_FRESH
+                    and not ((cached.get("sources") or {}).get("nvd") or {}
+                             ).get("ok")):
+                _nvd_err = str(((cached.get("sources") or {}).get("nvd") or {}
+                                ).get("error") or "nvd_failed")
+                cached["status"] = STATUS_UNKNOWN
+                cached["reason"] = f"INCOMPLETE_DEDUP_EVIDENCE: {_nvd_err}"
             cached["from_cache"] = True
             return cached
 
@@ -677,6 +809,8 @@ def dedup(slug: str, category: str, unit: str, *,
             "evidence_urls": [s.get("url") for s in local if s.get("url")],
             "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "coverage": {"local_seed": "checked", "online": "not_needed"},
+            # 本地种子命中是确定性结论，不需要在线证据。
+            "evidence_complete": True, "evidence_gaps": [],
         }
         if use_cache:
             _cache_put(cpath, rec)
@@ -690,6 +824,8 @@ def dedup(slug: str, category: str, unit: str, *,
             "checked_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "coverage": {"local_seed": "checked", "online": "skipped"},
             "reason": "online_disabled: freshness cannot be claimed offline",
+            "evidence_complete": False,
+            "evidence_gaps": ["online:skipped"],
         }
         return rec
 
@@ -758,8 +894,15 @@ def dedup(slug: str, category: str, unit: str, *,
                 _cls, _meth,
                 repo_name=(slug.split("/")[-1] if slug else ""))
         else:
-            global_issues = {"ok": True, "total": 0, "ids": [], "url": "",
-                             "error": "skipped_generic"}
+            # M359：泛化方法名不再一律 skipped_generic —— 文件名独特时
+            # 退化为 `"<repo>" "<file_stem>"` 搜索，把"没查"变成"查过"。
+            _stem = _distinctive_file_stem(file)
+            if _stem:
+                global_issues = query_github_issues_global_file(
+                    (slug.split("/")[-1] if slug else ""), _stem)
+            else:
+                global_issues = {"ok": True, "total": 0, "ids": [], "url": "",
+                                 "error": "skipped_generic"}
         _gadv_items = [x for x in (global_adv.get("items") or []) if x.get("id")]
         _gadv_cve = [x for x in _gadv_items
                      if str(x.get("id", "")).upper().startswith("CVE-")]
@@ -781,7 +924,25 @@ def dedup(slug: str, category: str, unit: str, *,
                   and global_issues.get("ok") and global_adv.get("ok")):
             status = STATUS_UNKNOWN
         else:
-            status = STATUS_FRESH
+            # M359：NVD 熔断时不能凭 CIRCL 0 命中就判 FRESH —— 那等于
+            # "没查过也算查过"。对这批极少数候选单独补查一次 NVD：
+            # 查到 CVE 直接判重，仍失败则压进 B 板（UNKNOWN）。
+            if not nvd.get("ok"):
+                _nvd_err = str(nvd.get("error") or "nvd_failed")
+                _retry = _query_nvd_retry(
+                    f"{slug} {unit}" if unit else f"{slug} {category}")
+                if _retry.get("ok") and int(_retry.get("total") or 0) > 0:
+                    nvd = _retry
+                    status = STATUS_CVE
+                    matched += nvd.get("ids") or []
+                    evidence.append(nvd.get("url", ""))
+                elif _retry.get("ok"):
+                    nvd = _retry          # 0 命中，但这次是真的查过了
+                else:
+                    status = STATUS_UNKNOWN
+                    rec_reason = f"INCOMPLETE_DEDUP_EVIDENCE: {_nvd_err}"
+            if not status:
+                status = STATUS_FRESH
 
     sources = {"nvd": nvd, "circl": circl, "github_issues": issues,
                "github_advisories": ghsa,
@@ -814,6 +975,11 @@ def dedup(slug: str, category: str, unit: str, *,
                        "via_circl" if circl.get("ok") else "unchecked",
         },
     }
+    # M359：证据完整性（六来源逐一核对）。FRESH 只有在 evidence_complete
+    # 为真时才站得住；缺口逐条写进 JSON，报告侧可直接引用。
+    _gaps = _evidence_gaps(sources)
+    rec["evidence_complete"] = not _gaps
+    rec["evidence_gaps"] = _gaps
     if status == STATUS_UNKNOWN:
         rec["reason"] = (rec_reason if rec_reason else
                          "one_or_more_sources_failed: freshness not claimed")

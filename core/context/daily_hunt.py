@@ -186,6 +186,25 @@ def _root_view(rc: dict, repo: Path) -> dict:
     }
 
 
+def noise_record(repo: Path, slug: str, rc: dict, head: dict,
+                 max_head_age_days: int, noise: dict) -> dict:
+    """本地降噪命中的记录骨架（M304/M359）：0 次联网，直接进 B 板留证。
+
+    M359：短路记录也要写**标准化** coverage —— 下游（报告/人工复核）不能
+    把"没联网查"误读成"查过且干净"。
+    """
+    rec = live_hunt._base_record(repo, slug, rc, head, max_head_age_days)
+    rec["status"] = cve_dedup.STATUS_UNKNOWN
+    rec["noise_code"] = noise.get("code", "")
+    rec["reason"] = f"{noise.get('code', '')}: {noise.get('reason', '')}"
+    rec["coverage"] = {"checked": [], "failed": [],
+                       "skipped": ["local_noise_shortcircuit"]}
+    if rec["head_sha"]:
+        rec["permalink"] = upstream_sync.head_permalink(
+            slug, rec["head_sha"], rec["file"], rec["line"])
+    return rec
+
+
 def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
                  dedup_online: bool = False, max_roots: int = 0,
                  max_head_age_days: int = 180, dedup_fn=None,
@@ -251,14 +270,7 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
 
     # 噪音项：0 网络请求、不占 --max-roots 名额，直接进板块 B 留证。
     for rc, noise in blocked_roots:
-        rec = live_hunt._base_record(repo, slug, rc, head, max_head_age_days)
-        rec["status"] = cve_dedup.STATUS_UNKNOWN
-        rec["noise_code"] = noise.get("code", "")
-        rec["reason"] = f"{noise.get('code', '')}: {noise.get('reason', '')}"
-        if rec["head_sha"]:
-            rec["permalink"] = upstream_sync.head_permalink(
-                slug, rec["head_sha"], rec["file"], rec["line"])
-        recs.append(rec)
+        recs.append(noise_record(repo, slug, rc, head, max_head_age_days, noise))
 
     fresh_keys: list[str] = []
     new: list[dict] = []
@@ -535,9 +547,14 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
             if evict_cache and not dry_run:
                 _evict(slug, evicted)
 
+    # M359：started_at 是入口开始时刻，generated_at 必须是**完成**时刻 ——
+    # 旧实现两者共用 started，报告时间戳比实际完成早 10 分钟（扫描 4 个仓
+    # 的真实耗时），看起来像报告比数据旧。
+    finished = _now()
     summary = _counts(records)
     daily_meta = {
-        "generated_at": started, "languages": lang_list, "days": days,
+        "started_at": started, "generated_at": finished,
+        "languages": lang_list, "days": days,
         "candidates": len(items),
         "scanned": sum(1 for x in ledger if x["result"] == "SCANNED"),
         "skipped": sum(1 for x in ledger if x["result"] == "SKIPPED"),
@@ -559,7 +576,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
                 "json": str(json_path), "evicted": evicted}
 
     live_hunt_report.write_outputs(
-        records, report, json_path, packs_dir, generated_at=started,
+        records, report, json_path, packs_dir, generated_at=finished,
         header_extra=_header(ledger, scout, days=days, languages=lang_list,
                              evicted=evicted, summary=summary,
                              blocked=blocked, cooldown_days=cooldown_days,

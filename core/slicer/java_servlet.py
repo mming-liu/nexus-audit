@@ -24,9 +24,11 @@ from typing import Iterable, List
 from core.models import CodeUnit, Language
 from core.text_utils import strip_java_comments
 
+# M358：knowledge / prompts / corpus 是知识库与语料目录（给模型看的漏洞
+# 示例、提示词、语料），不是业务入口；整目录排除，避免示例代码被切进 A 板。
 IGNORE_DIRS = {".git", "target", "build", "node_modules", "test", "tests",
                "example", "examples", "demo", "demos", "sample", "samples",
-               "docs"}
+               "docs", "knowledge", "prompts", "corpus"}
 # M338：示例/测试/基准子模块（hkj-spring/example、foo-demo、bar-tests）。
 # 只对 relative_to(repo_root) 的目录段生效 —— 扫描根目录本身叫 demo/test
 # 时不能被误杀（用户显式指定它就是要扫它）。

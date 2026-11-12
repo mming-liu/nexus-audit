@@ -43,6 +43,10 @@ from core.context.taint_chain import (         # noqa: E402
     build_chains, reads_of, render_chain_block, writes_of,
 )
 from core.models import CodeUnit, Language      # noqa: E402
+from core.context import cve_dedup, daily_hunt, wild_noise  # noqa: E402
+from core.context.symbol_indexer import (                      # noqa: E402
+    SymbolIndexer, _mask_multiline_strings,
+)
 
 # DSH 沙箱下系统 %TEMP% 的 mkdtemp 目录带 0o700 ACL，子进程/同进程
 # 继续往里 mkdir 会被拒（实测 WinError 5）。测试夹具统一改到工作区
@@ -12341,6 +12345,159 @@ check("M330：字面量拼接 + ? + args 绑定不再判 True",
           '    return db.queryForList(sql,args);\n'
           '}\n') is not True, True)
 check("M330：已执行断言数 >= 1900", COUNTS["n"] >= 1900, True)
+
+print("\n[322] M358：三引号示例代码不再被切成路由")
+_M358_SRC = '''"""Frameworks knowledge base.
+
+    @app.get("/file")
+    def get_file(name):
+        return open(name).read()
+
+    @app.post("/user")
+    def get_user(uid):
+        return uid
+"""
+
+@app.get("/real")
+def real_route():
+    return "ok"
+'''
+_M358_MASKED = _mask_multiline_strings(_M358_SRC)
+check("M358：遮蔽后字符数不变", len(_M358_MASKED), len(_M358_SRC))
+check("M358：遮蔽后行数不变", _M358_MASKED.count("\n"), _M358_SRC.count("\n"))
+_M358_DIR = Path(_ws_mkdtemp("m358_"))
+(_M358_DIR / "frameworks.py").write_text(_M358_SRC, encoding="utf-8")
+_M358_IDX = SymbolIndexer(_M358_DIR)
+_M358_IDX.build()
+check("M358：示例 get_file 不进符号表",
+      "get_file" in _M358_IDX.symbol_table, False)
+check("M358：示例 get_user 不进符号表",
+      "get_user" in _M358_IDX.symbol_table, False)
+_M358_SYM = (_M358_IDX.symbol_table.get("real_route") or [{}])[0]
+_M358_REAL_LINE = _M358_SRC.splitlines().index("def real_route():") + 1
+check("M358：真实函数行号零偏移", _M358_SYM.get("start"), _M358_REAL_LINE)
+check("M358：真实函数装饰器保留",
+      _M358_SYM.get("decorators"), ['@app.get("/real")'])
+check("M358：只切出 1 条路由单元", len(_M358_IDX.to_code_units()), 1)
+
+print("\n[323] M359：证据门禁 / 泛化方法名回退 / loopback 继承 / 时间戳")
+_M359_BACKUP = {_k: getattr(cve_dedup, _k) for _k in (
+    "query_nvd", "_query_nvd_retry", "query_circl", "query_github_issues",
+    "query_github_advisories", "query_github_global_advisories",
+    "query_github_issues_global", "query_github_issues_global_file")}
+
+
+def _m359_ok(*_a, **_kw):
+    return {"ok": True, "total": 0, "ids": [], "items": [], "url": "", "error": ""}
+
+
+def _m359_setup(nvd_ok, retry_ok, file_search=None):
+    cve_dedup.query_nvd = lambda kw: (
+        {"ok": True, "total": 0, "ids": [], "url": "u", "error": ""}
+        if nvd_ok else
+        {"ok": False, "total": 0, "ids": [], "url": "u",
+         "error": "nvd_circuit_open"})
+    cve_dedup._query_nvd_retry = lambda kw: (
+        {"ok": True, "total": 0, "ids": [], "url": "u", "error": ""}
+        if retry_ok else
+        {"ok": False, "total": 0, "ids": [], "url": "u",
+         "error": "nvd_retry_budget_exhausted"})
+    cve_dedup.query_circl = lambda slug: {
+        "ok": True, "total": 0, "ids": [], "items": [], "url": "c",
+        "error": ""}
+    cve_dedup.query_github_issues = _m359_ok
+    cve_dedup.query_github_advisories = _m359_ok
+    cve_dedup.query_github_global_advisories = _m359_ok
+    cve_dedup.query_github_issues_global = _m359_ok
+    cve_dedup.query_github_issues_global_file = file_search or _m359_ok
+    cve_dedup._REPO_MEMO.clear()
+
+
+try:
+    _m359_setup(nvd_ok=False, retry_ok=False)
+    _M359_REC = cve_dedup.dedup("acme/demo", "sqli", "Demo.get_file",
+                                file="backend/assets.py", use_cache=False)
+    check("M359：NVD 熔断不放行 FRESH", _M359_REC["status"], "UNKNOWN")
+    check("M359：熔断原因可核对",
+          _M359_REC["reason"].startswith(
+              "INCOMPLETE_DEDUP_EVIDENCE: nvd_circuit_open"), True)
+    check("M359：证据完整性为 False", _M359_REC["evidence_complete"], False)
+    check("M359：证据缺口记 nvd",
+          any(g.startswith("nvd:") for g in _M359_REC["evidence_gaps"]), True)
+
+    _m359_setup(nvd_ok=False, retry_ok=True)
+    _M359_REC = cve_dedup.dedup("acme/demo", "sqli", "Demo.get_file",
+                                file="backend/assets.py", use_cache=False)
+    check("M359：补查 NVD 成功后仍可判 FRESH",
+          _M359_REC["status"], "ZERO_RECORD_FRESH")
+
+    _M359_CALLS = {}
+
+
+    def _m359_file_search(repo, stem):
+        _M359_CALLS["hit"] = (repo, stem)
+        return {"ok": True, "total": 0, "ids": [], "url": "", "error": ""}
+
+
+    _m359_setup(nvd_ok=True, retry_ok=False, file_search=_m359_file_search)
+    cve_dedup.dedup("larlarua/AutoCVE", "sqli", "Demo.get_file",
+                    file="backend/services/assets.py", use_cache=False)
+    check("M359：泛化方法名回退文件名搜索",
+          _M359_CALLS.get("hit"), ("AutoCVE", "assets"))
+    _M359_CALLS.clear()
+    _M359_REC = cve_dedup.dedup(
+        "larlarua/AutoCVE", "sqli", "Demo.get_file",
+        file="backend/app/knowledge/frameworks/fastapi.py", use_cache=False)
+    check("M359：框架同名文件不退化搜索", _M359_CALLS, {})
+    check("M359：框架文件记为 skipped_generic",
+          "github_global_issues:skipped_generic" in _M359_REC["evidence_gaps"],
+          True)
+finally:
+    for _k, _v in _M359_BACKUP.items():
+        setattr(cve_dedup, _k, _v)
+    cve_dedup._REPO_MEMO.clear()
+
+_M359_LOOP = Path(_ws_mkdtemp("m359_loop_"))
+(_M359_LOOP / "api").mkdir(parents=True, exist_ok=True)
+(_M359_LOOP / "api" / "server.py").write_text(
+    'import uvicorn\nuvicorn.run(app, host="127.0.0.1", port=8000)\n',
+    encoding="utf-8")
+(_M359_LOOP / "api" / "dashboard").mkdir(exist_ok=True)
+(_M359_LOOP / "api" / "dashboard" / "app.py").write_text(
+    "from fastapi import APIRouter\nrouter = APIRouter()\n", encoding="utf-8")
+_M359_NOISE = wild_noise.classify(
+    {"category": "authz", "unit": "Dashboard.list",
+     "file": "api/dashboard/app.py"}, _M359_LOOP)
+check("M359：主服务 loopback 由子路由继承",
+      _M359_NOISE.get("code"), "LOCAL_LOOPBACK_ONLY")
+
+_M359_PUB = Path(_ws_mkdtemp("m359_pub_"))
+(_M359_PUB / "api").mkdir(parents=True, exist_ok=True)
+(_M359_PUB / "api" / "server.py").write_text(
+    'import uvicorn\nuvicorn.run(app, host="0.0.0.0", port=8000)\n',
+    encoding="utf-8")
+check("M359：公网绑定不继承 loopback",
+      wild_noise.classify({"category": "authz", "unit": "Dashboard.list",
+                           "file": "api/dashboard/app.py"},
+                          _M359_PUB).get("blocked"), False)
+
+_M359_RUN = daily_hunt.run(
+    languages=["python"], limit=0, dry_run=True,
+    state_path=_M359_LOOP / "state.json", report=_M359_LOOP / "r.md",
+    json_path=_M359_LOOP / "j.json", packs_dir=_M359_LOOP / "packs",
+    offline=True, scout_fn=lambda **kw: {"items": [], "source": "smoke"})
+_M359_DAILY = _M359_RUN["daily"]
+check("M359：started_at 不晚于 generated_at",
+      _M359_DAILY["started_at"] <= _M359_DAILY["generated_at"], True)
+_M359_NREC = daily_hunt.noise_record(
+    _M359_LOOP, "acme/demo",
+    {"category": "authz", "unit_name": "Dashboard.list",
+     "file": str(_M359_LOOP / "api" / "dashboard" / "app.py"), "line": 2},
+    {"head_sha": "abc123", "head_commit_date": "2026-11-10",
+     "head_age_days": 2.0}, 180,
+    {"code": "LOCAL_LOOPBACK_ONLY", "reason": "x"})
+check("M359：短路记录写标准化 coverage", _M359_NREC["coverage"],
+      {"checked": [], "failed": [], "skipped": ["local_noise_shortcircuit"]})
 
 check("M148：失败清单为空", len(FAILS), 0)
 
