@@ -110,6 +110,19 @@ seaweedfs，不发布 api。也就是说：**WebSocket 只能经 Caddy 的 `/api
 3. 建议把 `_authed` 与 `current_user` 合并成同一套依赖（WebSocket 也支持
    `Depends`），避免两套鉴权语义漂移。
 
+## 6b. M361 之后的流水线状态（2026-11-13 补记）
+
+复核结论已沉淀成静态规则：
+
+- `rule_detectors.ws_auth_guard()` 识别「`@*.websocket` + `accept()` 之前的
+  守卫调用（`_authed` / `jwt.decode` / `authenticate` …）+ `close(4401/4403/1008)`」，
+  `authz_verdict()` 直接判 **False**；
+- `wild_noise` 新增 `WS_AUTH_PRESENT`，作为降噪层的兜底分类。
+
+实测：对上面 6 个 WS 入口逐个跑 `authz_verdict` 全部 `False`；对这 5 条
+authz 记录跑 `wild_noise.classify` 全部 `WS_AUTH_PRESENT` —— 它们不会再进
+板块 B。
+
 ## 7. 查重状态
 
 未进入交单流程，因此**未跑完整四来源查重**（NVD / CIRCL / GitHub Issue /

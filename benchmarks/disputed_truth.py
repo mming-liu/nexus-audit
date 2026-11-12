@@ -301,6 +301,11 @@ def verify_evidence(repo_root: str | Path) -> list[str]:
         if not sub:
             problems.append(f"{d.unit}: 未知靶场 {d.target}")
             continue
+        # M362：靶场没克隆 ≠ 证据写错。pre-push 在只拉了部分靶场的机器上
+        # 也要能全绿 —— 这里按"目录是否落地"整条跳过，别把"本机没拉"报成
+        # "文件不存在"。真正证据写错（目录在、文件/行号不对）仍然会红。
+        if not (root / sub).is_dir():
+            continue
         for e in d.evidence:
             p = root / sub / e.file
             if not p.is_file():
@@ -320,6 +325,14 @@ def verify_evidence(repo_root: str | Path) -> list[str]:
                     f"    登记: {e.text.strip()}\n"
                     f"    实际: {actual}")
     return problems
+
+
+def missing_targets(repo_root: str | Path) -> list[str]:
+    """本机没克隆的靶场（M362）：`--check` 用它说明"通过"覆盖了哪些范围。"""
+    root = Path(repo_root) / "reference_repos"
+    targets = {d.target for d in REGISTRY}
+    return [t for t, sub in _TARGET_ROOTS.items()
+            if t in targets and not (root / sub).is_dir()]
 
 
 # ---------------- 导出 ----------------

@@ -37,8 +37,13 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 from core.agents.rule_detectors import (       # noqa: E402
-    has_external_input, redir_verdict, verdict, xss_verdict,
+    authz_verdict, has_external_input, redir_verdict, verdict,
+    ws_auth_guard, xss_verdict,
 )
+from benchmarks.disputed_truth import (       # noqa: E402
+    missing_targets, verify_evidence,
+)
+from core.context import mitre_cna          # noqa: E402
 from core.context.taint_chain import (         # noqa: E402
     build_chains, reads_of, render_chain_block, writes_of,
 )
@@ -71,8 +76,25 @@ FAILS: list[str] = []
 # 的 DEFAULT_TARGET）；缺失时 benchmark 段记 SKIP 并在末尾汇总，规则断言照常判定，
 # 不让"夹具没拉"把整条链打死。
 REFERENCE_ROOT = ROOT / "reference_repos"
-RULE_ONLY = bool(_os.environ.get("NEXUS_RULE_ONLY")) or not (
-    REFERENCE_ROOT.is_dir() and any(REFERENCE_ROOT.iterdir()))
+
+
+def _registered_repos() -> list[tuple]:
+    """50 仓注册表（wild_hunt.REPOS）—— 判"靶场是否齐全"的唯一依据。"""
+    try:
+        from benchmarks.wild_hunt import REPOS as _repos
+        return list(_repos)
+    except Exception:                                       # noqa: BLE001
+        return []
+
+
+_REGISTERED = _registered_repos()
+_PRESENT_REPOS = sum(1 for _r in _REGISTERED if (ROOT / _r[1]).exists())
+# M362：旧判据只看 reference_repos/ **是否为空**，于是"只拉了 9/50 个靶场"
+# 仍按全量模式跑：缺夹具的 benchmark 段全红，pre-push 只能 --no-verify。
+# 现在按注册表判齐全度 —— 不全就整体降级为规则模式（benchmark 段记 SKIP），
+# 规则断言照常判定；50/50 齐全时仍是全量模式。
+RULE_ONLY = bool(_os.environ.get("NEXUS_RULE_ONLY")) or not _REGISTERED or (
+    _PRESENT_REPOS < len(_REGISTERED))
 SKIPS: list[str] = []
 
 def _ref(*parts: str):
@@ -130,6 +152,10 @@ def unit(name: str, body: str, own: str | None = None) -> CodeUnit:
 
 
 # ---------------- 1. 介质配对 ----------------
+
+if RULE_ONLY and not _os.environ.get("NEXUS_RULE_ONLY"):
+    print(f"（靶场 {_PRESENT_REPOS}/{len(_REGISTERED)} 已落地 → 规则模式；"
+          f"benchmark 段记 SKIP）")
 
 print("[1] 介质读写识别")
 STORE = '''@RequestMapping("/stored/store")
@@ -12499,6 +12525,81 @@ _M359_NREC = daily_hunt.noise_record(
 check("M359：短路记录写标准化 coverage", _M359_NREC["coverage"],
       {"checked": [], "failed": [], "skipped": ["local_noise_shortcircuit"]})
 
+print("\n[324] M361：WebSocket 前置鉴权（accept() 前 _authed + close(4401)）")
+_WS_GUARDED = '''@router.websocket("/ws/shell/{shell_id}")
+async def ws_shell(ws: WebSocket, shell_id: str) -> None:
+    if not _authed(ws):
+        await ws.close(code=4401)
+        return
+    await ws.accept()
+    await _pump(ws, shell_channel(shell_id))
+'''
+_WS_OPEN = '''@router.websocket("/ws/open")
+async def ws_open(ws: WebSocket) -> None:
+    await ws.accept()
+    await _pump(ws, "x")
+'''
+_WS_LATE = '''@router.websocket("/ws/late")
+async def ws_late(ws: WebSocket) -> None:
+    await ws.accept()
+    if not jwt.decode(ws.cookies.get("rc_session"), "k"):
+        await ws.close(code=4401)
+'''
+check("M361：守卫 WS 识别", ws_auth_guard(_WS_GUARDED), True)
+check("M361：守卫 WS 判 False（安全）", authz_verdict(_WS_GUARDED), False)
+check("M361：无守卫 WS 不判 False", authz_verdict(_WS_OPEN) is False, False)
+check("M361：accept() 之后的校验不算", ws_auth_guard(_WS_LATE), False)
+
+_WS_DIR = Path(_ws_mkdtemp("m361_"))
+(_WS_DIR / "ws.py").write_text(_WS_GUARDED, encoding="utf-8")
+_WS_NOISE = wild_noise.classify(
+    {"category": "authz", "unit": "ws_shell", "file": "ws.py"}, _WS_DIR)
+check("M361：降噪层标 WS_AUTH_PRESENT",
+      _WS_NOISE.get("code"), "WS_AUTH_PRESENT")
+
+print("\n[325] M362/M363：靶场守卫 + cve-submit 直投闭环")
+_M362_ROOT = Path(_ws_mkdtemp("m362_"))
+(_M362_ROOT / "reference_repos").mkdir(parents=True, exist_ok=True)
+check("M362：靶场未克隆时证据核对全跳过", verify_evidence(_M362_ROOT), [])
+(_M362_ROOT / "reference_repos" / "Hello-Java-Sec-master").mkdir()
+_M362_PROBLEMS = verify_evidence(_M362_ROOT)
+check("M362：靶场已落地但证据缺失仍报错",
+      any("文件不存在" in _p for _p in _M362_PROBLEMS), True)
+check("M362：未克隆靶场清单可枚举",
+      sorted(missing_targets(_M362_ROOT)), ["JavaSecLab", "OWASP"])
+
+import base64 as _b64                                      # noqa: E402
+import json as _json                                       # noqa: E402
+import time as _time                                       # noqa: E402
+
+_M363_CLAIMS = {"sub": "6ae20ef12008b20d4cf40d13", "sid": "bae210f1",
+                "iss": "https://cveform-api.mitre.org",
+                "iat": int(_time.time()), "exp": int(_time.time()) + 420}
+
+
+def _m363_seg(payload: dict) -> str:
+    return _b64.urlsafe_b64encode(
+        _json.dumps(payload).encode()).decode().rstrip("=")
+
+
+_M363_JWT = (f"{_m363_seg({'alg': 'HS256', 'typ': 'JWT'})}."
+             f"{_m363_seg(_M363_CLAIMS)}.sig")
+_M363_BLOB = ('login success {"access_token":"' + _M363_JWT +
+              '","token_type":"Bearer"} mmliu0804@gmail.com')
+_M363_INFO = mitre_cna.parse_login_blob(_M363_BLOB)
+check("M363：login blob 解析邮箱", _M363_INFO["email"],
+      "mmliu0804@gmail.com")
+check("M363：JWT sub/sid 提取",
+      (_M363_INFO["sub"], _M363_INFO["sid"]),
+      (_M363_CLAIMS["sub"], "bae210f1"))
+_M363_REC = mitre_cna.build_cna_record(
+    mitre_cna.CNA_TARGETS["metasfresh"], "CAN-2026-0000001", requester_id="x")
+check("M363：metasfresh 记录零校验错误",
+      mitre_cna.validate_cna_record(_M363_REC), [])
+check("M363：CVE 5.2 版本与厂商",
+      (_M363_REC["dataVersion"],
+       _M363_REC["containers"]["cna"]["affected"][0]["vendor"]),
+      ("5.2", "metasfresh"))
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

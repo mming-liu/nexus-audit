@@ -38,6 +38,50 @@ WEAK_HASHES = ("MD2", "MD4", "MD5", "SHA", "SHA-0", "SHA-1", "SHA1")
 _SEP = re.compile(r"^//\s*----", re.M)
 
 
+# ---------------- M361：WebSocket 前置鉴权 ----------------
+#
+# FastAPI / Starlette 的 WebSocket 路由不走 HTTP 的 Depends() 依赖链，鉴权
+# 通常写成"在 accept() 之前校验 Cookie/Token，不通过就 close(4401/1008)"：
+#
+#     def _authed(ws):
+#         token = ws.cookies.get("rc_session")
+#         return bool(token) and jwt.decode(token, settings.jwt_secret, ...)
+#
+#     @router.websocket("/ws/shell/{shell_id}")
+#     async def ws_shell(ws, shell_id):
+#         if not _authed(ws):
+#             await ws.close(code=4401)
+#             return
+#         await ws.accept()
+#
+# 旧判据只认 @PreAuthorize / Depends(...) 这类声明式守卫，于是把 redcell 的
+# 5 条 WS 路由全判成"缺鉴权"（a006c2a 之前的 B 板噪音）。这里按**机制**认：
+# 守卫调用 + 拒绝 close，且两者都必须发生在 accept() 之前 —— accept() 之后
+# 再校验的不算（连接已经建立，数据可能已发）。
+_WS_ROUTE_RE = re.compile(r"@\w[\w.]*\.websocket\s*\(")
+_WS_GUARD_CALL_RE = re.compile(
+    r"(?:\b(?:_authed|authenticate|authorize|verify_token|verify_jwt|"
+    r"check_token|check_auth|require_auth)\s*\(|"
+    r"\bjwt\s*\.\s*decode\s*\(|"
+    r"\b(?:get_current_user|current_user)\s*\()", re.I)
+_WS_DENY_CLOSE_RE = re.compile(
+    r"\.\s*close\s*\(\s*(?:code\s*=\s*)?(?:1008|4401|4403)\b")
+
+
+def ws_auth_guard(source: str) -> bool:
+    """WebSocket 路由是否在 `accept()` 前做了主体校验并拒绝未授权连接。
+
+    True 表示"鉴权存在"，可据此判 False（安全）；False 表示看不出前置守卫，
+    仍需按普通 authz 口径继续判定。
+    """
+    if not source or not _WS_ROUTE_RE.search(source):
+        return False
+    idx = source.find(".accept(")
+    head = source[:idx] if idx > 0 else source
+    return bool(_WS_GUARD_CALL_RE.search(head)
+                and _WS_DENY_CLOSE_RE.search(head))
+
+
 def entry_body(source: str) -> str:
     """只保留入口方法体：截到第一个 `// ---- ...` 分隔注释之前，并**剥掉注释**。
 
@@ -5978,6 +6022,11 @@ def authz_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not body:
         return None
+
+    # M361：WebSocket 前置鉴权（accept() 前 _authed / jwt.decode + close(4401)）
+    # 是确定性守卫 —— redcell 5 条 WS 路由由此判 False，不再进 B 板。
+    if ws_auth_guard(source):
+        return False
 
     # M121：DRF 类视图（切片头带 `// View-Action:`）走专门的口径。
     _va = re.search(r"//\s*View-Action:\s*(\w+)", source)

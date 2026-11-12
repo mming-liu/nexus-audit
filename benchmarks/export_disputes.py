@@ -29,8 +29,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from benchmarks.disputed_truth import (          # noqa: E402
-    KIND_LABEL, all_disputes, dump_issues, dump_json, render_markdown,
-    verify_evidence,
+    KIND_LABEL, all_disputes, dump_issues, dump_json, missing_targets,
+    render_markdown, verify_evidence,
 )
 
 
@@ -60,7 +60,10 @@ def main() -> int:
                 print(f"  - {p}")
             return 1
         n = len(all_disputes())
-        print(f"✔ 证据核对通过：{n} 条争议，全部能逐字对上源码")
+        skipped = missing_targets(ROOT)
+        note = (f"（{len(skipped)} 个靶场未克隆，已跳过：{'/'.join(skipped)}）"
+                if skipped else "，全部能逐字对上源码")
+        print(f"✔ 证据核对通过：{n} 条争议{note}")
         return 0
 
     if args.issues:

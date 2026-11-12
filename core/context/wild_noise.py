@@ -36,6 +36,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from core.agents.rule_detectors import ws_auth_guard
+
 DEMO_CONTROLLER = "DEMO_CONTROLLER"
 PUBLIC_READONLY_ENDPOINT = "PUBLIC_READONLY_ENDPOINT"
 AUTHZ_SIBLING_GUARD = "AUTHZ_SIBLING_GUARD"
@@ -47,6 +49,9 @@ LOCAL_UNIX_SOCKET_SERVER = "LOCAL_UNIX_SOCKET_SERVER"
 # M337：显式只允许 loopback 的单机工作台（LocalAccessMiddleware / 127.0.0.1
 # 客户端校验）。这类应用没有远程攻击面，不能占板块 A 的交单席位。
 LOCAL_LOOPBACK_ONLY = "LOCAL_LOOPBACK_ONLY"
+# M361：WebSocket 路由在 accept() 前做了主体校验并 close(4401/1008)。
+# 这类"鉴权存在"的 WS 入口不再是未授权候选（redcell 5 条由此归零）。
+WS_AUTH_PRESENT = "WS_AUTH_PRESENT"
 UNVERIFIED_WILD_AUTHZ = "UNVERIFIED_WILD_AUTHZ"
 ZERO_ENTRY_LIB = "ZERO_ENTRY_LIB"
 RULE_LANGUAGE_MISMATCH = "RULE_LANGUAGE_MISMATCH"
@@ -107,6 +112,27 @@ def _read(repo_root: Path | None, rel: str) -> str:
         return path.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return ""
+
+
+def _ws_handler_block(src: str, unit: str) -> str:
+    """截出入口函数（含装饰器）的一段源码，供 WS 前置鉴权判定（M361）。
+
+    不能整文件判定：同一个 ws.py 里可能既有前置鉴权路由、也有后置校验路由，
+    按文件判会把真洞一起放过。
+    """
+    meth = (unit or "").rsplit(".", 1)[-1]
+    if not src or not meth:
+        return ""
+    m = re.search(rf"^[ \t]*(?:async\s+)?def\s+{re.escape(meth)}\s*\(",
+                  src, re.M)
+    if not m:
+        return ""
+    start = src.rfind("@", 0, m.start())
+    start = start if start >= 0 and m.start() - start < 800 else m.start()
+    tail = src[m.start():]
+    nxt = re.search(r"^[ \t]*(?:async\s+)?def\s+\w+\s*\(", tail[1:], re.M)
+    end = m.start() + (nxt.start() + 1 if nxt else len(tail))
+    return src[start:end]
 
 
 def looks_local_socket(text: str) -> bool:
@@ -245,6 +271,15 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
     if "demo" in file or "demo" in unit.lower():
         return {"blocked": True, "code": DEMO_CONTROLLER,
                 "reason": "demo/示例入口（非生产代码）"}
+
+    # M361：WebSocket 前置鉴权。accept() 前校验会话并 close(4401/1008) 的
+    # WS 入口不是未授权候选（redcell 5 条 authz 在此归零）。
+    if (record.get("category") == "authz" and file.endswith(".py")):
+        _ws_src = _read(repo_root, str(record.get("file") or ""))
+        if _ws_src and ws_auth_guard(_ws_handler_block(_ws_src, unit)):
+            return {"blocked": True, "code": WS_AUTH_PRESENT,
+                    "reason": ("WebSocket 路由在 accept() 前校验会话并 "
+                               "close(4401/1008)：鉴权存在，不是未授权入口")}
 
     if str(record.get("category") or "") in SOLIDITY_ONLY and not file.endswith(
             ".sol"):
