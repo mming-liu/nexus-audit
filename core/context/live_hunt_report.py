@@ -109,6 +109,8 @@ def render_report(records: list[dict], generated_at: str | None = None,
                STATUS_STALE, STATUS_UNKNOWN)}
     counts["BOARD_A"] = len(a)
     counts["BOARD_B"] = len(b)
+    # M368：NVD 熔断时经 CIRCL+GHSA 四源仲裁放行的条数（报告须可解释）。
+    fallback = sum(1 for r in rows if r.get("nvd_fallback"))
     lines = [
         "# 活水首杀作战大盘（LIVE_HUNT）", "",
         "> 机器事实源：" + (source_json or
@@ -124,6 +126,8 @@ def render_report(records: list[dict], generated_at: str | None = None,
         f"PATCHED_UPSTREAM {counts[STATUS_PATCHED]} / "
         f"STALE_REPO {counts[STATUS_STALE]} / "
         f"UNKNOWN {counts[STATUS_UNKNOWN]}",
+        *([f"- NVD 熔断兜底：{fallback} 条经 CIRCL+GHSA 仲裁（NVD 未查）"]
+          if fallback else []),
         "",
         "<!-- live_hunt_counts: " + json.dumps(counts, ensure_ascii=False,
                                                 sort_keys=True) + " -->",

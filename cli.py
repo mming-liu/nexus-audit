@@ -6077,7 +6077,9 @@ def cmd_daily_hunt(args) -> int:
         dedup_online=not args.offline_dedup, dry_run=args.dry_run,
         max_head_age_days=args.max_head_age_days,
         repo_timeout=args.repo_timeout, cooldown_days=args.cooldown_days,
-        min_units=args.min_units)
+        min_units=args.min_units,
+        repos=([s.strip() for s in (args.repos or "").split(",") if s.strip()]
+               or None))
     d = res["daily"]
     tag = "（dry-run，未落盘）" if res.get("dry_run") else ""
     print(f"[daily-hunt]{tag} 候选 {d['candidates']} ｜ 实扫 {d['scanned']} ｜ "
@@ -6501,8 +6503,10 @@ def main():
                          help="只看最近 N 天有 push 的仓（默认 14）")
     p_daily.add_argument("--limit", type=int, default=10,
                          help="每天最多实扫多少个候选仓（默认 10）")
-    p_daily.add_argument("--max-roots", type=int, default=0,
-                         help="每仓最多复核多少条根因（0=全部）")
+    p_daily.add_argument("--max-roots", type=int, default=5,
+                         help="每仓最多复核多少条根因（默认 5；0=全部）")
+    p_daily.add_argument("--repos", default=None,
+                         help="显式重扫名单（逗号分隔 owner/repo，跳过侦察）")
     p_daily.add_argument("--min-stars", type=int, default=300,
                          help="星级下限（默认 300，过滤个人练手玩具仓）")
     p_daily.add_argument("--max-stars", type=int, default=10000)

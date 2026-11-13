@@ -12417,7 +12417,7 @@ def _m359_ok(*_a, **_kw):
     return {"ok": True, "total": 0, "ids": [], "items": [], "url": "", "error": ""}
 
 
-def _m359_setup(nvd_ok, retry_ok, file_search=None):
+def _m359_setup(nvd_ok, retry_ok, file_search=None, circl_ok=True):
     cve_dedup.query_nvd = lambda kw: (
         {"ok": True, "total": 0, "ids": [], "url": "u", "error": ""}
         if nvd_ok else
@@ -12428,9 +12428,11 @@ def _m359_setup(nvd_ok, retry_ok, file_search=None):
         if retry_ok else
         {"ok": False, "total": 0, "ids": [], "url": "u",
          "error": "nvd_retry_budget_exhausted"})
-    cve_dedup.query_circl = lambda slug: {
-        "ok": True, "total": 0, "ids": [], "items": [], "url": "c",
-        "error": ""}
+    cve_dedup.query_circl = lambda slug: (
+        {"ok": True, "total": 0, "ids": [], "items": [], "url": "c",
+         "error": ""} if circl_ok else
+        {"ok": False, "total": 0, "ids": [], "items": [], "url": "c",
+         "error": "rate_limited_http_403"})
     cve_dedup.query_github_issues = _m359_ok
     cve_dedup.query_github_advisories = _m359_ok
     cve_dedup.query_github_global_advisories = _m359_ok
@@ -12440,13 +12442,13 @@ def _m359_setup(nvd_ok, retry_ok, file_search=None):
 
 
 try:
-    _m359_setup(nvd_ok=False, retry_ok=False)
+    _m359_setup(nvd_ok=False, retry_ok=False, circl_ok=False)
     _M359_REC = cve_dedup.dedup("acme/demo", "sqli", "Demo.get_file",
                                 file="backend/assets.py", use_cache=False)
     check("M359：NVD 熔断不放行 FRESH", _M359_REC["status"], "UNKNOWN")
     check("M359：熔断原因可核对",
           _M359_REC["reason"].startswith(
-              "INCOMPLETE_DEDUP_EVIDENCE: nvd_circuit_open"), True)
+              "INCOMPLETE_DEDUP_EVIDENCE"), True)
     check("M359：证据完整性为 False", _M359_REC["evidence_complete"], False)
     check("M359：证据缺口记 nvd",
           any(g.startswith("nvd:") for g in _M359_REC["evidence_gaps"]), True)
@@ -12692,6 +12694,110 @@ _M366_RUN = daily_hunt.run(
     offline=True, scout_fn=lambda **kw: {"items": [], "source": "smoke"})
 check("M366：daily_meta 带 incomplete_dedup",
       _M366_RUN["daily"].get("incomplete_dedup"), 0)
+print("\n[328] M367/M368：裸 authz 本地拦截 + NVD 熔断多源仲裁")
+_M367_DIR = Path(_ws_mkdtemp("m367_"))
+_M367_ROOTS = [
+    {"category": "authz", "unit_name": "Api.list_items",
+     "file": str(_M367_DIR / "api.py"), "line": 10,
+     "routes": ["/api/items"]},
+    {"category": "authz", "unit_name": "Api.get_item",
+     "file": str(_M367_DIR / "api.py"), "line": 20,
+     "routes": ["/api/item"]},
+]
+(_M367_DIR / "api.py").write_text("def list_items():\n    return 1\n",
+                                  encoding="utf-8")
+_M367_CALLS = {"dedup": 0}
+
+
+def _m367_dedup(*_a, **_k):
+    _M367_CALLS["dedup"] += 1
+    return {"status": "ZERO_RECORD_FRESH", "matched_ids": [], "sources": {},
+            "evidence_urls": [], "checked_at": "", "coverage": {}}
+
+
+_orig_scan = daily_hunt.live_hunt.scan_repo
+_orig_head = daily_hunt.upstream_sync.local_head
+daily_hunt.live_hunt.scan_repo = lambda repo, timeout=900: {
+    "roots": _M367_ROOTS, "total_units": 12}
+daily_hunt.upstream_sync.local_head = lambda repo: {
+    "status": "OK", "head_sha": "a" * 40, "head_commit_date": "2026-11-12",
+    "head_age_days": 1.0, "branch": "main"}
+try:
+    _M367_RES = daily_hunt.process_repo(
+        "acme/api", _M367_DIR, {}, dedup_online=True, max_roots=5,
+        dedup_fn=_m367_dedup)
+finally:
+    daily_hunt.live_hunt.scan_repo = _orig_scan
+    daily_hunt.upstream_sync.local_head = _orig_head
+check("M367：裸 authz 不发查重", _M367_CALLS["dedup"], 0)
+check("M367：裸 authz 直接进 B",
+      [r.get("noise_code") for r in _M367_RES["records"]],
+      ["UNVERIFIED_WILD_AUTHZ", "UNVERIFIED_WILD_AUTHZ"])
+
+_M368_BACKUP = {_k: getattr(cve_dedup, _k) for _k in (
+    "query_nvd", "_query_nvd_retry", "query_circl", "query_github_issues",
+    "query_github_advisories", "query_github_global_advisories",
+    "query_github_issues_global", "query_github_issues_global_file")}
+
+
+def _m368_src(ok, err="rate_limited_http_403"):
+    def _fn(*_a, **_k):
+        return ({"ok": True, "total": 0, "ids": [], "items": [], "url": "",
+                 "error": ""} if ok else
+                {"ok": False, "total": 0, "ids": [], "items": [], "url": "",
+                 "error": err})
+    return _fn
+
+
+def _m368_setup(nvd_ok, circl_ok, issues_ok, ghsa_ok, gadv_ok):
+    cve_dedup.query_nvd = lambda kw: (
+        {"ok": True, "total": 0, "ids": [], "url": "u", "error": ""}
+        if nvd_ok else
+        {"ok": False, "total": 0, "ids": [], "url": "u",
+         "error": "nvd_circuit_open"})
+    cve_dedup._query_nvd_retry = lambda kw: {
+        "ok": False, "total": 0, "ids": [], "url": "",
+        "error": "nvd_retry_budget_exhausted"}
+    cve_dedup.query_circl = _m368_src(circl_ok)
+    cve_dedup.query_github_issues = _m368_src(issues_ok)
+    cve_dedup.query_github_advisories = _m368_src(ghsa_ok)
+    cve_dedup.query_github_global_advisories = _m368_src(gadv_ok)
+    cve_dedup.query_github_issues_global = _m368_src(True)
+    cve_dedup.query_github_issues_global_file = _m368_src(True)
+    cve_dedup._REPO_MEMO.clear()
+
+
+try:
+    _m368_setup(False, True, True, True, True)
+    _M368_REC = cve_dedup.dedup("acme/api", "sqli", "Api.list_items",
+                                file="api.py", use_cache=False)
+    check("M368：NVD 熔断 + 四源全通 → FRESH",
+          _M368_REC["status"], "ZERO_RECORD_FRESH")
+    check("M368：标注 via CIRCL+GHSA",
+          _M368_REC.get("nvd_fallback"), "CIRCL+GHSA")
+    check("M368：缺口记 fallback",
+          "nvd_circuit_open_fallback_circl_ghsa" in _M368_REC["evidence_gaps"],
+          True)
+
+    _m368_setup(False, False, True, True, True)
+    _M368_REC = cve_dedup.dedup("acme/api", "sqli", "Api.list_items",
+                                file="api.py", use_cache=False)
+    check("M368：NVD+CIRCL 双挂 → UNKNOWN", _M368_REC["status"], "UNKNOWN")
+    check("M368：双挂原因可核对",
+          _M368_REC["reason"].startswith("INCOMPLETE_DEDUP_EVIDENCE"), True)
+
+    _m368_setup(False, True, False, True, True)
+    _M368_REC = cve_dedup.dedup("acme/api", "sqli", "Api.list_items",
+                                file="api.py", use_cache=False)
+    check("M368：issue 403 限流 → UNKNOWN", _M368_REC["status"], "UNKNOWN")
+finally:
+    for _k, _v in _M368_BACKUP.items():
+        setattr(cve_dedup, _k, _v)
+    cve_dedup._REPO_MEMO.clear()
+
+import inspect as _inspect                                   # noqa: E402
+check("M367：daily-hunt 默认 max_roots=5",
+      _inspect.signature(daily_hunt.run).parameters["max_roots"].default, 5)
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

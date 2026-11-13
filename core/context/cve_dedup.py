@@ -205,7 +205,12 @@ def query_nvd(keyword: str) -> dict:
     if _NVD_FAILS >= 2:
         return {"ok": False, "total": 0, "ids": [], "url": url,
                 "error": "nvd_circuit_open"}
-    ok, data, err = _get_json(url, timeout=8.0)
+    # M368：NVD 对无 Key IP 极易 403/429；有 NVD_API_KEY 时附 apiKey 头。
+    headers = {}
+    _key = (os.getenv("NVD_API_KEY") or "").strip()
+    if _key:
+        headers["apiKey"] = _key
+    ok, data, err = _get_json(url, headers=headers or None, timeout=8.0)
     if not ok or not isinstance(data, dict):
         _NVD_FAILS += 1
         return {"ok": False, "total": 0, "ids": [], "url": url, "error": err}
@@ -803,6 +808,22 @@ def _distinctive_file_stem(file: str) -> str:
 _EVIDENCE_OK_ERRORS = frozenset({"not_needed", "skipped_short_circuit"})
 
 
+def _dedup_quorum_ok(circl: dict, ghsa: dict, global_adv: dict,
+                     issues: dict) -> bool:
+    """M368：NVD 熔断时的多源仲裁（CIRCL + 仓内/全网 GHSA + 仓内 Issue）。
+
+    四个独立来源**全部成功返回**才算数；任一被限流（403）/失败/跳过都
+    不算 —— 否则"没查过"会被当成"查过且干净"。
+    """
+    for src in (circl, ghsa, global_adv, issues):
+        if not src.get("ok"):
+            return False
+        err = str(src.get("error") or "")
+        if err.startswith("skipped") or err == "not_needed":
+            return False
+    return True
+
+
 def _evidence_gaps(sources: dict) -> list[str]:
     """列出没查成/被跳过的来源（M359）。
 
@@ -904,6 +925,7 @@ def dedup(slug: str, category: str, unit: str, *,
     evidence: list[str] = []
     status = ""
     rec_reason = ""
+    nvd_fallback = False
     cve_hit = False
     circl_hit = False
     if cve_src.get("ok") and cve_src.get("total", 0) > 0:
@@ -990,6 +1012,17 @@ def dedup(slug: str, category: str, unit: str, *,
         elif not (cve_src.get("ok") and issues.get("ok") and ghsa.get("ok")
                   and global_issues.get("ok") and global_adv.get("ok")):
             status = STATUS_UNKNOWN
+            # M368：说清楚是哪一源挂了（403 限流 / 失败），别只写一句
+            # "one_or_more_sources_failed"。
+            for _name, _src in (("cve", cve_src),
+                                ("github_issues", issues),
+                                ("github_advisories", ghsa),
+                                ("github_global_issues", global_issues),
+                                ("github_global_advisories", global_adv)):
+                if not _src.get("ok"):
+                    rec_reason = (f"INCOMPLETE_DEDUP_EVIDENCE: {_name}:"
+                                  f"{_src.get('error') or 'failed'}")
+                    break
         else:
             # M359：NVD 熔断时不能凭 CIRCL 0 命中就判 FRESH —— 那等于
             # "没查过也算查过"。对这批极少数候选单独补查一次 NVD：
@@ -1005,6 +1038,12 @@ def dedup(slug: str, category: str, unit: str, *,
                     evidence.append(nvd.get("url", ""))
                 elif _retry.get("ok"):
                     nvd = _retry          # 0 命中，但这次是真的查过了
+                elif _dedup_quorum_ok(circl, ghsa, global_adv, issues):
+                    # M368：NVD 熔断不再一票否决 —— CIRCL + 仓内/全网 GHSA
+                    # + 仓内 Issue 四源全通且 0 命中，判 FRESH（报告标注
+                    # via CIRCL+GHSA）。只有这些源也失败/限流时才压 UNKNOWN。
+                    nvd_fallback = True
+                    status = STATUS_FRESH
                 else:
                     status = STATUS_UNKNOWN
                     rec_reason = f"INCOMPLETE_DEDUP_EVIDENCE: {_nvd_err}"
@@ -1045,6 +1084,13 @@ def dedup(slug: str, category: str, unit: str, *,
     # M359：证据完整性（六来源逐一核对）。FRESH 只有在 evidence_complete
     # 为真时才站得住；缺口逐条写进 JSON，报告侧可直接引用。
     _gaps = _evidence_gaps(sources)
+    if nvd_fallback:
+        # M368：NVD 没查，但四源仲裁通过 —— 缺口记成可解释的一条，
+        # 而不是笼统的 nvd:xxx，报告侧据此标注 "via CIRCL+GHSA"。
+        _gaps = ["nvd_circuit_open_fallback_circl_ghsa"] + [
+            g for g in _gaps if not g.startswith("nvd:")]
+        rec["nvd_fallback"] = "CIRCL+GHSA"
+        rec["reason"] = "via CIRCL+GHSA (nvd_circuit_open)"
     rec["evidence_complete"] = not _gaps
     rec["evidence_gaps"] = _gaps
     if status == STATUS_UNKNOWN:

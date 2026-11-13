@@ -186,6 +186,21 @@ def _root_view(rc: dict, repo: Path) -> dict:
     }
 
 
+def is_bare_wild_authz(view: dict, promo: dict | None = None) -> bool:
+    """野仓裸 authz：无兄弟鉴权反差（非 HIGH）且无 /admin 路由（M367）。
+
+    与 `downgrade_wild_authz()` 同口径，但**必须在联网查重之前**判定 ——
+    否则每仓上百条注定进 B 的裸 authz 会先烧掉几百次 NVD/GitHub 请求
+    （2026-11-13 实盘：caura 157 次、MimirQ 128 次，直接撞 GitHub 403）。
+    """
+    if str(view.get("category") or "") != "authz":
+        return False
+    if str((promo or {}).get("level") or "") == "HIGH":
+        return False
+    routes = [str(r).lower() for r in (view.get("routes") or [])]
+    return not any("/admin" in r for r in routes)
+
+
 def is_incomplete_dedup(record: dict) -> bool:
     """记录是否因查重证据不足被压成 UNKNOWN（M366）。"""
     return (record.get("status") == cve_dedup.STATUS_UNKNOWN
@@ -255,6 +270,12 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
             blocked_roots.append((rc, noise))
             continue
         promo = wild_noise.promote(view, repo)
+        # M367：裸 authz 在**联网前**压 B —— 0 次请求、不占 max_roots 名额。
+        if is_bare_wild_authz(view, promo):
+            blocked_roots.append((rc, {
+                "code": wild_noise.UNVERIFIED_WILD_AUTHZ,
+                "reason": "无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A"}))
+            continue
         kept.append((root_priority(view, promo.get("level", ""), recent),
                      rc, promo))
     kept.sort(key=lambda x: x[0])        # 稳定排序：同档保持扫描顺序
@@ -409,7 +430,7 @@ def _header(ledger: list[dict], scout: dict, *, days: int,
 
 def run(*, languages=("java", "python", "solidity"), days: int = 14,
         limit: int = 10, min_stars: int = 150, max_stars: int = 10000,
-        max_roots: int = 0, state_path: Path | str | None = None,
+        max_roots: int = 5, state_path: Path | str | None = None,
         report: Path | str | None = None, json_path: Path | str | None = None,
         packs_dir: Path | str | None = None, evict_cache: bool = False,
         offline: bool = False, dedup_online: bool = True,
@@ -417,7 +438,8 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         repo_timeout: int = 900, cooldown_days: int = DEFAULT_COOLDOWN_DAYS,
         min_units: int = 8,
         recent_boost: bool = True,
-        scout_fn=None, sync_fn=None, dedup_fn=None) -> dict:
+        scout_fn=None, sync_fn=None, dedup_fn=None,
+        repos: list[str] | None = None) -> dict:
     """M286 主流程；scout_fn / sync_fn 可注入（冒烟测试不联网）。"""
     started = _now()
     state_path = Path(state_path) if state_path else DEFAULT_STATE
@@ -439,17 +461,22 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
             _age = last_scan_age_days(_entry)
             if _age is not None and _age < cooldown_days:
                 exclude.add(str(_slug))
-    try:
-        scout = scout_fn(languages=lang_list, days=days, limit=limit,
-                         min_stars=min_stars, max_stars=max_stars,
-                         allow_online=not offline,
-                         exclude_slugs=exclude or None)
-    except TypeError:
-        scout = scout_fn(languages=lang_list, days=days, limit=limit,
-                         min_stars=min_stars, max_stars=max_stars,
-                         allow_online=not offline)
-    # M293：候选不再硬截断到 limit —— 纯库/无路由仓不占名额，顺延抓下一个。
-    items = list(scout.get("items") or [])
+    # M369：`--repos` 显式指定重扫名单（跳过侦察，只跑这几仓）。
+    if repos:
+        items = [{"slug": str(s).strip()} for s in repos if str(s).strip()]
+        scout = {"items": items, "source": "explicit_repos"}
+    else:
+        try:
+            scout = scout_fn(languages=lang_list, days=days, limit=limit,
+                             min_stars=min_stars, max_stars=max_stars,
+                             allow_online=not offline,
+                             exclude_slugs=exclude or None)
+        except TypeError:
+            scout = scout_fn(languages=lang_list, days=days, limit=limit,
+                             min_stars=min_stars, max_stars=max_stars,
+                             allow_online=not offline)
+        # M293：候选不再硬截断到 limit —— 纯库/无路由仓不占名额，顺延抓下一个。
+        items = list(scout.get("items") or [])
 
     records: list[dict] = []
     ledger: list[dict] = []
