@@ -328,6 +328,22 @@ def query_circl(slug: str) -> dict:
     return res
 
 
+def _issue_item(it: dict, repo: str = "") -> dict:
+    """把 GitHub search item 收成 {id, title, text}（M365）。
+
+    旧实现只留 `#num title` 字符串，调用方拿到 total>0 就只能判重复 ——
+    没有 title/body 就没法核对"这条 issue 是不是真的在说这个漏洞"。
+    """
+    title = str(it.get("title") or "")
+    body = str(it.get("body") or "")
+    num = it.get("number")
+    return {
+        "id": f"{repo}#{num} {title[:60]}" if repo else f"#{num} {title[:60]}",
+        "title": title,
+        "text": (title + "\n" + body)[:4000],
+    }
+
+
 def query_github_issues(slug: str, unit: str, category: str) -> dict:
     term = unit or category
     q = urllib.parse.quote(f"repo:{slug} {term}")
@@ -336,11 +352,13 @@ def query_github_issues(slug: str, unit: str, category: str) -> dict:
         "Accept": "application/vnd.github+json",
         "User-Agent": "nexus-audit/1.2"})
     if not ok or not isinstance(data, dict):
-        return {"ok": False, "total": 0, "ids": [], "url": url, "error": err}
-    items = data.get("items") or []
-    ids = [f"#{it.get('number')} {it.get('title', '')[:60]}" for it in items]
+        return {"ok": False, "total": 0, "ids": [], "items": [], "url": url,
+                "error": err}
+    raw = data.get("items") or []
+    items = [_issue_item(it) for it in raw]
     return {"ok": True, "total": int(data.get("total_count") or len(items)),
-            "ids": ids[:5], "url": url, "error": ""}
+            "ids": [x["id"] for x in items][:5], "items": items,
+            "url": url, "error": ""}
 
 
 def query_github_advisories(slug: str) -> dict:
@@ -385,17 +403,18 @@ def _search_global_issues(term: str) -> dict:
         "Accept": "application/vnd.github+json",
         "User-Agent": "nexus-audit/1.3"})
     if not ok or not isinstance(data, dict):
-        return {"ok": False, "total": 0, "ids": [], "url": url, "error": err}
-    items = data.get("items") or []
-    ids = []
-    for it in items:
+        return {"ok": False, "total": 0, "ids": [], "items": [], "url": url,
+                "error": err}
+    items = []
+    for it in data.get("items") or []:
         repo_url = str(it.get("repository_url") or "")
         repo = ("/".join(repo_url.rstrip("/").split("/")[-2:])
                 if repo_url else "")
-        ids.append(f"{repo}#{it.get('number')} {it.get('title', '')[:60]}")
+        items.append(_issue_item(it, repo=repo))
     return {"ok": True,
             "total": int(data.get("total_count") or len(items)),
-            "ids": ids[:5], "url": url, "error": "", "query": term}
+            "ids": [x["id"] for x in items][:5], "items": items,
+            "url": url, "error": "", "query": term}
 
 
 def query_github_issues_global(class_name: str, method_name: str,
@@ -668,6 +687,41 @@ def _unit_in_text(unit: str, file: str, text: str) -> bool:
         rf"(?<![A-Za-z0-9_]){re.escape(stem)}(?![A-Za-z0-9_])", t))
 
 
+# M365：Issue 证据门禁。旧实现只要 `repo:<slug> <method>` 或全网搜索
+# total>0 就判 DUPLICATE_ISSUE_OR_GHSA —— 2026-11-13 实盘 201 条假重复：
+#   · Dependabot "Bump the python group ..."          （MimirQ ×N）
+#   · awesome-list "Add apowerb" / "Add FoJin"        （apowerb / fojin）
+#   · 功能 issue "Cache preview renders ..."          （docling-Studio）
+# GitHub 搜索按 token 分词（`get_block` → get + block），"命中"不等于
+# "这条 issue 在说这个漏洞"。现在三条件缺一不可：
+#   1) 标题不是依赖升级 / 收录 / 文档类噪音；
+#   2) 标题含安全语义词（CVE/GHSA/injection/bypass/...）；
+#   3) 方法名或文件名在标题+正文里**逐字**出现（_unit_in_text）。
+_ISSUE_NOISE_TITLE_RE = re.compile(
+    r"(?:^\s*(?:bump|chore\(deps\)|build\(deps\)|deps\b)|dependabot|renovate|"
+    r"awesome[-\s]|project submission|^\s*add\s+\S+\s+(?:to|in)\b|"
+    r"^\s*docs?\s*[(:]|\breadme\b)", re.I)
+_ISSUE_SECURITY_TITLE_RE = re.compile(
+    r"(?:cve-\d{4}-\d+|ghsa-|vulnerab|security|exploit|\brce\b|remote code|"
+    r"sqli|sql injection|injection|\bxss\b|\bcsrf\b|\bssrf\b|\bxxe\b|"
+    r"traversal|\blfi\b|\brfi\b|\bidor\b|bypass|unauthori[sz]ed|"
+    r"unauthenticat|privilege|"
+    r"deserial|open redirect|denial of service|\bdos\b|"
+    r"information disclosure|arbitrary file|file read|file upload|"
+    r"code execution|access control|authorization)", re.I)
+
+
+def _issue_dup_evidence(unit: str, file: str, item: dict) -> bool:
+    """这条 issue/PR 是否构成"本方法已被报过"的证据（M365）。"""
+    title = str(item.get("title") or "")
+    text = str(item.get("text") or "")
+    if not title or _ISSUE_NOISE_TITLE_RE.search(title):
+        return False
+    if not _ISSUE_SECURITY_TITLE_RE.search(title):
+        return False
+    return _unit_in_text(unit, file, text)
+
+
 # M317：泛化方法名 / 通用控制器 —— 这类组合全网搜只会烧配额，跳过。
 _GENERIC_METHODS = frozenset({
     "apply", "test", "index", "login", "logout", "list", "page", "get",
@@ -727,6 +781,11 @@ def _is_distinctive(class_name: str, method_name: str) -> bool:
 _GENERIC_FILE_STEMS = frozenset({
     "fastapi", "flask", "django", "views", "routes", "api", "app",
     "main", "index",
+    # M365：2026-11-13 实盘里 `"MimirQ" "datasets"` / `"apowerb" "tools"`
+    # 这类"通用文件名"查询只会捞到 Dependabot 与 awesome-list，补进停用表。
+    "tools", "utils", "helpers", "config", "settings", "models", "model",
+    "data", "datasets", "pipeline", "groups", "observability", "analyses",
+    "relations", "services", "service", "core", "common", "base",
 })
 
 
@@ -863,6 +922,11 @@ def dedup(slug: str, category: str, unit: str, *,
             evidence.append(cve_src.get("url", ""))
     gh_hits = [x for x in (ghsa.get("items") or [])
                if x.get("id") and _unit_in_text(unit, file, x.get("text", ""))]
+    # M365：仓库内 Issue 必须逐条核对（标题安全语义 + 方法名逐字命中），
+    # 不能只看 total>0 —— 否则 Dependabot / awesome-list / 功能 issue 全被
+    # 当成"已报过"。
+    issue_hits = [x for x in (issues.get("items") or [])
+                  if _issue_dup_evidence(unit, file, x)]
 
     if cve_hit:
         status = STATUS_CVE
@@ -870,9 +934,9 @@ def dedup(slug: str, category: str, unit: str, *,
         status = STATUS_ISSUE
         matched += [x["id"] for x in gh_hits]
         evidence.append(ghsa.get("url", ""))
-    elif issues.get("ok") and issues.get("total", 0) > 0:
+    elif issue_hits:
         status = STATUS_ISSUE
-        matched += issues.get("ids") or []
+        matched += [x["id"] for x in issue_hits]
         evidence.append(issues.get("url", ""))
     elif ghsa.get("ok") and ghsa.get("total", 0) > 0:
         # M290：仓库级公告列表不能连坐——只有公告文本真的命中方法/文件名
@@ -906,8 +970,11 @@ def dedup(slug: str, category: str, unit: str, *,
         _gadv_items = [x for x in (global_adv.get("items") or []) if x.get("id")]
         _gadv_cve = [x for x in _gadv_items
                      if str(x.get("id", "")).upper().startswith("CVE-")]
-        _gissue_hit = bool(global_issues.get("ok")
-                           and global_issues.get("total", 0) > 0)
+        # M365：全网 Issue 同样要过证据门禁（Dependabot "Bump…"、
+        # awesome-list "Add X" 都曾把真根因压成"重复"）。
+        _gissue_hits = [x for x in (global_issues.get("items") or [])
+                        if _issue_dup_evidence(unit, file, x)]
+        _gissue_hit = bool(_gissue_hits)
         if _gadv_cve:
             status = STATUS_CVE
             matched += [x["id"] for x in _gadv_cve]
@@ -918,7 +985,7 @@ def dedup(slug: str, category: str, unit: str, *,
             evidence.append(global_adv.get("url", ""))
         elif _gissue_hit:
             status = STATUS_ISSUE
-            matched += global_issues.get("ids") or []
+            matched += [x["id"] for x in _gissue_hits]
             evidence.append(global_issues.get("url", ""))
         elif not (cve_src.get("ok") and issues.get("ok") and ghsa.get("ok")
                   and global_issues.get("ok") and global_adv.get("ok")):

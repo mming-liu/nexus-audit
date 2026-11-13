@@ -12600,6 +12600,77 @@ check("M363：CVE 5.2 版本与厂商",
       (_M363_REC["dataVersion"],
        _M363_REC["containers"]["cna"]["affected"][0]["vendor"]),
       ("5.2", "metasfresh"))
+print("\n[326] M365：Issue 证据门禁（Dependabot / awesome / 功能 issue 不算重复）")
+_M365_CASES = [
+    ("Add apowerb", "Add apowerb to the awesome list.",
+     "Apowerb.list_tool_configs", "backend/tools.py", False, "awesome 收录"),
+    ("Bump the python group across 1 directory with 52 updates",
+     "update_dataset deps", "MimirQ.update_dataset", "app/datasets.py",
+     False, "Dependabot"),
+    ("Cache preview renders — /preview re-rasterises", "preview cache",
+     "Docling.preview", "preview.py", False, "功能 issue"),
+    ("notion: a page, a block and a data source answer the minute",
+     "get_block", "Backlot.get_block", "api/blocks.py", False, "分词误命中"),
+    ("SQL injection in list_tool_configs",
+     "list_tool_configs concatenates name into SQL",
+     "Apowerb.list_tool_configs", "backend/tools.py", True, "真安全 issue"),
+    ("Unauthenticated access to update_dataset",
+     "update_dataset has no auth check", "MimirQ.update_dataset",
+     "app/datasets.py", True, "真未授权 issue"),
+]
+for _title, _text, _unit, _file, _want, _label in _M365_CASES:
+    check(f"M365：{_label}",
+          cve_dedup._issue_dup_evidence(
+              _unit, _file, {"title": _title, "text": _text}), _want)
+
+_M365_BACKUP = {_k: getattr(cve_dedup, _k) for _k in (
+    "query_nvd", "query_circl", "query_github_issues",
+    "query_github_advisories", "query_github_global_advisories",
+    "query_github_issues_global", "query_github_issues_global_file")}
+
+
+def _m365_ok(*_a, **_k):
+    return {"ok": True, "total": 0, "ids": [], "items": [], "url": "",
+            "error": ""}
+
+
+def _m365_setup(issue_items):
+    cve_dedup.query_nvd = lambda kw: {"ok": True, "total": 0, "ids": [],
+                                      "url": "u", "error": ""}
+    cve_dedup.query_circl = lambda slug: {"ok": True, "total": 0, "ids": [],
+                                          "items": [], "url": "c",
+                                          "error": ""}
+    cve_dedup.query_github_issues = lambda slug, unit, cat: {
+        "ok": True, "total": len(issue_items),
+        "ids": [x["id"] for x in issue_items], "items": issue_items,
+        "url": "i", "error": ""}
+    cve_dedup.query_github_advisories = _m365_ok
+    cve_dedup.query_github_global_advisories = _m365_ok
+    cve_dedup.query_github_issues_global = _m365_ok
+    cve_dedup.query_github_issues_global_file = _m365_ok
+    cve_dedup._REPO_MEMO.clear()
+
+
+try:
+    _m365_setup([{"id": "#29 Add apowerb", "title": "Add apowerb",
+                  "text": "Add apowerb to awesome list"}])
+    _M365_REC = cve_dedup.dedup(
+        "apowerb/apowerb", "authz", "Apowerb.list_tool_configs",
+        file="backend/tools.py", use_cache=False)
+    check("M365：假 issue 不再压掉 FRESH", _M365_REC["status"],
+          "ZERO_RECORD_FRESH")
+    _m365_setup([{"id": "#7 SQL injection in list_tool_configs",
+                  "title": "SQL injection in list_tool_configs",
+                  "text": "list_tool_configs concatenates name into SQL"}])
+    _M365_REC = cve_dedup.dedup(
+        "apowerb/apowerb", "sqli", "Apowerb.list_tool_configs",
+        file="backend/tools.py", use_cache=False)
+    check("M365：真安全 issue 仍判重复", _M365_REC["status"],
+          "DUPLICATE_ISSUE_OR_GHSA")
+finally:
+    for _k, _v in _M365_BACKUP.items():
+        setattr(cve_dedup, _k, _v)
+    cve_dedup._REPO_MEMO.clear()
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
