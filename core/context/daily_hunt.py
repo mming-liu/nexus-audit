@@ -186,6 +186,13 @@ def _root_view(rc: dict, repo: Path) -> dict:
     }
 
 
+def is_incomplete_dedup(record: dict) -> bool:
+    """记录是否因查重证据不足被压成 UNKNOWN（M366）。"""
+    return (record.get("status") == cve_dedup.STATUS_UNKNOWN
+            and str(record.get("reason") or "").startswith(
+                "INCOMPLETE_DEDUP_EVIDENCE"))
+
+
 def noise_record(repo: Path, slug: str, rc: dict, head: dict,
                  max_head_age_days: int, noise: dict) -> dict:
     """本地降噪命中的记录骨架（M304/M359）：0 次联网，直接进 B 板留证。
@@ -274,11 +281,18 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
 
     fresh_keys: list[str] = []
     new: list[dict] = []
+    incomplete = 0
     for rec in recs:
         if rec.get("noise_code"):
             new.append(rec)              # 本地已判 B，无需再查重
             continue
         if rec.get("status") != cve_dedup.STATUS_FRESH:
+            # M366：v1.5.1 把"NVD 熔断"的候选降成 UNKNOWN 压 B，但这里
+            # 非 FRESH 一律丢弃 —— 结果是这些根因既不进 A 也不进 B，
+            # 报告上完全看不见（2026-11-13 实盘 515 条）。这里只计数，
+            # 由 run() 在报告头部汇总，避免 B 板被 500 行"不可判"淹没。
+            if is_incomplete_dedup(rec):
+                incomplete += 1
             continue
         key = root_key(rec)
         fresh_keys.append(key)
@@ -299,6 +313,7 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
     return {"records": new, "entry": upd, "skipped_unchanged": False,
             "head_sha": head_sha, "raw_roots": len(roots),
             "recent_files": len(recent),
+            "incomplete_dedup": incomplete,
             "total_units": int(scan.get("total_units") or 0)}
 
 
@@ -359,7 +374,7 @@ def _counts(records: list[dict]) -> dict:
 def _header(ledger: list[dict], scout: dict, *, days: int,
             languages: list[str], evicted: list[str], summary: dict,
             blocked: int, cooldown_days: int = 0,
-            cooldown_skipped: int = 0) -> str:
+            cooldown_skipped: int = 0, incomplete_dedup: int = 0) -> str:
     scanned = [x for x in ledger if x["result"] == "SCANNED"]
     skipped = [x for x in ledger if x["result"] == "SKIPPED"]
     failed = [x for x in ledger if x["result"] == "FAILED"]
@@ -374,6 +389,10 @@ def _header(ledger: list[dict], scout: dict, *, days: int,
         f"候选来源：{scout.get('source', '') or '—'}",
         f"- 本次新增根因：{summary['total']} ｜ 板块 A：{summary['board_a']} ｜ "
         f"拦截进 B：{blocked}",
+        # M366：这些根因**不在** A/B 任何一行里（非 FRESH 被丢弃），
+        # 必须显式报数，否则"NVD 熔断"会让整轮静默变成空报告。
+        f"- 证据不足未列：{incomplete_dedup} 条"
+        f"（NVD 熔断 / 全网 Issue 限流，未宣称 FRESH，需人工复核）",
         f"- 冷却期免克隆：{cooldown_skipped} 个"
         + (f"（--cooldown-days {cooldown_days}：距上次扫描不足 "
            f"{cooldown_days} 天的仓直接 0 秒顺延）" if cooldown_days else "（已关闭）"),
@@ -436,6 +455,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
     ledger: list[dict] = []
     evicted: list[str] = []
     blocked = 0
+    incomplete_dedup = 0
     scanned_slots = 0
     cooldown_skipped = 0
 
@@ -532,6 +552,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
                     blocked += 1
                 new.append(rec)
 
+            incomplete_dedup += int(res.get("incomplete_dedup") or 0)
             records.extend(new)
             state["repos"][slug] = res["entry"]
             scanned_slots += 1
@@ -561,6 +582,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         "failed": sum(1 for x in ledger if x["result"] == "FAILED"),
         "new_roots": summary["total"], "board_a": summary["board_a"],
         "blocked": blocked, "evicted": evicted,
+        "incomplete_dedup": incomplete_dedup,
         "recent_90d_roots": sum(1 for r in records if r.get("recent_90d")),
         "cooldown_days": cooldown_days,
         "min_units": int(min_units or 0),
@@ -580,7 +602,8 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         header_extra=_header(ledger, scout, days=days, languages=lang_list,
                              evicted=evicted, summary=summary,
                              blocked=blocked, cooldown_days=cooldown_days,
-                             cooldown_skipped=cooldown_skipped),
+                             cooldown_skipped=cooldown_skipped,
+                             incomplete_dedup=incomplete_dedup),
         with_confidence=True, extra={"daily": daily_meta})
     save_state(state_path, state)
 

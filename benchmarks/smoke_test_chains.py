@@ -12671,6 +12671,27 @@ finally:
     for _k, _v in _M365_BACKUP.items():
         setattr(cve_dedup, _k, _v)
     cve_dedup._REPO_MEMO.clear()
+_M366_DIR = Path(_ws_mkdtemp("m366_"))
+print("\n[327] M366：证据不足根因必须报数（不能静默消失）")
+check("M366：INCOMPLETE_DEDUP_EVIDENCE 可识别",
+      daily_hunt.is_incomplete_dedup(
+          {"status": "UNKNOWN",
+           "reason": "INCOMPLETE_DEDUP_EVIDENCE: nvd_circuit_open"}), True)
+check("M366：FRESH 不算证据不足",
+      daily_hunt.is_incomplete_dedup(
+          {"status": "ZERO_RECORD_FRESH", "reason": ""}), False)
+_M366_HEADER = daily_hunt._header(
+    [], {"source": "smoke"}, days=14, languages=["python"], evicted=[],
+    summary={"total": 0, "board_a": 0}, blocked=0, incomplete_dedup=515)
+check("M366：报告头部报出证据不足条数",
+      "证据不足未列：515 条" in _M366_HEADER, True)
+_M366_RUN = daily_hunt.run(
+    languages=["python"], limit=0, dry_run=True,
+    state_path=_M366_DIR / "state.json", report=_M366_DIR / "r.md",
+    json_path=_M366_DIR / "j.json", packs_dir=_M366_DIR / "packs",
+    offline=True, scout_fn=lambda **kw: {"items": [], "source": "smoke"})
+check("M366：daily_meta 带 incomplete_dedup",
+      _M366_RUN["daily"].get("incomplete_dedup"), 0)
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
