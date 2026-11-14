@@ -12887,6 +12887,83 @@ check("M372：DB 结果 **payload 不算批量赋值",
       mass_assignment_verdict(_M372_MASS_DB), None)
 check("M372：request.json ** 仍算批量赋值",
       mass_assignment_verdict(_M372_MASS_REQ), True)
+print("\n[330] M375/M376：上传落盘面门禁 + WebSocket 前置鉴权补齐")
+_M375_A = Path(_ws_mkdtemp("m375_a_"))
+(_M375_A / "routers").mkdir(parents=True)
+(_M375_A / "routers" / "files.py").write_text(
+    "from fastapi.responses import FileResponse\n"
+    "import os\n"
+    "@router.post('/files/upload')\n"
+    "async def upload_file(file):\n"
+    "    name = os.path.basename(file.filename)\n"
+    "    open(name, 'wb').write(await file.read())\n"
+    "@router.get('/files/{name}')\n"
+    "async def download(name):\n"
+    "    return FileResponse(name, filename=name)\n",
+    encoding="utf-8")
+_M375_R = wild_noise.classify(
+    {"category": "unrestricted_upload", "unit": "upload_file",
+     "file": "routers/files.py"}, _M375_A)
+check("M375：防穿越 + attachment → UPLOAD_SERVING_ONLY",
+      _M375_R.get("code"), wild_noise.UPLOAD_SERVING_ONLY)
+
+_M375_B = Path(_ws_mkdtemp("m375_b_"))
+(_M375_B / "rag").mkdir(parents=True)
+(_M375_B / "rag" / "index_files.py").write_text(
+    "import re, os\n"
+    "@router.post('/rag/index-files')\n"
+    "async def index_files(files):\n"
+    "    fn = re.sub(r'[^a-zA-Z0-9_.-]', '_', os.path.basename(f.filename))\n"
+    "    open(os.path.join('uploads', fn), 'wb').write(await f.read())\n",
+    encoding="utf-8")
+check("M375：防穿越 + RAG 索引 → UPLOAD_SERVING_ONLY",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "index_files",
+                           "file": "rag/index_files.py"},
+                          _M375_B).get("code"),
+      wild_noise.UPLOAD_SERVING_ONLY)
+
+_M375_C = Path(_ws_mkdtemp("m375_c_"))
+(_M375_C / "app").mkdir(parents=True)
+(_M375_C / "app" / "main.py").write_text(
+    "from fastapi.staticfiles import StaticFiles\n"
+    "app.mount('/uploads', StaticFiles(directory='uploads'), name='uploads')\n",
+    encoding="utf-8")
+(_M375_C / "app" / "upload.py").write_text(
+    "import os\n"
+    "@router.post('/upload')\n"
+    "async def upload(file):\n"
+    "    name = os.path.basename(file.filename)\n"
+    "    open('uploads/' + name, 'wb').write(await file.read())\n",
+    encoding="utf-8")
+check("M375：StaticFiles 挂载上传目录 → 不拦",
+      wild_noise.classify({"category": "unrestricted_upload", "unit": "upload",
+                           "file": "app/upload.py"},
+                          _M375_C).get("blocked"), False)
+
+_M375_D = Path(_ws_mkdtemp("m375_d_"))
+(_M375_D / "app").mkdir(parents=True)
+(_M375_D / "app" / "upload.py").write_text(
+    "@router.post('/upload')\n"
+    "async def upload(file):\n"
+    "    open('uploads/' + file.filename, 'wb').write(await file.read())\n",
+    encoding="utf-8")
+check("M375：无防穿越 → 不拦",
+      wild_noise.classify({"category": "unrestricted_upload", "unit": "upload",
+                           "file": "app/upload.py"},
+                          _M375_D).get("blocked"), False)
+
+_M376_WS = '''@router.websocket("/ws/x")
+async def ws_x(ws):
+    if not verify_token(ws):
+        await ws.close(code=4001)
+        return
+    await ws.accept()
+'''
+check("M376：close(4001) 也算前置鉴权", ws_auth_guard(_M376_WS), True)
+check("M376：jwt.decode 计入身份校验证据",
+      bool(wild_noise._IDENTITY_GUARD_RE.search(
+          "jwt.decode(token, settings.jwt_secret)")), True)
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

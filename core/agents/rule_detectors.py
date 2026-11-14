@@ -65,7 +65,8 @@ _WS_GUARD_CALL_RE = re.compile(
     r"\bjwt\s*\.\s*decode\s*\(|"
     r"\b(?:get_current_user|current_user)\s*\()", re.I)
 _WS_DENY_CLOSE_RE = re.compile(
-    r"\.\s*close\s*\(\s*(?:code\s*=\s*)?(?:1008|4401|4403)\b")
+    # M376：补齐常见"未授权/策略拒绝"关闭码（redcell 4401、通用 4001/4003）。
+    r"\.\s*close\s*\(\s*(?:code\s*=\s*)?(?:1008|4001|4003|4401|4403)\b")
 
 
 def ws_auth_guard(source: str) -> bool:

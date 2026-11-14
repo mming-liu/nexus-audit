@@ -52,6 +52,12 @@ LOCAL_LOOPBACK_ONLY = "LOCAL_LOOPBACK_ONLY"
 # M361：WebSocket 路由在 accept() 前做了主体校验并 close(4401/1008)。
 # 这类"鉴权存在"的 WS 入口不再是未授权候选（redcell 5 条由此归零）。
 WS_AUTH_PRESENT = "WS_AUTH_PRESENT"
+# M375：上传已防路径穿越、且没有任何"静态挂载 / 内联渲染"出口 ——
+# 攻击者写不进可执行文件，也拿不到 inline 响应，不占 A 板席位。
+UPLOAD_SERVING_ONLY = "UPLOAD_SERVING_ONLY"
+# M375：落盘目录不是 Web 根/静态目录（无 StaticFiles / addResourceHandlers），
+# 上传物只能被内部读取 —— 同上，压 B。
+NON_EXECUTABLE_UPLOAD = "NON_EXECUTABLE_UPLOAD"
 UNVERIFIED_WILD_AUTHZ = "UNVERIFIED_WILD_AUTHZ"
 ZERO_ENTRY_LIB = "ZERO_ENTRY_LIB"
 RULE_LANGUAGE_MISMATCH = "RULE_LANGUAGE_MISMATCH"
@@ -188,6 +194,66 @@ _SCAN_SKIP_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__",
                    "docs", "examples", "example"}
 _REPO_LOOPBACK_MEMO: dict[str, tuple[bool, str]] = {}
 
+# ---------------- M375：上传落盘面（是否可服务/可执行） ----------------
+# 前提 A：文件名/落盘路径已做防穿越约束。
+_UPLOAD_TRAVERSAL_GUARD_RE = re.compile(
+    r"os\s*\.\s*path\s*\.\s*basename|\bsecure_filename\b|"
+    r"\bPath\s*\([^)]{0,120}\)\s*\.\s*name\b|\bre\s*\.\s*sub\s*\(|"
+    r"_contained_upload_path|\.\s*relative_to\s*\(|getCanonicalPath|"
+    r"FilenameUtils\s*\.\s*getName|\.\s*normalize\s*\(", re.I)
+# 条件 B-a：同文件下载出口是附件下载（浏览器不内联渲染）。
+_UPLOAD_ATTACHMENT_RE = re.compile(
+    r"content-disposition[^\n]{0,120}attachment|"
+    r"\bFileResponse\s*\([^)]{0,200}filename\s*=|"
+    r"as_attachment\s*=\s*True", re.I)
+# 条件 B-a'：入口本身就是 RAG/索引/入库，不对外提供取回。
+_UPLOAD_RAG_HINT_RE = re.compile(
+    r"\b(?:rag|index|ingest|embed|vector|corpus|knowledge)\b", re.I)
+# 条件 B-b：仓内是否把上传目录挂成静态目录。
+_UPLOAD_STATIC_MOUNT_RE = re.compile(
+    r"StaticFiles\s*\([^)]{0,200}upload|"
+    r"\.\s*mount\s*\(\s*[\"'][^\"']*upload|"
+    r"addResourceHandlers[\s\S]{0,400}upload|"
+    r"send_from_directory\s*\([^)]{0,120}upload", re.I)
+_REPO_UPLOAD_SERVE_MEMO: dict[str, bool] = {}
+
+
+def _repo_serves_uploads(repo_root: Path | None) -> bool:
+    """仓内是否把上传目录挂成静态目录（M375）。
+
+    只认"挂载路径/目录名里带 upload"的装配；`StaticFiles("/static", ...)`
+    这种与上传无关的挂载不能当成"上传可服务"。
+    """
+    if repo_root is None:
+        return False
+    root = Path(repo_root)
+    try:
+        key = str(root.resolve())
+    except OSError:
+        key = str(root)
+    if key in _REPO_UPLOAD_SERVE_MEMO:
+        return _REPO_UPLOAD_SERVE_MEMO[key]
+    found = False
+    scanned = 0
+    for pattern in ("*.py", "*.java"):
+        for p in root.rglob(pattern):
+            if any(part in _SCAN_SKIP_DIRS for part in p.parts):
+                continue
+            scanned += 1
+            if scanned > 300:
+                break
+            try:
+                text = p.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if _UPLOAD_STATIC_MOUNT_RE.search(text):
+                found = True
+                break
+        if found:
+            break
+    _REPO_UPLOAD_SERVE_MEMO[key] = found
+    return found
+
 
 def _repo_loopback_only(repo_root: Path | None) -> tuple[bool, str]:
     """整仓是否只监听本机回环（M359）。
@@ -279,6 +345,27 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
             return {"blocked": True, "code": WS_AUTH_PRESENT,
                     "reason": ("WebSocket 路由在 accept() 前校验会话并 "
                                "close(4401/1008)：鉴权存在，不是未授权入口")}
+
+    # M375：上传面。前提 A（已防穿越）+ 条件 B（无可服务/可执行出口）
+    # 同时成立 → 攻击者既跳不出目录，也拿不到 inline 响应，压 B 板。
+    # 落点必须在 wild_noise（有 repo_root 才能看全局挂载）；放进
+    # rule_detectors 的单函数切片会误伤 PyGoat/Hello-Java-Sec 等基准靶场。
+    if (record.get("category") == "unrestricted_upload"
+            and repo_root is not None and file.endswith((".py", ".java"))):
+        _up_src = _read(repo_root, str(record.get("file") or ""))
+        if _up_src and _UPLOAD_TRAVERSAL_GUARD_RE.search(_up_src):
+            if not _repo_serves_uploads(repo_root):
+                if (_UPLOAD_ATTACHMENT_RE.search(_up_src)
+                        or _UPLOAD_RAG_HINT_RE.search(unit)
+                        or _UPLOAD_RAG_HINT_RE.search(
+                            str(record.get("file") or ""))):
+                    return {"blocked": True, "code": UPLOAD_SERVING_ONLY,
+                            "reason": ("已防路径穿越，且下载为 attachment / "
+                                       "仅内部语料入库，无静态挂载或内联渲染面")}
+                return {"blocked": True, "code": NON_EXECUTABLE_UPLOAD,
+                        "reason": ("已防路径穿越，落盘目录非 Web 静态挂载"
+                                   "（无 StaticFiles/addResourceHandlers 指向"
+                                   "上传目录），上传物不可执行")}
 
     if str(record.get("category") or "") in SOLIDITY_ONLY and not file.endswith(
             ".sol"):
@@ -447,7 +534,9 @@ _IDENTITY_GUARD_RE = re.compile(
     r"\b(?:getUserDetails|checkAuthor|getCurrentUser|getLoginUser|"
     r"SecurityUtils\s*\.\s*get|StpUtil\s*\.\s*(?:check|get)|"
     r"request\s*\.\s*user\s*\.\s*is_authenticated|@login_required|"
-    r"get_current_user|current_user\b)")
+    r"get_current_user|current_user\b|"
+    # M376：WebSocket 前置鉴权（redcell 形态）也算身份校验证据。
+    r"jwt\s*\.\s*decode|_authed\s*\(|verify_token\s*\()")
 
 
 def _package_guard(path: Path, lines: list[str]) -> dict:
