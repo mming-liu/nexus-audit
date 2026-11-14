@@ -257,7 +257,10 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
     base = {"scans": int(entry.get("scans") or 0) + 1}
 
     if head_sha and entry.get("last_scanned_sha") == head_sha:
-        return {"records": [], "entry": {**entry, **base},
+        # M388：确认未变也要刷新 last_scanned_at，否则它永远停在首次扫描日，
+        # 7 天后每轮都重新克隆一遍再跳过（6 个老仓白占 6 个候选名额）。
+        return {"records": [],
+                "entry": {**entry, **base, "last_scanned_at": _now()},
                 "skipped_unchanged": True, "head_sha": head_sha,
                 "raw_roots": 0, "total_units": None}
 
@@ -462,8 +465,12 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
     # M346：把仍在冷却期的仓传给侦察器，让它在当前页被冷却仓挤空时
     # 自动翻到下一页；否则 --min-stars 500 会反复抓回同一批老面孔。
     exclude: set[str] = set()
-    if cooldown_days > 0:
-        for _slug, _entry in state["repos"].items():
+    scanned_at: dict[str, str] = {}
+    for _slug, _entry in state["repos"].items():
+        # M388：已扫仓的扫描时刻表，供侦察阶段按 pushed_at 免克隆排除。
+        if _entry.get("last_scanned_sha") and _entry.get("last_scanned_at"):
+            scanned_at[str(_slug)] = str(_entry["last_scanned_at"])
+        if cooldown_days > 0:
             _age = last_scan_age_days(_entry)
             if _age is not None and _age < cooldown_days:
                 exclude.add(str(_slug))
@@ -476,11 +483,18 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
             scout = scout_fn(languages=lang_list, days=days, limit=limit,
                              min_stars=min_stars, max_stars=max_stars,
                              allow_online=not offline,
-                             exclude_slugs=exclude or None)
+                             exclude_slugs=exclude or None,
+                             scanned_at=scanned_at or None)
         except TypeError:
-            scout = scout_fn(languages=lang_list, days=days, limit=limit,
-                             min_stars=min_stars, max_stars=max_stars,
-                             allow_online=not offline)
+            try:
+                scout = scout_fn(languages=lang_list, days=days, limit=limit,
+                                 min_stars=min_stars, max_stars=max_stars,
+                                 allow_online=not offline,
+                                 exclude_slugs=exclude or None)
+            except TypeError:
+                scout = scout_fn(languages=lang_list, days=days, limit=limit,
+                                 min_stars=min_stars, max_stars=max_stars,
+                                 allow_online=not offline)
         # M293：候选不再硬截断到 limit —— 纯库/无路由仓不占名额，顺延抓下一个。
         items = list(scout.get("items") or [])
 

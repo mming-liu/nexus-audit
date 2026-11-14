@@ -357,13 +357,29 @@ def _merge_round_robin(buckets: dict[str, list[dict]],
     return ordered
 
 
+def _norm_ts(value: str) -> str:
+    """ISO 时间戳归一（`2026-11-05T09:03:45Z` → `2026-11-05 09:03:45`）。"""
+    return str(value or "").replace("T", " ").replace("Z", "")[:19]
+
+
+def _pushed_before(item: dict, scanned_at: dict[str, str]) -> bool:
+    """远端 pushed_at 是否 <= 上次扫描时刻（之后没有任何新 push）（M388）。"""
+    slug = str(item.get("slug") or "")
+    last = scanned_at.get(slug)
+    pushed = str(item.get("pushed_at") or "")
+    if not last or not pushed:
+        return False
+    return _norm_ts(pushed) <= _norm_ts(last)
+
+
 def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                                                           "solidity"),
                 days: int = 14, limit: int = 10, min_stars: int = 300,
                 max_stars: int = 10000, allow_online: bool = True,
                 today: _dt.date | None = None,
                 terms_per_language: int = 2,
-                exclude_slugs: set[str] | list[str] | None = None) -> dict:
+                exclude_slugs: set[str] | list[str] | None = None,
+                scanned_at: dict[str, str] | None = None) -> dict:
     """M285/M311/M325：每日动态抓新仓（跨语言 Round-Robin 混排）。
 
     每个语言分两条轨：
@@ -385,6 +401,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
     errors: list[str] = []
     dropped = 0
     dropped_tool = 0
+    dropped_unchanged = 0
     online_ok = 0
     day_index = today.toordinal()
 
@@ -486,6 +503,13 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         parsed, drop, drop_tool = _parse_search(data, spec["language"])
         if excluded:
             parsed = [x for x in parsed if x.get("slug") not in excluded]
+        # M388：已扫仓若远端 pushed_at 不晚于上次扫描时刻，说明自那以后
+        # 没有任何新 push —— 侦察阶段直接排除，不克隆、不占名额。
+        if scanned_at:
+            _before = len(parsed)
+            parsed = [x for x in parsed
+                      if not _pushed_before(x, scanned_at)]
+            dropped_unchanged += _before - len(parsed)
         # M346：当前页剔除冷却仓后不足 2 个，且还有下一页时，顺延 page+1/+2。
         # 单查询最多多翻 2 页，避免把整轮变成无限分页。
         try:
@@ -556,6 +580,9 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             parsed, drop, drop_tool = _parse_search(data, lang)
             if excluded:
                 parsed = [x for x in parsed if x.get("slug") not in excluded]
+            if scanned_at:
+                parsed = [x for x in parsed
+                          if not _pushed_before(x, scanned_at)]
             buckets[lang] += parsed
             dropped += drop
             dropped_tool += drop_tool
@@ -573,6 +600,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                 "new_gen_queries": new_gen_queries,
                 "items": ordered[:max(1, limit)],
                 "dropped": 0, "dropped_tool": 0,
+                "dropped_unchanged": dropped_unchanged,
                 "error": "; ".join(errors)[:400]}
 
     ordered = _merge_round_robin(buckets, langs)
@@ -581,4 +609,5 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             "new_gen_queries": new_gen_queries,
             "items": ordered,
             "dropped": dropped, "dropped_tool": dropped_tool,
+            "dropped_unchanged": dropped_unchanged,
             "error": "; ".join(errors)[:400]}

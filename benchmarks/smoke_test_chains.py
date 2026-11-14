@@ -13137,6 +13137,62 @@ check("M384：老 sqli (-1) 排在最近 redir (0) 之前",
 check("M384：最近高危 (-2) 排在老高危 (-1) 之前",
       daily_hunt.root_priority({"category": "sqli", "file": "src/new.java"},
                                recent_files=_M384_RF)[0], -2)
+print("\n[333] M387/M388：Webhook 验签回显 + 未变仓不再无限重克隆")
+_M387 = Path(_ws_mkdtemp("m387_"))
+(_M387 / "src").mkdir(parents=True)
+(_M387 / "src" / "WxCallbackRestController.java").write_text(
+    "public class WxCallbackRestController {\n"
+    "    @GetMapping(path = \"callback\")\n"
+    "    public String check(HttpServletRequest request) {\n"
+    "        this.wxCallbackSecurityCheck();\n"
+    "        String echoStr = request.getParameter(\"echostr\");\n"
+    "        if (StringUtils.isNoneEmpty(echoStr)) { return echoStr; }\n"
+    "        return \"\";\n"
+    "    }\n"
+    "}\n", encoding="utf-8")
+check("M387：echostr 验签回显 → WEBHOOK_CHALLENGE_ECHO",
+      wild_noise.classify({"category": "xss",
+                           "unit": "WxCallbackRestController.check",
+                           "file": "src/WxCallbackRestController.java"},
+                          _M387).get("code"),
+      wild_noise.WEBHOOK_CHALLENGE_ECHO)
+
+(_M387 / "src" / "EchoController.java").write_text(
+    "public class EchoController {\n"
+    "    @GetMapping(\"/echo\")\n"
+    "    public String echo(String name) { return name; }\n"
+    "}\n", encoding="utf-8")
+check("M387：普通反射 XSS 不被误拦",
+      wild_noise.classify({"category": "xss", "unit": "EchoController.echo",
+                           "file": "src/EchoController.java"},
+                          _M387).get("blocked"), False)
+
+_M388_DIR = Path(_ws_mkdtemp("m388_"))
+_orig_head388 = daily_hunt.upstream_sync.local_head
+daily_hunt.upstream_sync.local_head = lambda repo: {
+    "status": "OK", "head_sha": "a" * 40, "head_commit_date": "2026-11-01",
+    "head_age_days": 12.0, "branch": "main"}
+try:
+    _M388_RES = daily_hunt.process_repo(
+        "acme/unchanged", _M388_DIR,
+        {"last_scanned_sha": "a" * 40,
+         "last_scanned_at": "2026-11-01 00:00:00"})
+finally:
+    daily_hunt.upstream_sync.local_head = _orig_head388
+check("M388：同 HEAD 直接跳过并记 skipped_unchanged",
+      _M388_RES.get("skipped_unchanged"), True)
+check("M388：同 HEAD 时刷新 last_scanned_at",
+      _M388_RES["entry"].get("last_scanned_at") != "2026-11-01 00:00:00", True)
+check("M388：刷新后重新进入 7 天冷却",
+      (daily_hunt.last_scan_age_days(_M388_RES["entry"]) or 99) < 7, True)
+check("M388：pushed_at 早于扫描时刻 → 侦察阶段排除",
+      target_scout._pushed_before(
+          {"slug": "acme/old", "pushed_at": "2026-11-01T08:00:00Z"},
+          {"acme/old": "2026-11-02 00:00:00"}), True)
+check("M388：pushed_at 晚于扫描时刻 → 保留",
+      target_scout._pushed_before(
+          {"slug": "acme/new", "pushed_at": "2026-11-03T08:00:00Z"},
+          {"acme/new": "2026-11-02 00:00:00"}), False)
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

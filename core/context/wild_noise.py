@@ -62,6 +62,10 @@ NON_EXECUTABLE_UPLOAD = "NON_EXECUTABLE_UPLOAD"
 SERVER_BUILT_REDIRECT = "SERVER_BUILT_REDIRECT"
 REFERER_OPEN_REDIRECT = "REFERER_OPEN_REDIRECT"
 SHORTLINK_BY_DESIGN = "SHORTLINK_BY_DESIGN"
+# M387：第三方 Webhook/公众号验签挑战串（echostr / hub.challenge）原样回显。
+# 它不是浏览器 HTML 页面，不能按反射型 XSS 交单；也不能在 rule_detectors
+# 一刀切排除 @RestController 的 String 返回（会打穿 [6]/[10] 与靶场地板）。
+WEBHOOK_CHALLENGE_ECHO = "WEBHOOK_CHALLENGE_ECHO"
 UNVERIFIED_WILD_AUTHZ = "UNVERIFIED_WILD_AUTHZ"
 ZERO_ENTRY_LIB = "ZERO_ENTRY_LIB"
 RULE_LANGUAGE_MISMATCH = "RULE_LANGUAGE_MISMATCH"
@@ -223,6 +227,15 @@ _UPLOAD_STATIC_MOUNT_RE = re.compile(
     r"addResourceHandlers[\s\S]{0,400}upload|"
     r"send_from_directory\s*\([^)]{0,120}upload", re.I)
 _REPO_UPLOAD_SERVE_MEMO: dict[str, bool] = {}
+
+
+# ---------------- M387：Webhook 验签回显 ----------------
+_WEBHOOK_NAME_RE = re.compile(r"(?i)(?:wxcallback|wechatcallback|webhook)")
+_WEBHOOK_CHALLENGE_RE = re.compile(
+    r"(?i)(?:echostr|hub\.challenge|zd_echo|hub_mode|hub_verify_token)")
+_WEBHOOK_SIG_RE = re.compile(
+    r"(?:wxCallbackSecurityCheck|checkSignature|verifySignature|"
+    r"verify_signature|check_signature|computeWechatSignature)")
 
 
 # ---------------- M383：redir 野仓降噪 ----------------
@@ -513,6 +526,21 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
             return {"blocked": True, "code": WS_AUTH_PRESENT,
                     "reason": ("WebSocket 路由在 accept() 前校验会话并 "
                                "close(4401/1008)：鉴权存在，不是未授权入口")}
+
+    # M387：Webhook 验签挑战串回显（echostr / hub.challenge）。
+    if record.get("category") == "xss":
+        _xu = str(unit or "")
+        _xf = str(record.get("file") or "")
+        _xsrc = _read(repo_root, _xf)
+        if _xsrc:
+            _xblock = (_java_method_block(_xsrc, _xu.rsplit(".", 1)[-1])
+                       if _xf.endswith(".java") else _xsrc)
+            if (_WEBHOOK_NAME_RE.search(_xu) or _WEBHOOK_NAME_RE.search(_xf)
+                    or _WEBHOOK_CHALLENGE_RE.search(_xblock)
+                    or _WEBHOOK_SIG_RE.search(_xblock)):
+                return {"blocked": True, "code": WEBHOOK_CHALLENGE_ECHO,
+                        "reason": ("第三方 Webhook 验签挑战串原样回显"
+                                   "（echostr/challenge），非浏览器 HTML 页面")}
 
     # M383：redir 三类野仓降噪（paicoding 实测：5 条 A 全是 redir）。
     if record.get("category") == "redir":
