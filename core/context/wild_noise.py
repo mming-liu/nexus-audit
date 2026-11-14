@@ -135,8 +135,11 @@ def _ws_handler_block(src: str, unit: str) -> str:
     start = src.rfind("@", 0, m.start())
     start = start if start >= 0 and m.start() - start < 800 else m.start()
     tail = src[m.start():]
-    nxt = re.search(r"^[ \t]*(?:async\s+)?def\s+\w+\s*\(", tail[1:], re.M)
-    end = m.start() + (nxt.start() + 1 if nxt else len(tail))
+    head_end = tail.find("\n")
+    if head_end < 0:
+        head_end = len(tail)
+    nxt = re.search(r"^[ \t]*(?:async\s+)?def\s+\w+\s*\(", tail[head_end:], re.M)
+    end = m.start() + (head_end + nxt.start() if nxt else len(tail))
     return src[start:end]
 
 
@@ -325,6 +328,97 @@ def _repo_loopback_only(repo_root: Path | None) -> tuple[bool, str]:
     return res
 
 
+# M379：跨文件 2-Hop 上传守卫。入口把校验/落盘委托给 service 时，
+# 单文件切片看不到白名单与固定命名，规则层会判 True；这里用 repo_root
+# 把 Hop1（service）与 Hop2（校验/存储 helper）拼回证据面。
+_UPLOAD_EXT_WHITELIST_RE = re.compile(
+    r"(?:\b(?:not\s+in|in)\s+\w*(?:EXTENSIONS?|ALLOWED|SUPPORTED|WHITELIST|VALID)\w*|"
+    r"\b(?:EXTENSIONS?|ALLOWED_\w+|SUPPORTED_\w+|WHITELIST)\b\s*(?:=|:)|"
+    r"\.\s*suffix\b[^\n]{0,60}\bin\b)", re.I)
+_UPLOAD_GENERATED_NAME_RE = re.compile(
+    r"uuid\s*\.\s*uuid4|uuid4\s*\(|secrets\s*\.\s*token_hex", re.I)
+_PY_CALL_EXCLUDE = frozenset({
+    "if", "for", "while", "with", "return", "print", "len", "str", "int",
+    "float", "bool", "dict", "list", "set", "tuple", "open", "range",
+    "enumerate", "zip", "sorted", "isinstance", "super", "type", "getattr",
+    "setattr", "hasattr", "format", "join", "split", "strip", "lower",
+    "upper", "replace", "startswith", "endswith", "append", "extend",
+    "get", "keys", "values", "items", "read", "write", "close", "encode",
+    "decode", "raise", "assert", "await", "async", "def", "class", "lambda",
+})
+
+
+def _py_function_blocks(text: str, names: set[str],
+                        limit: int = 8) -> dict[str, str]:
+    """在文本里找 `def <name>(` 的函数体（M379）。"""
+    out: dict[str, str] = {}
+    for name in names:
+        if len(out) >= limit:
+            break
+        m = re.search(rf"(?m)^[ \t]*(?:async\s+)?def\s+{re.escape(name)}\s*\(",
+                      text)
+        if not m:
+            continue
+        tail = text[m.start():]
+        # 从**当前 def 行之后**找下一个 def：旧写法 `tail[1:]` 会把同一个
+        # def 行（缩进后整体右移一位）再次匹配上，函数体被截成 1 个字符。
+        head_end = tail.find("\n")
+        if head_end < 0:
+            head_end = len(tail)
+        nxt = re.search(r"(?m)^[ \t]*(?:async\s+)?def\s+\w+\s*\(",
+                        tail[head_end:])
+        out[name] = tail[:head_end + nxt.start()] if nxt else tail
+    return out
+
+
+def _repo_def_bodies(repo_root: Path, names: set[str],
+                     max_files: int = 400) -> dict[str, str]:
+    """跨文件找函数定义体（Hop 1/2），有界扫描（M379）。"""
+    out: dict[str, str] = {}
+    if not names:
+        return out
+    scanned = 0
+    for p in Path(repo_root).rglob("*.py"):
+        if any(part in _SCAN_SKIP_DIRS for part in p.parts):
+            continue
+        scanned += 1
+        if scanned > max_files or len(out) >= len(names):
+            break
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for name, body in _py_function_blocks(text, names - set(out)).items():
+            out[name] = body
+    return out
+
+
+def _py_called_names(text: str) -> set[str]:
+    # 允许点号前缀：`chat_attachment_service.save_upload(` 要取到
+    # `save_upload`（M379 实测：带 `(?<![\w.])` 会把跨文件 service 调用
+    # 整条漏掉，2-Hop 守卫永远拼不起来）。
+    names = set(re.findall(r"(?<![\w])([a-z_][\w]*)\s*\(", text))
+    return {n for n in names if n not in _PY_CALL_EXCLUDE and len(n) > 3}
+
+
+def upload_guard_scope(repo_root: Path | None, src: str, unit: str) -> str:
+    """入口 + Hop1 + Hop2 的上传守卫证据面（M379）。
+
+    RAG_LearnLittleCode 形态：`routers/chat.py:upload_chat_file` →
+    `services/chat_attachment_service.py:save_upload`（Hop 1）→
+    `utils/file_handler.py:validate_chat_attachment`（Hop 2，白名单 + magic）。
+    切片只带入口，规则层因此判 True；这里用 repo_root 把两跳拼回来。
+    """
+    if repo_root is None or not src:
+        return src or ""
+    meth = unit.rsplit(".", 1)[-1]
+    entry = _py_function_blocks(src, {meth}).get(meth) or src
+    hop1 = _repo_def_bodies(Path(repo_root), _py_called_names(entry))
+    hop1_text = "\n".join(hop1.values())
+    hop2 = _repo_def_bodies(Path(repo_root), _py_called_names(hop1_text))
+    return entry + "\n" + hop1_text + "\n" + "\n".join(hop2.values())
+
+
 def classify(record: dict, repo_root: Path | None = None) -> dict:
     """判定一条 FRESH 根因是否属于“陌生野仓噪音”。
 
@@ -353,17 +447,26 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
     if (record.get("category") == "unrestricted_upload"
             and repo_root is not None and file.endswith((".py", ".java"))):
         _up_src = _read(repo_root, str(record.get("file") or ""))
-        if _up_src and _UPLOAD_TRAVERSAL_GUARD_RE.search(_up_src):
-            if not _repo_serves_uploads(repo_root):
+        if _up_src:
+            # M379：入口把校验/落盘委托给 service 时，把 Hop1/Hop2 拼回证据面。
+            _scope = (upload_guard_scope(repo_root, _up_src, unit)
+                      if file.endswith(".py") else _up_src)
+            _guarded = bool(_UPLOAD_TRAVERSAL_GUARD_RE.search(_scope))
+            _whitelisted = bool(_UPLOAD_EXT_WHITELIST_RE.search(_scope)
+                                and _UPLOAD_GENERATED_NAME_RE.search(_scope))
+            if (_guarded or _whitelisted) and not _repo_serves_uploads(repo_root):
                 if (_UPLOAD_ATTACHMENT_RE.search(_up_src)
+                        or _UPLOAD_ATTACHMENT_RE.search(_scope)
                         or _UPLOAD_RAG_HINT_RE.search(unit)
                         or _UPLOAD_RAG_HINT_RE.search(
                             str(record.get("file") or ""))):
                     return {"blocked": True, "code": UPLOAD_SERVING_ONLY,
-                            "reason": ("已防路径穿越，且下载为 attachment / "
-                                       "仅内部语料入库，无静态挂载或内联渲染面")}
+                            "reason": ("已防路径穿越 / 已做扩展名白名单+固定"
+                                       "命名，且下载为 attachment 或仅内部"
+                                       "语料入库，无静态挂载或内联渲染面")}
                 return {"blocked": True, "code": NON_EXECUTABLE_UPLOAD,
-                        "reason": ("已防路径穿越，落盘目录非 Web 静态挂载"
+                        "reason": ("已防路径穿越 / 已做扩展名白名单+固定命名，"
+                                   "落盘目录非 Web 静态挂载"
                                    "（无 StaticFiles/addResourceHandlers 指向"
                                    "上传目录），上传物不可执行")}
 

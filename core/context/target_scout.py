@@ -513,6 +513,55 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         dropped += drop
         dropped_tool += drop_tool
 
+    # M380：有效候选不足 limit 时，用下一组轮换业务词补拉（最多 2 轮）。
+    # 背景：`--limit 8 --min-stars 300` 实测只回 3 个候选，供给不足会让
+    # daily-hunt 的实扫名额空转。补拉只走传统轨的轮换词，且一旦撞上
+    # GitHub 限流就立即停手（无 Token 时搜索限流 10 次/分钟）。
+    def _candidate_count() -> int:
+        seen: set[str] = set()
+        for vals in buckets.values():
+            for it in vals:
+                slug = it.get("slug")
+                if slug and slug not in excluded:
+                    seen.add(slug)
+        return len(seen)
+
+    def _rate_limited() -> bool:
+        return any("403" in e or "rate" in e.lower() for e in errors)
+
+    extra_rounds = 0
+    ng_off = new_gen_terms if any(NEW_GEN_KEYWORDS.get(lang) for lang in langs) else 0
+    while (allow_online and online_ok > 0 and extra_rounds < 2
+           and _candidate_count() < max(1, int(limit))
+           and not _rate_limited()):
+        extra_rounds += 1
+        for lang in langs:
+            offset = day_index + ng_off + traditional_terms + extra_rounds
+            qualifier = next_qualifier(lang, offset)
+            bucket = TRADITIONAL_STAR_BUCKETS[
+                offset % len(TRADITIONAL_STAR_BUCKETS)]
+            star_range = _bounded_star_range(min_stars, max_stars, bucket)
+            q = search_query(lang, min_stars, max_stars, since, limit,
+                             qualifier, star_range=star_range)
+            queries.append(q)
+            specs.append({"language": lang, "track": "traditional",
+                          "qualifier": qualifier, "query": q, "page": 1,
+                          "topup_round": extra_rounds})
+            ok, data, err = _get(search_url(q, 1, per_page))
+            if not ok or not isinstance(data, dict):
+                errors.append(f"{lang}: {err}")
+                if "403" in str(err) or "rate" in str(err).lower():
+                    break
+                continue
+            parsed, drop, drop_tool = _parse_search(data, lang)
+            if excluded:
+                parsed = [x for x in parsed if x.get("slug") not in excluded]
+            buckets[lang] += parsed
+            dropped += drop
+            dropped_tool += drop_tool
+            if _candidate_count() >= max(1, int(limit)):
+                break
+
     new_gen_queries = sum(1 for s in specs if s["track"] == "new_gen")
     if online_ok == 0:
         seeds: dict[str, list[dict]] = {}

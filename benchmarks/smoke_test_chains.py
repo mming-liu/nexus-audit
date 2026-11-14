@@ -49,7 +49,9 @@ from core.context.taint_chain import (         # noqa: E402
     build_chains, reads_of, render_chain_block, writes_of,
 )
 from core.models import CodeUnit, Language      # noqa: E402
-from core.context import cve_dedup, daily_hunt, wild_noise  # noqa: E402
+from core.context import (                                  # noqa: E402
+    cve_dedup, daily_hunt, target_scout, wild_noise,
+)
 from core.context.symbol_indexer import (                      # noqa: E402
     SymbolIndexer, _mask_multiline_strings,
 )
@@ -12964,6 +12966,105 @@ check("M376：close(4001) 也算前置鉴权", ws_auth_guard(_M376_WS), True)
 check("M376：jwt.decode 计入身份校验证据",
       bool(wild_noise._IDENTITY_GUARD_RE.search(
           "jwt.decode(token, settings.jwt_secret)")), True)
+print("\n[331] M379/M380：2-Hop 上传守卫 + 新生代星标下限")
+_M379_A = Path(_ws_mkdtemp("m379_a_"))
+for _sub in ("app/routers", "app/services", "app/utils"):
+    (_M379_A / _sub).mkdir(parents=True, exist_ok=True)
+(_M379_A / "app" / "routers" / "chat.py").write_text(
+    "from app.services.svc import svc\n"
+    "@router.post('/chat/files')\n"
+    "async def upload_chat_file(file, user=Depends(get_current_user_id)):\n"
+    "    content = await file.read()\n"
+    "    return await svc.save_upload(user, file.filename, content)\n",
+    encoding="utf-8")
+(_M379_A / "app" / "services" / "svc.py").write_text(
+    "import uuid\n"
+    "from app.utils.validator import validate_attachment\n"
+    "class S:\n"
+    "    async def save_upload(self, user, filename, content):\n"
+    "        ext = validate_attachment(filename, content)\n"
+    "        file_id = uuid.uuid4().hex\n"
+    "        path = f'data/files/{user}/{file_id}{ext}'\n"
+    "        open(path, 'wb').write(content)\n"
+    "        return path\n"
+    "svc = S()\n",
+    encoding="utf-8")
+(_M379_A / "app" / "utils" / "validator.py").write_text(
+    "IMAGE_EXTENSIONS = {'.png', '.jpg'}\n"
+    "def validate_attachment(filename, content):\n"
+    "    ext = '.' + filename.rsplit('.', 1)[-1].lower()\n"
+    "    if ext not in IMAGE_EXTENSIONS:\n"
+    "        raise ValueError('bad type')\n"
+    "    return ext\n",
+    encoding="utf-8")
+check("M379：2-Hop service 白名单 + UUID → 拦",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "upload_chat_file",
+                           "file": "app/routers/chat.py"},
+                          _M379_A).get("blocked"), True)
+
+_M379_B = Path(_ws_mkdtemp("m379_b_"))
+for _sub in ("app/routers", "app/services"):
+    (_M379_B / _sub).mkdir(parents=True, exist_ok=True)
+(_M379_B / "app" / "routers" / "chat.py").write_text(
+    "from app.services.svc import svc\n"
+    "@router.post('/upload')\n"
+    "async def upload_raw(file):\n"
+    "    return await svc.save_raw(file.filename, await file.read())\n",
+    encoding="utf-8")
+(_M379_B / "app" / "services" / "svc.py").write_text(
+    "class S:\n"
+    "    async def save_raw(self, filename, content):\n"
+    "        open('uploads/' + filename, 'wb').write(content)\n"
+    "svc = S()\n",
+    encoding="utf-8")
+check("M379：2-Hop 但无白名单/无防穿越 → 不拦",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "upload_raw",
+                           "file": "app/routers/chat.py"},
+                          _M379_B).get("blocked"), False)
+
+_M379_C = Path(_ws_mkdtemp("m379_c_"))
+for _sub in ("app/routers", "app/services"):
+    (_M379_C / _sub).mkdir(parents=True, exist_ok=True)
+(_M379_C / "app" / "main.py").write_text(
+    "from fastapi.staticfiles import StaticFiles\n"
+    "app.mount('/uploads', StaticFiles(directory='uploads'), name='uploads')\n",
+    encoding="utf-8")
+(_M379_C / "app" / "routers" / "chat.py").write_text(
+    "from app.services.svc import svc\n"
+    "@router.post('/upload')\n"
+    "async def upload_static(file):\n"
+    "    return await svc.save_upload(file.filename, await file.read())\n",
+    encoding="utf-8")
+(_M379_C / "app" / "services" / "svc.py").write_text(
+    "import uuid\n"
+    "class S:\n"
+    "    async def save_upload(self, filename, content):\n"
+    "        file_id = uuid.uuid4().hex\n"
+    "        open('uploads/' + file_id + '.png', 'wb').write(content)\n"
+    "svc = S()\n",
+    encoding="utf-8")
+check("M379：上传目录被 StaticFiles 挂载 → 不拦",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "upload_static",
+                           "file": "app/routers/chat.py"},
+                          _M379_C).get("blocked"), False)
+
+_M380_SPECS = target_scout.scout_daily(
+    languages=["python"], min_stars=300, limit=8, allow_online=False)
+_M380_NG = [s for s in _M380_SPECS["query_specs"] if s["track"] == "new_gen"]
+_M380_TR = [s for s in _M380_SPECS["query_specs"] if s["track"] == "traditional"]
+check("M380：新生代星标下限不随 min_stars=300 抬高",
+      bool(_M380_NG) and all("stars:150..5000" in s["query"] for s in _M380_NG),
+      True)
+_M380_TR_LO = [int(s["query"].split("stars:")[1].split("..")[0])
+               for s in _M380_TR if "stars:" in s["query"]]
+check("M380：传统轨道星标下限仍 >= min_stars=300",
+      bool(_M380_TR_LO) and all(lo >= 300 for lo in _M380_TR_LO), True)
+check("M380：点号调用名可提取",
+      "save_upload" in wild_noise._py_called_names(
+          "await svc.save_upload(a, b)"), True)
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
