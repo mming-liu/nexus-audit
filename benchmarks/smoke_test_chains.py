@@ -13230,6 +13230,12 @@ check("M393：SKIPPED 行带原因",
       "SKIPPED (unchanged_head)" in _M393_H, True)
 check("M393：http_403 识别为限流", target_scout._is_rate_limit("http_403"), True)
 check("M393：timeout 不算限流", target_scout._is_rate_limit("timeout"), False)
+check("M394：Python 文件不判 ERC20 类目（语言不匹配）",
+      wild_noise.classify({"category": "unchecked_erc20_return",
+                           "unit": "transfer",
+                           "file": "backend/app/api/routes/v1/phone.py"},
+                          None).get("code"),
+      wild_noise.RULE_LANGUAGE_MISMATCH)
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

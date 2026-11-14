@@ -90,7 +90,11 @@ _CMD_SINK_RE = re.compile(
 
 # M297：只在 Solidity 里成立的类目；落到 .py/.java 入口一定是判据串了语言。
 SOLIDITY_ONLY = frozenset({"reentrancy", "unchecked_low_level_calls",
-                           "tx_origin", "delegatecall_untrusted"})
+                           "tx_origin", "delegatecall_untrusted",
+                           # M394：ERC20 返回值 / 预言机价格是 Solidity 专属类目；
+                           # 实测 Python 路由 `transfer(a, b)` 被
+                           # unchecked_erc20_return 误判（agenticos phone.py）。
+                           "unchecked_erc20_return", "oracle_stale_price"})
 
 PUBLIC_PREFIXES = ("/app-api/", "/public/", "/open-api/")
 
