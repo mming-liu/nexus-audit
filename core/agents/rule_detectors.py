@@ -6663,7 +6663,10 @@ def _py_strip_outer_parens(expr: str) -> str:
 def _py_assignments(region: str, name: str) -> list[str]:
     """region 里该名字的**全部**赋值右值（含 PEP 8 折行续行）。"""
     lines = region.split("\n")
-    pat = re.compile(rf"^[ \t]*{re.escape(name)}\s*=\s*(?!=)(.*)$")
+    # M372：支持带类型注解的赋值（`stmt: Select = select(...)`）——
+    # 旧正则只认 `name =`，SQLAlchemy 常见的注解写法整条漏掉。
+    pat = re.compile(
+        rf"^[ \t]*{re.escape(name)}\s*(?::\s*[^=\n]+)?=\s*(?!=)(.*)$")
     out: list[str] = []
     i = 0
     while i < len(lines):
@@ -6762,6 +6765,13 @@ def _py_orm_expr(expr: str, source: str, pos: int | None = None,
     e = _py_strip_outer_parens(expr)
     if _PY_ORM_EXPR_RE.match(e):
         return True
+    # M372：链式语句对象（`stmt.where(...).limit(...)`）与 ORM 条件链
+    # （`t.c.x == v` / `.in_(...)`）—— 旧实现只认 `select(` 开头，链式
+    # 追加后的表达式整条漏判。含 `text(` 的不算（那是真的 SQL 文本）。
+    if (re.search(r"\.\s*(?:where|filter|filter_by|in_|join|order_by|"
+                  r"limit|offset|group_by|having)\s*\(", e)
+            and not re.search(r"\btext\s*\(", e)):
+        return True
     if re.fullmatch(r"[A-Za-z_]\w*", e) and pos is not None:
         region = _py_local_region(source, pos)
         for rhs in _py_assignments(region, e):
@@ -6776,6 +6786,10 @@ def _py_orm_expr(expr: str, source: str, pos: int | None = None,
             if (re.match(r"[A-Za-z_][\w.]*\s*\(", rhs)
                     and _py_orm_expr(rhs, source, pos, _depth + 1)):
                 return True
+        # M372：形参在调用点收到的是 ORM 语句
+        # （`_fetch_batch(stmt.where(...))` 里的 `session.execute(stmt)`）。
+        if _py_param_receives_orm(source, e, pos, _depth):
+            return True
         return False
     m = re.match(r"(?:self\s*\.\s*)?([A-Za-z_]\w*)\s*\(", e)
     if m:
@@ -6789,6 +6803,66 @@ def _py_orm_expr(expr: str, source: str, pos: int | None = None,
         if re.search(r"(?:_stmt|_statement|_query|_select|_clause)$", fname, re.I):
             return True
     return False
+
+
+def _py_param_receives_orm(source: str, name: str, pos: int | None,
+                           _depth: int = 0) -> bool:
+    """该形参在**调用点**收到的是不是 ORM 语句（M372）。
+
+    `_fetch_batch(stmt)` 里 `session.execute(stmt)` 的 `stmt` 是形参，
+    局部区域看不到赋值；但调用点写的是 `_fetch_batch(stmt.where(...))`。
+    只看"形参 = 客户端可控"会把 fojin 的三个导出接口全判成注入。
+    """
+    if _depth > 3:
+        return False
+    info = _py_enclosing_def(source, pos)
+    if not info:
+        return False
+    fname, params, _start = info
+    if name not in params:
+        return False
+    idx = params.index(name)
+    for m in re.finditer(rf"(?<![\w.]){re.escape(fname)}\s*\(", source):
+        before = source[max(0, m.start() - 40):m.start()]
+        if re.search(r"\b(?:async\s+)?def\s+$", before):
+            continue                       # 定义本身，不是调用
+        args = _balanced_cond(source, m.end())
+        if args is None:
+            continue
+        parts = _split_args(args)
+        if idx >= len(parts):
+            continue
+        if _py_orm_expr(parts[idx], source, m.start(), _depth + 1):
+            return True
+    return False
+
+
+def python_entry_sql_sink(source: str, entry_name: str = "") -> bool:
+    """入口函数体（含其可达辅助函数）里是否有 SQL 执行调用（M372）。
+
+    `NO_SQL_SINK` 旧判据看**整份文件**有没有 `.execute`：只要文件里
+    别处有一处执行，入口体无 SQL 也会放行（apowerb 的 `list_skills` /
+    `list_tool_configs` 就是这么进的 A 板）。这里从入口函数出发，沿
+    调用链只走它**真正调用到**的函数。
+    """
+    entry = (_py_function_body(source, entry_name) if entry_name
+             else _py_entry_region(source))
+    if not entry:
+        return bool(_PY_SQL_SINK_RE.search(source))
+    seen: set[str] = set()
+    queue = list(re.findall(r"\b([A-Za-z_]\w*)\s*\(", entry))
+    hay = entry
+    while queue and len(seen) < 60:
+        name = queue.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        body = _py_function_body(source, name)
+        if not body:
+            continue
+        hay += "\n" + body
+        queue.extend(re.findall(r"\b([A-Za-z_]\w*)\s*\(", body))
+    return bool(_PY_SQL_SINK_RE.search(hay))
 
 
 def python_sqli_verdict(source: str) -> bool | None:
@@ -6893,6 +6967,13 @@ def _py_local_region(source: str, pos: int) -> str:
     return source[seg:pos]
 
 
+# M371：SQL 标识符/值转义函数 —— 名字里带 sql/ident/quote 的视为已清洗。
+# 不按 "escape" 泛匹配：`escape_html` 不做 SQL 转义，不能当安全证据。
+_PY_SQL_SANITIZER_RE = re.compile(r"(?:sql|ident|quote)", re.I)
+# 值域透传包装：只剥这几个壳，其余未知调用一律不猜。
+_PY_TRANSPARENT_WRAPPERS = frozenset({"str", "repr", "format"})
+
+
 def _py_value_text_capable(expr: str, source: str, depth: int = 0,
                            pos: int | None = None) -> bool | None:
     """SQL 文本表达式能否携带运行时值（三态）。None=查不出，保守不判。"""
@@ -6984,7 +7065,7 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0,
         region = _py_local_region(source, pos) if pos is not None \
             else _py_entry_region(source)
         lines = region.split("\n")
-        pat = re.compile(rf"^[ \t]*{re.escape(e)}\s*=[^=]")
+        pat = re.compile(rf"^[ \t]*{re.escape(e)}\s*(?::\s*[^=\n]+)?=[^=]")
         rhs = None
         d = 0
         i = 0
@@ -7031,6 +7112,17 @@ def _py_value_text_capable(expr: str, source: str, depth: int = 0,
         return True
     mm = re.match(r"[\w.]+\s*\(", e)
     if mm:
+        # M371：**不能把任意函数调用当透传包装**。旧实现把
+        # `quote_sqlite_ident(table)` 剥壳成 `table`，于是专门做标识符
+        # 白名单转义的函数反而被判成注入源（MimirQ 实测）。
+        # 现在：已知转义/白名单函数 → False；已知透传（str/repr/format）
+        # → 剥壳看实参；其余未知调用 → None（与 Java `_concat_only_sanitized`
+        # 的"未知调用不退 True"同口径）。
+        callee = re.match(r"([\w.]+)\s*\(", e).group(1).split(".")[-1]
+        if _PY_SQL_SANITIZER_RE.search(callee):
+            return False
+        if callee not in _PY_TRANSPARENT_WRAPPERS:
+            return None
         args = _balanced_cond(e, mm.end())
         # 关键字实参取值：`f(sql=sql)` 的值域跟 `sql` 走，不是跟着字面名
         # "sql=sql" 走（pygoat 实测：kwargs 形态在真实代码里常见）。
@@ -7065,7 +7157,9 @@ def _py_interp_text_capable(expr: str, source: str, depth: int = 0,
         region = (_py_local_region(source, pos) if pos is not None
                   else _py_entry_region(source))
         rhs = None
-        for am in re.finditer(rf"(?m)^[ \t]*{re.escape(e)}\s*=\s*(.+)$", region):
+        for am in re.finditer(
+                rf"(?m)^[ \t]*{re.escape(e)}\s*(?::\s*[^=\n]+)?=\s*(.+)$",
+                region):
             rhs = am.group(1)
         if rhs is not None:
             return _py_value_text_capable(rhs, source, depth + 1, pos=pos)
@@ -10715,6 +10809,17 @@ def _entry_region(source: str) -> str:
     return re.split(r"(?m)^[ \t]*//[ \t]*(?:----|来自)", source)[0]
 
 
+def _py_var_from_request(body: str, name: str) -> bool:
+    """变量是否被赋值为 request 请求数据（M372）。"""
+    pat = re.compile(
+        rf"(?m)^[ \t]*{re.escape(name)}\s*(?::\s*[^=\n]+)?=\s*(.+)$")
+    for m in pat.finditer(body):
+        if re.search(r"request\s*\.\s*(?:json|form|data|values|get_json|"
+                     r"body|POST|GET|FILES|query_params)", m.group(1)):
+            return True
+    return False
+
+
 def _mass_target_has_priv_fields(text: str) -> bool:
     """目标模型/实参里是否出现权限字段。"""
     low = text.lower()
@@ -10730,6 +10835,16 @@ def mass_assignment_verdict(source: str) -> bool | None:
         return None
     if _looks_python(source):
         m = _MASS_PY_SINK_RE.search(body) or _MASS_PY_UPDATE_RE.search(body)
+        # M372：`Model(**payload)` 里的 payload 若是**服务端产物**（数据库
+        # 查询结果），不是批量赋值入口。只有来自 request.* 或本身就是
+        # 入口形参时才认（MimirQ 的 `TableQueryResponse(**payload)` 实测）。
+        if m:
+            _vm = re.search(r"\*\*\s*([A-Za-z_]\w*)", m.group(0))
+            if _vm and _vm.group(1) in {"data", "payload", "params", "kwargs"}:
+                _var = _vm.group(1)
+                if (not _py_var_from_request(body, _var)
+                        and not _py_is_input_param(source, _var, None)):
+                    m = None
         if not m:
             # 有"从请求数据构造模型"但被字段白名单过滤掉 →
             # `User(**{k: v for k, v in request.json.items() if k in ALLOWED})`

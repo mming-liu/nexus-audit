@@ -36,7 +36,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from core.agents.rule_detectors import ws_auth_guard
+from core.agents.rule_detectors import python_entry_sql_sink, ws_auth_guard
 
 DEMO_CONTROLLER = "DEMO_CONTROLLER"
 PUBLIC_READONLY_ENDPOINT = "PUBLIC_READONLY_ENDPOINT"
@@ -68,7 +68,6 @@ NO_CMD_SINK = "NO_CMD_SINK"
 # 超管本就拥有全部权限，这类"路径拼接/缺注解"按厂商惯例不立项。
 SUPERADMIN_ONLY = "SUPERADMIN_ONLY"
 
-_PY_SQL_SINK_RE = re.compile(r"\.\s*(?:execute|executemany|executescript)\s*\(")
 _CMD_SINK_RE = re.compile(
     r"\b(?:os\s*\.\s*(?:system|popen|exec\w*|spawn\w*)|"
     r"subprocess\s*\.\s*\w+|commands\s*\.\s*getoutput|"
@@ -321,10 +320,13 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
     if record.get("category") == "sqli" and file.endswith(".py"):
         raw = str(record.get("file") or "")
         src = _read(repo_root, raw)
-        if src and not _PY_SQL_SINK_RE.search(src):
+        # M372：从"整份文件有没有 .execute"收紧到"入口函数体 + 其可达
+        # 辅助函数"。apowerb 的 list_skills / list_tool_configs 入口体
+        # 里没有任何 SQL，但同文件别处有 .execute —— 旧判据因此放行。
+        if src and not python_entry_sql_sink(src, unit.rsplit(".", 1)[-1]):
             return {"blocked": True, "code": NO_SQL_SINK,
-                    "reason": ("入口文件无任何 SQL 执行语句"
-                               "（.execute/.executemany/.executescript），"
+                    "reason": ("入口函数体（含其可达辅助函数）里没有任何 SQL "
+                               "执行语句（.execute/.executemany/.executescript），"
                                "sqli 来自切片里未被入口调用的辅助函数")}
 
     if record.get("category") in ("authz", "pathtraver",

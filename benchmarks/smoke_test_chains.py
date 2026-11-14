@@ -37,7 +37,8 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 from core.agents.rule_detectors import (       # noqa: E402
-    authz_verdict, has_external_input, redir_verdict, verdict,
+    authz_verdict, has_external_input, mass_assignment_verdict,
+    python_entry_sql_sink, python_sqli_verdict, redir_verdict, verdict,
     ws_auth_guard, xss_verdict,
 )
 from benchmarks.disputed_truth import (       # noqa: E402
@@ -12798,6 +12799,94 @@ finally:
 import inspect as _inspect                                   # noqa: E402
 check("M367：daily-hunt 默认 max_roots=5",
       _inspect.signature(daily_hunt.run).parameters["max_roots"].default, 5)
+print("\n[329] M371/M372：Python SQLi 假阳清零（转义函数 / 注解赋值 / ORM 链 / 入口级 sink）")
+_M371_SANITIZED = '''
+@router.get("/t")
+def preview(table: str):
+    q = quote_sqlite_ident(table)
+    cur.execute(f"SELECT * FROM {q}")
+'''
+_M371_UNKNOWN = '''
+@router.get("/u")
+def preview(table: str):
+    cur.execute(f"SELECT * FROM {helper(table)}")
+'''
+_M371_STR = '''
+@router.get("/s")
+def get_user(uid: str):
+    cur.execute("SELECT * FROM users WHERE id = " + str(uid))
+'''
+_M371_ANNOTATED = '''
+from sqlalchemy import select
+@router.get("/a")
+def get_user(uid: str):
+    stmt: Select = select(User).where(User.id == uid)
+    session.execute(stmt)
+'''
+_M371_CHAIN = '''
+@router.get("/c")
+def get_user(uid: str):
+    session.execute(select(User).where(User.id == uid))
+'''
+_M371_PARAM_ORM = '''
+from sqlalchemy import select
+async def _fetch_batch(stmt):
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+@router.get("/p")
+async def export(uid: str):
+    return await _fetch_batch(select(User).where(User.id == uid))
+'''
+check("M371：转义函数不判注入",
+      python_sqli_verdict(_M371_SANITIZED), False)
+check("M371：未知函数不剥壳猜值域",
+      python_sqli_verdict(_M371_UNKNOWN), None)
+check("M371：str() 透传仍判注入",
+      python_sqli_verdict(_M371_STR), True)
+check("M372：带注解的 ORM 赋值不判注入",
+      python_sqli_verdict(_M371_ANNOTATED), False)
+check("M372：链式 where 不判注入",
+      python_sqli_verdict(_M371_CHAIN), False)
+check("M372：形参收到 ORM 语句不判注入",
+      python_sqli_verdict(_M371_PARAM_ORM), False)
+
+_M372_FILE_NO_ENTRY_SQL = '''
+def helper():
+    conn.execute("DELETE FROM x")
+
+@router.get("/n")
+def list_skills(current_user=Depends(get_current_user)):
+    return list_all_skills(organization_id=current_user.email)
+'''
+_M372_FILE_ENTRY_SQL = '''
+async def _fetch_batch(stmt):
+    return await session.execute(stmt)
+
+@router.get("/m")
+async def export(uid: str):
+    return await _fetch_batch(select(User).where(User.id == uid))
+'''
+check("M372：入口体无 SQL → NO_SQL_SINK",
+      python_entry_sql_sink(_M372_FILE_NO_ENTRY_SQL, "list_skills"), False)
+check("M372：入口可达辅助有 SQL → 不拦",
+      python_entry_sql_sink(_M372_FILE_ENTRY_SQL, "export"), True)
+
+_M372_MASS_DB = '''
+@router.get("/p")
+def preview_dataset_table(dataset_id):
+    payload = run_table_query(dataset_id)
+    return TableQueryResponse(**payload)
+'''
+_M372_MASS_REQ = '''
+@router.post("/u")
+def create_user():
+    return User(**request.json)
+'''
+check("M372：DB 结果 **payload 不算批量赋值",
+      mass_assignment_verdict(_M372_MASS_DB), None)
+check("M372：request.json ** 仍算批量赋值",
+      mass_assignment_verdict(_M372_MASS_REQ), True)
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
