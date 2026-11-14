@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -95,13 +96,27 @@ def default_branch(slug: str, timeout: int = 60) -> str:
     return "main"
 
 
+def _current_branch(dest: Path, slug: str) -> str:
+    rc, out = _git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=dest, timeout=30)
+    branch = out.strip() if rc == 0 else ""
+    return branch if branch and branch != "HEAD" else default_branch(slug)
+
+
 def sync_repo(slug: str, dest_root: Path = CACHE_ROOT,
               depth: int = 50) -> dict:
-    """浅克隆/fetch 到缓存目录；返回 head_sha / branch / path。"""
+    """轻量浅克隆/fetch 到缓存目录；返回 head_sha / branch / path（M392）。
+
+    首次克隆不再先发 `ls-remote` 探测默认分支（瞬断会盲退 main，非 main 仓
+    直接失败），而是 `--single-branch --no-tags --filter=blob:none` 让远端
+    HEAD 决定分支；老 git 不支持 `--filter` 时自动回退。
+    """
     dest_root.mkdir(parents=True, exist_ok=True)
     dest = dest_root / safe_dirname(slug)
-    branch = default_branch(slug)
+    # 上次失败残留（有目录但没有有效 .git/HEAD）先清掉，避免 clone 直接失败。
+    if dest.exists() and not (dest / ".git" / "HEAD").is_file():
+        shutil.rmtree(dest, ignore_errors=True)
     if (dest / ".git").is_dir():
+        branch = _current_branch(dest, slug)
         rc, out = _git(["fetch", "--depth", str(depth), "origin",
                         f"refs/heads/{branch}"], cwd=dest, timeout=180)
         if rc != 0:
@@ -112,11 +127,18 @@ def sync_repo(slug: str, dest_root: Path = CACHE_ROOT,
             return {"status": "UNKNOWN", "reason": f"reset_failed: {out[-300:]}",
                     "slug": slug, "branch": branch, "path": str(dest)}
     else:
-        rc, out = _git(["clone", "--depth", str(depth), "--branch", branch,
+        rc, out = _git(["clone", "--depth", str(depth), "--filter=blob:none",
+                        "--single-branch", "--no-tags",
                         remote_url(slug), str(dest)], timeout=300)
         if rc != 0:
+            shutil.rmtree(dest, ignore_errors=True)
+            rc, out = _git(["clone", "--depth", str(depth), "--single-branch",
+                            "--no-tags", remote_url(slug), str(dest)],
+                           timeout=300)
+        if rc != 0:
             return {"status": "UNKNOWN", "reason": f"clone_failed: {out[-300:]}",
-                    "slug": slug, "branch": branch, "path": str(dest)}
+                    "slug": slug, "branch": "", "path": str(dest)}
+        branch = _current_branch(dest, slug)
     rc, sha = _git(["rev-parse", "HEAD"], cwd=dest, timeout=30)
     if rc != 0:
         return {"status": "UNKNOWN", "reason": "rev_parse_failed",

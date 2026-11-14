@@ -426,14 +426,24 @@ def _header(ledger: list[dict], scout: dict, *, days: int,
         f"- 冷却期免克隆：{cooldown_skipped} 个"
         + (f"（--cooldown-days {cooldown_days}：距上次扫描不足 "
            f"{cooldown_days} 天的仓直接 0 秒顺延）" if cooldown_days else "（已关闭）"),
-        "",
-        "| 仓库 | HEAD | 结果 | 新增 |",
-        "|---|---|---|---|",
+        # M393：侦察阶段按 pushed_at 免克隆排除的未变仓数量。
+        f"- 侦察免克隆排除（未变老仓）："
+        f"{int(scout.get('dropped_unchanged') or 0)} 个",
     ]
+    _scout_err = str(scout.get("error") or "").strip()
+    if _scout_err:
+        lines.append(f"- 侦察告警：{_scout_err[:300]}")
+    lines += ["", "| 仓库 | HEAD | 结果 | 新增 |", "|---|---|---|---|"]
     for x in ledger[:MAX_LEDGER_ROWS]:
+        _result = str(x.get("result", ""))
+        _reason = str(x.get("reason") or "")
+        # M393：FAILED/SKIPPED 必须带简短原因（clone_failed / cooldown_7d /
+        # low_units_3 / unchanged_head），消除"空 HEAD + 裸 FAILED"。
+        _label = (_result if _result not in ("FAILED", "SKIPPED") or not _reason
+                  else f"{_result} ({_reason[:40]})")
         lines.append(f"| {x.get('slug', '')} | "
                      f"{str(x.get('head_sha') or '')[:12]} | "
-                     f"{x.get('result', '')} | {x.get('new_roots', 0)} |")
+                     f"{_label} | {x.get('new_roots', 0)} |")
     return "\n".join(lines)
 
 
@@ -635,6 +645,9 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         "min_units": int(min_units or 0),
         "cooldown_skipped": cooldown_skipped,
         "scout_source": scout.get("source", ""),
+        # M393：侦察阶段按 pushed_at 免克隆排除的未变仓 + 限流/告警原文。
+        "dropped_unchanged": int(scout.get("dropped_unchanged") or 0),
+        "scout_error": str(scout.get("error") or "")[:400],
         "state_path": str(state_path),
     }
 

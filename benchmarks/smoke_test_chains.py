@@ -13193,6 +13193,43 @@ check("M388：pushed_at 晚于扫描时刻 → 保留",
       target_scout._pushed_before(
           {"slug": "acme/new", "pushed_at": "2026-11-03T08:00:00Z"},
           {"acme/new": "2026-11-02 00:00:00"}), False)
+print("\n[334] M391-M393：时区归一 + PoC 过滤 + 报告可观测性")
+check("M391：本地 20:28 扫描后 15:00Z 的新 push 不算未变",
+      target_scout._pushed_before(
+          {"slug": "acme/tz", "pushed_at": "2026-11-14T15:00:00Z"},
+          {"acme/tz": "2026-11-14 20:28:00"}), False)
+check("M391：扫描前的 10:00Z push 仍算未变",
+      target_scout._pushed_before(
+          {"slug": "acme/tz", "pushed_at": "2026-11-14T10:00:00Z"},
+          {"acme/tz": "2026-11-14 20:28:00"}), True)
+check("M392：Vulnerability-Wiki-PoC 被 is_tool_lib 拦截",
+      target_scout.is_tool_lib("SourByte05/Vulnerability-Wiki-PoC",
+                               "vulnerability wiki poc"), True)
+check("M392：普通 CRM 项目不被 is_tool_lib 误杀",
+      target_scout.is_tool_lib("DjangoCRM/django-crm", "CRM system"), False)
+check("M392：sync_repo 使用 --filter=blob:none 轻量克隆",
+      "--filter=blob:none" in __import__("inspect").getsource(
+          daily_hunt.upstream_sync.sync_repo), True)
+
+_M393_H = daily_hunt._header(
+    [{"slug": "a/b", "result": "FAILED", "reason": "clone_failed: fatal",
+      "new_roots": 0, "head_sha": ""},
+     {"slug": "c/d", "result": "SKIPPED", "reason": "unchanged_head",
+      "new_roots": 0, "head_sha": "abc123"}],
+    {"source": "github_search", "dropped_unchanged": 18,
+     "error": "python: http_403"},
+    days=21, languages=["java", "python"], evicted=[],
+    summary={"total": 0, "board_a": 0}, blocked=0)
+check("M393：头部披露 dropped_unchanged",
+      "侦察免克隆排除（未变老仓）：18 个" in _M393_H, True)
+check("M393：头部披露 scout.error 告警",
+      "侦察告警：python: http_403" in _M393_H, True)
+check("M393：FAILED 行带原因",
+      "FAILED (clone_failed: fatal)" in _M393_H, True)
+check("M393：SKIPPED 行带原因",
+      "SKIPPED (unchanged_head)" in _M393_H, True)
+check("M393：http_403 识别为限流", target_scout._is_rate_limit("http_403"), True)
+check("M393：timeout 不算限流", target_scout._is_rate_limit("timeout"), False)
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

@@ -146,7 +146,11 @@ _TOOL_LIB_RE = re.compile(
     r"gradio|streamlit|jupyter|notebook|mcp-server|"
     # M358：安全工具/漏洞库/靶场本体（AutoCVE、vuln-scanner、exploit-db、
     # honeypot 等）不是业务系统，扫它们只会把知识库示例当漏洞报。
-    r"autocve|vuln-scanner|pentest|exploit-db|honeypot)(?:[^a-z0-9]|$)"
+    # M392：PoC/漏洞文库/靶场模板仓也不是业务系统（Vulnerability-Wiki-PoC、
+    # nuclei-templates、payloads 等），侦察阶段直接拦掉。
+    r"autocve|vuln-scanner|pentest|exploit-db|honeypot|"
+    r"poc|pocs|vulnerability-wiki|vuln-wiki|writeup|writeups|payloads|"
+    r"nuclei-templates|cve-\d{4})(?:[^a-z0-9]|$)"
     r"|(?:ide|vscode|intellij|eclipse)-)", re.I)
 
 # M312：名字以框架前缀开头、描述又是"库/插件/中间件/可复用包"的第三方组件，
@@ -357,19 +361,49 @@ def _merge_round_robin(buckets: dict[str, list[dict]],
     return ordered
 
 
-def _norm_ts(value: str) -> str:
-    """ISO 时间戳归一（`2026-11-05T09:03:45Z` → `2026-11-05 09:03:45`）。"""
-    return str(value or "").replace("T", " ").replace("Z", "")[:19]
+def _is_rate_limit(err: object) -> bool:
+    """GitHub 搜索限流（无 Token 10 次/分钟）（M393）。"""
+    s = str(err or "").lower()
+    return "403" in s or "429" in s or "rate limit" in s or "ratelimit" in s
+
+
+def _ts_epoch(value: str) -> float | None:
+    """ISO 时间 → UTC epoch 秒；无时区标记按**本地时区**解释（M391）。
+
+    旧实现直接比较去 `Z` 的字符串，把 UTC 的 `pushed_at` 与本地
+    `last_scanned_at` 混算 —— 在 UTC+8 下会把"扫描后 8 小时内"的新 push
+    误判成"未变"，白白跳过刚更新的仓。
+    """
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        if raw.endswith(("Z", "z")):
+            dt = _dt.datetime.fromisoformat(raw[:-1] + "+00:00")
+        else:
+            dt = _dt.datetime.fromisoformat(raw)
+    except ValueError:
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
+            try:
+                dt = _dt.datetime.strptime(raw[:19], fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.astimezone()  # naive → 本地时区
+    return dt.timestamp()
 
 
 def _pushed_before(item: dict, scanned_at: dict[str, str]) -> bool:
-    """远端 pushed_at 是否 <= 上次扫描时刻（之后没有任何新 push）（M388）。"""
+    """远端 pushed_at 是否 <= 上次扫描时刻（之后没有任何新 push）（M388/M391）。"""
     slug = str(item.get("slug") or "")
-    last = scanned_at.get(slug)
-    pushed = str(item.get("pushed_at") or "")
-    if not last or not pushed:
+    pushed_ts = _ts_epoch(str(item.get("pushed_at") or ""))
+    scanned_ts = _ts_epoch(scanned_at.get(slug) or "")
+    if pushed_ts is None or scanned_ts is None:
         return False
-    return _norm_ts(pushed) <= _norm_ts(last)
+    return pushed_ts <= scanned_ts
 
 
 def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
@@ -437,7 +471,10 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             specs.append({"language": lang, "track": "traditional",
                           "qualifier": qualifier, "query": q, "page": page})
 
+    rate_limited = False
     for spec in specs:
+        if rate_limited:
+            break
         queries.append(spec["query"])
         if not allow_online:
             continue
@@ -445,6 +482,9 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         ok, data, err = _get(search_url(spec["query"], page, per_page))
         if not ok or not isinstance(data, dict):
             errors.append(f"{spec['language']}: {err}")
+            if _is_rate_limit(err):
+                rate_limited = True
+                break
             continue
         # 新生代词太窄/当天该词没结果时，顺延 1..2 个词，避免整条轨道空手。
         if (spec["track"] == "new_gen"
@@ -460,6 +500,9 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                         created_since=NEW_GEN_CREATED_SINCE,
                         star_range=NEW_GEN_STARS)
                     ok2, data2, err2 = _get(search_url(alt_q, 1, per_page))
+                    if not ok2 and _is_rate_limit(err2):
+                        rate_limited = True
+                        break
                     if (ok2 and isinstance(data2, dict)
                             and int(data2.get("total_count") or 0) > 0):
                         data = data2
@@ -482,6 +525,9 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                     word, created_since=NEW_GEN_FALLBACK_CREATED_SINCE,
                     star_range=NEW_GEN_FALLBACK_STARS)
                 ok3, data3, err3 = _get(search_url(alt_q, 1, per_page))
+                if not ok3 and _is_rate_limit(err3):
+                    rate_limited = True
+                    break
                 if (ok3 and isinstance(data3, dict)
                         and int(data3.get("total_count") or 0) > 0):
                     data = data3
@@ -495,6 +541,9 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             ok, data, err = _get(search_url(spec["query"], 1, per_page))
             if not ok or not isinstance(data, dict):
                 errors.append(f"{spec['language']}: {err}")
+                if _is_rate_limit(err):
+                    rate_limited = True
+                    break
                 continue
             spec["page_used"] = 1
         else:
@@ -523,6 +572,8 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             okp, datap, errp = _get(search_url(spec["query"], nxt, per_page))
             if not okp or not isinstance(datap, dict):
                 errors.append(f"{spec['language']}: {errp}")
+                if _is_rate_limit(errp):
+                    rate_limited = True
                 break
             more, d2, t2 = _parse_search(datap, spec["language"])
             if excluded:
@@ -556,6 +607,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
     extra_rounds = 0
     ng_off = new_gen_terms if any(NEW_GEN_KEYWORDS.get(lang) for lang in langs) else 0
     while (allow_online and online_ok > 0 and extra_rounds < 2
+           and not rate_limited
            and _candidate_count() < max(1, int(limit))
            and not _rate_limited()):
         extra_rounds += 1
@@ -574,7 +626,8 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             ok, data, err = _get(search_url(q, 1, per_page))
             if not ok or not isinstance(data, dict):
                 errors.append(f"{lang}: {err}")
-                if "403" in str(err) or "rate" in str(err).lower():
+                if _is_rate_limit(err):
+                    rate_limited = True
                     break
                 continue
             parsed, drop, drop_tool = _parse_search(data, lang)
@@ -588,6 +641,25 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             dropped_tool += drop_tool
             if _candidate_count() >= max(1, int(limit)):
                 break
+
+    # M393：限流导致在线有效候选为 0 时，退回离线种子并显式标注来源。
+    if rate_limited and _candidate_count() == 0:
+        _seeds: dict[str, list[dict]] = {}
+        for lang in langs:
+            _seeds[lang] = [
+                x for x in _offline(lang, min_stars, max_stars,
+                                    per_page)["items"]
+                if x.get("slug") not in excluded]
+        _ordered = _merge_round_robin(_seeds, langs)
+        return {"ok": bool(_ordered), "source": "github_search_rate_limited",
+                "queries": queries, "query_specs": specs,
+                "new_gen_queries": sum(1 for s in specs
+                                       if s["track"] == "new_gen"),
+                "items": _ordered, "dropped": dropped,
+                "dropped_tool": dropped_tool,
+                "dropped_unchanged": dropped_unchanged,
+                "error": ("; ".join(errors)
+                          or "github_search_rate_limited")[:400]}
 
     new_gen_queries = sum(1 for s in specs if s["track"] == "new_gen")
     if online_ok == 0:
