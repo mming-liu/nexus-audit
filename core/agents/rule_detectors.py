@@ -11498,9 +11498,11 @@ _UPLOAD_PY_SINK_RE = re.compile(
 # 白名单/固定后缀的"证据面"：必须同时出现**判定**与**中止**，
 # 只写一个 ALLOWED 常量但从不拿它 if，不算防护。
 _UPLOAD_WHITELIST_HINT_RE = re.compile(
-    r"(?i)(?:allowed|permitted|valid)_?(?:ext|exts|extensions?|suffix|suffixes|filetypes?|types?)"
+    # M373：`SUPPORTED_EXTENSIONS` / `ACCEPTED_TYPES` 也是白名单常量名
+    # （apowerb 的 upload_csv 就是 `extension not in SUPPORTED_EXTENSIONS`）。
+    r"(?i)(?:allowed|permitted|valid|supported|accepted)_?(?:ext|exts|extensions?|suffix|suffixes|filetypes?|types?)"
     r"|\bwhitelist\b|\.\s*endsWith\s*\(|\.\s*endswith\s*\("
-    r"|\b(?:in|not\s+in)\s+\w*(?:ALLOWED|SAFE|PERMITTED|VALID)\w*"
+    r"|\b(?:in|not\s+in)\s+\w*(?:ALLOWED|SAFE|PERMITTED|VALID|SUPPORTED|ACCEPTED)\w*"
     r"|\.\s*contains\s*\(\s*(?:ext|suffix|fileType)\s*\)"
     # M308：内联后缀字面量集合 —— if ext not in {".png", ".jpg"} / [...]
     r"|(?:in|not\s+in)\s*[\(\[\{][^)\]\}]{0,240}\."
