@@ -69,6 +69,23 @@ def _board(rec: dict) -> str:
     return A
 
 
+def scout_cache_line(cache_hits: int = 0, backfilled: int = 0) -> str:
+    """M396：侦察缓存/限流回填的头部披露行（唯一渲染点）。
+
+    放在本模块而非 daily_hunt，是为了让 LIVE_HUNT_REPORT 的排版责任留在
+    报告层；daily_hunt._header 只负责把 scout 字典里的数传进来。
+    两者都为 0 时返回空串，不污染历史报告格式。
+    """
+    try:
+        hits, filled = int(cache_hits or 0), int(backfilled or 0)
+    except (TypeError, ValueError):
+        return ""
+    if hits <= 0 and filled <= 0:
+        return ""
+    return (f"- 侦察缓存与回填：缓存命中 {hits} 页 / "
+            f"限流回填 {filled} 仓")
+
+
 def _row_a(i: int, r: dict, with_confidence: bool = False) -> str:
     playbook = r.get("playbook") or ""
     link = (f"[{Path(playbook).name}]({playbook})" if playbook else "—")

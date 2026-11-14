@@ -88,13 +88,19 @@ _CMD_SINK_RE = re.compile(
     r"asyncio\s*\.\s*create_subprocess\w*|pty\s*\.\s*spawn)\s*\(",
     re.I)
 
-# M297：只在 Solidity 里成立的类目；落到 .py/.java 入口一定是判据串了语言。
-SOLIDITY_ONLY = frozenset({"reentrancy", "unchecked_low_level_calls",
-                           "tx_origin", "delegatecall_untrusted",
-                           # M394：ERC20 返回值 / 预言机价格是 Solidity 专属类目；
-                           # 实测 Python 路由 `transfer(a, b)` 被
-                           # unchecked_erc20_return 误判（agenticos phone.py）。
-                           "unchecked_erc20_return", "oracle_stale_price"})
+# M395：只在 Solidity 里成立的类目；落到 .py/.java 入口一定是判据串了语言。
+# 必须与 core/agents/rule_detectors.py 的 SOLIDITY_ONLY_CATEGORIES **逐项一致**
+# （冒烟 [335] 有等值断言）。规则层在 verdict() 入口挡第一道，降噪层在
+# classify() 按文件后缀挡第二道；缺任一端都会让跨语言假根因漏到 B 板。
+# M394 只补了 ERC20/预言机两项，剩下 5 项（access_control / broken_access /
+# arithmetic / bad_randomness / tx_origin / delegatecall_untrusted /
+# signature_replay）在 agenticos 的 Python 切片上同样会误命中。
+SOLIDITY_ONLY = frozenset({
+    "reentrancy", "access_control", "broken_access",
+    "unchecked_low_level_calls", "arithmetic", "bad_randomness",
+    "tx_origin", "delegatecall_untrusted", "signature_replay",
+    "unchecked_erc20_return", "oracle_stale_price",
+})
 
 PUBLIC_PREFIXES = ("/app-api/", "/public/", "/open-api/")
 

@@ -14,9 +14,13 @@ M269 只做“找候选仓”；M285 增加 scout_daily()：
 from __future__ import annotations
 
 import datetime as _dt
+import hashlib
+import json
 import os
 import re
+import time
 import urllib.parse
+from pathlib import Path
 
 try:
     import httpx
@@ -25,6 +29,23 @@ except ImportError:                                          # pragma: no cover
 
 GH_API = "https://api.github.com"
 UA = "nexus-audit/1.3"
+
+# M396：GitHub 搜索响应本地磁盘缓存。无 Token 时 /search/repositories 只有
+# 10 次/分钟，一轮 scout_daily 动辄十几次查询，跑到一半 403 就前功尽弃。
+# 6 小时内的相同 URL 直接复用本地响应（0 网络请求），半途限流时还能把
+# 历史缓存页当"备用候选池"回填，避免一轮只剩 1 个仓。
+DEFAULT_CACHE_DIR = (Path(__file__).resolve().parents[2] / ".cache" /
+                     "scout_search")
+DEFAULT_CACHE_TTL = 21600                      # 6 小时
+
+
+def _cache_dir(explicit: Path | str | None = None) -> Path:
+    """缓存目录优先级：显式参数 > NEXUS_SCOUT_CACHE_DIR > 仓库内默认值。"""
+    if explicit is not None:
+        return Path(explicit)
+    env = (os.getenv("NEXUS_SCOUT_CACHE_DIR") or "").strip()
+    return Path(env) if env else DEFAULT_CACHE_DIR
+
 
 OFFLINE_SEEDS = [
     {"slug": "newbee-ltd/newbee-mall-api", "stars": 1200, "language": "Java"},
@@ -247,6 +268,44 @@ def _get(url: str, timeout: float = 20.0) -> tuple[bool, dict | None, str]:
         return False, None, f"{type(e).__name__}: {e}"[:200]
 
 
+def _get_cached(url: str, *, cache_dir: Path | None = None,
+                cache_ttl: int = DEFAULT_CACHE_TTL
+                ) -> tuple[bool, dict | None, str, bool]:
+    """M396：带 6 小时磁盘缓存的 `_get`。
+
+    返回 (ok, data, err, from_cache)。`from_cache=True` 表示本次 **0 网络
+    请求**，调用方可据此统计 cache_hits。缓存文件以 URL 的 sha1 命名，
+    内容 {"ts", "url", "data"}；坏文件 / 过期 / 目录不可写一律静默降级为
+    直连，绝不让缓存把侦察卡死。
+    """
+    root = _cache_dir(cache_dir)
+    key = hashlib.sha1(url.encode("utf-8")).hexdigest()
+    path = root / f"{key}.json"
+    try:
+        if path.is_file():
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if (isinstance(payload, dict)
+                    and isinstance(payload.get("data"), dict)
+                    and time.time() - float(payload.get("ts") or 0)
+                    <= max(0, int(cache_ttl))):
+                return True, payload["data"], "", True
+    except (OSError, ValueError, TypeError):
+        pass                                    # 坏缓存 == 没有缓存
+    ok, data, err = _get(url)
+    if not (ok and isinstance(data, dict)):
+        return ok, data, err, False
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        tmp = root / f"{key}.{os.getpid()}.tmp"
+        tmp.write_text(json.dumps({"ts": time.time(), "url": url,
+                                   "data": data}, ensure_ascii=False),
+                       encoding="utf-8")
+        tmp.replace(path)                       # 原子替换，避免读到半截 JSON
+    except (OSError, ValueError, TypeError):
+        pass
+    return True, data, "", False
+
+
 def _offline(language: str, min_stars: int, max_stars: int,
              limit: int) -> dict:
     items = [dict(x, pushed_at="", description="offline seed",
@@ -413,7 +472,9 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                 today: _dt.date | None = None,
                 terms_per_language: int = 2,
                 exclude_slugs: set[str] | list[str] | None = None,
-                scanned_at: dict[str, str] | None = None) -> dict:
+                scanned_at: dict[str, str] | None = None,
+                cache_dir: Path | str | None = None,
+                cache_ttl: int = DEFAULT_CACHE_TTL) -> dict:
     """M285/M311/M325：每日动态抓新仓（跨语言 Round-Robin 混排）。
 
     每个语言分两条轨：
@@ -438,6 +499,20 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
     dropped_unchanged = 0
     online_ok = 0
     day_index = today.toordinal()
+    # M396：缓存目录 + 本轮统计。cache_hits 计「命中缓存的查询页数」，
+    # backfilled 计「半途 403 后从缓存/离线种子补进来的仓数」。
+    cache_root = _cache_dir(cache_dir)
+    cache_hits = 0
+    backfilled = 0
+
+    def _fetch(url: str) -> tuple[bool, dict | None, str]:
+        """统一走缓存；命中即记一笔，供报告披露。"""
+        nonlocal cache_hits
+        ok, data, err, from_cache = _get_cached(
+            url, cache_dir=cache_root, cache_ttl=cache_ttl)
+        if from_cache:
+            cache_hits += 1
+        return ok, data, err
 
     terms = max(1, int(terms_per_language))
     if terms == 1:
@@ -479,7 +554,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         if not allow_online:
             continue
         page = int(spec.get("page") or 1)
-        ok, data, err = _get(search_url(spec["query"], page, per_page))
+        ok, data, err = _fetch(search_url(spec["query"], page, per_page))
         if not ok or not isinstance(data, dict):
             errors.append(f"{spec['language']}: {err}")
             if _is_rate_limit(err):
@@ -499,7 +574,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                         NEW_GEN_PUSHED_SINCE, limit, alt_kw,
                         created_since=NEW_GEN_CREATED_SINCE,
                         star_range=NEW_GEN_STARS)
-                    ok2, data2, err2 = _get(search_url(alt_q, 1, per_page))
+                    ok2, data2, err2 = _fetch(search_url(alt_q, 1, per_page))
                     if not ok2 and _is_rate_limit(err2):
                         rate_limited = True
                         break
@@ -524,7 +599,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                     NEW_GEN_FALLBACK_STARS[1], NEW_GEN_PUSHED_SINCE, limit,
                     word, created_since=NEW_GEN_FALLBACK_CREATED_SINCE,
                     star_range=NEW_GEN_FALLBACK_STARS)
-                ok3, data3, err3 = _get(search_url(alt_q, 1, per_page))
+                ok3, data3, err3 = _fetch(search_url(alt_q, 1, per_page))
                 if not ok3 and _is_rate_limit(err3):
                     rate_limited = True
                     break
@@ -538,7 +613,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                     break
         # 轮转到 page 2..4 但该页为空时回退第 1 页，避免空手而归。
         if page > 1 and int(data.get("total_count") or 0) == 0:
-            ok, data, err = _get(search_url(spec["query"], 1, per_page))
+            ok, data, err = _fetch(search_url(spec["query"], 1, per_page))
             if not ok or not isinstance(data, dict):
                 errors.append(f"{spec['language']}: {err}")
                 if _is_rate_limit(err):
@@ -569,7 +644,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         while (excluded and len(parsed) < 2 and extra < 2
                and total_count > (page + extra) * per_page):
             nxt = page + extra + 1
-            okp, datap, errp = _get(search_url(spec["query"], nxt, per_page))
+            okp, datap, errp = _fetch(search_url(spec["query"], nxt, per_page))
             if not okp or not isinstance(datap, dict):
                 errors.append(f"{spec['language']}: {errp}")
                 if _is_rate_limit(errp):
@@ -623,7 +698,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             specs.append({"language": lang, "track": "traditional",
                           "qualifier": qualifier, "query": q, "page": 1,
                           "topup_round": extra_rounds})
-            ok, data, err = _get(search_url(q, 1, per_page))
+            ok, data, err = _fetch(search_url(q, 1, per_page))
             if not ok or not isinstance(data, dict):
                 errors.append(f"{lang}: {err}")
                 if _is_rate_limit(err):
@@ -642,24 +717,51 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             if _candidate_count() >= max(1, int(limit)):
                 break
 
-    # M393：限流导致在线有效候选为 0 时，退回离线种子并显式标注来源。
+    # M396：半途限流回填（Partial Rate-Limit Backfill）。
+    # 背景：无 Token 时 /search 只有 10 次/分钟，查询循环常在第 5~6 条
+    # 撞 403 提前 break；M380 的补拉轮一旦 rate_limited 就不再跑，于是一轮
+    # 可能只回 1 个候选，daily-hunt 的 --limit 8 有 7 个名额空转。
+    # 顺序：① 6 小时缓存页（按 ts 新→旧）→ ② OFFLINE_SEEDS。两级都按语言
+    # 轮转补，严格复用 excluded / scanned_at 的过滤口径，不把冷却仓放回来。
+    forced_source = ""
     if rate_limited and _candidate_count() == 0:
-        _seeds: dict[str, list[dict]] = {}
-        for lang in langs:
-            _seeds[lang] = [
-                x for x in _offline(lang, min_stars, max_stars,
-                                    per_page)["items"]
-                if x.get("slug") not in excluded]
-        _ordered = _merge_round_robin(_seeds, langs)
-        return {"ok": bool(_ordered), "source": "github_search_rate_limited",
-                "queries": queries, "query_specs": specs,
-                "new_gen_queries": sum(1 for s in specs
-                                       if s["track"] == "new_gen"),
-                "items": _ordered, "dropped": dropped,
-                "dropped_tool": dropped_tool,
-                "dropped_unchanged": dropped_unchanged,
-                "error": ("; ".join(errors)
-                          or "github_search_rate_limited")[:400]}
+        # M393：0 在线候选也要显式标注来源，但不再早退 —— 统一走回填，
+        # 让 cache_hits / backfilled 在报告里可解释。
+        forced_source = "github_search_rate_limited"
+
+    def _iter_round_robin(pool: dict[str, list[dict]]):
+        lists = [pool.get(lang) or [] for lang in langs]
+        i = 0
+        while any(i < len(v) for v in lists):
+            for lang_idx, vals in enumerate(lists):
+                if i < len(vals):
+                    yield langs[lang_idx], vals[i]
+            i += 1
+
+    def _fill(pool: dict[str, list[dict]], needed: int,
+              seen: set[str]) -> int:
+        """把池里的有效候选按语言轮转补进 buckets，返回实际补入数。"""
+        nonlocal backfilled
+        added = 0
+        for lang, it in _iter_round_robin(pool):
+            if added >= needed:
+                break
+            slug = str(it.get("slug") or "")
+            if not slug or slug in seen or slug in excluded:
+                continue
+            try:
+                stars = int(it.get("stars") or 0)
+            except (TypeError, ValueError):
+                stars = 0
+            if not (min_stars <= stars <= max_stars):
+                continue
+            if scanned_at and _pushed_before(it, scanned_at):
+                continue
+            seen.add(slug)
+            buckets.setdefault(lang, []).append(it)
+            added += 1
+        backfilled += added
+        return added
 
     new_gen_queries = sum(1 for s in specs if s["track"] == "new_gen")
     if online_ok == 0:
@@ -673,13 +775,71 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                 "items": ordered[:max(1, limit)],
                 "dropped": 0, "dropped_tool": 0,
                 "dropped_unchanged": dropped_unchanged,
+                "cache_hits": cache_hits, "backfilled": 0,
                 "error": "; ".join(errors)[:400]}
 
     ordered = _merge_round_robin(buckets, langs)
-    return {"ok": bool(ordered), "source": "github_search",
+    if (rate_limited or _rate_limited()) and len(ordered) < max(1, int(limit)):
+        needed = max(1, int(limit)) - len(ordered)
+        seen = {str(x.get("slug") or "") for x in ordered}
+
+        # ① 缓存页：按 ts 从新到旧，逐页用 _parse_search 抽候选。
+        cached_pages: list[tuple[float, dict]] = []
+        try:
+            for p in cache_root.glob("*.json"):
+                try:
+                    payload = json.loads(p.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    continue
+                if (isinstance(payload, dict)
+                        and isinstance(payload.get("data"), dict)):
+                    try:
+                        ts = float(payload.get("ts") or 0)
+                    except (TypeError, ValueError):
+                        ts = 0.0
+                    cached_pages.append((ts, payload["data"]))
+        except OSError:
+            cached_pages = []
+        cached_pages.sort(key=lambda x: x[0], reverse=True)
+
+        lang_set = {str(x).lower() for x in langs}
+        cache_pool: dict[str, list[dict]] = {lang: [] for lang in langs}
+        pool_seen: set[str] = set()
+        for _ts, data in cached_pages:
+            for lang in langs:
+                parsed, _, _ = _parse_search(data, lang)
+                for x in parsed:
+                    slug = str(x.get("slug") or "")
+                    if not slug or slug in pool_seen:
+                        continue
+                    item_lang = str(x.get("language") or lang).strip().lower()
+                    if item_lang not in lang_set:
+                        continue
+                    pool_seen.add(slug)
+                    key = item_lang if item_lang in cache_pool else lang
+                    cache_pool.setdefault(key, []).append(x)
+        needed -= _fill(cache_pool, needed, seen)
+
+        # ② 离线种子：缓存仍不够时按语言补差额。
+        if needed > 0:
+            seed_pool: dict[str, list[dict]] = {}
+            for lang in langs:
+                seed_pool[lang] = [
+                    x for x in _offline(lang, min_stars, max_stars,
+                                        per_page)["items"]
+                    if x.get("slug") not in excluded]
+            _fill(seed_pool, needed, seen)
+
+        ordered = _merge_round_robin(buckets, langs)
+        # 回填分支内才截断；正常路径仍不硬截断（M293：纯库仓不占名额）。
+        if backfilled and len(ordered) > max(1, int(limit)):
+            ordered = ordered[:max(1, int(limit))]
+
+    return {"ok": bool(ordered), "source": forced_source or "github_search",
             "queries": queries, "query_specs": specs,
             "new_gen_queries": new_gen_queries,
             "items": ordered,
             "dropped": dropped, "dropped_tool": dropped_tool,
             "dropped_unchanged": dropped_unchanged,
+            "cache_hits": cache_hits, "backfilled": backfilled,
             "error": "; ".join(errors)[:400]}

@@ -24,6 +24,24 @@ RSA_FAMILY = ("RSA", "OAEP", "MGF1")
 
 WEAK_HASHES = ("MD2", "MD4", "MD5", "SHA", "SHA-0", "SHA-1", "SHA1")
 
+# M395：Solidity 专属类目的**唯一真源**。规则层（本文件 verdict）与降噪层
+# （core/context/wild_noise.py 的 SOLIDITY_ONLY）必须保持同一份集合，否则
+# 会出现"规则判 True、降噪没拦"或"降噪拦了、规则仍产假根因"的错位。
+# 背景：agenticos 的 Python 路由里 `twilio_client.calls.transfer(a, b)` 和
+# `oracle.latestRoundData()` 本是普通业务调用，却被 DeFi 规则当成
+# ERC20/Chainlink 判成 True，B 板一次冒出 400+ 条跨语言假根因。
+# 除这 11 类外，Solidity 切片上只允许 hardcoded_secret / weakrand 两个
+# 跨语言类目（私钥硬编码、弱随机数在 .sol 里同样成立）。
+SOLIDITY_ONLY_CATEGORIES = frozenset({
+    "reentrancy", "access_control", "broken_access",
+    "unchecked_low_level_calls", "arithmetic", "bad_randomness",
+    "tx_origin", "delegatecall_untrusted", "signature_replay",
+    "unchecked_erc20_return", "oracle_stale_price",
+})
+
+# 与降噪层共用的跨语言白名单（Solidity 切片上仍可判定的 Web/通用类目）。
+SOLIDITY_SHARED_CATEGORIES = frozenset({"hardcoded_secret", "weakrand"})
+
 
 # ---------------- 入口体切分 ----------------
 #
@@ -11825,6 +11843,10 @@ def unchecked_erc20_return_verdict(source: str) -> bool | None:
     或合约显式使用 SafeERC20 的 safeTransfer/safeTransferFrom。
     单参 .transfer(amount) 是原生 ETH，不是 ERC20，跳过。
     """
+    # M395：单函数直调也要挡。Python 的 `twilio_client.calls.transfer(a, b)`
+    # 与本规则的 `\w+\.transfer\(` 完全同形，只有语言能区分。
+    if not _looks_solidity(source):
+        return None
     body = entry_body(source)
     if not body:
         return None
@@ -11853,6 +11875,10 @@ def unchecked_erc20_return_verdict(source: str) -> bool | None:
 
 def oracle_stale_price_verdict(source: str) -> bool | None:
     """第 36 类（M188）：Chainlink 价格未同时校验零价与 updatedAt 新鲜度。"""
+    # M395：Python/Java 里的 `oracle.latestRoundData()`（行情查询、报表聚合）
+    # 与 DeFi 预言机无关，直接退 None，连 B 板假根因都不产生。
+    if not _looks_solidity(source):
+        return None
     body = entry_body(source)
     if not body:
         return None
@@ -12033,6 +12059,19 @@ def arbitrary_file_delete_verdict(source: str) -> bool | None:
 
 def verdict(category: str, source: str) -> bool | None:
     """对配置型类目给出确定性结论：True(有漏洞) / False(安全) / None(证据不足)。"""
+    # M395：双向语言门禁（规则层第一道闸，降噪层 wild_noise 是第二道）。
+    # 两个方向都要堵：
+    #   · Web 切片上跑 Solidity 规则 → `.transfer(a,b)` / `.latestRoundData()`
+    #     这类普通业务调用被当成 ERC20/Chainlink，产出跨语言假根因；
+    #   · Solidity 切片上跑 Web 规则 → SQL/XSS/命令注入判据在合约里没有
+    #     对应的 sink，命中即噪音。
+    # 必须在 parse_config_block() 之前：一旦落进任何分支就退不回 None 了。
+    is_sol = _looks_solidity(source)
+    if category in SOLIDITY_ONLY_CATEGORIES and not is_sol:
+        return None
+    if (is_sol and category not in SOLIDITY_ONLY_CATEGORIES
+            and category not in SOLIDITY_SHARED_CATEGORIES):
+        return None
     cfg = parse_config_block(source)
 
     if category == "crypto":

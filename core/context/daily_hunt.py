@@ -430,6 +430,12 @@ def _header(ledger: list[dict], scout: dict, *, days: int,
         f"- 侦察免克隆排除（未变老仓）："
         f"{int(scout.get('dropped_unchanged') or 0)} 个",
     ]
+    # M396：缓存命中 / 半途限流回填是「候选为什么够数」的唯二解释，必须
+    # 在头部显式披露，否则 403 之后凭空多出的仓会被误读成在线搜索结果。
+    _cache_line = live_hunt_report.scout_cache_line(
+        scout.get("cache_hits"), scout.get("backfilled"))
+    if _cache_line:
+        lines.append(_cache_line)
     _scout_err = str(scout.get("error") or "").strip()
     if _scout_err:
         lines.append(f"- 侦察告警：{_scout_err[:300]}")
@@ -648,6 +654,9 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         # M393：侦察阶段按 pushed_at 免克隆排除的未变仓 + 限流/告警原文。
         "dropped_unchanged": int(scout.get("dropped_unchanged") or 0),
         "scout_error": str(scout.get("error") or "")[:400],
+        # M396：JSON 侧同源披露，报告头部与 daily 元数据取同一份数。
+        "cache_hits": int(scout.get("cache_hits") or 0),
+        "backfilled": int(scout.get("backfilled") or 0),
         "state_path": str(state_path),
     }
 

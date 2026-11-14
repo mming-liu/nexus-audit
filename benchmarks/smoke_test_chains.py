@@ -13236,6 +13236,183 @@ check("M394：Python 文件不判 ERC20 类目（语言不匹配）",
                            "file": "backend/app/api/routes/v1/phone.py"},
                           None).get("code"),
       wild_noise.RULE_LANGUAGE_MISMATCH)
+print("\n[335] M395/M396：双端语言隔离 + 侦察缓存/限流回填（纯离线）")
+import hashlib as _hashlib395                                 # noqa: E402
+import json as _json395                                     # noqa: E402
+import time as _time395                                     # noqa: E402
+from core.agents import rule_detectors as _rd395              # noqa: E402
+from core.context import live_hunt_report as _lhr395          # noqa: E402
+
+# M395-1：Python / Java 路由切片里的同形业务调用，绝不能落到 DeFi 规则上。
+_M395_PY = '''
+@app.post("/api/voice/transfer")
+def transfer_call(request: Request):
+    call_sid = request.json.get("call_sid")
+    target_phone = request.json.get("target_phone")
+    twilio_client.calls.transfer(call_sid, target_phone)
+    price = oracle.latestRoundData()
+    return {"ok": True, "price": price}
+'''
+_M395_JAVA = '''
+@RestController
+public class PriceController {
+    @GetMapping("/price")
+    public BigDecimal price(String symbol) {
+        oracle.latestRoundData();
+        token.transfer(from, to);
+        return BigDecimal.ZERO;
+    }
+}
+'''
+# M395-2：真实 Solidity 合约切片，两个 DeFi 漏检样本必须仍判 True。
+_M395_SOL_ERC20 = '''
+pragma solidity ^0.8.0;
+contract Vault {
+    IERC20 public token;
+    mapping(address => uint256) public balances;
+    function payout(address to, uint256 amount) external {
+        token.transfer(to, amount);
+        balances[to] -= amount;
+    }
+}
+'''
+_M395_SOL_ORACLE = '''
+pragma solidity ^0.8.0;
+contract Lending {
+    AggregatorV3Interface public oracle;
+    mapping(address => uint256) public debt;
+    function liquidate(address user) external {
+        (, int256 answer, , , ) = oracle.latestRoundData();
+        uint256 price = uint256(answer);
+        debt[user] = price * 10;
+    }
+}
+'''
+check("M395：规则层与降噪层 11 项集合逐项一致",
+      _rd395.SOLIDITY_ONLY_CATEGORIES == wild_noise.SOLIDITY_ONLY, True)
+check("M395：Solidity 专属集合规模为 11",
+      len(_rd395.SOLIDITY_ONLY_CATEGORIES), 11)
+for _n395, _s395 in (("Python", _M395_PY), ("Java", _M395_JAVA)):
+    check(f"M395：{_n395} 的 transfer(a,b) 不落 ERC20 规则",
+          _rd395.verdict("unchecked_erc20_return", _s395), None)
+    check(f"M395：{_n395} 的 latestRoundData 不落预言机规则",
+          _rd395.verdict("oracle_stale_price", _s395), None)
+    check(f"M395：{_n395} 单函数直调 ERC20 亦退 None",
+          _rd395.unchecked_erc20_return_verdict(_s395), None)
+    check(f"M395：{_n395} 单函数直调预言机亦退 None",
+          _rd395.oracle_stale_price_verdict(_s395), None)
+    check(f"M395：{_n395} 切片上 11 个专属类目全退 None",
+          all(_rd395.verdict(c, _s395) is None
+              for c in _rd395.SOLIDITY_ONLY_CATEGORIES), True)
+check("M395：Solidity 上漏检 ERC20 返回值仍判 True",
+      _rd395.verdict("unchecked_erc20_return", _M395_SOL_ERC20), True)
+check("M395：Solidity 上漏检预言机新鲜度仍判 True",
+      _rd395.verdict("oracle_stale_price", _M395_SOL_ORACLE), True)
+for _c395 in ("sqli", "xss", "cmdi", "pathtraver", "authz"):
+    check(f"M395：Solidity 切片上 {_c395} 退 None",
+          _rd395.verdict(_c395, _M395_SOL_ERC20), None)
+from unittest import mock as _mock395                        # noqa: E402
+with _mock395.patch.object(_rd395, "hardcoded_secret_verdict",
+                           return_value=True):
+    check("M395：Solidity 上 hardcoded_secret 白名单未被误拦",
+          _rd395.verdict("hardcoded_secret", _M395_SOL_ERC20), True)
+with _mock395.patch.object(_rd395, "sqli_verdict", return_value=True):
+    check("M395：门禁在类目分发之前生效",
+          _rd395.verdict("sqli", _M395_SOL_ERC20), None)
+
+# M396-1：临时 cache_dir + 预置缓存 → 相同查询 0 网络请求。
+_M395_TMP = Path(_ws_mkdtemp("m395_")) / "cache"
+_M395_TMP.mkdir(parents=True, exist_ok=True)
+_M395_FAKE = {"total_count": 1, "items": [{
+    "full_name": "acme/fresh-web", "stargazers_count": 900,
+    "language": "Java", "pushed_at": "2026-11-13T10:00:00Z",
+    "description": "fresh business system", "has_issues": True,
+    "topics": []}]}
+_M395_CALLS: list[str] = []
+_orig_get395 = target_scout._get
+
+
+def _fake_get395(url, timeout=20.0):
+    _M395_CALLS.append(url)
+    return True, dict(_M395_FAKE), ""
+
+
+_M395_KW = dict(languages=("java",), days=21, limit=2, min_stars=300,
+                max_stars=10000,
+                today=target_scout._dt.date(2026, 11, 14),
+                cache_dir=_M395_TMP, allow_online=True)
+target_scout._get = _fake_get395
+try:
+    _r395a = target_scout.scout_daily(**_M395_KW)
+finally:
+    target_scout._get = _orig_get395
+check("M396：首次侦察写入磁盘缓存",
+      len(list(_M395_TMP.glob("*.json"))) > 0, True)
+check("M396：首个查询确实发出且被缓存",
+      len(_M395_CALLS) >= 1, True)
+_key395 = _hashlib395.sha1(_M395_CALLS[0].encode("utf-8")).hexdigest()
+(_M395_TMP / f"{_key395}.json").write_text(
+    _json395.dumps({"ts": _time395.time(), "url": _M395_CALLS[0],
+                    "data": _M395_FAKE}, ensure_ascii=False), encoding="utf-8")
+check("M396：缓存文件名是 URL 的 sha1",
+      (_M395_TMP / f"{_key395}.json").is_file(), True)
+_payload395 = _json395.loads(
+    (_M395_TMP / f"{_key395}.json").read_text(encoding="utf-8"))
+check("M396：缓存体含 ts/url/data",
+      all(k in _payload395 for k in ("ts", "url", "data")), True)
+_M395_CALLS.clear()
+target_scout._get = _fake_get395
+try:
+    _r395b = target_scout.scout_daily(**_M395_KW)
+finally:
+    target_scout._get = _orig_get395
+check("M396：相同查询全命中缓存后 0 网络请求", len(_M395_CALLS), 0)
+check("M396：cache_hits >= 1",
+      _r395b.get("cache_hits", 0) >= 1, True)
+
+# M396-2：第 1 条查询回 1 个候选、第 2 条 403 → 自动回填到 limit=4。
+_M396_TMP = Path(_ws_mkdtemp("m396_")) / "cache"
+_M396_TMP.mkdir(parents=True, exist_ok=True)
+_M395_CALLS.clear()
+
+
+def _fake_get403(url, timeout=20.0):
+    _M395_CALLS.append(url)
+    if len(_M395_CALLS) == 1:
+        return True, dict(_M395_FAKE), ""
+    return False, None, "http_403"
+
+
+target_scout._get = _fake_get403
+try:
+    _r395c = target_scout.scout_daily(
+        languages=("java",), days=21, limit=4, min_stars=300,
+        max_stars=10000,
+        today=target_scout._dt.date(2026, 11, 14),
+        cache_dir=_M396_TMP, allow_online=True)
+finally:
+    target_scout._get = _orig_get395
+check("M396：第 2 条 403 后仍凑满 limit=4", len(_r395c["items"]), 4)
+check("M396：backfilled >= 3",
+      _r395c.get("backfilled", 0) >= 3, True)
+check("M396：限流后首位候选未被回填覆盖",
+      _r395c["items"][0].get("slug"), "acme/fresh-web")
+check("M396：回填项来源可追溯",
+      all(str(x.get("source") or "") in ("github_search", "offline_seed")
+          for x in _r395c["items"]), True)
+check("M396：报告行按缓存/回填数渲染",
+      _lhr395.scout_cache_line(2, 3),
+      "- 侦察缓存与回填：缓存命中 2 页 / 限流回填 3 仓")
+check("M396：0/0 不产生披露行", _lhr395.scout_cache_line(0, 0), "")
+_M395_H = daily_hunt._header(
+    [], {"cache_hits": 1, "backfilled": 3}, days=21,
+    languages=["java"], evicted=[], summary={"total": 0, "board_a": 0},
+    blocked=0)
+check("M396：_header 带出披露行", "侦察缓存与回填" in _M395_H, True)
+check("M396：daily 元数据透传两个计数",
+      '"cache_hits": int(scout.get("cache_hits")' in
+      __import__("inspect").getsource(daily_hunt.run), True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
