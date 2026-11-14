@@ -2,41 +2,31 @@
 
 > 机器事实源：benchmarks/results/daily_hunt.json。本报告的 A/B 行数必须与 JSON 计数一致；ZERO_RECORD_FRESH 只代表四个来源**实际查过且 0 命中**，不代表漏洞一定成立，更不代表人工已核验。
 
-- 生成时间：2026-11-14 12:35:15
-- 总条数：137 ｜ 板块 A：**5** ｜ 板块 B：**132**
-- 状态计数：ZERO_RECORD_FRESH 5 / DUPLICATE_CVE 0 / DUPLICATE_ISSUE_OR_GHSA 0 / PATCHED_UPSTREAM 0 / STALE_REPO 0 / UNKNOWN 132
+- 生成时间：2026-11-14 14:10:58
+- 总条数：135 ｜ 板块 A：**1** ｜ 板块 B：**134**
+- 状态计数：ZERO_RECORD_FRESH 1 / DUPLICATE_CVE 0 / DUPLICATE_ISSUE_OR_GHSA 0 / PATCHED_UPSTREAM 0 / STALE_REPO 0 / UNKNOWN 134
 
-<!-- live_hunt_counts: {"BOARD_A": 5, "BOARD_B": 132, "DUPLICATE_CVE": 0, "DUPLICATE_ISSUE_OR_GHSA": 0, "PATCHED_UPSTREAM": 0, "STALE_REPO": 0, "UNKNOWN": 132, "ZERO_RECORD_FRESH": 5} -->
+<!-- live_hunt_counts: {"BOARD_A": 1, "BOARD_B": 134, "DUPLICATE_CVE": 0, "DUPLICATE_ISSUE_OR_GHSA": 0, "PATCHED_UPSTREAM": 0, "STALE_REPO": 0, "UNKNOWN": 134, "ZERO_RECORD_FRESH": 1} -->
 
 ## 今日巡猎（daily-hunt）
 
-> 自动流水线：近 21 天有提交的 java/python 仓 → 同 HEAD 直接跳过 → 只报新引入或尚未导出的 ZERO_RECORD_FRESH 根因；本次即扫即焚 8 个缓存。
+> 自动流水线：近 14 天有提交的 java/python/solidity 仓 → 同 HEAD 直接跳过 → 只报新引入或尚未导出的 ZERO_RECORD_FRESH 根因；本次即扫即焚 2 个缓存。
 
-- 候选仓：8 ｜ 实扫：2 ｜ 跳过：6 ｜ 失败：0 ｜ 候选来源：github_search
-- 本次新增根因：137 ｜ 板块 A：5 ｜ 拦截进 B：132
+- 候选仓：2 ｜ 实扫：2 ｜ 跳过：0 ｜ 失败：0 ｜ 候选来源：explicit_repos
+- 本次新增根因：135 ｜ 板块 A：1 ｜ 拦截进 B：134
 - 证据不足未列：0 条（NVD 熔断 / 全网 Issue 限流，未宣称 FRESH，需人工复核）
-- 冷却期免克隆：0 个（--cooldown-days 7：距上次扫描不足 7 天的仓直接 0 秒顺延）
+- 冷却期免克隆：0 个（已关闭）
 
 | 仓库 | HEAD | 结果 | 新增 |
 |---|---|---|---|
+| itwanger/paicoding | 903adce70309 | SCANNED | 125 |
 | continew-org/continew-admin | 5a651cea9386 | SCANNED | 10 |
-| itwanger/paicoding | 903adce70309 | SCANNED | 127 |
-| dromara/RuoYi-Vue-Plus | 835246ebeb7b | SKIPPED | 0 |
-| dromara/RuoYi-Cloud-Plus | 8bb23fa703bf | SKIPPED | 0 |
-| yulichang/mybatis-plus-join | 07a372a9cd73 | SKIPPED | 0 |
-| techa03/goodsKill | 1187aafc34bb | SKIPPED | 0 |
-| yzcheng90/x-springboot | f4acf07c6b13 | SKIPPED | 0 |
-| 201206030/novel-cloud | c602974ab597 | SKIPPED | 0 |
 
 ## 板块 A｜🟢 可直接交单的 ZERO_RECORD_FRESH
 
 | # | 仓库 | 类目 | 根因 | 置信度 | HEAD 提交日期 | HEAD | 源码行 | 提单入口 | 本地手册 |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | paicoding | redir | LoginRestController.logOut | — | 2026-11-13 (1.1d) | 903adce70309 | [paicoding-web/src/main/java/com/github/paicoding/forum/web/front/login/pwd/LoginRestController.java:82](https://github.com/itwanger/paicoding/blob/903adce70309d340f7eec51ec3c80cfe3c8326c1/paicoding-web/src/main/java/com/github/paicoding/forum/web/front/login/pwd/LoginRestController.java#L82) | [Advisory](https://github.com/itwanger/paicoding/security/advisories/new) · [Issue](https://github.com/itwanger/paicoding/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/paicoding_redir_logOut/SUBMISSION_PLAYBOOK.md) |
-| 2 | paicoding | redir | LoginRestController.redirectToZsxq | — | 2026-11-13 (1.1d) | 903adce70309 | [paicoding-web/src/main/java/com/github/paicoding/forum/web/front/login/pwd/LoginRestController.java:102](https://github.com/itwanger/paicoding/blob/903adce70309d340f7eec51ec3c80cfe3c8326c1/paicoding-web/src/main/java/com/github/paicoding/forum/web/front/login/pwd/LoginRestController.java#L102) | [Advisory](https://github.com/itwanger/paicoding/security/advisories/new) · [Issue](https://github.com/itwanger/paicoding/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/paicoding_redir_redirectToZsxq/SUBMISSION_PLAYBOOK.md) |
-| 3 | paicoding | redir | ShortLinkController.getOriginalLink | — | 2026-11-13 (1.1d) | 903adce70309 | [paicoding-web/src/main/java/com/github/paicoding/forum/web/front/shortlink/rest/ShortLinkController.java:53](https://github.com/itwanger/paicoding/blob/903adce70309d340f7eec51ec3c80cfe3c8326c1/paicoding-web/src/main/java/com/github/paicoding/forum/web/front/shortlink/rest/ShortLinkController.java#L53) | [Advisory](https://github.com/itwanger/paicoding/security/advisories/new) · [Issue](https://github.com/itwanger/paicoding/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/paicoding_redir_getOriginalLink/SUBMISSION_PLAYBOOK.md) |
-| 4 | paicoding | redir | UserTransferController.transferByZsxq | — | 2026-11-13 (1.1d) | 903adce70309 | [paicoding-web/src/main/java/com/github/paicoding/forum/web/front/user/rest/UserTransferController.java:50](https://github.com/itwanger/paicoding/blob/903adce70309d340f7eec51ec3c80cfe3c8326c1/paicoding-web/src/main/java/com/github/paicoding/forum/web/front/user/rest/UserTransferController.java#L50) | [Advisory](https://github.com/itwanger/paicoding/security/advisories/new) · [Issue](https://github.com/itwanger/paicoding/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/paicoding_redir_transferByZsxq/SUBMISSION_PLAYBOOK.md) |
-| 5 | paicoding | redir | ZsxqLoginController.autoBindZsxqUser | — | 2026-11-13 (1.1d) | 903adce70309 | [paicoding-web/src/main/java/com/github/paicoding/forum/web/front/login/zsxq/controller/ZsxqLoginController.java:51](https://github.com/itwanger/paicoding/blob/903adce70309d340f7eec51ec3c80cfe3c8326c1/paicoding-web/src/main/java/com/github/paicoding/forum/web/front/login/zsxq/controller/ZsxqLoginController.java#L51) | [Advisory](https://github.com/itwanger/paicoding/security/advisories/new) · [Issue](https://github.com/itwanger/paicoding/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/paicoding_redir_autoBindZsxqUser/SUBMISSION_PLAYBOOK.md) |
+| 1 | paicoding | xss | WxCallbackRestController.check | — | 2026-11-13 (1.1d) | 903adce70309 | [paicoding-web/src/main/java/com/github/paicoding/forum/web/front/login/wx/callback/WxCallbackRestController.java:88](https://github.com/itwanger/paicoding/blob/903adce70309d340f7eec51ec3c80cfe3c8326c1/paicoding-web/src/main/java/com/github/paicoding/forum/web/front/login/wx/callback/WxCallbackRestController.java#L88) | [Advisory](https://github.com/itwanger/paicoding/security/advisories/new) · [Issue](https://github.com/itwanger/paicoding/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/paicoding_xss_check/SUBMISSION_PLAYBOOK.md) |
 
 ## 板块 B｜🔴 自动拦截 / 不可交单
 
@@ -174,11 +164,13 @@
 | 130 | paicoding | authz | ZsxqWhiteListController.operate | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
 | 131 | paicoding | authz | ZsxqWhiteListController.reset | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
 | 132 | paicoding | authz | ZsxqWhiteListController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 133 | paicoding | redir | LoginRestController.logOut | **UNKNOWN** | — | REFERER_OPEN_REDIRECT: 跳转目标取自 Referer 头（自引用跳转），外部域名不可由参数注入，低危 | — |
+| 134 | paicoding | redir | ShortLinkController.getOriginalLink | **UNKNOWN** | — | SHORTLINK_BY_DESIGN: 短链还原服务按设计跳转到创建者写入的 originalUrl，不是开放重定向缺陷 | — |
 
 ## 对账
 
 | 板块 | 行数 |
 |---|---|
-| A（ZERO_RECORD_FRESH） | 5 |
-| B（其余状态） | 132 |
-| 合计 | 137 |
+| A（ZERO_RECORD_FRESH） | 1 |
+| B（其余状态） | 134 |
+| 合计 | 135 |
