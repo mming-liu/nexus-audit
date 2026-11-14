@@ -11034,8 +11034,8 @@ check("M304：真 sqli 仍为 FRESH",
 check("M304：查重优先级函数（sqli 高于 xss）",
       _dh304.root_priority({"category": "sqli"})
       < _dh304.root_priority({"category": "xss"}), True)
-check("M304：HIGH authz 进第一梯队",
-      _dh304.root_priority({"category": "authz"}, "HIGH")[0], 0)
+check("M304：HIGH authz 进第一梯队（非近期档 -1）",
+      _dh304.root_priority({"category": "authz"}, "HIGH")[0], -1)
 
 print("\n[292] M305：ApiResult 统一包装不报存储型 XSS + log_injection 进 B")
 _rd305 = _rd301
@@ -11765,14 +11765,13 @@ check("M326：最近 90 天文件集合解析正确",
 check("M326：git log 带 90 天窗口且限 30 条",
       (any("--since=90 days ago" in a for a in _seen310[0]),
        "-n" in _seen310[0] and "30" in _seen310[0]), (True, True))
-check("M326：最近改动文件优先级最高",
+check("M326：最近改动的普通类目进第 3 档（0）",
       _dh310.root_priority({"category": "xss", "file": "src/new.java"},
-                           recent_files=_rf310)[0], -1)
-check("M326：最近 xss 排在老 sqli 之前",
-      _dh310.root_priority({"category": "xss", "file": "src/new.java"},
-                           recent_files=_rf310)
-      < _dh310.root_priority({"category": "sqli", "file": "src/old.py"}),
-      True)
+                           recent_files=_rf310)[0], 0)
+check("M384：老 sqli 仍排在最近 xss 之前（高危优先于普通）",
+      _dh310.root_priority({"category": "sqli", "file": "src/old.py"})
+      < _dh310.root_priority({"category": "xss", "file": "src/new.java"},
+                             recent_files=_rf310), True)
 check("M326：浅克隆默认 >= 30 条（实际 50）",
       __import__("inspect").signature(
           _dh310.upstream_sync.sync_repo).parameters["depth"].default >= 30,
@@ -13065,6 +13064,79 @@ check("M380：传统轨道星标下限仍 >= min_stars=300",
 check("M380：点号调用名可提取",
       "save_upload" in wild_noise._py_called_names(
           "await svc.save_upload(a, b)"), True)
+print("\n[332] M383/M384：redir 三类降噪 + 四档优先级")
+_M383 = Path(_ws_mkdtemp("m383_"))
+(_M383 / "src").mkdir(parents=True)
+(_M383 / "src" / "ZsxqLoginController.java").write_text(
+    "public class ZsxqLoginController {\n"
+    "    @RequestMapping(\"zsxq/bind\")\n"
+    "    public void autoBindZsxqUser(@RequestParam(name = \"useXqName\", required = false, defaultValue = \"true\") Boolean useXqName, HttpServletResponse response) throws IOException {\n"
+    "        String url = zsxqHelper.buildZsxqLoginUrl(\"\" + useXqName);\n"
+    "        response.sendRedirect(url);\n"
+    "    }\n"
+    "}\n", encoding="utf-8")
+check("M383：服务端 URL 构造 helper → SERVER_BUILT_REDIRECT",
+      wild_noise.classify({"category": "redir",
+                           "unit": "ZsxqLoginController.autoBindZsxqUser",
+                           "file": "src/ZsxqLoginController.java"},
+                          _M383).get("code"),
+      wild_noise.SERVER_BUILT_REDIRECT)
+
+(_M383 / "src" / "LoginController.java").write_text(
+    "public class LoginController {\n"
+    "    @RequestMapping(\"logout\")\n"
+    "    public void logOut(HttpServletRequest request, HttpServletResponse response) throws IOException {\n"
+    "        String referer = request.getHeader(\"Referer\");\n"
+    "        response.sendRedirect(referer);\n"
+    "    }\n"
+    "}\n", encoding="utf-8")
+check("M383：Referer 自引用跳转 → REFERER_OPEN_REDIRECT",
+      wild_noise.classify({"category": "redir",
+                           "unit": "LoginController.logOut",
+                           "file": "src/LoginController.java"},
+                          _M383).get("code"),
+      wild_noise.REFERER_OPEN_REDIRECT)
+
+(_M383 / "src" / "ShortLinkController.java").write_text(
+    "public class ShortLinkController {\n"
+    "    @GetMapping(\"/{shortCode}\")\n"
+    "    public void getOriginalLink(@PathVariable String shortCode, HttpServletResponse response) throws IOException {\n"
+    "        response.sendRedirect(shortLinkService.getOriginalLink(shortCode).getOriginalUrl());\n"
+    "    }\n"
+    "}\n", encoding="utf-8")
+check("M383：短链还原 → SHORTLINK_BY_DESIGN",
+      wild_noise.classify({"category": "redir",
+                           "unit": "ShortLinkController.getOriginalLink",
+                           "file": "src/ShortLinkController.java"},
+                          _M383).get("code"),
+      wild_noise.SHORTLINK_BY_DESIGN)
+
+_M383_BOOL = '''
+@RequestMapping("zsxq/bind")
+public void autoBindZsxqUser(@RequestParam(name = "useXqName", required = false, defaultValue = "true") Boolean useXqName, HttpServletResponse response) throws IOException {
+    String url = zsxqHelper.buildZsxqLoginUrl("" + useXqName);
+    response.sendRedirect(url);
+}
+'''
+check("M383：Boolean-only 形参 redir 判 False",
+      redir_verdict(_M383_BOOL), False)
+_M383_STR = '''
+@RequestMapping("/go")
+public void go(String url, HttpServletResponse response) throws IOException {
+    response.sendRedirect(url);
+}
+'''
+check("M383：String url 形参仍判 True", redir_verdict(_M383_STR), True)
+
+_M384_RF = {"src/new.java"}
+check("M384：老 sqli (-1) 排在最近 redir (0) 之前",
+      daily_hunt.root_priority({"category": "sqli", "file": "src/old.py"},
+                               recent_files=_M384_RF)
+      < daily_hunt.root_priority({"category": "redir", "file": "src/new.java"},
+                                 recent_files=_M384_RF), True)
+check("M384：最近高危 (-2) 排在老高危 (-1) 之前",
+      daily_hunt.root_priority({"category": "sqli", "file": "src/new.java"},
+                               recent_files=_M384_RF)[0], -2)
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

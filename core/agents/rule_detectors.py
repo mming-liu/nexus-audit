@@ -4373,6 +4373,27 @@ def redir_verdict(source: str) -> bool | None:
     if not body:
         return None
 
+    # M383：形参类型底线 —— 全部形参都是 Boolean/数值/响应对象，且方法体
+    # 不读 request.getParameter/getHeader/getQueryString 时，外部域名根本
+    # 传不进来（paicoding 的 `autoBindZsxqUser(Boolean, HttpServletResponse)`）。
+    # 先剥注解再找签名：`@RequestMapping("x")` 的括号会先被非贪婪正则吃掉。
+    _body_noann = re.sub(r"@\w+(?:\s*\([^()]*\))?", "", body)
+    _sig = re.search(r"\(\s*(.*?)\s*\)\s*(?:throws\s+[^{]+)?\{",
+                     _body_noann, re.S)
+    if _sig:
+        _clean = _sig.group(1)
+        _types = [p.strip().split()[0] for p in _clean.split(",") if p.strip()]
+        _safe_types = {
+            "Boolean", "boolean", "int", "Integer", "long", "Long",
+            "short", "Short", "byte", "Byte", "double", "Double",
+            "float", "Float", "char", "Character", "BigDecimal",
+            "HttpServletResponse", "ServletResponse"}
+        if (_types
+                and all(t.split("<")[0] in _safe_types for t in _types)
+                and not re.search(r"getParameter|getHeader|getQueryString",
+                                  body)):
+            return False
+
     has_location = bool(REDIR_LOCATION_SINK_RE.search(body))
     has_forward = bool(REDIR_FORWARD_ONLY_RE.search(body))
 

@@ -156,24 +156,30 @@ def recent_files(repo: Path, days: int = RECENT_DAYS,
 
 def root_priority(record: dict, confidence: str = "",
                   recent_files: set[str] | None = None) -> tuple[int, int]:
-    """查重优先级：最近 90 天改动文件最高，其次第一梯队，最后其余。
+    """查重优先级：**高危类目永远优先于普通类目**，同档内近期文件优先（M384）。
 
-    M326：老仓的 5 年前 Controller 不应再挤掉开发者刚写完的新业务代码。
-    最近改动返回 (-1, 类目序)，在 `kept.sort()` 里永远排在 0 档之前。
+    四档（严格序）：
+      1. 近 90 天 + 第一梯队高危  → (-2, 类目序)
+      2. 非近 90 天 + 第一梯队高危 → (-1, 类目序)
+      3. 近 90 天 + 普通类目       → (0, 0)
+      4. 非近 90 天 + 普通类目     → (1, 0)
+
+    旧实现把"近期的普通类目"放在 (-1, 0)，反而排到"陈旧但高危的 sqli"
+    (0, rank) 之前 —— 2026-11-14 实盘：paicoding 的 5 条 redir 吃光了
+    `--max-roots 5` 名额，把同仓 122 个高危根因全挤掉。
     """
     cat = str(record.get("category") or "")
     if cat in _CATEGORY_RANK:
-        base = (0, _CATEGORY_RANK[cat])
+        high, rank = True, _CATEGORY_RANK[cat]
     elif (cat == "authz"
           and str(confidence or record.get("confidence") or "") == "HIGH"):
-        base = (0, len(_CATEGORY_RANK))
+        high, rank = True, len(_CATEGORY_RANK)
     else:
-        base = (1, 0)
-    if _is_recent_file(str(record.get("file") or ""), recent_files):
-        # 最近改动分两档：最近的高价值类目 (-2) 仍排在最近的普通类目 (-1)
-        # 之前；最近的低价值类目整体仍高于“陈旧的 sqli”(0)。
-        return (-2, base[1]) if base[0] == 0 else (-1, 0)
-    return base
+        high, rank = False, 0
+    recent = _is_recent_file(str(record.get("file") or ""), recent_files)
+    if high:
+        return (-2, rank) if recent else (-1, rank)
+    return (0, 0) if recent else (1, 0)
 
 
 def _root_view(rc: dict, repo: Path) -> dict:

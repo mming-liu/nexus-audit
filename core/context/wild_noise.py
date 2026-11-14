@@ -58,6 +58,10 @@ UPLOAD_SERVING_ONLY = "UPLOAD_SERVING_ONLY"
 # M375：落盘目录不是 Web 根/静态目录（无 StaticFiles / addResourceHandlers），
 # 上传物只能被内部读取 —— 同上，压 B。
 NON_EXECUTABLE_UPLOAD = "NON_EXECUTABLE_UPLOAD"
+# M383：redir 三类野仓降噪 —— 服务端构造跳转 / Referer 自引用 / 短链设计。
+SERVER_BUILT_REDIRECT = "SERVER_BUILT_REDIRECT"
+REFERER_OPEN_REDIRECT = "REFERER_OPEN_REDIRECT"
+SHORTLINK_BY_DESIGN = "SHORTLINK_BY_DESIGN"
 UNVERIFIED_WILD_AUTHZ = "UNVERIFIED_WILD_AUTHZ"
 ZERO_ENTRY_LIB = "ZERO_ENTRY_LIB"
 RULE_LANGUAGE_MISMATCH = "RULE_LANGUAGE_MISMATCH"
@@ -219,6 +223,76 @@ _UPLOAD_STATIC_MOUNT_RE = re.compile(
     r"addResourceHandlers[\s\S]{0,400}upload|"
     r"send_from_directory\s*\([^)]{0,120}upload", re.I)
 _REPO_UPLOAD_SERVE_MEMO: dict[str, bool] = {}
+
+
+# ---------------- M383：redir 野仓降噪 ----------------
+_REDIR_CALL_RE = re.compile(r"sendRedirect\s*\(\s*([^;]{0,300}?)\s*\)\s*;", re.S)
+_SERVER_URL_HELPER_RE = re.compile(
+    r"(?i)\b(?:build\w*Url|\w*LoginUrl|\w*Oauth\w*Url|\w*Sso\w*Url|"
+    r"getRedirectUrl)\b")
+_REFERER_HEADER_RE = re.compile(
+    r"getHeader\s*\(\s*[\"']referer[\"']\s*\)|"
+    r"headers?\s*\.\s*get\s*\(\s*[\"']referer", re.I)
+_SHORTLINK_RE = re.compile(r"(?i)shortlink|getOriginalLink")
+
+
+def _java_method_block(src: str, meth: str) -> str:
+    """截出 Java 方法体（含签名），避免同文件兄弟方法的 Referer 连坐（M383）。"""
+    if not meth:
+        return src
+    m = re.search(rf"\b{re.escape(meth)}\s*\(", src)
+    if not m:
+        return src
+    start = src.rfind("\n", 0, m.start())
+    start = start + 1 if start >= 0 else 0
+    brace = src.find("{", m.end())
+    if brace < 0:
+        return src[start:]
+    depth = 0
+    for i in range(brace, len(src)):
+        if src[i] == "{":
+            depth += 1
+        elif src[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return src[start:i + 1]
+    return src[start:]
+
+
+def _redir_targets(src: str) -> list[str]:
+    """sendRedirect 的实参；裸变量先回溯到同方法内的赋值右值。"""
+    out: list[str] = []
+    for m in _REDIR_CALL_RE.finditer(src):
+        t = m.group(1).strip()
+        if re.fullmatch(r"[A-Za-z_]\w*", t):
+            am = re.search(rf"\b{re.escape(t)}\s*=\s*([^;]+);", src)
+            if am:
+                out.append(am.group(1).strip())
+                continue
+        out.append(t)
+    return out
+
+
+def _redirect_from_referer(src: str, targets: list[str]) -> bool:
+    """跳转目标是否直接/间接取自 Referer 头（M383）。"""
+    for t in targets:
+        if _REFERER_HEADER_RE.search(t):
+            return True
+        if re.fullmatch(r"[A-Za-z_]\w*", t) and re.search(
+                rf"\b{re.escape(t)}\s*=\s*[^;]{{0,240}}?"
+                rf"getHeader\s*\(\s*[\"']referer", src, re.I):
+            return True
+    return False
+
+
+def _redir_args_non_free(src: str, target: str) -> bool:
+    """构造 helper 的实参里有没有自由文本（String 形参/请求读取）（M383）。"""
+    if re.search(r"getParameter|getHeader|getQueryString", target):
+        return False
+    for ident in set(re.findall(r"[A-Za-z_]\w*", target)):
+        if re.search(rf"\bString\s+{re.escape(ident)}\b", src):
+            return False
+    return True
 
 
 def _repo_serves_uploads(repo_root: Path | None) -> bool:
@@ -439,6 +513,31 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
             return {"blocked": True, "code": WS_AUTH_PRESENT,
                     "reason": ("WebSocket 路由在 accept() 前校验会话并 "
                                "close(4401/1008)：鉴权存在，不是未授权入口")}
+
+    # M383：redir 三类野仓降噪（paicoding 实测：5 条 A 全是 redir）。
+    if record.get("category") == "redir":
+        _ru = str(unit or "")
+        _rf = str(record.get("file") or "")
+        if _SHORTLINK_RE.search(_ru) or _SHORTLINK_RE.search(_rf):
+            return {"blocked": True, "code": SHORTLINK_BY_DESIGN,
+                    "reason": ("短链还原服务按设计跳转到创建者写入的 "
+                               "originalUrl，不是开放重定向缺陷")}
+        _rsrc = _read(repo_root, _rf)
+        if _rsrc:
+            _block = (_java_method_block(_rsrc, _ru.rsplit(".", 1)[-1])
+                      if _rf.endswith(".java") else _rsrc)
+            _targets = _redir_targets(_block)
+            if _redirect_from_referer(_block, _targets):
+                return {"blocked": True, "code": REFERER_OPEN_REDIRECT,
+                        "reason": ("跳转目标取自 Referer 头（自引用跳转），"
+                                   "外部域名不可由参数注入，低危")}
+            for _t in _targets:
+                if (_SERVER_URL_HELPER_RE.search(_t)
+                        and _redir_args_non_free(_block, _t)):
+                    return {"blocked": True, "code": SERVER_BUILT_REDIRECT,
+                            "reason": ("跳转目标由服务端 URL 构造 helper 产出，"
+                                       "实参为常量/布尔/非自由文本，"
+                                       "外部域名不可控")}
 
     # M375：上传面。前提 A（已防穿越）+ 条件 B（无可服务/可执行出口）
     # 同时成立 → 攻击者既跳不出目录，也拿不到 inline 响应，压 B 板。
