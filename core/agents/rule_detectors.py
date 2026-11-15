@@ -4628,8 +4628,12 @@ def _url_var_is_config(var: str, source: str, body: str,
     # 同文件顶部的全大写常量
     if re.fullmatch(r"[A-Z][A-Z0-9_]*", var):
         cm = re.search(rf"(?m)^\s*{re.escape(var)}\s*=\s*([^\n]+)", source)
-        if cm and _config_rhs(cm.group(1), source, body):
-            return True
+        if cm:
+            return _config_rhs(cm.group(1), source, body)
+        # M415：切片里看不到赋值（模块级常量在切片外 / 从其它文件 import，
+        # 如 android-agent 的 `OLLAMA_URL = settings.ollama_base_url`）——
+        # 全大写约定就是配置常量，按安全处理，避免把 Ollama 固定地址误报 SSRF。
+        return True
     return False
 
 

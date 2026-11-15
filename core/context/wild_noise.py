@@ -743,7 +743,10 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
     # 本地管理面。tubecli 的 4 条本地项由此收归 B 板；android-agent 的
     # `run.py:11` 是无条件 0.0.0.0，条件 A 不成立，不受影响。
     _repo_auth_local, _repo_auth_ev = _repo_authenticated_local(repo_root)
-    if _repo_auth_local:
+    if _repo_auth_local and str(record.get("category") or "") not in (
+            "hardcoded_secret", "jwt_weakness"):
+        # M415：硬编码密钥 / JWT 弱校验是鉴权基石类目 —— 攻击者可借它
+        # 直接伪造全局鉴权凭据，不能被"认证后本地管理面"降噪压掉。
         return {"blocked": True, "code": AUTHENTICATED_LOCAL_ONLY,
                 "reason": (f"服务默认回环绑定且挂有全局请求鉴权"
                            f"（{_repo_auth_ev}），属认证后本地管理面，"

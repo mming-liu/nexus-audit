@@ -13919,6 +13919,111 @@ check("M411：0.0.0.0 无鉴权的删除入口不被降噪",
 check("M412：sync_repo 默认 clone_timeout == 180",
       _us338.sync_repo.__defaults__[-1], 180)
 
+print("\n[340] M415：缓存四源仲裁往返 / 旧缓存降级 / 鉴权基石类目豁免")
+from core.context import cve_dedup as _cd340                    # noqa: E402
+
+_M340_CACHE = Path(_ws_mkdtemp("m340_dedup_"))
+_M340_OK = {"ok": True, "total": 0, "ids": [], "url": "", "error": ""}
+_M340_NVD_FAIL = {"ok": False, "total": 0, "ids": [], "url": "",
+                  "error": "nvd_circuit_open"}
+_M340_PATCHES = [
+    _mock395.patch.object(_cd340, "CACHE", _M340_CACHE),
+    _mock395.patch.object(_cd340, "query_nvd",
+                          side_effect=lambda *_a, **_k: dict(_M340_NVD_FAIL)),
+    _mock395.patch.object(_cd340, "_query_nvd_retry",
+                          side_effect=lambda *_a, **_k: dict(_M340_NVD_FAIL)),
+    _mock395.patch.object(_cd340, "query_circl",
+                          side_effect=lambda *_a, **_k: dict(_M340_OK)),
+    _mock395.patch.object(_cd340, "query_github_issues",
+                          side_effect=lambda *_a, **_k: dict(_M340_OK)),
+    _mock395.patch.object(_cd340, "query_github_advisories",
+                          side_effect=lambda *_a, **_k: dict(_M340_OK)),
+    _mock395.patch.object(_cd340, "query_github_global_advisories",
+                          side_effect=lambda *_a, **_k: dict(_M340_OK)),
+    _mock395.patch.object(_cd340, "query_github_issues_global",
+                          side_effect=lambda *_a, **_k: dict(_M340_OK)),
+    _mock395.patch.object(_cd340, "query_github_issues_global_file",
+                          side_effect=lambda *_a, **_k: dict(_M340_OK)),
+    _mock395.patch.object(_cd340, "_local_match",
+                          side_effect=lambda *_a, **_k: []),
+]
+for _p340 in _M340_PATCHES:
+    _p340.start()
+try:
+    _M340_ARGS = dict(slug="acme/m415", category="ssrf", unit="cache_roundtrip",
+                      file="app/routes.py", use_cache=True, allow_online=True)
+    _M340_FIRST = _cd340.dedup(**_M340_ARGS)
+    check("M415：四源仲裁 FRESH 首次调用不标 from_cache",
+          (_M340_FIRST.get("status"), _M340_FIRST.get("nvd_fallback"),
+           _M340_FIRST.get("from_cache")),
+          ("ZERO_RECORD_FRESH", "CIRCL+GHSA", None))
+    _M340_SECOND = _cd340.dedup(**_M340_ARGS)
+    check("M415：缓存读回仍保留四源仲裁 FRESH（不误降级 UNKNOWN）",
+          (_M340_SECOND.get("status"), _M340_SECOND.get("from_cache"),
+           _M340_SECOND.get("nvd_fallback")),
+          ("ZERO_RECORD_FRESH", True, "CIRCL+GHSA"))
+    check("M415：缓存读回把 nvd 缺口规范化为 fallback 标记",
+          "nvd_circuit_open_fallback_circl_ghsa"
+          in (_M340_SECOND.get("evidence_gaps") or []), True)
+finally:
+    for _p340 in _M340_PATCHES:
+        _p340.stop()
+
+_M340_OLD = {
+    "status": "ZERO_RECORD_FRESH", "matched_ids": [],
+    "sources": {
+        "nvd": {"ok": False, "error": "nvd_circuit_open"},
+        "circl": {"ok": False, "error": "ConnectTimeout"},
+        "github_advisories": {"ok": True, "total": 0},
+        "github_global_advisories": {"ok": True, "total": 0},
+        "github_issues": {"ok": True, "total": 0},
+        "github_global_issues": {"ok": True, "total": 0},
+    },
+    "evidence_gaps": ["nvd:nvd_circuit_open"], "evidence_complete": False,
+    "checked_at": "2026-11-15 20:00:00",
+}
+with _mock395.patch.object(_cd340, "CACHE", _M340_CACHE):
+    _M340_OLD_PATH = _cd340._cache_path("acme/m415", "ssrf",
+                                        "old_bad_cache")
+    _M340_OLD_PATH.write_text(
+        json.dumps({**_M340_OLD, "_cached_at": __import__("time").time()}),
+        encoding="utf-8")
+    _M340_OLD_RES = _cd340.dedup(slug="acme/m415", category="ssrf",
+                                 unit="old_bad_cache", file="app/routes.py",
+                                 use_cache=True, allow_online=True)
+check("M415：四源仲裁也不成立的旧缓存仍降级 UNKNOWN",
+      (_M340_OLD_RES.get("status"), _M340_OLD_RES.get("from_cache")),
+      ("UNKNOWN", True))
+
+_M340_TUBE = Path(_ws_mkdtemp("m340_tube_"))
+(_M340_TUBE / "server.py").write_text(
+    "from fastapi import FastAPI, Request\n"
+    "app = FastAPI()\n"
+    "@app.middleware('http')\n"
+    "async def gate(request: Request, call_next):\n"
+    "    from x import auth\n"
+    "    refusal = auth.check_request(request.client.host,\n"
+    "                                request.cookies.get('sid'), request.headers)\n"
+    "    return await call_next(request)\n", encoding="utf-8")
+(_M340_TUBE / "run.py").write_text(
+    "import uvicorn\nfrom server import app\n"
+    "def main(host: str = '127.0.0.1'):\n    uvicorn.run(app, host=host)\n",
+    encoding="utf-8")
+for _cat340, _want340 in (("ssrf", True), ("arbitrary_file_delete", True),
+                          ("hardcoded_secret", False),
+                          ("jwt_weakness", False)):
+    _r340 = wild_noise.classify(
+        {"category": _cat340, "unit": "x", "file": "routes.py"}, _M340_TUBE)
+    check(f"M415：AUTHENTICATED_LOCAL_ONLY 对 {_cat340} 的拦截={_want340}",
+          _r340.get("blocked"), _want340)
+
+_M340_SSRF_CONST = '''import requests
+def f(req):
+    return requests.post(f"{OLLAMA_URL}/api/pull", json={"name": req.model})
+'''
+check("M415：切片外全大写配置常量 URL 不判 SSRF",
+      _rd395.ssrf_verdict(_M340_SSRF_CONST), False)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

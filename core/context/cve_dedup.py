@@ -870,10 +870,34 @@ def dedup(slug: str, category: str, unit: str, *,
             if (cached.get("status") == STATUS_FRESH
                     and not ((cached.get("sources") or {}).get("nvd") or {}
                              ).get("ok")):
-                _nvd_err = str(((cached.get("sources") or {}).get("nvd") or {}
-                                ).get("error") or "nvd_failed")
-                cached["status"] = STATUS_UNKNOWN
-                cached["reason"] = f"INCOMPLETE_DEDUP_EVIDENCE: {_nvd_err}"
+                _srcs = cached.get("sources") or {}
+                _nvd = _srcs.get("nvd") or {}
+                _nvd_err = str(_nvd.get("error") or "nvd_failed")
+                # M415：缓存里的 FRESH 可能是 M368 四源仲裁的结论
+                # （CIRCL + 仓内/全网 GHSA + 仓内 Issue 全通且 0 命中）。
+                # 旧逻辑只看 NVD 就降级 UNKNOWN，把已经仲裁过的 FRESH
+                # 又打回去 —— 这里按同一口径复核：带 nvd_fallback 标记、
+                # 或四源仍全部成功，就保留 FRESH，绝不误降级。
+                _quorum_ok = _dedup_quorum_ok(
+                    _srcs.get("circl") or {},
+                    _srcs.get("github_advisories") or {},
+                    _srcs.get("github_global_advisories") or {},
+                    _srcs.get("github_issues") or {})
+                if cached.get("nvd_fallback") == "CIRCL+GHSA" or _quorum_ok:
+                    cached["status"] = STATUS_FRESH
+                    cached["nvd_fallback"] = "CIRCL+GHSA"
+                    cached["reason"] = "via CIRCL+GHSA (nvd_circuit_open)"
+                    _gaps = [
+                        ("nvd_circuit_open_fallback_circl_ghsa"
+                         if str(g).startswith("nvd:") else str(g))
+                        for g in (cached.get("evidence_gaps") or [])]
+                    if not any(g.startswith("nvd") for g in _gaps):
+                        _gaps = ["nvd_circuit_open_fallback_circl_ghsa"] + _gaps
+                    cached["evidence_gaps"] = _gaps
+                    cached["evidence_complete"] = not _gaps
+                else:
+                    cached["status"] = STATUS_UNKNOWN
+                    cached["reason"] = f"INCOMPLETE_DEDUP_EVIDENCE: {_nvd_err}"
             cached["from_cache"] = True
             return cached
 
