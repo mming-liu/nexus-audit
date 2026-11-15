@@ -12031,9 +12031,12 @@ def _get316(url, timeout=20.0):
 
 _ts316._get = _get316
 try:
+    # M400：第一级缓存回填改为无条件触发，这里必须给独立 cache_dir，
+    # 否则会读到实盘 .cache/scout_search 的历史页（测试变成非确定性）。
     _r316 = _ts316.scout_daily(["java"], allow_online=True,
                                today=_dt309.date(2026, 11, 7), limit=2,
-                               terms_per_language=1)
+                               terms_per_language=1,
+                               cache_dir=Path(_ws_mkdtemp("m339_cache_")))
 finally:
     _ts316._get = _orig_get316
 check("M339：框架词全干后回退到业务词并拿到候选",
@@ -12216,9 +12219,13 @@ def _get320(url, timeout=20.0):
 
 _ts309._get = _get320
 try:
+    # M400：第一级缓存回填会扫描 cache_dir，测试必须隔离，不能把
+    # acme/* 夹具页写进实盘 .cache/scout_search（否则会污染在线巡猎）。
     _r320 = _ts309.scout_daily(
         ["java"], allow_online=True, today=_dt320.date(2026, 11, 8),
-        limit=2, terms_per_language=1, exclude_slugs={"acme/old1", "acme/old2"})
+        limit=2, terms_per_language=1,
+        exclude_slugs={"acme/old1", "acme/old2"},
+        cache_dir=Path(_ws_mkdtemp("m346_cache_")))
 finally:
     _ts309._get = _orig_get320
 check("M346：冷却仓被剔除后自动翻到 page 2",
@@ -13373,36 +13380,61 @@ check("M396：相同查询全命中缓存后 0 网络请求", len(_M395_CALLS), 
 check("M396：cache_hits >= 1",
       _r395b.get("cache_hits", 0) >= 1, True)
 
-# M396-2：第 1 条查询回 1 个候选、第 2 条 403 → 自动回填到 limit=4。
+# M396-2 / M400：403 且在线候选为 0 → 第二级离线种子补到 limit=4。
 _M396_TMP = Path(_ws_mkdtemp("m396_")) / "cache"
 _M396_TMP.mkdir(parents=True, exist_ok=True)
 _M395_CALLS.clear()
+_M395_EMPTY = {"total_count": 0, "items": []}
 
 
-def _fake_get403(url, timeout=20.0):
+def _fake_get403_empty(url, timeout=20.0):
+    _M395_CALLS.append(url)
+    if len(_M395_CALLS) == 1:
+        return True, dict(_M395_EMPTY), ""
+    return False, None, "http_403"
+
+
+target_scout._get = _fake_get403_empty
+try:
+    _r395c = target_scout.scout_daily(
+        languages=("java",), days=21, limit=4, min_stars=300,
+        max_stars=10000,
+        today=target_scout._dt.date(2026, 11, 14),
+        cache_dir=_M396_TMP, allow_online=True, max_http_requests=8)
+finally:
+    target_scout._get = _orig_get395
+check("M396：第 2 条 403 后仍凑满 limit=4", len(_r395c["items"]), 4)
+check("M396：backfilled >= 3",
+      _r395c.get("backfilled", 0) >= 3, True)
+check("M396：回填项来源可追溯",
+      all(str(x.get("source") or "") in ("github_search", "offline_seed")
+          for x in _r395c["items"]), True)
+
+# M400：已有 1 个真实候选时不混入离线种子（第二级只在 0 候选时兜底）。
+_M396_TMP_B = Path(_ws_mkdtemp("m396b_")) / "cache"
+_M396_TMP_B.mkdir(parents=True, exist_ok=True)
+_M395_CALLS.clear()
+
+
+def _fake_get403_one(url, timeout=20.0):
     _M395_CALLS.append(url)
     if len(_M395_CALLS) == 1:
         return True, dict(_M395_FAKE), ""
     return False, None, "http_403"
 
 
-target_scout._get = _fake_get403
+target_scout._get = _fake_get403_one
 try:
-    _r395c = target_scout.scout_daily(
+    _r395d = target_scout.scout_daily(
         languages=("java",), days=21, limit=4, min_stars=300,
         max_stars=10000,
         today=target_scout._dt.date(2026, 11, 14),
-        cache_dir=_M396_TMP, allow_online=True)
+        cache_dir=_M396_TMP_B, allow_online=True, max_http_requests=8)
 finally:
     target_scout._get = _orig_get395
-check("M396：第 2 条 403 后仍凑满 limit=4", len(_r395c["items"]), 4)
-check("M396：backfilled >= 3",
-      _r395c.get("backfilled", 0) >= 3, True)
-check("M396：限流后首位候选未被回填覆盖",
-      _r395c["items"][0].get("slug"), "acme/fresh-web")
-check("M396：回填项来源可追溯",
-      all(str(x.get("source") or "") in ("github_search", "offline_seed")
-          for x in _r395c["items"]), True)
+check("M400：有 1 个真实候选时不混入离线种子",
+      len(_r395d["items"]), 1)
+check("M400：有候选时 backfilled == 0", _r395d.get("backfilled", 0), 0)
 check("M396：报告行按缓存/回填数渲染",
       _lhr395.scout_cache_line(2, 3),
       "- 侦察缓存与回填：缓存命中 2 页 / 限流回填 3 仓")
@@ -13415,6 +13447,173 @@ check("M396：_header 带出披露行", "侦察缓存与回填" in _M395_H, True
 check("M396：daily 元数据透传两个计数",
       '"cache_hits": int(scout.get("cache_hits")' in
       __import__("inspect").getsource(daily_hunt.run), True)
+
+print("\n[336] M399-M401：跨语言预算 / 两级回填 / 安全删除隔离（纯离线）")
+_M336_TODAY = target_scout._dt.date(2026, 11, 15)
+_M336_TMP = Path(_ws_mkdtemp("m336_")) / "cache"
+_M336_TMP.mkdir(parents=True, exist_ok=True)
+_M336_OFF = target_scout.scout_daily(
+    languages=("java", "python", "solidity"), terms_per_language=2,
+    allow_online=False, cache_dir=_M336_TMP, today=_M336_TODAY)
+check("M399：specs 前 3 条按 java→python→solidity 交织",
+      [s["language"] for s in _M336_OFF["query_specs"][:3]],
+      ["java", "python", "solidity"])
+check("M399：交织后总条数仍守恒（solidity 无新生代词）",
+      len(_M336_OFF["query_specs"]), 5)
+check("M399：离线模式 0 网络请求",
+      _M336_OFF.get("http_requests"), 0)
+
+# M399：max_http_requests=8 —— 空页风暴下真实 _get 严格 <= 8，
+# 且预算耗尽后仍能命中已缓存的最后一页。
+_M336_BUDGET_DIR = Path(_ws_mkdtemp("m336_budget_")) / "cache"
+_M336_BUDGET_DIR.mkdir(parents=True, exist_ok=True)
+_M336_PRE = target_scout.scout_daily(
+    languages=("java", "python", "solidity"), terms_per_language=3, limit=8,
+    allow_online=False, today=_M336_TODAY)["query_specs"]
+_M336_LAST = _M336_PRE[-1]
+_M336_LAST_URL = target_scout.search_url(
+    _M336_LAST["query"], int(_M336_LAST.get("page") or 1), 30)
+_M336_CACHED = {"total_count": 1, "items": [{
+    "full_name": "acme/budget-cached", "stargazers_count": 900,
+    "language": "Python", "pushed_at": "2026-11-13T00:00:00Z",
+    "description": "business admin", "has_issues": True, "topics": []}]}
+(_M336_BUDGET_DIR /
+ f"{_hashlib395.sha1(_M336_LAST_URL.encode()).hexdigest()}.json"
+ ).write_text(_json395.dumps({"ts": _time395.time(), "url": _M336_LAST_URL,
+                              "data": _M336_CACHED}), encoding="utf-8")
+_M336_BUDGET_CALLS: list[str] = []
+
+
+def _m336_empty(url, timeout=20.0):
+    _M336_BUDGET_CALLS.append(url)
+    return True, {"total_count": 0, "items": []}, ""
+
+
+target_scout._get = _m336_empty
+try:
+    _M336_BUD = target_scout.scout_daily(
+        languages=("java", "python", "solidity"), terms_per_language=3,
+        limit=8, allow_online=True, cache_dir=_M336_BUDGET_DIR,
+        max_http_requests=8, today=_M336_TODAY)
+finally:
+    target_scout._get = _orig_get395
+check("M399：空页风暴下真实 _get 调用严格 <= 8",
+      len(_M336_BUDGET_CALLS) <= 8, True)
+check("M399：预算计数与耗尽标记",
+      (_M336_BUD["http_requests"], _M336_BUD["budget_exhausted"]),
+      (8, True))
+check("M399：预算耗尽后仍命中已缓存页",
+      (_M336_BUD["cache_hits"] >= 1,
+       any(x["slug"] == "acme/budget-cached" for x in _M336_BUD["items"])),
+      (True, True))
+check("M399：http_budget_exhausted 不进告警",
+      "http_budget_exhausted" in _M336_BUD["error"], False)
+
+# M400：无 403、但当页候选全被 exclude_slugs 清空 → 第一级缓存池回填；
+# 120 星 new_gen 缓存条目不被 min_stars=300 误杀，也不混入 OFFLINE_SEEDS。
+_M336_POOL_DIR = Path(_ws_mkdtemp("m336_pool_")) / "cache"
+_M336_POOL_DIR.mkdir(parents=True, exist_ok=True)
+_M336_SINCE = (_M336_TODAY - target_scout._dt.timedelta(days=14)).isoformat()
+_M336_POOL_URL = target_scout.search_url(
+    target_scout.search_query("java", 300, 10000, _M336_SINCE, 10, "erp"),
+    1, 30)
+_M336_POOL = {"total_count": 2, "items": [
+    {"full_name": "acme/tiny-120", "stargazers_count": 120,
+     "language": "Java", "pushed_at": "2026-11-13T00:00:00Z",
+     "description": "business admin", "has_issues": True, "topics": []},
+    {"full_name": "acme/mid-900", "stargazers_count": 900,
+     "language": "Java", "pushed_at": "2026-11-13T00:00:00Z",
+     "description": "business admin", "has_issues": True, "topics": []}]}
+(_M336_POOL_DIR /
+ f"{_hashlib395.sha1(_M336_POOL_URL.encode()).hexdigest()}.json"
+ ).write_text(_json395.dumps({"ts": _time395.time(), "url": _M336_POOL_URL,
+                              "data": _M336_POOL}), encoding="utf-8")
+
+
+def _m336_excluded(url, timeout=20.0):
+    return True, {"total_count": 1, "items": [{
+        "full_name": "acme/excluded", "stargazers_count": 800,
+        "language": "Java", "pushed_at": "2026-11-13T00:00:00Z",
+        "description": "business", "has_issues": True, "topics": []}]}, ""
+
+
+target_scout._get = _m336_excluded
+try:
+    _M336_POOL_RUN = target_scout.scout_daily(
+        languages=("java",), terms_per_language=1, limit=2, min_stars=300,
+        allow_online=True, cache_dir=_M336_POOL_DIR,
+        exclude_slugs={"acme/excluded"}, today=_M336_TODAY,
+        max_http_requests=8)
+finally:
+    target_scout._get = _orig_get395
+check("M400：无 403 也能从缓存池回填", len(_M336_POOL_RUN["items"]), 2)
+check("M400：120 星 new_gen 缓存条目不被 min_stars=300 误杀",
+      any(x["slug"] == "acme/tiny-120"
+          for x in _M336_POOL_RUN["items"]), True)
+check("M400：缓存池回填不混入离线种子",
+      all(x.get("source") != "offline_seed"
+          for x in _M336_POOL_RUN["items"]), True)
+check("M400：backfilled 计数 == 2", _M336_POOL_RUN.get("backfilled"), 2)
+
+# M401：safe-delete 阈值异常时 _evict 安全返回 False，run() 仍落盘。
+_M336_EVICT_ROOT = Path(_ws_mkdtemp("m336_evict_"))
+_M336_EVICT_SLUG = "acme/evict-me"
+_M336_TARGET = (_M336_EVICT_ROOT /
+                daily_hunt.upstream_sync.safe_dirname(_M336_EVICT_SLUG))
+_M336_TARGET.mkdir(parents=True, exist_ok=True)
+(_M336_TARGET / "f.txt").write_text("x", encoding="utf-8")
+_M336_SKIPPED: list[str] = []
+_M336_EVICTED: list[str] = []
+with _mock395.patch.object(daily_hunt.upstream_sync, "CACHE_ROOT",
+                           _M336_EVICT_ROOT), \
+        _mock395.patch.object(
+            daily_hunt.shutil, "rmtree",
+            side_effect=RuntimeError(
+                "safe-delete: count=9580, threshold=50")):
+    _M336_EVICT_OK = daily_hunt._evict(
+        _M336_EVICT_SLUG, _M336_EVICTED, _M336_SKIPPED)
+check("M401：safe-delete 异常时 _evict 安全返回 False",
+      _M336_EVICT_OK, False)
+check("M401：删除失败的 slug 记入 evict_skipped",
+      _M336_SKIPPED, [_M336_EVICT_SLUG])
+check("M401：删除失败的 slug 不记入 evicted", _M336_EVICTED, [])
+
+_M336_RUN_DIR = Path(_ws_mkdtemp("m336_run_"))
+_old_proc336 = daily_hunt.process_repo
+
+
+def _proc336(slug, repo, entry, **kw):
+    return {"skipped_unchanged": False, "head_sha": "c" * 40,
+            "entry": {"last_scanned_sha": "c" * 40,
+                      "last_scanned_at": "2026-11-15T00:00:00"},
+            "total_units": 12, "records": []}
+
+
+daily_hunt.process_repo = _proc336
+try:
+    with _mock395.patch.object(daily_hunt.upstream_sync, "CACHE_ROOT",
+                               _M336_EVICT_ROOT), \
+            _mock395.patch.object(
+                daily_hunt.shutil, "rmtree",
+                side_effect=RuntimeError(
+                    "safe-delete: count=9580, threshold=50")):
+        _M336_RUN = daily_hunt.run(
+            languages=["java"], limit=1, evict_cache=True,
+            state_path=_M336_RUN_DIR / "state.json",
+            report=_M336_RUN_DIR / "R.md",
+            json_path=_M336_RUN_DIR / "R.json",
+            packs_dir=_M336_RUN_DIR / "packs",
+            scout_fn=lambda **kw: {"ok": True, "source": "smoke",
+                                   "items": [{"slug": _M336_EVICT_SLUG}]},
+            sync_fn=lambda s: {"status": "OK", "path": str(_M336_RUN_DIR)},
+            dedup_fn=lambda *a, **k: {"status": "UNKNOWN"})
+finally:
+    daily_hunt.process_repo = _old_proc336
+check("M401：删除失败仍落盘报告", (_M336_RUN_DIR / "R.md").is_file(), True)
+check("M401：删除失败仍落盘账本 JSON", (_M336_RUN_DIR / "R.json").is_file(), True)
+check("M401：daily_meta 暴露 evict_skipped",
+      _M336_RUN["daily"].get("evict_skipped"), [_M336_EVICT_SLUG])
+check("M401：扫描仍记为 SCANNED", _M336_RUN["daily"].get("scanned"), 1)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

@@ -347,29 +347,48 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
             "total_units": int(scan.get("total_units") or 0)}
 
 
-def _force_rmtree(path: Path) -> None:
-    """Windows 下 .git/objects 是只读文件，直接 rmtree 会静默失败。"""
-    for base, dirs, files in os.walk(path):
-        for name in dirs + files:
-            try:
-                os.chmod(os.path.join(base, name), stat.S_IWRITE)
-            except OSError:
-                pass
+def _force_rmtree(path: Path) -> bool:
+    """Windows 下 .git/objects 是只读文件，直接 rmtree 会静默失败。
+
+    M401：整段包 try/except —— 宿主环境的 safe-delete 钩子会按文件数阈值
+    抛异常（`count=9580, threshold=50`），不能让它穿透到 `run()` 的收尾
+    阶段；删不掉就返回 False，由调用方记入 `evict_skipped`。
+    """
     try:
-        os.chmod(path, stat.S_IWRITE)
-    except OSError:
-        pass
-    shutil.rmtree(path, ignore_errors=True)
+        for base, dirs, files in os.walk(path):
+            for name in dirs + files:
+                try:
+                    os.chmod(os.path.join(base, name), stat.S_IWRITE)
+                except OSError:
+                    pass
+        try:
+            os.chmod(path, stat.S_IWRITE)
+        except OSError:
+            pass
+        shutil.rmtree(path, ignore_errors=True)
+    except Exception:                                         # noqa: BLE001
+        return False
+    return not path.exists()
 
 
-def _evict(slug: str, evicted: list[str]) -> bool:
-    """删掉 .cache/upstream/<repo>，只留报告与账本；拒绝越界路径。"""
+def _evict(slug: str, evicted: list[str],
+           evict_skipped: list[str] | None = None) -> bool:
+    """删掉 .cache/upstream/<repo>，只留报告与账本；拒绝越界路径。
+
+    M401：删除失败（safe-delete 阈值 / ACL / 只读文件）一律安全返回 False，
+    并把 slug 记进 `evict_skipped`，绝不中断报告与账本落盘。
+    """
     root = upstream_sync.CACHE_ROOT.resolve()
     target = (root / upstream_sync.safe_dirname(slug)).resolve()
     if target.parent != root or not target.is_dir():
         return False
-    _force_rmtree(target)
-    if target.exists():
+    try:
+        removed = _force_rmtree(target)
+    except Exception:                                         # noqa: BLE001
+        removed = False
+    if not removed or target.exists():
+        if evict_skipped is not None:
+            evict_skipped.append(slug)
         return False
     evicted.append(slug)
     return True
@@ -517,6 +536,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
     records: list[dict] = []
     ledger: list[dict] = []
     evicted: list[str] = []
+    evict_skipped: list[str] = []
     blocked = 0
     incomplete_dedup = 0
     scanned_slots = 0
@@ -628,8 +648,12 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
                            "reason": f"{type(e).__name__}: {e}"[:300]})
         finally:
             # M295：缓存清理放进 finally —— 扫描失败/超时也不留 50MB 垃圾。
+            # M401：safe-delete 阈值/ACL 拦截时只记 skipped，绝不中断报告落盘。
             if evict_cache and not dry_run:
-                _evict(slug, evicted)
+                try:
+                    _evict(slug, evicted, evict_skipped)
+                except Exception:                             # noqa: BLE001
+                    evict_skipped.append(slug)
 
     # M359：started_at 是入口开始时刻，generated_at 必须是**完成**时刻 ——
     # 旧实现两者共用 started，报告时间戳比实际完成早 10 分钟（扫描 4 个仓
@@ -645,6 +669,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         "failed": sum(1 for x in ledger if x["result"] == "FAILED"),
         "new_roots": summary["total"], "board_a": summary["board_a"],
         "blocked": blocked, "evicted": evicted,
+        "evict_skipped": evict_skipped,
         "incomplete_dedup": incomplete_dedup,
         "recent_90d_roots": sum(1 for r in records if r.get("recent_90d")),
         "cooldown_days": cooldown_days,
@@ -664,7 +689,8 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         return {"ok": True, "dry_run": True, "scout": scout, "ledger": ledger,
                 "records": records, "summary": summary, "daily": daily_meta,
                 "state_path": str(state_path), "report": str(report),
-                "json": str(json_path), "evicted": evicted}
+                "json": str(json_path), "evicted": evicted,
+                "evict_skipped": evict_skipped}
 
     live_hunt_report.write_outputs(
         records, report, json_path, packs_dir, generated_at=finished,
@@ -679,4 +705,5 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
     return {"ok": True, "dry_run": False, "scout": scout, "ledger": ledger,
             "records": records, "summary": summary, "daily": daily_meta,
             "state_path": str(state_path), "report": str(report),
-            "json": str(json_path), "evicted": evicted}
+            "json": str(json_path), "evicted": evicted,
+            "evict_skipped": evict_skipped}

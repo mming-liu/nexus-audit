@@ -30,6 +30,22 @@ except ImportError:                                          # pragma: no cover
 GH_API = "https://api.github.com"
 UA = "nexus-audit/1.3"
 
+# M399：单轮 HTTP 预算耗尽时的哨兵错误。它**不是**告警（不写 errors），
+# 只表示"本轮不再发真实请求"，剩余 specs 仍可命中本地缓存。
+BUDGET_EXHAUSTED = "http_budget_exhausted"
+
+
+def _default_http_budget() -> int:
+    """M399：单轮搜索网络请求预算。
+
+    无 Token 时 GitHub `/search/repositories` 只有 10 次/分钟，取 8 留 2 次
+    余量；有 Token 时 30 次/分钟，取 24 同样留余量。NEXUS_GITHUB_TOKEN 与
+    `_headers()` 的取值口径保持一致，避免"实际带 Token 却按无 Token 限流"。
+    """
+    token = (os.getenv("GITHUB_TOKEN") or os.getenv("NEXUS_GITHUB_TOKEN")
+             or os.getenv("GH_TOKEN") or "").strip()
+    return 24 if token else 8
+
 # M396：GitHub 搜索响应本地磁盘缓存。无 Token 时 /search/repositories 只有
 # 10 次/分钟，一轮 scout_daily 动辄十几次查询，跑到一半 403 就前功尽弃。
 # 6 小时内的相同 URL 直接复用本地响应（0 网络请求），半途限流时还能把
@@ -150,6 +166,16 @@ NEW_GEN_FALLBACK_STARS = (150, 5000)
 # 传统业务词也按星标分桶；80..450 抓新锐小仓，451..2000 抓中型业务仓。
 TRADITIONAL_STAR_BUCKETS = ((300, 1000), (1001, 5000))
 
+# M400：缓存池回填的星标下限。在线查询下限是 M342 定的 150（新生代）/300
+# （传统），但 6 小时缓存页里仍可能躺着更早抓到的 80..150 星新锐仓；回填只
+# 消费**已经抓到**的页面，不该再被在线门槛二次过滤 —— 否则 pass2 这种
+# "缓存全命中、但当页候选被冷却/未变清空"的轮次会被 min_stars=300 整池滤空。
+CACHE_POOL_MIN_STARS = 80
+
+# M400：缓存页的语言归属。缓存文件体里存了原始 URL，`language:java` 比
+# "按本轮每个语言把同一页重复解析 N 次"可靠，也省掉 N 倍解析开销。
+_LANG_IN_URL_RE = re.compile(r"language:([a-zA-Z0-9_+-]+)")
+
 
 # M293/M300：纯工具库/驱动/插件/CLI/桌面/评测框架/开发工具/测试框架，
 # 没有业务路由，直接丢。2026-10-31 实盘里 datamodel-code-generator（代码生成器）、
@@ -268,6 +294,45 @@ def _get(url: str, timeout: float = 20.0) -> tuple[bool, dict | None, str]:
         return False, None, f"{type(e).__name__}: {e}"[:200]
 
 
+def _cache_path(url: str, cache_dir: Path | None = None) -> Path:
+    """缓存文件路径：URL 的 sha1 + .json。"""
+    root = _cache_dir(cache_dir)
+    key = hashlib.sha1(url.encode("utf-8")).hexdigest()
+    return root / f"{key}.json"
+
+
+def _read_cache(url: str, *, cache_dir: Path | None = None,
+                cache_ttl: int = DEFAULT_CACHE_TTL) -> dict | None:
+    """M396/M399：只读缓存；命中返回 data，未命中/过期/坏文件返回 None。"""
+    path = _cache_path(url, cache_dir)
+    try:
+        if path.is_file():
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if (isinstance(payload, dict)
+                    and isinstance(payload.get("data"), dict)
+                    and time.time() - float(payload.get("ts") or 0)
+                    <= max(0, int(cache_ttl))):
+                return payload["data"]
+    except (OSError, ValueError, TypeError):
+        pass                                    # 坏缓存 == 没有缓存
+    return None
+
+
+def _write_cache(url: str, data: dict,
+                 cache_dir: Path | None = None) -> None:
+    """M396：成功响应落盘；目录不可写时静默降级，绝不阻塞侦察。"""
+    path = _cache_path(url, cache_dir)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.parent / f"{path.stem}.{os.getpid()}.tmp"
+        tmp.write_text(json.dumps({"ts": time.time(), "url": url,
+                                   "data": data}, ensure_ascii=False),
+                       encoding="utf-8")
+        tmp.replace(path)                       # 原子替换，避免读到半截 JSON
+    except (OSError, ValueError, TypeError):
+        pass
+
+
 def _get_cached(url: str, *, cache_dir: Path | None = None,
                 cache_ttl: int = DEFAULT_CACHE_TTL
                 ) -> tuple[bool, dict | None, str, bool]:
@@ -278,31 +343,13 @@ def _get_cached(url: str, *, cache_dir: Path | None = None,
     内容 {"ts", "url", "data"}；坏文件 / 过期 / 目录不可写一律静默降级为
     直连，绝不让缓存把侦察卡死。
     """
-    root = _cache_dir(cache_dir)
-    key = hashlib.sha1(url.encode("utf-8")).hexdigest()
-    path = root / f"{key}.json"
-    try:
-        if path.is_file():
-            payload = json.loads(path.read_text(encoding="utf-8"))
-            if (isinstance(payload, dict)
-                    and isinstance(payload.get("data"), dict)
-                    and time.time() - float(payload.get("ts") or 0)
-                    <= max(0, int(cache_ttl))):
-                return True, payload["data"], "", True
-    except (OSError, ValueError, TypeError):
-        pass                                    # 坏缓存 == 没有缓存
+    cached = _read_cache(url, cache_dir=cache_dir, cache_ttl=cache_ttl)
+    if cached is not None:
+        return True, cached, "", True
     ok, data, err = _get(url)
     if not (ok and isinstance(data, dict)):
         return ok, data, err, False
-    try:
-        root.mkdir(parents=True, exist_ok=True)
-        tmp = root / f"{key}.{os.getpid()}.tmp"
-        tmp.write_text(json.dumps({"ts": time.time(), "url": url,
-                                   "data": data}, ensure_ascii=False),
-                       encoding="utf-8")
-        tmp.replace(path)                       # 原子替换，避免读到半截 JSON
-    except (OSError, ValueError, TypeError):
-        pass
+    _write_cache(url, data, cache_dir)
     return True, data, "", False
 
 
@@ -474,7 +521,8 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                 exclude_slugs: set[str] | list[str] | None = None,
                 scanned_at: dict[str, str] | None = None,
                 cache_dir: Path | str | None = None,
-                cache_ttl: int = DEFAULT_CACHE_TTL) -> dict:
+                cache_ttl: int = DEFAULT_CACHE_TTL,
+                max_http_requests: int | None = None) -> dict:
     """M285/M311/M325：每日动态抓新仓（跨语言 Round-Robin 混排）。
 
     每个语言分两条轨：
@@ -482,7 +530,11 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         关键词走 RAG/Agent/MES/WMS/HIS 等 2024-2026 新场景；
       · 传统业务：保留 erp/crm/mall 等词，但按天轮转 page=1..4 和星标分桶，
         避免每天都被第 1 页的 2018-2022 老仓占满。
-    在线查询全部失败时整体回退离线种子，同样轮转混排。
+
+    M399：specs 按语言**交织**生成（java#1 → python#1 → solidity#1 →
+    java#2 …），并用 `max_http_requests` 给单轮真实网络请求封顶（默认有
+    Token 24 / 无 Token 8）。缓存命中不占预算；预算耗尽后不再发请求，
+    但继续检查剩余 specs 能否命中本地缓存。在线彻底没货时才回退离线种子。
     """
     langs = [str(x).strip() for x in (languages or []) if str(x).strip()]
     excluded = {str(x) for x in (exclude_slugs or set())}
@@ -500,18 +552,31 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
     online_ok = 0
     day_index = today.toordinal()
     # M396：缓存目录 + 本轮统计。cache_hits 计「命中缓存的查询页数」，
-    # backfilled 计「半途 403 后从缓存/离线种子补进来的仓数」。
+    # backfilled 计「从缓存/离线种子补进来的仓数」。
     cache_root = _cache_dir(cache_dir)
     cache_hits = 0
     backfilled = 0
+    # M399：单轮 HTTP 预算。`http_requests` 只计真实 `_get`，缓存命中不计。
+    budget = (_default_http_budget() if max_http_requests is None
+              else max(0, int(max_http_requests)))
+    http_requests = 0
+    budget_exhausted = False
 
     def _fetch(url: str) -> tuple[bool, dict | None, str]:
-        """统一走缓存；命中即记一笔，供报告披露。"""
-        nonlocal cache_hits
-        ok, data, err, from_cache = _get_cached(
-            url, cache_dir=cache_root, cache_ttl=cache_ttl)
-        if from_cache:
+        """M396/M399：缓存优先；未命中才消耗 HTTP 预算。"""
+        nonlocal cache_hits, http_requests, budget_exhausted
+        cached = _read_cache(url, cache_dir=cache_root, cache_ttl=cache_ttl)
+        if cached is not None:
             cache_hits += 1
+            return True, cached, ""
+        if http_requests >= budget:
+            budget_exhausted = True
+            return False, None, BUDGET_EXHAUSTED
+        ok, data, err = _get(url)
+        http_requests += 1
+        if ok and isinstance(data, dict):
+            _write_cache(url, data, cache_dir=cache_root)
+            return True, data, ""
         return ok, data, err
 
     terms = max(1, int(terms_per_language))
@@ -522,7 +587,11 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         new_gen_terms = min(terms - 1, max(1, int(round(terms * 0.6))))
         traditional_terms = terms - new_gen_terms
 
+    # M399：先按语言生成各自的 specs，再按轮次交织 —— 否则 java 的
+    # 新/传统两条轨会把前几个搜索配额吃光，python/solidity 永远轮不到。
+    per_lang_specs: dict[str, list[dict]] = {}
     for lang in langs:
+        lang_specs: list[dict] = []
         new_keywords = NEW_GEN_KEYWORDS.get(lang, ())
         ng = new_gen_terms if new_keywords else 0
         for k in range(ng):
@@ -532,8 +601,8 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                 NEW_GEN_PUSHED_SINCE, limit, keyword,
                 created_since=NEW_GEN_CREATED_SINCE,
                 star_range=NEW_GEN_STARS)
-            specs.append({"language": lang, "track": "new_gen",
-                          "qualifier": keyword, "query": q, "page": 1})
+            lang_specs.append({"language": lang, "track": "new_gen",
+                               "qualifier": keyword, "query": q, "page": 1})
         for k in range(traditional_terms):
             offset = day_index + ng + k
             qualifier = next_qualifier(lang, offset)
@@ -543,31 +612,79 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             page = (offset % 4) + 1
             q = search_query(lang, min_stars, max_stars, since, limit,
                              qualifier, star_range=star_range)
-            specs.append({"language": lang, "track": "traditional",
-                          "qualifier": qualifier, "query": q, "page": page})
+            lang_specs.append({"language": lang, "track": "traditional",
+                               "qualifier": qualifier, "query": q, "page": page})
+        per_lang_specs[lang] = lang_specs
+    for _round in range(max((len(v) for v in per_lang_specs.values()),
+                            default=0)):
+        for lang in langs:
+            _vals = per_lang_specs.get(lang) or []
+            if _round < len(_vals):
+                specs.append(_vals[_round])
+
+    # 纯离线模式：不发任何网络请求（连缓存也不消费），直接走离线种子。
+    if not allow_online:
+        _seeds: dict[str, list[dict]] = {}
+        for lang in langs:
+            _seeds[lang] = _offline(lang, min_stars, max_stars,
+                                    per_page)["items"]
+        _ordered = _merge_round_robin(_seeds, langs)
+        return {"ok": bool(_ordered), "source": "offline_seed",
+                "queries": [s["query"] for s in specs],
+                "query_specs": specs,
+                "new_gen_queries": sum(1 for s in specs
+                                       if s["track"] == "new_gen"),
+                "items": _ordered[:max(1, limit)],
+                "dropped": 0, "dropped_tool": 0, "dropped_unchanged": 0,
+                "cache_hits": 0, "backfilled": 0,
+                "http_requests": 0, "budget_exhausted": False,
+                "error": ""}
+
+    # M399：无 Token（预算 <= 8）时收敛单条 spec 的顺延/翻页次数，
+    # 把有限配额留给"还没轮到"的语言。
+    tight = budget <= 8
+    alt_attempts = 1 if tight else 2
+    fallback_attempts = 1 if tight else 5
+    max_extra = 1 if tight else 2
+
+    def _candidate_count() -> int:
+        seen: set[str] = set()
+        for vals in buckets.values():
+            for it in vals:
+                slug = it.get("slug")
+                if slug and slug not in excluded:
+                    seen.add(slug)
+        return len(seen)
+
+    def _rate_limited() -> bool:
+        return any("403" in e or "429" in e or "rate" in e.lower()
+                   for e in errors)
 
     rate_limited = False
     for spec in specs:
         if rate_limited:
             break
         queries.append(spec["query"])
-        if not allow_online:
-            continue
         page = int(spec.get("page") or 1)
         ok, data, err = _fetch(search_url(spec["query"], page, per_page))
         if not ok or not isinstance(data, dict):
+            if err == BUDGET_EXHAUSTED:
+                # M399：预算耗尽不是告警；继续下一个 spec，仍可能命中缓存。
+                continue
             errors.append(f"{spec['language']}: {err}")
             if _is_rate_limit(err):
                 rate_limited = True
                 break
             continue
-        # 新生代词太窄/当天该词没结果时，顺延 1..2 个词，避免整条轨道空手。
+        # 新生代词太窄/当天该词没结果时，顺延词表；无 Token 只试 1 次。
         if (spec["track"] == "new_gen"
                 and int(data.get("total_count") or 0) == 0):
             kws = NEW_GEN_KEYWORDS.get(spec["language"], ())
             if kws and spec["qualifier"] in kws:
                 start = kws.index(spec["qualifier"])
-                for step in range(1, min(3, len(kws))):
+                for step in range(1, 1 + alt_attempts):
+                    if rate_limited or budget_exhausted:
+                        break
                     alt_kw = kws[(start + step) % len(kws)]
                     alt_q = search_query(
                         spec["language"], NEW_GEN_STARS[0], NEW_GEN_STARS[1],
@@ -575,6 +692,8 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                         created_since=NEW_GEN_CREATED_SINCE,
                         star_range=NEW_GEN_STARS)
                     ok2, data2, err2 = _fetch(search_url(alt_q, 1, per_page))
+                    if err2 == BUDGET_EXHAUSTED:
+                        break
                     if not ok2 and _is_rate_limit(err2):
                         rate_limited = True
                         break
@@ -588,11 +707,14 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                         break
         # M339：框架+业务词全干时，退到**单业务系统词**（admin/cms/erp/...），
         # 绝不再裸搜框架名；用 created:>2024-01-01 + stars:60..5000 保持新锐。
-        if (spec["track"] == "new_gen"
+        if (not rate_limited and not budget_exhausted
+                and spec["track"] == "new_gen"
                 and int(data.get("total_count") or 0) == 0):
             words = NEW_GEN_FALLBACK_WORDS
             start = day_index % len(words)
-            for step in range(min(5, len(words))):
+            for step in range(min(fallback_attempts, len(words))):
+                if rate_limited or budget_exhausted:
+                    break
                 word = words[(start + step) % len(words)]
                 alt_q = search_query(
                     spec["language"], NEW_GEN_FALLBACK_STARS[0],
@@ -600,6 +722,8 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                     word, created_since=NEW_GEN_FALLBACK_CREATED_SINCE,
                     star_range=NEW_GEN_FALLBACK_STARS)
                 ok3, data3, err3 = _fetch(search_url(alt_q, 1, per_page))
+                if err3 == BUDGET_EXHAUSTED:
+                    break
                 if not ok3 and _is_rate_limit(err3):
                     rate_limited = True
                     break
@@ -612,9 +736,12 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                     queries.append(alt_q)
                     break
         # 轮转到 page 2..4 但该页为空时回退第 1 页，避免空手而归。
-        if page > 1 and int(data.get("total_count") or 0) == 0:
+        if (page > 1 and int(data.get("total_count") or 0) == 0
+                and not rate_limited):
             ok, data, err = _fetch(search_url(spec["query"], 1, per_page))
             if not ok or not isinstance(data, dict):
+                if err == BUDGET_EXHAUSTED:
+                    continue
                 errors.append(f"{spec['language']}: {err}")
                 if _is_rate_limit(err):
                     rate_limited = True
@@ -635,17 +762,20 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                       if not _pushed_before(x, scanned_at)]
             dropped_unchanged += _before - len(parsed)
         # M346：当前页剔除冷却仓后不足 2 个，且还有下一页时，顺延 page+1/+2。
-        # 单查询最多多翻 2 页，避免把整轮变成无限分页。
+        # M399：无 Token 时最多多翻 1 页，避免一条 spec 把配额吃光。
         try:
             total_count = int(data.get("total_count") or 0)
         except (TypeError, ValueError):
             total_count = 0
         extra = 0
-        while (excluded and len(parsed) < 2 and extra < 2
-               and total_count > (page + extra) * per_page):
+        while (excluded and len(parsed) < 2 and extra < max_extra
+               and total_count > (page + extra) * per_page
+               and not rate_limited and not budget_exhausted):
             nxt = page + extra + 1
             okp, datap, errp = _fetch(search_url(spec["query"], nxt, per_page))
             if not okp or not isinstance(datap, dict):
+                if errp == BUDGET_EXHAUSTED:
+                    break
                 errors.append(f"{spec['language']}: {errp}")
                 if _is_rate_limit(errp):
                     rate_limited = True
@@ -662,27 +792,20 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         buckets[spec["language"]] += parsed
         dropped += drop
         dropped_tool += drop_tool
+        # M399：凑够 limit 且每个语言都有货就提前收手，节省搜索配额。
+        if (not rate_limited
+                and _candidate_count() >= max(1, int(limit))
+                and all(buckets.get(lang) for lang in langs)):
+            break
 
     # M380：有效候选不足 limit 时，用下一组轮换业务词补拉（最多 2 轮）。
     # 背景：`--limit 8 --min-stars 300` 实测只回 3 个候选，供给不足会让
     # daily-hunt 的实扫名额空转。补拉只走传统轨的轮换词，且一旦撞上
-    # GitHub 限流就立即停手（无 Token 时搜索限流 10 次/分钟）。
-    def _candidate_count() -> int:
-        seen: set[str] = set()
-        for vals in buckets.values():
-            for it in vals:
-                slug = it.get("slug")
-                if slug and slug not in excluded:
-                    seen.add(slug)
-        return len(seen)
-
-    def _rate_limited() -> bool:
-        return any("403" in e or "rate" in e.lower() for e in errors)
-
+    # GitHub 限流 / 预算耗尽就立即停手。
     extra_rounds = 0
     ng_off = new_gen_terms if any(NEW_GEN_KEYWORDS.get(lang) for lang in langs) else 0
     while (allow_online and online_ok > 0 and extra_rounds < 2
-           and not rate_limited
+           and not rate_limited and not budget_exhausted
            and _candidate_count() < max(1, int(limit))
            and not _rate_limited()):
         extra_rounds += 1
@@ -700,6 +823,8 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                           "topup_round": extra_rounds})
             ok, data, err = _fetch(search_url(q, 1, per_page))
             if not ok or not isinstance(data, dict):
+                if err == BUDGET_EXHAUSTED:
+                    break
                 errors.append(f"{lang}: {err}")
                 if _is_rate_limit(err):
                     rate_limited = True
@@ -717,12 +842,13 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             if _candidate_count() >= max(1, int(limit)):
                 break
 
-    # M396：半途限流回填（Partial Rate-Limit Backfill）。
-    # 背景：无 Token 时 /search 只有 10 次/分钟，查询循环常在第 5~6 条
-    # 撞 403 提前 break；M380 的补拉轮一旦 rate_limited 就不再跑，于是一轮
-    # 可能只回 1 个候选，daily-hunt 的 --limit 8 有 7 个名额空转。
-    # 顺序：① 6 小时缓存页（按 ts 新→旧）→ ② OFFLINE_SEEDS。两级都按语言
-    # 轮转补，严格复用 excluded / scanned_at 的过滤口径，不把冷却仓放回来。
+    # M396/M400：两级回填。
+    # 第一级（缓存池）：只要主循环结束时候选不足 limit 就**无条件**启用 ——
+    #   403/429、预算耗尽、以及 pass2 那种"缓存全命中但当页候选被冷却/未变
+    #   清空"的轮次都算。缓存池只消费已经抓到的页面，所以星标下限放宽到
+    #   CACHE_POOL_MIN_STARS（80），不再被在线 min_stars=300 误杀。
+    # 第二级（离线种子）：只在线彻底没货（0 个真实候选）且确实撞了限流/
+    #   预算/全失败时兜底，避免有 1 个真实候选时混入老种子。
     forced_source = ""
     if rate_limited and _candidate_count() == 0:
         # M393：0 在线候选也要显式标注来源，但不再早退 —— 统一走回填，
@@ -739,8 +865,13 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             i += 1
 
     def _fill(pool: dict[str, list[dict]], needed: int,
-              seen: set[str]) -> int:
-        """把池里的有效候选按语言轮转补进 buckets，返回实际补入数。"""
+              seen: set[str], *, min_s: int = min_stars,
+              max_s: int = max_stars) -> int:
+        """把池里的有效候选按语言轮转补进 buckets，返回实际补入数。
+
+        M400：星标范围由调用方分层给 —— 缓存池放宽到 80 星起，离线种子
+        放宽上限到 100000，避免 `_fill` 用同一把在线尺子把池子滤空。
+        """
         nonlocal backfilled
         added = 0
         for lang, it in _iter_round_robin(pool):
@@ -753,7 +884,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                 stars = int(it.get("stars") or 0)
             except (TypeError, ValueError):
                 stars = 0
-            if not (min_stars <= stars <= max_stars):
+            if not (min_s <= stars <= max_s):
                 continue
             if scanned_at and _pushed_before(it, scanned_at):
                 continue
@@ -764,40 +895,31 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         return added
 
     new_gen_queries = sum(1 for s in specs if s["track"] == "new_gen")
-    if online_ok == 0:
-        seeds: dict[str, list[dict]] = {}
-        for lang in langs:
-            seeds[lang] = _offline(lang, min_stars, max_stars, per_page)["items"]
-        ordered = _merge_round_robin(seeds, langs)
-        return {"ok": bool(ordered), "source": "offline_seed",
-                "queries": queries, "query_specs": specs,
-                "new_gen_queries": new_gen_queries,
-                "items": ordered[:max(1, limit)],
-                "dropped": 0, "dropped_tool": 0,
-                "dropped_unchanged": dropped_unchanged,
-                "cache_hits": cache_hits, "backfilled": 0,
-                "error": "; ".join(errors)[:400]}
 
     ordered = _merge_round_robin(buckets, langs)
-    if (rate_limited or _rate_limited()) and len(ordered) < max(1, int(limit)):
+    if len(ordered) < max(1, int(limit)):
         needed = max(1, int(limit)) - len(ordered)
         seen = {str(x.get("slug") or "") for x in ordered}
 
-        # ① 缓存页：按 ts 从新到旧，逐页用 _parse_search 抽候选。
-        cached_pages: list[tuple[float, dict]] = []
+        # ① 缓存页：按 ts 从新到旧，每页只解析一次（语言取自缓存 URL）。
+        cached_pages: list[tuple[float, dict, str]] = []
         try:
             for p in cache_root.glob("*.json"):
                 try:
                     payload = json.loads(p.read_text(encoding="utf-8"))
                 except (OSError, ValueError):
                     continue
-                if (isinstance(payload, dict)
+                if not (isinstance(payload, dict)
                         and isinstance(payload.get("data"), dict)):
-                    try:
-                        ts = float(payload.get("ts") or 0)
-                    except (TypeError, ValueError):
-                        ts = 0.0
-                    cached_pages.append((ts, payload["data"]))
+                    continue
+                try:
+                    ts = float(payload.get("ts") or 0)
+                except (TypeError, ValueError):
+                    ts = 0.0
+                url = str(payload.get("url") or "")
+                _m = _LANG_IN_URL_RE.search(urllib.parse.unquote(url))
+                cached_pages.append(
+                    (ts, payload["data"], _m.group(1).lower() if _m else ""))
         except OSError:
             cached_pages = []
         cached_pages.sort(key=lambda x: x[0], reverse=True)
@@ -805,41 +927,58 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         lang_set = {str(x).lower() for x in langs}
         cache_pool: dict[str, list[dict]] = {lang: [] for lang in langs}
         pool_seen: set[str] = set()
-        for _ts, data in cached_pages:
-            for lang in langs:
-                parsed, _, _ = _parse_search(data, lang)
-                for x in parsed:
-                    slug = str(x.get("slug") or "")
-                    if not slug or slug in pool_seen:
-                        continue
-                    item_lang = str(x.get("language") or lang).strip().lower()
-                    if item_lang not in lang_set:
-                        continue
-                    pool_seen.add(slug)
-                    key = item_lang if item_lang in cache_pool else lang
-                    cache_pool.setdefault(key, []).append(x)
-        needed -= _fill(cache_pool, needed, seen)
+        for _ts, data, page_lang in cached_pages:
+            parsed, _, _ = _parse_search(data, page_lang)
+            for x in parsed:
+                slug = str(x.get("slug") or "")
+                if not slug or slug in pool_seen:
+                    continue
+                item_lang = str(x.get("language") or page_lang
+                                or "").strip().lower()
+                if item_lang not in lang_set:
+                    continue
+                pool_seen.add(slug)
+                cache_pool.setdefault(item_lang, []).append(x)
+        needed -= _fill(cache_pool, needed, seen,
+                        min_s=min(int(min_stars), NEW_GEN_STARS[0],
+                                  CACHE_POOL_MIN_STARS),
+                        max_s=max_stars)
+        ordered = _merge_round_robin(buckets, langs)
 
-        # ② 离线种子：缓存仍不够时按语言补差额。
-        if needed > 0:
+        # ② 离线种子：仅当在线彻底没货（0 个真实候选）且确实撞了限流/
+        # 预算/全部请求失败时兜底。
+        if (needed > 0 and not ordered
+                and (rate_limited or _rate_limited() or budget_exhausted
+                     or online_ok == 0)):
             seed_pool: dict[str, list[dict]] = {}
             for lang in langs:
+                # M400：种子池本身就要按放宽后的上限取，否则 >max_stars
+                # 的大仓在进 `_fill` 之前就被 `_offline` 滤掉了。
                 seed_pool[lang] = [
-                    x for x in _offline(lang, min_stars, max_stars,
+                    x for x in _offline(lang, min_stars,
+                                        max(max_stars, 100000),
                                         per_page)["items"]
                     if x.get("slug") not in excluded]
-            _fill(seed_pool, needed, seen)
+            _fill(seed_pool, needed, seen, min_s=min_stars,
+                  max_s=max(max_stars, 100000))
+            ordered = _merge_round_robin(buckets, langs)
 
-        ordered = _merge_round_robin(buckets, langs)
         # 回填分支内才截断；正常路径仍不硬截断（M293：纯库仓不占名额）。
         if backfilled and len(ordered) > max(1, int(limit)):
             ordered = ordered[:max(1, int(limit))]
 
-    return {"ok": bool(ordered), "source": forced_source or "github_search",
+    source = "github_search"
+    if online_ok == 0:
+        source = "offline_seed"
+    elif forced_source:
+        source = forced_source
+    return {"ok": bool(ordered), "source": source,
             "queries": queries, "query_specs": specs,
             "new_gen_queries": new_gen_queries,
             "items": ordered,
             "dropped": dropped, "dropped_tool": dropped_tool,
             "dropped_unchanged": dropped_unchanged,
             "cache_hits": cache_hits, "backfilled": backfilled,
+            "http_requests": http_requests,
+            "budget_exhausted": budget_exhausted,
             "error": "; ".join(errors)[:400]}

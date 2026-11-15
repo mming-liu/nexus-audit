@@ -113,8 +113,12 @@ def sync_repo(slug: str, dest_root: Path = CACHE_ROOT,
     dest_root.mkdir(parents=True, exist_ok=True)
     dest = dest_root / safe_dirname(slug)
     # 上次失败残留（有目录但没有有效 .git/HEAD）先清掉，避免 clone 直接失败。
+    # M401：safe-delete 钩子会按文件数阈值抛异常，清理失败不能穿透到同步流程。
     if dest.exists() and not (dest / ".git" / "HEAD").is_file():
-        shutil.rmtree(dest, ignore_errors=True)
+        try:
+            shutil.rmtree(dest, ignore_errors=True)
+        except Exception:                                     # noqa: BLE001
+            pass
     if (dest / ".git").is_dir():
         branch = _current_branch(dest, slug)
         rc, out = _git(["fetch", "--depth", str(depth), "origin",
@@ -131,7 +135,10 @@ def sync_repo(slug: str, dest_root: Path = CACHE_ROOT,
                         "--single-branch", "--no-tags",
                         remote_url(slug), str(dest)], timeout=300)
         if rc != 0:
-            shutil.rmtree(dest, ignore_errors=True)
+            try:
+                shutil.rmtree(dest, ignore_errors=True)
+            except Exception:                                 # noqa: BLE001
+                pass
             rc, out = _git(["clone", "--depth", str(depth), "--single-branch",
                             "--no-tags", remote_url(slug), str(dest)],
                            timeout=300)
