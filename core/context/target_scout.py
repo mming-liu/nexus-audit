@@ -301,6 +301,18 @@ def _cache_path(url: str, cache_dir: Path | None = None) -> Path:
     return root / f"{key}.json"
 
 
+def _is_real_cache_dir(cache_dir: Path | str | None = None) -> bool:
+    """M404：目标是否为默认实盘缓存（未显式给目录、且未设置沙箱环境变量）。"""
+    if (os.getenv("NEXUS_SCOUT_CACHE_DIR") or "").strip():
+        return False
+    if cache_dir is None:
+        return True
+    try:
+        return Path(cache_dir).resolve() == DEFAULT_CACHE_DIR.resolve()
+    except OSError:
+        return False
+
+
 def _read_cache(url: str, *, cache_dir: Path | None = None,
                 cache_ttl: int = DEFAULT_CACHE_TTL) -> dict | None:
     """M396/M399：只读缓存；命中返回 data，未命中/过期/坏文件返回 None。"""
@@ -320,7 +332,18 @@ def _read_cache(url: str, *, cache_dir: Path | None = None,
 
 def _write_cache(url: str, data: dict,
                  cache_dir: Path | None = None) -> None:
-    """M396：成功响应落盘；目录不可写时静默降级，绝不阻塞侦察。"""
+    """M396：成功响应落盘；目录不可写时静默降级，绝不阻塞侦察。
+
+    M404：写默认实盘目录时拒绝全 `acme/*` / `example/*` 的测试夹具 ——
+    冒烟测试已有全局沙箱（`NEXUS_SCOUT_CACHE_DIR`），这是第二道保险。
+    """
+    if _is_real_cache_dir(cache_dir):
+        _items = data.get("items") if isinstance(data, dict) else None
+        if _items and all(
+                str(_it.get("full_name") or "").startswith(
+                    ("acme/", "example/"))
+                for _it in _items if isinstance(_it, dict)):
+            return
     path = _cache_path(url, cache_dir)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -556,6 +579,9 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
     cache_root = _cache_dir(cache_dir)
     cache_hits = 0
     backfilled = 0
+    # M405：回填来源分账 —— 第一级缓存池 vs 第二级离线种子。
+    cache_backfilled = 0
+    seed_backfilled = 0
     # M399：单轮 HTTP 预算。`http_requests` 只计真实 `_get`，缓存命中不计。
     budget = (_default_http_budget() if max_http_requests is None
               else max(0, int(max_http_requests)))
@@ -589,13 +615,18 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
 
     # M399：先按语言生成各自的 specs，再按轮次交织 —— 否则 java 的
     # 新/传统两条轨会把前几个搜索配额吃光，python/solidity 永远轮不到。
+    # M403：词索引按 `day_index * 每轮词数` 步进，保证相邻两天的**主查询词
+    # 集合 0 重叠**（旧写法 `day_index + k` 在 terms=2 时相邻天有 50% 重叠，
+    # 第二天有一半查询是昨天跑过的缓存页）。
     per_lang_specs: dict[str, list[dict]] = {}
+    base_trad = day_index * max(1, traditional_terms)
     for lang in langs:
         lang_specs: list[dict] = []
         new_keywords = NEW_GEN_KEYWORDS.get(lang, ())
         ng = new_gen_terms if new_keywords else 0
+        base_ng = day_index * max(1, ng)
         for k in range(ng):
-            keyword = new_keywords[(day_index + k) % len(new_keywords)]
+            keyword = new_keywords[(base_ng + k) % len(new_keywords)]
             q = search_query(
                 lang, NEW_GEN_STARS[0], NEW_GEN_STARS[1],
                 NEW_GEN_PUSHED_SINCE, limit, keyword,
@@ -604,7 +635,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             lang_specs.append({"language": lang, "track": "new_gen",
                                "qualifier": keyword, "query": q, "page": 1})
         for k in range(traditional_terms):
-            offset = day_index + ng + k
+            offset = base_trad + k
             qualifier = next_qualifier(lang, offset)
             bucket = TRADITIONAL_STAR_BUCKETS[
                 offset % len(TRADITIONAL_STAR_BUCKETS)]
@@ -637,6 +668,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                 "items": _ordered[:max(1, limit)],
                 "dropped": 0, "dropped_tool": 0, "dropped_unchanged": 0,
                 "cache_hits": 0, "backfilled": 0,
+                "cache_backfilled": 0, "seed_backfilled": 0,
                 "http_requests": 0, "budget_exhausted": False,
                 "error": ""}
 
@@ -798,49 +830,78 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                 and all(buckets.get(lang) for lang in langs)):
             break
 
-    # M380：有效候选不足 limit 时，用下一组轮换业务词补拉（最多 2 轮）。
+    # M380/M403：有效候选不足 limit 时，用下一组轮换词补拉。
     # 背景：`--limit 8 --min-stars 300` 实测只回 3 个候选，供给不足会让
-    # daily-hunt 的实扫名额空转。补拉只走传统轨的轮换词，且一旦撞上
-    # GitHub 限流 / 预算耗尽就立即停手。
+    # daily-hunt 的实扫名额空转。M403 把固定 2 轮升级为预算驱动的 8 轮：
+    # 顺延查询若命中缓存（0 次 HTTP）且候选全被 excluded/scanned_at 滤空，
+    # 循环会继续跨过已扫轮次，直到翻到当天未查过的词、用剩余预算抓新候选。
+    max_extra_rounds = 8
     extra_rounds = 0
-    ng_off = new_gen_terms if any(NEW_GEN_KEYWORDS.get(lang) for lang in langs) else 0
-    while (allow_online and online_ok > 0 and extra_rounds < 2
+
+    def _topup_one(lang: str, track: str, q: str, qualifier: str,
+                   page: int = 1) -> str:
+        """M403：执行一条顺延查询；返回 ok / err / stop。"""
+        nonlocal dropped, dropped_tool, rate_limited, budget_exhausted
+        queries.append(q)
+        specs.append({"language": lang, "track": track,
+                      "qualifier": qualifier, "query": q, "page": page,
+                      "topup_round": extra_rounds})
+        ok, data, err = _fetch(search_url(q, page, per_page))
+        if not ok or not isinstance(data, dict):
+            if err == BUDGET_EXHAUSTED:
+                budget_exhausted = True
+                return "stop"
+            errors.append(f"{lang}: {err}")
+            if _is_rate_limit(err):
+                rate_limited = True
+                return "stop"
+            return "err"
+        parsed, drop, drop_tool = _parse_search(data, lang)
+        if excluded:
+            parsed = [x for x in parsed if x.get("slug") not in excluded]
+        if scanned_at:
+            parsed = [x for x in parsed
+                      if not _pushed_before(x, scanned_at)]
+        buckets[lang] += parsed
+        dropped += drop
+        dropped_tool += drop_tool
+        return "ok"
+
+    while (allow_online and extra_rounds < max_extra_rounds
            and not rate_limited and not budget_exhausted
            and _candidate_count() < max(1, int(limit))
            and not _rate_limited()):
         extra_rounds += 1
+        _stop = False
         for lang in langs:
-            offset = day_index + ng_off + traditional_terms + extra_rounds
+            # ① 新生代下一顺位词（跨过当天主查询用掉的 ng 个词）。
+            kws = NEW_GEN_KEYWORDS.get(lang) or ()
+            ng = new_gen_terms if kws else 0
+            if kws:
+                keyword = kws[(day_index * max(1, ng) + ng
+                               + extra_rounds - 1) % len(kws)]
+                q = search_query(
+                    lang, NEW_GEN_STARS[0], NEW_GEN_STARS[1],
+                    NEW_GEN_PUSHED_SINCE, limit, keyword,
+                    created_since=NEW_GEN_CREATED_SINCE,
+                    star_range=NEW_GEN_STARS)
+                if _topup_one(lang, "new_gen", q, keyword) == "stop":
+                    _stop = True
+                    break
+            # ② 传统轨下一顺位词（跨过当天主查询用掉的 traditional_terms 个）。
+            offset = (day_index * max(1, traditional_terms)
+                      + traditional_terms + extra_rounds - 1)
             qualifier = next_qualifier(lang, offset)
             bucket = TRADITIONAL_STAR_BUCKETS[
                 offset % len(TRADITIONAL_STAR_BUCKETS)]
             star_range = _bounded_star_range(min_stars, max_stars, bucket)
             q = search_query(lang, min_stars, max_stars, since, limit,
                              qualifier, star_range=star_range)
-            queries.append(q)
-            specs.append({"language": lang, "track": "traditional",
-                          "qualifier": qualifier, "query": q, "page": 1,
-                          "topup_round": extra_rounds})
-            ok, data, err = _fetch(search_url(q, 1, per_page))
-            if not ok or not isinstance(data, dict):
-                if err == BUDGET_EXHAUSTED:
-                    break
-                errors.append(f"{lang}: {err}")
-                if _is_rate_limit(err):
-                    rate_limited = True
-                    break
-                continue
-            parsed, drop, drop_tool = _parse_search(data, lang)
-            if excluded:
-                parsed = [x for x in parsed if x.get("slug") not in excluded]
-            if scanned_at:
-                parsed = [x for x in parsed
-                          if not _pushed_before(x, scanned_at)]
-            buckets[lang] += parsed
-            dropped += drop
-            dropped_tool += drop_tool
-            if _candidate_count() >= max(1, int(limit)):
+            if _topup_one(lang, "traditional", q, qualifier) == "stop":
+                _stop = True
                 break
+        if _stop or _candidate_count() >= max(1, int(limit)):
+            break
 
     # M396/M400：两级回填。
     # 第一级（缓存池）：只要主循环结束时候选不足 limit 就**无条件**启用 ——
@@ -872,7 +933,6 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         M400：星标范围由调用方分层给 —— 缓存池放宽到 80 星起，离线种子
         放宽上限到 100000，避免 `_fill` 用同一把在线尺子把池子滤空。
         """
-        nonlocal backfilled
         added = 0
         for lang, it in _iter_round_robin(pool):
             if added >= needed:
@@ -891,7 +951,6 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             seen.add(slug)
             buckets.setdefault(lang, []).append(it)
             added += 1
-        backfilled += added
         return added
 
     new_gen_queries = sum(1 for s in specs if s["track"] == "new_gen")
@@ -939,10 +998,12 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                     continue
                 pool_seen.add(slug)
                 cache_pool.setdefault(item_lang, []).append(x)
-        needed -= _fill(cache_pool, needed, seen,
-                        min_s=min(int(min_stars), NEW_GEN_STARS[0],
-                                  CACHE_POOL_MIN_STARS),
-                        max_s=max_stars)
+        _cache_added = _fill(cache_pool, needed, seen,
+                             min_s=min(int(min_stars), NEW_GEN_STARS[0],
+                                       CACHE_POOL_MIN_STARS),
+                             max_s=max_stars)
+        cache_backfilled += _cache_added
+        needed -= _cache_added
         ordered = _merge_round_robin(buckets, langs)
 
         # ② 离线种子：仅当在线彻底没货（0 个真实候选）且确实撞了限流/
@@ -959,19 +1020,27 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                                         max(max_stars, 100000),
                                         per_page)["items"]
                     if x.get("slug") not in excluded]
-            _fill(seed_pool, needed, seen, min_s=min_stars,
-                  max_s=max(max_stars, 100000))
+            seed_backfilled += _fill(seed_pool, needed, seen,
+                                     min_s=min_stars,
+                                     max_s=max(max_stars, 100000))
             ordered = _merge_round_robin(buckets, langs)
 
         # 回填分支内才截断；正常路径仍不硬截断（M293：纯库仓不占名额）。
         if backfilled and len(ordered) > max(1, int(limit)):
             ordered = ordered[:max(1, int(limit))]
 
+    # M405：来源精确归因。`backfilled` 是两级之和，source 细分到
+    # 「全种子 / 搜索+种子混合 / 纯搜索」，报告侧据此渲染分账披露行。
+    backfilled = cache_backfilled + seed_backfilled
     source = "github_search"
-    if online_ok == 0:
-        source = "offline_seed"
-    elif forced_source:
+    if forced_source:
         source = forced_source
+    elif seed_backfilled > 0 and len(ordered) == seed_backfilled:
+        source = "offline_seed_backfill"
+    elif seed_backfilled > 0:
+        source = "github_search+seed_backfill"
+    elif online_ok == 0:
+        source = "offline_seed"
     return {"ok": bool(ordered), "source": source,
             "queries": queries, "query_specs": specs,
             "new_gen_queries": new_gen_queries,
@@ -979,6 +1048,8 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             "dropped": dropped, "dropped_tool": dropped_tool,
             "dropped_unchanged": dropped_unchanged,
             "cache_hits": cache_hits, "backfilled": backfilled,
+            "cache_backfilled": cache_backfilled,
+            "seed_backfilled": seed_backfilled,
             "http_requests": http_requests,
             "budget_exhausted": budget_exhausted,
             "error": "; ".join(errors)[:400]}

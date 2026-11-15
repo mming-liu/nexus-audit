@@ -24,6 +24,8 @@ sys.path.insert(0, str(ROOT))
 # 变成 None（随后 `"x" in p.stdout` 抛 TypeError）。子进程强制 UTF-8 +
 # 捕获侧 `errors="replace"`，两头都钉死。
 import os as _os
+import atexit as _atexit
+import shutil as _shutil_mod
 _os.environ.setdefault("PYTHONUTF8", "1")
 _os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 # 本进程自己的 stdout/stderr 也要钉住：`run_all` 用管道捕获本脚本输出，
@@ -73,6 +75,15 @@ def _ws_mkdtemp(prefix: str = "tmp", *args, **kwargs) -> str:
 
 
 _tempfile_mod.mkdtemp = _ws_mkdtemp
+
+# M404：整套冒烟的 scout 缓存沙箱。任何未显式传 cache_dir 的 scout_daily()
+# 都会落到这里，绝不触碰实盘 .cache/scout_search（v1.5.13 的 acme/* 夹具
+# 污染就是这么发生的）。用工作区 .tmp 而不是系统 %TEMP%：DSH 沙箱下后者
+# 的 ACL 会让子目录写入失败。
+_SMOKE_SCOUT_CACHE_DIR = _ws_mkdtemp("nexus_smoke_scout_")
+_os.environ["NEXUS_SCOUT_CACHE_DIR"] = _SMOKE_SCOUT_CACHE_DIR
+_atexit.register(
+    lambda: _shutil_mod.rmtree(_SMOKE_SCOUT_CACHE_DIR, ignore_errors=True))
 
 FAILS: list[str] = []
 # M331：靶场夹具与规则断言解耦。reference_repos/ 是可选的本地夹具（各 benchmark
@@ -11254,11 +11265,14 @@ _ts311._get = _fake_get311
 try:
     # M396：默认参数与实盘 daily-hunt 相同，URL 会被真实 6 小时缓存命中；
     # 这里必须给独立 cache_dir，否则 _get 一次都不调，断言数归零（假红）。
-    _ts311.scout_daily(languages=["java", "python"], allow_online=True,
-                       cache_dir=Path(_ws_mkdtemp("m311_cache_")))
+    _r311 = _ts311.scout_daily(languages=["java", "python"], allow_online=True,
+                               cache_dir=Path(_ws_mkdtemp("m311_cache_")))
 finally:
     _ts311._get = _orig_get311
-check("M311：每语言默认查 2 个轮换词", len(_calls311), 4)
+# M403：动态顺延会额外发查询；这里只数**主 specs**（每语言默认 2 个轮换词）。
+_M311_MAIN = [s for s in _r311["query_specs"] if "topup_round" not in s]
+check("M311：每语言默认查 2 个轮换词", len(_M311_MAIN), 4)
+check("M403：顺延查询不越过单轮预算", len(_calls311) <= 8, True)
 check("M312：已执行断言数 >= 1775", COUNTS["n"] >= 1775, True)
 
 print("\n[298] M313：数字拼接 / 业务 apply / classpath 常量 / RedirectView 常量 / 锁文件")
@@ -13370,13 +13384,18 @@ _payload395 = _json395.loads(
     (_M395_TMP / f"{_key395}.json").read_text(encoding="utf-8"))
 check("M396：缓存体含 ts/url/data",
       all(k in _payload395 for k in ("ts", "url", "data")), True)
+_M395_CACHED_PAGES = len(list(_M395_TMP.glob("*.json")))
 _M395_CALLS.clear()
 target_scout._get = _fake_get395
 try:
     _r395b = target_scout.scout_daily(**_M395_KW)
 finally:
     target_scout._get = _orig_get395
-check("M396：相同查询全命中缓存后 0 网络请求", len(_M395_CALLS), 0)
+# M403：动态顺延会越过上一轮已缓存的 8 页继续翻新词；缓存页仍然 0 重复请求，
+# 只有新顺延轮才走网络（且不超过单轮预算 8）。
+check("M396：已缓存页全部命中、新顺延轮才走网络",
+      (_r395b.get("cache_hits", 0) >= _M395_CACHED_PAGES,
+       len(_M395_CALLS) <= 8), (True, True))
 check("M396：cache_hits >= 1",
       _r395b.get("cache_hits", 0) >= 1, True)
 
@@ -13614,6 +13633,147 @@ check("M401：删除失败仍落盘账本 JSON", (_M336_RUN_DIR / "R.json").is_f
 check("M401：daily_meta 暴露 evict_skipped",
       _M336_RUN["daily"].get("evict_skipped"), [_M336_EVICT_SLUG])
 check("M401：扫描仍记为 SCANNED", _M336_RUN["daily"].get("scanned"), 1)
+
+print("\n[337] M403-M405：动态顺延 / 缓存沙箱 / 回填分账 / 失败冷却（纯离线）")
+check("M404：冒烟全局 scout 缓存沙箱已生效",
+      (_os.environ.get("NEXUS_SCOUT_CACHE_DIR"),
+       Path(_SMOKE_SCOUT_CACHE_DIR).is_dir()),
+      (_SMOKE_SCOUT_CACHE_DIR, True))
+
+# M404：默认实盘目录拒写全 acme/* 夹具（第二道保险）。
+_M337_REAL = Path(_ws_mkdtemp("m337_real_"))
+_M337_ACME = {"total_count": 1, "items": [{
+    "full_name": "acme/fake-repo", "stargazers_count": 900,
+    "language": "Java", "pushed_at": "2026-11-13T00:00:00Z",
+    "description": "x", "has_issues": True, "topics": []}]}
+_old_env337 = _os.environ.pop("NEXUS_SCOUT_CACHE_DIR", None)
+_old_default337 = target_scout.DEFAULT_CACHE_DIR
+target_scout.DEFAULT_CACHE_DIR = _M337_REAL
+target_scout._get = lambda url, timeout=20.0: (True, dict(_M337_ACME), "")
+try:
+    _M337_GOT = target_scout._get_cached(
+        "https://api.github.com/search/repositories?q=fixture")
+finally:
+    target_scout.DEFAULT_CACHE_DIR = _old_default337
+    target_scout._get = _orig_get395
+    if _old_env337 is not None:
+        _os.environ["NEXUS_SCOUT_CACHE_DIR"] = _old_env337
+check("M404：默认实盘目录拒写全 acme/* 夹具",
+      (_M337_GOT[0], len(list(_M337_REAL.glob("*.json")))), (True, 0))
+
+# M403：同日暖缓存 —— 主 specs 全命中缓存且候选全被排除，动态顺延
+# 跨过已扫轮次，用剩余预算抓回新词候选。
+_M337_TODAY = target_scout._dt.date(2026, 11, 15)
+_M337_CACHE = Path(_ws_mkdtemp("m337_warm_")) / "cache"
+_M337_CACHE.mkdir(parents=True, exist_ok=True)
+_M337_EXCL = {"acme/old-a", "acme/old-b"}
+_M337_MAIN = target_scout.scout_daily(
+    languages=("java", "python"), terms_per_language=2, limit=8,
+    allow_online=False, today=_M337_TODAY)["query_specs"]
+for _s337 in _M337_MAIN:
+    _u337 = target_scout.search_url(
+        _s337["query"], int(_s337.get("page") or 1), 30)
+    _d337 = {"total_count": 1, "items": [{
+        "full_name": "acme/old-a", "stargazers_count": 900,
+        "language": _s337["language"].title(),
+        "pushed_at": "2026-11-13T00:00:00Z",
+        "description": "business", "has_issues": True, "topics": []}]}
+    (_M337_CACHE /
+     f"{_hashlib395.sha1(_u337.encode()).hexdigest()}.json"
+     ).write_text(_json395.dumps({"ts": _time395.time(), "url": _u337,
+                                  "data": _d337}), encoding="utf-8")
+_M337_CALLS: list[str] = []
+
+
+def _m337_get(url, timeout=20.0):
+    _M337_CALLS.append(url)
+    return True, {"total_count": 8, "items": [{
+        "full_name": f"acme/fresh-{_i}",
+        "stargazers_count": 600,
+        "language": "Java" if _i % 2 == 0 else "Python",
+        "pushed_at": "2026-11-14T00:00:00Z",
+        "description": "business admin", "has_issues": True,
+        "topics": []} for _i in range(8)]}, ""
+
+
+target_scout._get = _m337_get
+try:
+    _M337_WARM = target_scout.scout_daily(
+        languages=("java", "python"), terms_per_language=2, limit=8,
+        allow_online=True, today=_M337_TODAY, cache_dir=_M337_CACHE,
+        exclude_slugs=_M337_EXCL, max_http_requests=8)
+finally:
+    target_scout._get = _orig_get395
+check("M403：主 specs 全命中缓存仍继续顺延",
+      (_M337_WARM["cache_hits"] >= 4, bool(_M337_WARM["items"])),
+      (True, True))
+check("M403：顺延后动用剩余预算抓回新候选",
+      (1 <= _M337_WARM["http_requests"] <= 8,
+       any(x["slug"].startswith("acme/fresh-")
+           for x in _M337_WARM["items"])),
+      (True, True))
+check("M403：未耗尽预算的顺延不再受 extra_rounds<2 限制",
+      _M337_WARM["http_requests"] >= 1, True)
+
+# M405：全部候选来自离线种子时 source 细分 + 分账披露行。
+_M337_SEED_CACHE = Path(_ws_mkdtemp("m337_seed_")) / "cache"
+_M337_SEED_CACHE.mkdir(parents=True, exist_ok=True)
+
+
+def _m337_empty(url, timeout=20.0):
+    return True, {"total_count": 0, "items": []}, ""
+
+
+target_scout._get = _m337_empty
+try:
+    _M337_SEED = target_scout.scout_daily(
+        languages=("java",), terms_per_language=1, limit=4, min_stars=300,
+        allow_online=True, today=_M337_TODAY, cache_dir=_M337_SEED_CACHE,
+        max_http_requests=1)
+finally:
+    target_scout._get = _orig_get395
+check("M405：全种子回填时 source 细分",
+      _M337_SEED["source"], "offline_seed_backfill")
+check("M405：seed_backfilled == len(items)",
+      (_M337_SEED["seed_backfilled"], len(_M337_SEED["items"])), (4, 4))
+check("M405：cache_backfilled 为 0", _M337_SEED["cache_backfilled"], 0)
+check("M405：披露行展开两级分账",
+      _lhr395.scout_cache_line(0, 4, 0, 4),
+      "- 侦察缓存与回填：缓存命中 0 页 / 限流回填 4 仓（缓存 0 / 种子 4）")
+
+# M405：单仓 TimeoutExpired 入账 + 3 天失败冷却，复跑不再重复克隆。
+_M337_RUN_DIR = Path(_ws_mkdtemp("m337_fail_"))
+_M337_STATE = _M337_RUN_DIR / "state.json"
+_M337_SYNC_CALLS = {"n": 0}
+
+
+def _m337_scout(**kw):
+    return {"ok": True, "source": "test", "items": [{"slug": "acme/slow"}]}
+
+
+def _m337_sync(slug):
+    _M337_SYNC_CALLS["n"] += 1
+    raise __import__("subprocess").TimeoutExpired(cmd="git clone", timeout=300)
+
+
+_M337_RUN1 = daily_hunt.run(
+    languages=["java"], limit=1, state_path=_M337_STATE,
+    report=_M337_RUN_DIR / "R1.md", json_path=_M337_RUN_DIR / "R1.json",
+    packs_dir=_M337_RUN_DIR / "p1", scout_fn=_m337_scout,
+    sync_fn=_m337_sync, dedup_fn=lambda *a, **k: {"status": "UNKNOWN"})
+_M337_ST = _json395.loads(_M337_STATE.read_text(encoding="utf-8"))
+check("M405：超时 slug 写入 last_failed_at",
+      bool(_M337_ST["repos"]["acme/slow"].get("last_failed_at")), True)
+_M337_RUN2 = daily_hunt.run(
+    languages=["java"], limit=1, state_path=_M337_STATE,
+    report=_M337_RUN_DIR / "R2.md", json_path=_M337_RUN_DIR / "R2.json",
+    packs_dir=_M337_RUN_DIR / "p2", scout_fn=_m337_scout,
+    sync_fn=_m337_sync, dedup_fn=lambda *a, **k: {"status": "UNKNOWN"})
+check("M405：复跑时失败 slug 进入 3 天冷却",
+      (_M337_RUN2["ledger"][0]["result"],
+       _M337_RUN2["ledger"][0]["reason"]),
+      ("SKIPPED", "failed_cooldown_3d"))
+check("M405：冷却后不再重复克隆", _M337_SYNC_CALLS["n"], 1)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

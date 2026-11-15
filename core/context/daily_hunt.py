@@ -452,7 +452,8 @@ def _header(ledger: list[dict], scout: dict, *, days: int,
     # M396：缓存命中 / 半途限流回填是「候选为什么够数」的唯二解释，必须
     # 在头部显式披露，否则 403 之后凭空多出的仓会被误读成在线搜索结果。
     _cache_line = live_hunt_report.scout_cache_line(
-        scout.get("cache_hits"), scout.get("backfilled"))
+        scout.get("cache_hits"), scout.get("backfilled"),
+        scout.get("cache_backfilled"), scout.get("seed_backfilled"))
     if _cache_line:
         lines.append(_cache_line)
     _scout_err = str(scout.get("error") or "").strip()
@@ -509,6 +510,13 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
             _age = last_scan_age_days(_entry)
             if _age is not None and _age < cooldown_days:
                 exclude.add(str(_slug))
+            # M405：失败/超时仓 3 天冷却 —— 防止 ruoyi-vue-pro 这类
+            # 单仓超时在每轮都白卡 300s。只取 min(cooldown_days, 3)。
+            _fail_age = last_scan_age_days(
+                {"last_scanned_at": str(_entry.get("last_failed_at") or "")})
+            if (_fail_age is not None
+                    and _fail_age < min(cooldown_days, 3)):
+                exclude.add(str(_slug))
     # M369：`--repos` 显式指定重扫名单（跳过侦察，只跑这几仓）。
     if repos:
         items = [{"slug": str(s).strip()} for s in repos if str(s).strip()]
@@ -560,6 +568,17 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
                     "head_sha": str(entry.get("last_scanned_sha") or "")})
                 cooldown_skipped += 1
                 continue
+            # M405：失败/超时仓 3 天冷却 —— 即使侦察器把 slug 又塞回来，
+            # 这里也直接顺延，不再白卡一次克隆超时。
+            _fail_age = last_scan_age_days(
+                {"last_scanned_at": str(entry.get("last_failed_at") or "")})
+            if _fail_age is not None and _fail_age < min(cooldown_days, 3):
+                ledger.append({
+                    "slug": slug, "result": "SKIPPED",
+                    "reason": f"failed_cooldown_{min(cooldown_days, 3)}d",
+                    "age_days": round(_fail_age, 2)})
+                cooldown_skipped += 1
+                continue
         try:
             if offline:
                 cached = (upstream_sync.CACHE_ROOT /
@@ -572,9 +591,13 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
             else:
                 sync = sync_fn(slug)
                 if sync.get("status") != "OK":
+                    reason = str(sync.get("reason") or "sync_failed")[:200]
+                    # M405：失败时间入账，3 天内不再重复拉取。
+                    state["repos"][slug] = {
+                        **entry, "last_failed_at": _now(),
+                        "last_failed_reason": reason}
                     ledger.append({
-                        "slug": slug, "result": "FAILED",
-                        "reason": str(sync.get("reason") or "sync_failed")[:200]})
+                        "slug": slug, "result": "FAILED", "reason": reason})
                     continue
                 repo = Path(sync["path"])
 
@@ -644,8 +667,13 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
                            "new_roots": len(new),
                            "fresh_total": res["entry"].get("fresh_total", 0)})
         except Exception as e:                                # noqa: BLE001
+            reason = f"{type(e).__name__}: {e}"[:300]
+            # M405：超时/异常同样入账（last_failed_at），避免下一轮再卡 300s。
+            state["repos"][slug] = {
+                **entry, "last_failed_at": _now(),
+                "last_failed_reason": reason[:200]}
             ledger.append({"slug": slug, "result": "FAILED",
-                           "reason": f"{type(e).__name__}: {e}"[:300]})
+                           "reason": reason})
         finally:
             # M295：缓存清理放进 finally —— 扫描失败/超时也不留 50MB 垃圾。
             # M401：safe-delete 阈值/ACL 拦截时只记 skipped，绝不中断报告落盘。
@@ -680,8 +708,11 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         "dropped_unchanged": int(scout.get("dropped_unchanged") or 0),
         "scout_error": str(scout.get("error") or "")[:400],
         # M396：JSON 侧同源披露，报告头部与 daily 元数据取同一份数。
+        # M405：回填来源分账（缓存池 / 离线种子）。
         "cache_hits": int(scout.get("cache_hits") or 0),
         "backfilled": int(scout.get("backfilled") or 0),
+        "cache_backfilled": int(scout.get("cache_backfilled") or 0),
+        "seed_backfilled": int(scout.get("seed_backfilled") or 0),
         "state_path": str(state_path),
     }
 
