@@ -154,6 +154,24 @@ B 板 3 条全部是 `geowebcache` 的 `authz` UNKNOWN
 第一轮的有效巡猎结果；两轮 JSON 分别在 `.tmp/m398_pass1_daily_hunt.json`
 与 `.tmp/m398_pass2_daily_hunt.json`（均为 gitignore 生成物）。
 
+### 第三轮（11-15 09:00 定时巡猎：403 回填首日实盘）
+
+定时任务按默认参数（java/python/solidity，days=14，limit=10）实跑，Python
+查询撞 `http_403` 提前停手：`source=github_search_rate_limited`、
+`cache_hits=0`、**`backfilled=1`**，候选 1 / 实扫 1 / 失败 0 / 新增根因 0。
+回填的 1 仓来自缓存目录里的历史搜索页（离线种子当时全部处于 7 天冷却或
+未变老仓排除中），报告头部如实输出：
+
+```
+- 侦察缓存与回填：缓存命中 0 页 / 限流回填 1 仓
+- 侦察告警：python: http_403
+```
+
+这证明「半途 403 → 不再空手而归」在真实限流下生效；同时暴露一个**测试隔离
+缺陷**：M311 冒烟用默认参数调 `scout_daily()`，URL 与实盘完全相同，被这次
+09:00 写入的缓存命中后 `_get` 一次都不调，断言数归零变成假红。已给该用例
+传入独立 `cache_dir`，复跑 `smoke_test_chains.py` PASS 1,699 项。
+
 ### 板块 A 精核
 
 两轮 **A=0，无新出候选，无需精核**。按巡检自动复核协议核对
