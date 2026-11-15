@@ -10761,7 +10761,7 @@ check("M297：Solidity 切片仍正常判定",
 print("\n[286] M298：Python 限定词去 panel")
 from core.context import target_scout as _ts298                   # noqa: E402
 _py298 = _ts298.BUSINESS_QUALIFIERS["python"]
-check("M298：panel 已移出 Python 词表", "panel" not in _py298, True)
+check("M298/M419：panel 已纳入 Python 词表", "panel" in _py298, True)
 check("M311：Python 词池改为框架+业务组合词",
       {"fastapi admin", "django erp", "django mall"} <= set(_py298), True)
 check("M311：Java 富矿词池就位",
@@ -11756,9 +11756,9 @@ check("M325：新生代 query 进入实际查询列表",
 check("M325：传统词按天轮转到 page 2..4",
       any(s["track"] == "traditional" and 2 <= int(s["page"]) <= 4
           for s in _r309["query_specs"]), True)
-check("M325：传统词使用星标分桶",
-      any("stars:1001..5000" in q or "stars:300..1000" in q
-          for q in _r309["queries"]), True)
+check("M325/M419：传统词使用三档星标分桶",
+      any(f"stars:{lo}..{hi}" in q for q in _r309["queries"]
+          for lo, hi in ((150, 450), (451, 2000), (2001, 10000))), True)
 check("M325：离线回退仍标注来源", _r309["source"], "offline_seed")
 
 print("\n[310] M326/M327：90 天新提交提权 + FileWriter/FileUtils 写入判据")
@@ -11937,12 +11937,12 @@ check("M335：HACS / ESPHome 被剔除",
       (True, True))
 check("M335：FastAPI RAG 业务仓不误杀",
       _ts309.is_tool_lib("acme/fastapi-rag", "FastAPI RAG backend"), False)
-check("M335：Python 新生代词全部带 Web 框架",
+check("M335/M419：Python 新生代前 15 词仍绑 Web 框架",
       all(k.startswith(("fastapi", "django", "flask"))
-          for k in _ts309.NEW_GEN_KEYWORDS["python"]), True)
-check("M335：Java 新生代词全部带 Spring/MyBatis",
+          for k in _ts309.NEW_GEN_KEYWORDS["python"][:15]), True)
+check("M335/M419：Java 新生代前 15 词仍带 Spring/MyBatis",
       all(("spring-boot" in k or "mybatis-plus" in k)
-          for k in _ts309.NEW_GEN_KEYWORDS["java"]), True)
+          for k in _ts309.NEW_GEN_KEYWORDS["java"][:15]), True)
 _r314 = _ts309.scout_daily(["python"], allow_online=False,
                            today=_dt309.date(2026, 11, 7), limit=6,
                            terms_per_language=2)
@@ -12126,9 +12126,9 @@ check("M342：Gradio 应用判工具库",
       _ts309.is_tool_lib("acme/gradio-ui", "gradio app"), True)
 check("M342：新生代星标下限 150",
       _ts309.NEW_GEN_STARS[0], 150)
-check("M342：传统分桶从 300 起",
+check("M342/M419：传统分桶三档覆盖 80..10000",
       _ts309.TRADITIONAL_STAR_BUCKETS,
-      ((300, 1000), (1001, 5000)))
+      ((80, 450), (451, 2000), (2001, 10000)))
 import inspect as _inspect317                                   # noqa: E402
 check("M342：scout_daily 默认 min_stars=300",
       _inspect317.signature(_ts309.scout_daily).parameters["min_stars"].default,
@@ -14023,6 +14023,57 @@ def f(req):
 '''
 check("M415：切片外全大写配置常量 URL 不判 SSRF",
       _rd395.ssrf_verdict(_M340_SSRF_CONST), False)
+
+print("\n[341] M419/M420：词池扩容 / 三星标桶 / 顺延翻页 / 纯 SDK 剔除")
+check("M419：agentkit 纯 SDK 判工具库",
+      target_scout.is_tool_lib("Hainrixz/whatsapp-agentkit",
+                               "WhatsApp AgentKit library"), True)
+check("M419：webkit-crm-portal 不误杀",
+      target_scout.is_tool_lib("acme/webkit-crm-portal",
+                               "CRM web portal"), False)
+check("M419：传统分桶含 2001..10000",
+      (2001, 10000) in target_scout.TRADITIONAL_STAR_BUCKETS, True)
+check("M419：_bounded_star_range 保留第三桶",
+      target_scout._bounded_star_range(300, 10000, (2001, 10000)),
+      (2001, 10000))
+check("M419：python 业务词 >= 20",
+      len(target_scout.BUSINESS_QUALIFIERS["python"]) >= 20, True)
+check("M419：python 新生代词 >= 30",
+      len(target_scout.NEW_GEN_KEYWORDS["python"]) >= 30, True)
+
+_M341_CACHE = Path(_ws_mkdtemp("m341_")) / "cache"
+_M341_CACHE.mkdir(parents=True, exist_ok=True)
+_M341_CALLS: list[str] = []
+_M341_FAKE = {"total_count": 1, "items": [{
+    "full_name": "acme/portal-suite", "stargazers_count": 5000,
+    "language": "Python", "pushed_at": "2026-11-13T10:00:00Z",
+    "description": "business portal platform", "has_issues": True,
+    "topics": []}]}
+_orig_get341 = target_scout._get
+
+
+def _fake_get341(url, timeout=20.0):
+    _M341_CALLS.append(url)
+    return True, dict(_M341_FAKE), ""
+
+
+target_scout._get = _fake_get341
+try:
+    _r341 = target_scout.scout_daily(
+        languages=("python",), days=21, limit=8, min_stars=300,
+        max_stars=10000, today=target_scout._dt.date(2026, 11, 14),
+        cache_dir=_M341_CACHE, allow_online=True)
+finally:
+    target_scout._get = _orig_get341
+check("M419：顺延覆盖 2001..10000 星标桶",
+      any("stars%3A2001..10000" in u for u in _M341_CALLS), True)
+_M341_NEW_WORDS = ("fastapi", "litestar", "sanic", "aiohttp", "tornado",
+                   "dashboard", "portal", "gateway", "panel", "studio",
+                   "console", "platform", "server", "webhook")
+check("M419：顺延覆盖新增业务词",
+      any(w in u for u in _M341_CALLS for w in _M341_NEW_WORDS), True)
+check("M419：顺延第 3 轮起翻 page=2",
+      any("&page=2" in u for u in _M341_CALLS), True)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

@@ -120,11 +120,20 @@ BUSINESS_QUALIFIERS: dict[str, tuple[str, ...]] = {
     # M311：Java 富矿词池 —— 真实企业后台/脚手架（mybatis-plus / sa-token /
     # shiro 是出洞率最高的一批），不再只写一个裸 "spring-boot"。
     "java": ("mybatis-plus", "sa-token", "shiro", '"spring-boot" admin', "erp",
-             "crm", "mall", "oa", "cms", "mes", "wms"),
+             "crm", "mall", "oa", "cms", "mes", "wms",
+             # M419：企业后台富矿词（脚手架/中台/门户），与既有词轮换。
+             "ruoyi", "jeecg", "yudao", "springboot", "portal", "gateway",
+             "console", "platform", "dashboard", "system", "shop", "pay",
+             "hospital"),
     # M311：Python 用"框架 + 业务"组合词，裸 django/fastapi 会捞回一堆
     # 类型桩/Linter/插件库（django-stubs、djLint、django-auditlog…）。
+    # M419：追加高产单框架/Web 业务词；纯库/插件由 _TOOL_LIB_RE /
+    # _COMPONENT_NAME_RE 在侦察阶段兜底剔除。
     "python": ("fastapi admin", "fastapi cms", "django erp", "django crm",
-               "django mall", "flask admin", "rag admin"),
+               "django mall", "flask admin", "rag admin",
+               "fastapi", "django", "flask", "litestar", "sanic", "aiohttp",
+               "tornado", "dashboard", "portal", "gateway", "panel", "studio",
+               "console", "platform", "server", "webhook"),
     "solidity": ("vault", "staking", "lending", "swap"),
 }
 
@@ -145,13 +154,21 @@ NEW_GEN_KEYWORDS: dict[str, tuple[str, ...]] = {
              '"spring-boot" "iot"', 'mybatis-plus "wms"',
              'mybatis-plus "mes"', '"spring-boot" "his"',
              'mybatis-plus "lims"', '"spring-boot" "report"',
-             'mybatis-plus "bi"'),
+             'mybatis-plus "bi"',
+             # M419：2024–2026 高频 AI/Web 应用词（第 2 页顺延用）。
+             '"ollama"', '"dify"', '"vllm"', '"openwebui"', '"comfyui"',
+             '"langgraph"', '"crewai"', '"autogen"', '"studio"', '"panel"',
+             '"gateway"', '"console"', '"portal"', '"nas"', '"webhook"'),
     "python": ('fastapi "rag"', 'fastapi "agent"', 'fastapi "mcp"',
                'fastapi "workflow"', 'fastapi "text2sql"',
                'fastapi "chatbi"', 'fastapi "knowledge-base"',
                'fastapi "lowcode"', 'django "wms"', 'django "mes"',
                'django "his"', 'flask "iot"', 'fastapi "report"',
-               'fastapi "bi"', 'django "erp"'),
+               'fastapi "bi"', 'django "erp"',
+               # M419：同上，扩充到 30 词并保留前 15 词顺序。
+               '"ollama"', '"dify"', '"vllm"', '"openwebui"', '"comfyui"',
+               '"langgraph"', '"crewai"', '"autogen"', '"studio"', '"panel"',
+               '"gateway"', '"console"', '"portal"', '"nas"', '"webhook"'),
 }
 # M339：新生代“框架+业务词”全干时的回退词。上一版回退到裸框架名，
 # 把函数式库/桌面包装器当成了 Web 业务系统；这次只搜真实系统级业务词，
@@ -163,8 +180,9 @@ NEW_GEN_FALLBACK_WORDS = (
 NEW_GEN_FALLBACK_CREATED_SINCE = "2024-01-01"
 NEW_GEN_FALLBACK_STARS = (150, 5000)
 
-# 传统业务词也按星标分桶；80..450 抓新锐小仓，451..2000 抓中型业务仓。
-TRADITIONAL_STAR_BUCKETS = ((300, 1000), (1001, 5000))
+# 传统业务词也按星标分桶；80..450 抓新锐小仓，451..2000 抓中型业务仓，
+# 2001..10000 抓中大型活跃业务仓（M419：补齐此前从未覆盖的第三梯队）。
+TRADITIONAL_STAR_BUCKETS = ((80, 450), (451, 2000), (2001, 10000))
 
 # M400：缓存池回填的星标下限。在线查询下限是 M342 定的 150（新生代）/300
 # （传统），但 6 小时缓存页里仍可能躺着更早抓到的 80..150 星新锐仓；回填只
@@ -191,6 +209,10 @@ _TOOL_LIB_RE = re.compile(
     r"huey|celery|defectdojo|spring-boot-admin|home[-_]?assistant|"
     r"hacs|custom_components|esphome|comfyui|sd-webui|stable-diffusion|"
     r"gradio|streamlit|jupyter|notebook|mcp-server|"
+    # M420：粘连型纯 SDK/脚手架（agentkit/toolkit/devkit）没有 Web 路由，
+    # 侦察阶段直接丢，别浪费克隆与实扫名额（whatsapp-agentkit 教训）。
+    r"agentkit|agent-kit|toolkit|toolkits|starter-kit|starterkit|"
+    r"dev-kit|devkit|"
     # M358：安全工具/漏洞库/靶场本体（AutoCVE、vuln-scanner、exploit-db、
     # honeypot 等）不是业务系统，扫它们只会把知识库示例当漏洞报。
     # M392：PoC/漏洞文库/靶场模板仓也不是业务系统（Vulnerability-Wiki-PoC、
@@ -867,9 +889,14 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         dropped_tool += drop_tool
         return "ok"
 
+    # M419：limit>=6 时多备 2 个候选缓冲，防止个别候选克隆后因
+    # ZERO_ENTRY_LIB / low_units 跳过导致实扫名额空转；limit<6 的小样本
+    # 单测行为保持不变。
+    buffer_limit = max(1, int(limit)) + (2 if int(limit) >= 6 else 0)
+
     while (allow_online and extra_rounds < max_extra_rounds
            and not rate_limited and not budget_exhausted
-           and _candidate_count() < max(1, int(limit))
+           and _candidate_count() < buffer_limit
            and not _rate_limited()):
         extra_rounds += 1
         _stop = False
@@ -885,7 +912,11 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                     NEW_GEN_PUSHED_SINCE, limit, keyword,
                     created_since=NEW_GEN_CREATED_SINCE,
                     star_range=NEW_GEN_STARS)
-                if _topup_one(lang, "new_gen", q, keyword) == "stop":
+                # M419：第 3 轮起翻到第 2 页，避免 15→30 词扩了但只看
+                # 第 1 页、老仓仍占满结果。
+                _page = 2 if extra_rounds >= 3 else 1
+                if _topup_one(lang, "new_gen", q, keyword,
+                              page=_page) == "stop":
                     _stop = True
                     break
             # ② 传统轨下一顺位词（跨过当天主查询用掉的 traditional_terms 个）。
@@ -900,7 +931,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             if _topup_one(lang, "traditional", q, qualifier) == "stop":
                 _stop = True
                 break
-        if _stop or _candidate_count() >= max(1, int(limit)):
+        if _stop or _candidate_count() >= buffer_limit:
             break
 
     # M396/M400：两级回填。
