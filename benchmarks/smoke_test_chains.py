@@ -13775,6 +13775,102 @@ check("M405：复跑时失败 slug 进入 3 天冷却",
       ("SKIPPED", "failed_cooldown_3d"))
 check("M405：冷却后不再重复克隆", _M337_SYNC_CALLS["n"], 1)
 
+print("\n[338] M407/M408：SSRF 配置源 / 自建临时文件 / 固定源解压 / 克隆限时")
+from core.context import upstream_sync as _us338                 # noqa: E402
+_M338_SSRF_ENV = '''import os, requests
+def f():
+    base_url = os.getenv("API_BASE")
+    return requests.get(f"{base_url}/v1/models")
+'''
+check("M407：环境变量 base_url + 相对路径 → 非 SSRF",
+      _rd395.ssrf_verdict(_M338_SSRF_ENV), False)
+_M338_SSRF_FIXED = '''import requests
+def f(version):
+    return requests.get(f"https://github.com/org/repo/releases/download/{version}/pkg.zip")
+'''
+check("M407：固定主机字面量 → 非 SSRF",
+      _rd395.ssrf_verdict(_M338_SSRF_FIXED), False)
+_M338_SSRF_PARAM = '''def f(request):
+    target_url = request.args.get("url")
+    return requests.get(target_url)
+'''
+check("M407：入口形参控制的 URL 仍判 SSRF",
+      _rd395.ssrf_verdict(_M338_SSRF_PARAM), True)
+_M338_SSRF_HOST = '''def f(request):
+    user_host = request.args.get("host")
+    return requests.get(f"http://{user_host}/v1")
+'''
+check("M407：f-string 主机来自形参仍判 SSRF",
+      _rd395.ssrf_verdict(_M338_SSRF_HOST), True)
+
+_M338_DEL_TMP = '''def f():
+    tmp_path = "/tmp/out.bin"
+    with open(tmp_path, "wb") as fh:
+        fh.write(b"x")
+    os.remove(tmp_path)
+'''
+check("M407：先写盘再删除的自建临时文件 → 非任意删除",
+      _rd395.arbitrary_file_delete_verdict(_M338_DEL_TMP), False)
+_M338_DEL_PARAM = '''def f(root, req_name):
+    os.remove(os.path.join(root, req_name))
+'''
+check("M407：未写入直接删除形参路径仍判任意删除",
+      _rd395.arbitrary_file_delete_verdict(_M338_DEL_PARAM), True)
+
+_M338_ZIP_DIR = Path(_ws_mkdtemp("m338_zip_"))
+(_M338_ZIP_DIR / "svc.py").write_text(
+    "import requests, zipfile\n"
+    "def install_engine(version):\n"
+    "    url = f\"https://cdn.example.com/engine/{version}.zip\"\n"
+    "    requests.get(url)\n"
+    "    with zipfile.ZipFile('e.zip') as z:\n"
+    "        z.extractall('engine')\n", encoding="utf-8")
+check("M407：无上传入参 + 固定域名下载解压 → VENDOR_ARCHIVE_EXTRACT",
+      wild_noise.classify({"category": "zip_slip", "unit": "install_engine",
+                           "file": "svc.py"}, _M338_ZIP_DIR).get("code"),
+      wild_noise.VENDOR_ARCHIVE_EXTRACT)
+
+check("M408：sync_repo 默认 clone_timeout == 90",
+      _us338.sync_repo.__defaults__[-1], 90)
+_M338_SYNC_ROOT = Path(_ws_mkdtemp("m338_sync_"))
+_M338_CLONES: list[str] = []
+
+
+def _m338_git_timeout(args, cwd=None, timeout=None):
+    if args and args[0] == "clone":
+        _M338_CLONES.append("clone")
+        return 1, "TimeoutExpired: Command timed out after 90 seconds"
+    return 0, ""
+
+
+with _mock395.patch.object(_us338, "_git", side_effect=_m338_git_timeout):
+    _M338_SYNC1 = _us338.sync_repo("acme/timeout",
+                                   dest_root=_M338_SYNC_ROOT)
+check("M408：克隆超时只调用 1 次 clone 并返回 UNKNOWN",
+      (_M338_SYNC1["status"], len(_M338_CLONES)), ("UNKNOWN", 1))
+_M338_CLONES.clear()
+
+
+def _m338_git_oldfilter(args, cwd=None, timeout=None):
+    if args and args[0] == "clone":
+        _M338_CLONES.append("clone")
+        if len(_M338_CLONES) == 1:
+            return 1, "error: unknown option 'filter=blob:none'"
+        return 0, ""
+    if args and args[0] == "rev-parse":
+        return 0, "a" * 40
+    return 0, "main"
+
+
+with _mock395.patch.object(_us338, "_git",
+                           side_effect=_m338_git_oldfilter), \
+        _mock395.patch.object(_us338, "head_commit_info",
+                              return_value={}):
+    _M338_SYNC2 = _us338.sync_repo("acme/oldgit",
+                                   dest_root=_M338_SYNC_ROOT)
+check("M408：仅 filter 不支持时才二次无 filter 重试",
+      (_M338_SYNC2["status"], len(_M338_CLONES)), ("OK", 2))
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

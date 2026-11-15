@@ -69,6 +69,9 @@ WEBHOOK_CHALLENGE_ECHO = "WEBHOOK_CHALLENGE_ECHO"
 UNVERIFIED_WILD_AUTHZ = "UNVERIFIED_WILD_AUTHZ"
 ZERO_ENTRY_LIB = "ZERO_ENTRY_LIB"
 RULE_LANGUAGE_MISMATCH = "RULE_LANGUAGE_MISMATCH"
+# M407：zip_slip 但解压对象来自固定域名下载的组件包（自更新/内置资源），
+# 且入口没有任何上传入参 —— 攻击者不能控制压缩包内容，不是可交单的 zip_slip。
+VENDOR_ARCHIVE_EXTRACT = "VENDOR_ARCHIVE_EXTRACT"
 # M302：入口文件里根本没有 SQL 执行语句，sqli 根因一定来自切片里
 # 未被入口调用的辅助函数（跨跳污染）。宁可进 B 等人工复核，不进 A。
 NO_SQL_SINK = "NO_SQL_SINK"
@@ -576,6 +579,31 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
                             "reason": ("跳转目标由服务端 URL 构造 helper 产出，"
                                        "实参为常量/布尔/非自由文本，"
                                        "外部域名不可控")}
+
+    # M407：zip_slip 降噪 —— 入口没有上传入参，解压对象来自固定域名下载的
+    # 组件包（引擎/资源自更新），压缩包内容不可由请求方控制。
+    if (record.get("category") == "zip_slip" and file.endswith(".py")
+            and repo_root is not None):
+        _zsrc = _read(repo_root, str(record.get("file") or ""))
+        if _zsrc:
+            _zblock = _ws_handler_block(_zsrc, unit) or _zsrc
+            _has_upload = bool(re.search(
+                r"\bUploadFile\b|\bFile\s*\(|request\s*\.\s*files|"
+                r"request\s*\.\s*FILES", _zblock))
+            # M409：压缩包来源若可由请求体/查询参数控制（download_url 等），
+            # 就不是"固定域名组件包" —— 不能降噪，否则会把真 zip_slip 藏掉。
+            _body_url = bool(re.search(
+                r"body\s*\.\s*get\s*\(\s*[\"'](?:download_url|url|file_url)"
+                r"[\"']|request\s*\.\s*(?:json|form|args|GET|POST)|"
+                r"\bparams\s*\.\s*get\s*\(", _zblock))
+            _fixed_dl = bool(
+                re.search(r"f?[\"']https?://[A-Za-z0-9._-]+/", _zblock)
+                and re.search(r"requests|httpx|urllib|urlretrieve",
+                              _zblock, re.I))
+            if not _has_upload and not _body_url and _fixed_dl:
+                return {"blocked": True, "code": VENDOR_ARCHIVE_EXTRACT,
+                        "reason": ("无外部上传入参，解压对象来自固定域名"
+                                   "下载的组件包（自更新/内置资源）")}
 
     # M375：上传面。前提 A（已防穿越）+ 条件 B（无可服务/可执行出口）
     # 同时成立 → 攻击者既跳不出目录，也拿不到 inline 响应，压 B 板。

@@ -4530,9 +4530,19 @@ SSRF_URL_EVIDENCE_RE = re.compile(
     r"\b(?:Http)?URLConnection\b|\bURL\s+[A-Za-z_]\w*\s*=")
 
 
+# M407：Python HTTP 客户端本身就是强 sink —— 不论实参变量名是否含 url。
+# 旧规则只认 `requests.get(url)` 这类"实参名带 url"的形态，于是
+# `requests.get(f"{base_url}/v1")` 连 sink 都识别不到，规则直接退 None。
+SSRF_PY_CLIENT_RE = re.compile(
+    r"\b(?:requests|httpx|aiohttp)\s*\.\s*"
+    r"(?:get|post|put|delete|head|patch|request|stream)\s*\(")
+
+
 def _ssrf_sink_hit(body: str) -> bool:
     """本方法体里有没有**够格**的 SSRF sink（弱 sink 需带 URL 旁证）。"""
     if SSRF_SINK_RE.search(body):
+        return True
+    if SSRF_PY_CLIENT_RE.search(body):
         return True
     return bool(SSRF_WEAK_SINK_RE.search(body)
                 and SSRF_URL_EVIDENCE_RE.search(body))
@@ -4563,6 +4573,82 @@ def _httpclient_sink_hit(body: str) -> bool:
             return True
         if re.search(r"[A-Za-z_]\w*", _STR_LIT_RE.sub(" ", arg)):
             return True
+    return False
+
+
+# ---------------- M407：配置源 / 固定主机排除 ----------------
+# 请求目标来自环境变量或配置（os.getenv / os.environ / settings.* /
+# config.* / app.config.*），或主机部分被字面量锁死 —— 都不是 SSRF。
+_CONFIG_READER_RE = re.compile(
+    r"^(?:os\s*\.\s*getenv|os\s*\.\s*environ\s*\.\s*get|"
+    r"os\s*\.\s*environ\s*\[|settings\s*(?:\.|\[)|"
+    r"config\s*(?:\.|\[)|app\s*\.\s*config\s*(?:\.|\[))")
+# 字面量协议 + 主机 + `/`：主机名后第一个 `/` 之前不含 `{`/变量拼接。
+_FIXED_HOST_URL_RE = re.compile(r"^f?[\"']https?://[A-Za-z0-9._-]+/")
+_RELATIVE_URL_RE = re.compile(r"^f?[\"']/")
+_SSRF_URL_ARG_RES = (
+    re.compile(r"(?:requests|httpx|aiohttp)\s*\.\s*"
+               r"(?:get|post|put|delete|head|patch|request|stream)\s*"
+               r"\(\s*([^,\n)]+)"),
+    re.compile(r"urllib\s*\.\s*request\s*\.\s*(?:urlopen|urlretrieve)\s*"
+               r"\(\s*([^,\n)]+)"),
+    re.compile(r"\b(?:client|session)\s*\.\s*"
+               r"(?:get|post|put|delete|head|patch|request)\s*"
+               r"\(\s*([^,\n)]+)"),
+)
+
+
+def _config_rhs(rhs: str, source: str, body: str) -> bool:
+    """赋值右值是否是环境变量/配置读取，或固定主机字面量。"""
+    e = (rhs or "").strip()
+    if not e:
+        return False
+    if _CONFIG_READER_RE.match(e) or _FIXED_HOST_URL_RE.match(e):
+        return True
+    # 一跳别名：u = base; base = os.getenv(...)
+    am = re.fullmatch(r"[A-Za-z_]\w*", e)
+    if am:
+        rhs2 = _last_assign_rhs(body, am.group(0))
+        if rhs2 and (_CONFIG_READER_RE.match(rhs2.strip())
+                     or _FIXED_HOST_URL_RE.match(rhs2.strip())):
+            return True
+    return False
+
+
+def _url_var_is_config(var: str, source: str, body: str,
+                       params: set[str]) -> bool:
+    """URL 变量是否由配置/环境变量/固定主机赋值（且不是入口形参）。"""
+    if not re.fullmatch(r"[A-Za-z_]\w*", var or ""):
+        return False
+    if var in params:
+        return False
+    rhs = _last_assign_rhs(body, var)
+    if rhs and _config_rhs(rhs, source, body):
+        return True
+    # 同文件顶部的全大写常量
+    if re.fullmatch(r"[A-Z][A-Z0-9_]*", var):
+        cm = re.search(rf"(?m)^\s*{re.escape(var)}\s*=\s*([^\n]+)", source)
+        if cm and _config_rhs(cm.group(1), source, body):
+            return True
+    return False
+
+
+def _ssrf_arg_safe(expr: str, source: str, body: str,
+                   params: set[str]) -> bool:
+    """URL 实参是否指向配置主机/固定主机（安全）；保守返回 False。"""
+    e = (expr or "").strip()
+    if not e:
+        return False
+    if _FIXED_HOST_URL_RE.match(e) or _CONFIG_READER_RE.match(e):
+        return True
+    m = re.match(r"^f?[\"']\{([A-Za-z_]\w*)\}", e)
+    if m:
+        return _url_var_is_config(m.group(1), source, body, params)
+    m = re.match(r"^([A-Za-z_]\w*)\s*(?:\+|%|\.\s*format)", e)
+    if m:
+        return _url_var_is_config(m.group(1), source, body, params)
+    if re.fullmatch(r"[A-Za-z_]\w*", e):
+        return _url_var_is_config(e, source, body, params)
     return False
 
 
@@ -4597,20 +4683,36 @@ def ssrf_verdict(source: str) -> bool | None:
         if nat is not None:
             return nat
         return None
-    # M320：请求目标来自配置（settings.VOIP_FORWARD_URL / config.*），
-    # 不是请求入参 —— 这是正向转发，不是 SSRF。
-    _url_args = re.findall(
-        r"(?:requests|httpx)\s*\.\s*(?:get|post|put|delete|head|request)\s*"
-        r"\(\s*([A-Za-z_][\w.]*)", body)
-    def _config_url(a: str) -> bool:
-        if a.startswith(("settings.", "config.", "app.config.")):
-            return True
-        # 局部变量再上溯一层：url = settings.VOIP_FORWARD_URL
-        return bool(re.search(
-            rf"\b{re.escape(a)}\s*=\s*(?:settings|config|app\.config)\.",
-            body))
-
-    if _url_args and all(_config_url(a) for a in _url_args):
+    # M320/M407：请求目标来自配置/环境变量，或主机部分被固定域名锁死 ——
+    # 都不是请求入参可控的 SSRF。
+    _params = (_py_func_params(source) if _looks_python(source) else set())
+    _url_args = [m.group(1).strip() for _r in _SSRF_URL_ARG_RES
+                 for m in _r.finditer(body)]
+    if _url_args and all(_ssrf_arg_safe(a, source, body, _params)
+                         for a in _url_args):
+        return False
+    # httpx/requests Client(base_url=配置)：相对路径请求的主机由配置锁死，
+    # 入口形参只能改路径/查询串（ai-agent-platform 的 enqueue_message 形态）。
+    _cfg_base = False
+    _client_names: set[str] = set()
+    for _cm in re.finditer(
+            r"(?:httpx|requests)\s*\.\s*(?:AsyncClient|Client|Session)\s*\(",
+            body):
+        _seg = body[_cm.end():_cm.end() + 400]
+        _bm = re.search(r"base_url\s*=\s*([^,)\n]+)", _seg)
+        if _bm and _config_rhs(_bm.group(1), source, body):
+            _cfg_base = True
+        _am = re.search(r"\bas\s+([A-Za-z_]\w*)", _seg[:300])
+        if _am:
+            _client_names.add(_am.group(1))
+    if _cfg_base and _client_names:
+        _crx = re.compile(
+            r"\b(?:" + "|".join(re.escape(n) for n in _client_names)
+            + r")\s*\.\s*(?:get|post|put|delete|head|patch|request)\s*"
+              r"\(\s*([^,\n)]+)")
+        _url_args += [m.group(1).strip() for m in _crx.finditer(body)]
+    if (_cfg_base and _url_args
+            and all(_RELATIVE_URL_RE.match(a) for a in _url_args)):
         return False
     # Java：URL 变量由配置读取器赋值（SpringUtil.getProperty / Environment /
     # @Value / properties.get*），同样不是请求入参 —— qKnow 的 flow.url 形态。
@@ -12008,6 +12110,47 @@ _TEMP_FILE_ORIGIN_RE = re.compile(
     r"TemporaryFile|TemporaryDirectory)\s*\(", re.I)
 
 
+def _self_created_temp(body: str, arg: str, pos: int) -> bool:
+    """M407：删除目标是不是本函数自己创建/写入的临时文件。
+
+    覆盖四类证据（只看删除语句之前的 body）：
+      1. `X = mkstemp()/NamedTemporaryFile()`（arg 本身或 `X.name` 的 X）；
+      2. `open(arg, "w/a/x...")`；
+      3. `arg.write_bytes()/write_text()/save()` 或 `save(arg)` / `shutil.copy*(..., arg)`；
+      4. 变量名含 tmp/temp，且赋值右值含 temp/tmp/uuid/gettempdir。
+    """
+    arg = (arg or "").strip()
+    base = arg.split(".", 1)[0].strip()
+    if not re.fullmatch(r"[A-Za-z_]\w*", base or ""):
+        return False
+    pre = body[:pos]
+    # 1) 临时文件工厂赋值（arg 或它的宿主变量，如 tf.name 的 tf）
+    for _name in {arg, base}:
+        _assigns = [am for am in re.finditer(
+            rf"(?m)^[ \t]*(?:[^=\n]*,\s*)?{re.escape(_name)}\s*=\s*[^\n]*$",
+            pre)]
+        if _assigns and _TEMP_FILE_ORIGIN_RE.search(_assigns[-1].group(0)):
+            return True
+    _a = re.escape(arg)
+    # 2) 本函数先写盘，再删除（临时文件生命周期）
+    if re.search(rf"\bopen\s*\(\s*{_a}\s*,\s*[^)]*[\"'][^\"']*[wax]", pre):
+        return True
+    # 3) pathlib / PIL / shutil 的写入形态
+    if re.search(rf"\b{_a}\s*\.\s*(?:write_bytes|write_text|save)\s*\(", pre):
+        return True
+    if re.search(rf"\.\s*save\s*\(\s*{_a}\s*[,)]", pre):
+        return True
+    for _cm in re.finditer(r"\bshutil\s*\.\s*copy\w*\s*\(([^)]*)\)", pre):
+        if re.search(rf"\b{_a}\b", _cm.group(1)):
+            return True
+    # 4) tmp/temp 命名的变量，右值来自临时目录/随机名
+    if re.search(r"tmp|temp", base, re.I):
+        _rhs = _last_assign_rhs(pre, base) or ""
+        if re.search(r"temp|tmp|uuid|gettempdir", _rhs, re.I):
+            return True
+    return False
+
+
 def arbitrary_file_delete_verdict(source: str) -> bool | None:
     """第 40 类（M220）：外部路径直接删除，未做规范化目录校验。"""
     body = entry_body(source) or source
@@ -12031,6 +12174,9 @@ def arbitrary_file_delete_verdict(source: str) -> bool | None:
               else set(_bare_params(_entry_signature(source))))
     if arg in params:
         return True
+    # M407：删除目标在本函数里先被创建/写入 → 清理自己的临时文件，不是任意删除。
+    if _self_created_temp(body, arg, m.start()):
+        return False
     if re.fullmatch(r"[A-Za-z_]\w*", arg):
         # 删除的是本函数自己 mkstemp 出来的临时文件 → 不是任意文件删除。
         # 取 sink 之前**最后一次**赋值（先 temp_path = None、后 mkstemp 是常见写法）。
