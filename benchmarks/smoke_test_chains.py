@@ -11252,7 +11252,10 @@ def _fake_get311(url, timeout=20.0):
 
 _ts311._get = _fake_get311
 try:
-    _ts311.scout_daily(languages=["java", "python"], allow_online=True)
+    # M396：默认参数与实盘 daily-hunt 相同，URL 会被真实 6 小时缓存命中；
+    # 这里必须给独立 cache_dir，否则 _get 一次都不调，断言数归零（假红）。
+    _ts311.scout_daily(languages=["java", "python"], allow_online=True,
+                       cache_dir=Path(_ws_mkdtemp("m311_cache_")))
 finally:
     _ts311._get = _orig_get311
 check("M311：每语言默认查 2 个轮换词", len(_calls311), 4)
