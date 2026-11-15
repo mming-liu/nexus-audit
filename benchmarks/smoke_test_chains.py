@@ -13830,8 +13830,8 @@ check("M407：无上传入参 + 固定域名下载解压 → VENDOR_ARCHIVE_EXTR
                            "file": "svc.py"}, _M338_ZIP_DIR).get("code"),
       wild_noise.VENDOR_ARCHIVE_EXTRACT)
 
-check("M408：sync_repo 默认 clone_timeout == 90",
-      _us338.sync_repo.__defaults__[-1], 90)
+check("M408/M412：sync_repo 默认 clone_timeout == 180",
+      _us338.sync_repo.__defaults__[-1], 180)
 _M338_SYNC_ROOT = Path(_ws_mkdtemp("m338_sync_"))
 _M338_CLONES: list[str] = []
 
@@ -13839,7 +13839,7 @@ _M338_CLONES: list[str] = []
 def _m338_git_timeout(args, cwd=None, timeout=None):
     if args and args[0] == "clone":
         _M338_CLONES.append("clone")
-        return 1, "TimeoutExpired: Command timed out after 90 seconds"
+        return 1, "TimeoutExpired: Command timed out after 180 seconds"
     return 0, ""
 
 
@@ -13870,6 +13870,54 @@ with _mock395.patch.object(_us338, "_git",
                                    dest_root=_M338_SYNC_ROOT)
 check("M408：仅 filter 不支持时才二次无 filter 重试",
       (_M338_SYNC2["status"], len(_M338_CLONES)), ("OK", 2))
+
+print("\n[339] M411/M412：默认回环 + 全局鉴权降噪 / clone_timeout=180")
+_M339_TUBE = Path(_ws_mkdtemp("m339_tube_"))
+(_M339_TUBE / "server.py").write_text(
+    "from fastapi import FastAPI, Request\n"
+    "app = FastAPI()\n"
+    "@app.middleware('http')\n"
+    "async def gate(request: Request, call_next):\n"
+    "    from tubecli.core import auth\n"
+    "    refusal = auth.check_request(request.client.host,\n"
+    "                                request.cookies.get('sid'), request.headers)\n"
+    "    if refusal is not None:\n"
+    "        return refusal\n"
+    "    return await call_next(request)\n", encoding="utf-8")
+(_M339_TUBE / "run.py").write_text(
+    "import uvicorn\n"
+    "from server import app\n"
+    "def main(host: str = '127.0.0.1'):\n"
+    "    uvicorn.run(app, host=host, port=5295)\n", encoding="utf-8")
+for _cat339 in ("ssrf", "zip_slip", "unrestricted_upload",
+                "arbitrary_file_delete"):
+    _c339 = wild_noise.classify(
+        {"category": _cat339, "unit": "api_local",
+         "file": "routes.py"}, _M339_TUBE)
+    check(f"M411：默认回环 + 全局鉴权的 {_cat339} 收归 B 板",
+          (_c339.get("blocked"), _c339.get("code") in
+           (wild_noise.AUTHENTICATED_LOCAL_ONLY,
+            wild_noise.LOCAL_LOOPBACK_ONLY)), (True, True))
+
+_M339_AND = Path(_ws_mkdtemp("m339_and_"))
+(_M339_AND / "run.py").write_text(
+    "import uvicorn\n"
+    "from app import app\n"
+    "uvicorn.run(app, host='0.0.0.0', port=5055)\n", encoding="utf-8")
+(_M339_AND / "app.py").write_text(
+    "from fastapi import FastAPI\n"
+    "from fastapi.middleware.cors import CORSMiddleware\n"
+    "app = FastAPI()\n"
+    "app.add_middleware(CORSMiddleware, allow_origins=['http://127.0.0.1:5173'])\n",
+    encoding="utf-8")
+_M339_AND_REC = wild_noise.classify(
+    {"category": "arbitrary_file_delete", "unit": "explorer_delete",
+     "file": "routers/explorer.py"}, _M339_AND)
+check("M411：0.0.0.0 无鉴权的删除入口不被降噪",
+      _M339_AND_REC.get("blocked"), False)
+
+check("M412：sync_repo 默认 clone_timeout == 180",
+      _us338.sync_repo.__defaults__[-1], 180)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

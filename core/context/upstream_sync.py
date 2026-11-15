@@ -103,16 +103,16 @@ def _current_branch(dest: Path, slug: str) -> str:
 
 
 def sync_repo(slug: str, dest_root: Path = CACHE_ROOT,
-              depth: int = 50, clone_timeout: int = 90) -> dict:
+              depth: int = 50, clone_timeout: int = 180) -> dict:
     """轻量浅克隆/fetch 到缓存目录；返回 head_sha / branch / path（M392）。
 
     首次克隆不再先发 `ls-remote` 探测默认分支（瞬断会盲退 main，非 main 仓
     直接失败），而是 `--single-branch --no-tags --filter=blob:none` 让远端
     HEAD 决定分支；老 git 不支持 `--filter` 时自动回退。
 
-    M408：首次 clone 限时 `clone_timeout`（默认 90s）；**只有** git 明确报
-    "不支持 --filter" 时才回退第二次 clone。超时/网络错误直接清理并返回
-    UNKNOWN —— 消灭"超时 300s 再全量重跑 300s"的双倍卡死。
+    M408：首次 clone 限时 `clone_timeout`（M412 调优为 180s）；**只有** git
+    明确报"不支持 --filter"时才回退第二次 clone。超时/网络错误直接清理并
+    返回 UNKNOWN —— 消灭"超时 300s 再全量重跑 300s"的双倍卡死。
     """
     dest_root.mkdir(parents=True, exist_ok=True)
     dest = dest_root / safe_dirname(slug)

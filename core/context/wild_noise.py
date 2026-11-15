@@ -69,6 +69,9 @@ WEBHOOK_CHALLENGE_ECHO = "WEBHOOK_CHALLENGE_ECHO"
 UNVERIFIED_WILD_AUTHZ = "UNVERIFIED_WILD_AUTHZ"
 ZERO_ENTRY_LIB = "ZERO_ENTRY_LIB"
 RULE_LANGUAGE_MISMATCH = "RULE_LANGUAGE_MISMATCH"
+# M411：服务默认回环绑定 + 全局请求鉴权 —— 认证后的本地管理面，
+# 不作为远程未授权 0-day 交单（tubecli 的 4 条本地项由此收归 B 板）。
+AUTHENTICATED_LOCAL_ONLY = "AUTHENTICATED_LOCAL_ONLY"
 # M407：zip_slip 但解压对象来自固定域名下载的组件包（自更新/内置资源），
 # 且入口没有任何上传入参 —— 攻击者不能控制压缩包内容，不是可交单的 zip_slip。
 VENDOR_ARCHIVE_EXTRACT = "VENDOR_ARCHIVE_EXTRACT"
@@ -428,6 +431,84 @@ def _repo_loopback_only(repo_root: Path | None) -> tuple[bool, str]:
     return res
 
 
+# ---------------- M411：默认回环绑定 + 全局请求鉴权 ----------------
+# tubecli 的启动方式不是字面量 `uvicorn.run(app, host="127.0.0.1")`，而是
+#   host: str = "127.0.0.1"
+#   uvicorn.run(app, host=host)
+# 旧 `_LOOPBACK_BIND_RE` 只认字面量，漏掉了这种变量/默认参数形态。
+_LOOPBACK_DEFAULT_RE = re.compile(
+    r"\bhost\s*(?::\s*str)?\s*=\s*[\"'](?:127\.0\.0\.1|localhost|::1)[\"']|"
+    # tubecli：host = "0.0.0.0" if (in_container() or headless) else "127.0.0.1"
+    r"\bhost\s*=\s*[\"']0\.0\.0\.0[\"']\s+if\b[^\n]*\belse\s+[\"']"
+    r"(?:127\.0\.0\.1|localhost|::1)[\"']|"
+    r"os\s*\.\s*(?:getenv|environ\s*\.\s*get)\s*\([^)]*,\s*[\"']"
+    r"(?:127\.0\.0\.1|localhost|::1)[\"']\s*\)")
+_HOST_VAR_BIND_RE = re.compile(
+    r"\b(?:uvicorn\s*\.\s*run|app\s*\.\s*run|hypercorn\s*\.\s*run|serve)\s*"
+    r"\([^)]*?\bhost\s*=\s*host\b", re.I | re.S)
+# 全局请求鉴权：FastAPI/Flask 中间件、before_request、或通用 auth 校验调用。
+_GLOBAL_AUTH_RE = re.compile(
+    r"@app\s*\.\s*middleware\s*\(\s*[\"']http[\"']\s*\)|"
+    r"@app\s*\.\s*before_request|"
+    r"add_middleware\s*\(\s*\w*(?:Auth|Token|Session)\w*|"
+    r"\bauth\s*\.\s*check_request\s*\(|"
+    r"\bverify_token\s*\(|\bcheck_auth\s*\(", re.I)
+_REPO_AUTH_LOCAL_MEMO: dict[str, tuple[bool, str]] = {}
+
+
+def _repo_authenticated_local(repo_root: Path | None) -> tuple[bool, str]:
+    """M411：整仓是否「默认回环绑定 + 全局请求鉴权」。
+
+    条件 A：主服务有显式回环绑定（字面量或 `host = "127.0.0.1"` 变量形态），
+            且**没有无条件**的字面量 0.0.0.0 启动（android-agent 的
+            `run.py:11` 就是无条件 0.0.0.0 → 不满足）。
+    条件 B：主服务挂有全局请求鉴权中间件/守卫。
+    容器/headless 分支里的条件公网绑定（`host = "0.0.0.0" if ... else ...`）
+    不直接判公网 —— 那是显式部署选择，且全局鉴权仍在。
+    """
+    if repo_root is None:
+        return False, ""
+    root = Path(repo_root)
+    try:
+        key = str(root.resolve())
+    except OSError:
+        key = str(root)
+    if key in _REPO_AUTH_LOCAL_MEMO:
+        return _REPO_AUTH_LOCAL_MEMO[key]
+
+    loop_ev = ""
+    auth_ev = ""
+    public_ev = ""
+    scanned = 0
+    for p in root.rglob("*.py"):
+        if any(part in _SCAN_SKIP_DIRS for part in p.parts):
+            continue
+        scanned += 1
+        if scanned > 400:
+            break
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        rel = p.relative_to(root).as_posix()
+        if not loop_ev:
+            if _LOOPBACK_BIND_RE.search(text):
+                loop_ev = f"{rel} 显式回环绑定"
+            elif (_LOOPBACK_DEFAULT_RE.search(text)
+                  and _HOST_VAR_BIND_RE.search(text)):
+                loop_ev = f"{rel} 默认 host=127.0.0.1 变量绑定"
+        if not auth_ev and _GLOBAL_AUTH_RE.search(text):
+            auth_ev = f"{rel} 全局请求鉴权"
+        if not public_ev and _PUBLIC_BIND_RE.search(text):
+            public_ev = f"{rel} 无条件绑定 0.0.0.0"
+            break
+
+    res = (bool(loop_ev) and bool(auth_ev) and not public_ev,
+           f"{loop_ev} + {auth_ev}" if not public_ev else "")
+    _REPO_AUTH_LOCAL_MEMO[key] = res
+    return res
+
+
 # M379：跨文件 2-Hop 上传守卫。入口把校验/落盘委托给 service 时，
 # 单文件切片看不到白名单与固定命名，规则层会判 True；这里用 repo_root
 # 把 Hop1（service）与 Hop2（校验/存储 helper）拼回证据面。
@@ -658,6 +739,15 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
         return {"blocked": True, "code": LOCAL_LOOPBACK_ONLY,
                 "reason": (f"同仓主服务仅绑定回环（{_repo_ev}），"
                            f"子路由继承单机边界，无远程攻击面")}
+    # M411：默认回环绑定（变量/默认参数形态）+ 全局请求鉴权 —— 认证后的
+    # 本地管理面。tubecli 的 4 条本地项由此收归 B 板；android-agent 的
+    # `run.py:11` 是无条件 0.0.0.0，条件 A 不成立，不受影响。
+    _repo_auth_local, _repo_auth_ev = _repo_authenticated_local(repo_root)
+    if _repo_auth_local:
+        return {"blocked": True, "code": AUTHENTICATED_LOCAL_ONLY,
+                "reason": (f"服务默认回环绑定且挂有全局请求鉴权"
+                           f"（{_repo_auth_ev}），属认证后本地管理面，"
+                           f"不作为远程未授权 0-day 交单")}
 
     if record.get("category") == "cmdi" and file.endswith(".py"):
         src = _read(repo_root, str(record.get("file") or ""))
