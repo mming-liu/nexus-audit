@@ -12,4 +12,12 @@
 
 当前 6 单状态总表见 [CVE_AUTO_SUBMIT_2026-11-08.md](CVE_AUTO_SUBMIT_2026-11-08.md)：6 个 CAN 均为 PUBLISHED，等待 MITRE 审核分配正式 CVE。
 
+## v1.5.17 新增候选（防御修复包，未提交）
+
+| # | 单 | 文件 | 披露入口 | CWE | 状态 |
+|---|---|---|---|---|---|
+| 6 | android-agent 未授权目录删除 | [06_android_agent.md](06_android_agent.md) | GitHub Private Security Advisory / security@ghostinthedroid.com | CWE-22 / CWE-862 | 待用户通过 GitHub Private Security Advisory 私密提交 |
+
+该文件只含代码定位与防御补丁，不含攻击载荷或 `curl` 攻击命令。
+
 每份都包含：Step 1 提交入口、Step 2 GitHub 标题/描述、Step 3 CVE.org 六框、Step 3B CVE Services 逐框值、过审三要素、固定答法、提交前检查。
