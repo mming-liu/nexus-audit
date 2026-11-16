@@ -2,248 +2,226 @@
 
 > 机器事实源：benchmarks/results/daily_hunt.json。本报告的 A/B 行数必须与 JSON 计数一致；ZERO_RECORD_FRESH 只代表四个来源**实际查过且 0 命中**，不代表漏洞一定成立，更不代表人工已核验。
 
-- 生成时间：2026-11-16 00:07:47
-- 总条数：193 ｜ 板块 A：**7** ｜ 板块 B：**186**
-- 状态计数：ZERO_RECORD_FRESH 7 / DUPLICATE_CVE 0 / DUPLICATE_ISSUE_OR_GHSA 0 / PATCHED_UPSTREAM 0 / STALE_REPO 0 / UNKNOWN 186
+- 生成时间：2026-11-16 08:08:48
+- 总条数：173 ｜ 板块 A：**11** ｜ 板块 B：**162**
+- 状态计数：ZERO_RECORD_FRESH 11 / DUPLICATE_CVE 0 / DUPLICATE_ISSUE_OR_GHSA 0 / PATCHED_UPSTREAM 0 / STALE_REPO 0 / UNKNOWN 162
 
-<!-- live_hunt_counts: {"BOARD_A": 7, "BOARD_B": 186, "DUPLICATE_CVE": 0, "DUPLICATE_ISSUE_OR_GHSA": 0, "PATCHED_UPSTREAM": 0, "STALE_REPO": 0, "UNKNOWN": 186, "ZERO_RECORD_FRESH": 7} -->
+<!-- live_hunt_counts: {"BOARD_A": 11, "BOARD_B": 162, "DUPLICATE_CVE": 0, "DUPLICATE_ISSUE_OR_GHSA": 0, "PATCHED_UPSTREAM": 0, "STALE_REPO": 0, "UNKNOWN": 162, "ZERO_RECORD_FRESH": 11} -->
 
 ## 今日巡猎（daily-hunt）
 
 > 自动流水线：近 21 天有提交的 java/python 仓 → 同 HEAD 直接跳过 → 只报新引入或尚未导出的 ZERO_RECORD_FRESH 根因；本次即扫即焚 0 个缓存。
 
-- 候选仓：16 ｜ 实扫：4 ｜ 跳过：8 ｜ 失败：4 ｜ 候选来源：github_search
-- 本次新增根因：193 ｜ 板块 A：7 ｜ 拦截进 B：186
+- 候选仓：13 ｜ 实扫：5 ｜ 跳过：5 ｜ 失败：3 ｜ 候选来源：github_search
+- 本次新增根因：173 ｜ 板块 A：11 ｜ 拦截进 B：162
 - 证据不足未列：0 条（NVD 熔断 / 全网 Issue 限流，未宣称 FRESH，需人工复核）
 - 冷却期免克隆：0 个（--cooldown-days 7：距上次扫描不足 7 天的仓直接 0 秒顺延）
 - 侦察免克隆排除（未变老仓）：0 个
 
 | 仓库 | HEAD | 结果 | 新增 |
 |---|---|---|---|
-| tmseidel/ai-git-bot | d1e8b3b5b52c | SCANNED | 60 |
-| siddsachar/row-bot | ec7007a66874 | SKIPPED (all_local_or_demo) | 0 |
-| silentchainai/SILENTCHAIN | eed72be5c440 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
-| pipeshub-ai/pipeshub-ai |  | FAILED (TimeoutExpired: Command '['C:\\Users\\ee) | 0 |
-| kstevica/captain-claw | 4c859d5c2ffa | SKIPPED (all_local_or_demo) | 0 |
-| ldbumble/taskuary |  | FAILED (clone_failed: Cloning into 'C:\myFloders) | 0 |
-| roandejager/Hillock | b5e2569ab3aa | SKIPPED (low_units_3) | 0 |
-| Lethe044/hermes-life-os | d344941e1af0 | SKIPPED (all_local_or_demo) | 0 |
-| xuiltul/animaworks | 104f809b1ec1 | SCANNED | 90 |
-| ttlequals0/MinusPod |  | FAILED (clone_failed: benchmarks/llm/results/raw) | 0 |
-| Aseiel/VideoHighlighter | eaff178fd25f | SCANNED | 0 |
-| grregis/MuckScraper | 04fc19d290dc | SCANNED | 43 |
-| crow-hq/llm-wiki-v2 | 436fcd148f9e | SKIPPED (all_local_or_demo) | 0 |
-| SudoHopeX/KaliGPT | c97c910ee6c8 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
-| ghbalf/freecad-ai | 6160a2b3a618 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
-| aayushch/laya |  | FAILED (clone_failed: ed: Command '['git', '-c',) | 0 |
+| aklivity/zilla | bf5ef498eacb | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| Haohao-end/openagent |  | FAILED (clone_failed: t'...
+error: invalid path ) | 0 |
+| mguessan/davmail | 87a6a160d6d5 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| wwwzhouhui/dify-for-dsl | d835ecfa6cbe | SCANNED | 21 |
+| wso2/product-apim | 239049b850ce | SCANNED | 12 |
+| YFGaia/dify-plus | c48ecee4d7c3 | SCANNED | 82 |
+| jitsi/jigasi | 8e050ed1b694 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| FunnyWolf/agentic-soc-platform | 2da9bb33a62b | SCANNED | 5 |
+| scalecube/scalecube-services | 4ef08a2b5e1f | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| hustyichi/dify-rag | e15bb40fbe4a | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| java-up-up/damai | aaab651af141 | SCANNED | 53 |
+| didi/KnowSearch |  | FAILED (TimeoutExpired: Command '['C:\\Users\\ee) | 0 |
+| gravitee-io/gravitee-api-management |  | FAILED (TimeoutExpired: Command '['C:\\Users\\ee) | 0 |
 
 ## 板块 A｜🟢 可直接交单的 ZERO_RECORD_FRESH
 
 | # | 仓库 | 类目 | 根因 | 置信度 | HEAD 提交日期 | HEAD | 源码行 | 提单入口 | 本地手册 |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | MuckScraper | redir | save_feed_defaults | — | 2026-11-12 (3.4d) | 04fc19d290dc | [aggregator/blueprints/auth.py:162](https://github.com/grregis/MuckScraper/blob/04fc19d290dc6477339d932662a4dd36e505ce62/aggregator/blueprints/auth.py#L162) | [Advisory](https://github.com/grregis/MuckScraper/security/advisories/new) · [Issue](https://github.com/grregis/MuckScraper/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/MuckScraper_redir_save_feed_defaults/SUBMISSION_PLAYBOOK.md) |
-| 2 | ai-git-bot | deserial | UnifiedWebhookController.handleWebhook | — | 2026-11-13 (2.1d) | d1e8b3b5b52c | [src/main/java/org/remus/giteabot/webhook/UnifiedWebhookController.java:65](https://github.com/tmseidel/ai-git-bot/blob/d1e8b3b5b52c71ada9ba1bc9b6f14b62bca781c8/src/main/java/org/remus/giteabot/webhook/UnifiedWebhookController.java#L65) | [Advisory](https://github.com/tmseidel/ai-git-bot/security/advisories/new) · [Issue](https://github.com/tmseidel/ai-git-bot/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/ai-git-bot_deserial_handleWebhook/SUBMISSION_PLAYBOOK.md) |
-| 3 | ai-git-bot | xss | AiIntegrationController.save | — | 2026-11-13 (2.1d) | d1e8b3b5b52c | [src/main/java/org/remus/giteabot/admin/AiIntegrationController.java:72](https://github.com/tmseidel/ai-git-bot/blob/d1e8b3b5b52c71ada9ba1bc9b6f14b62bca781c8/src/main/java/org/remus/giteabot/admin/AiIntegrationController.java#L72) | [Advisory](https://github.com/tmseidel/ai-git-bot/security/advisories/new) · [Issue](https://github.com/tmseidel/ai-git-bot/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/ai-git-bot_xss_save/SUBMISSION_PLAYBOOK.md) |
-| 4 | ai-git-bot | xss | BotController.save | — | 2026-11-13 (2.1d) | d1e8b3b5b52c | [src/main/java/org/remus/giteabot/admin/BotController.java:90](https://github.com/tmseidel/ai-git-bot/blob/d1e8b3b5b52c71ada9ba1bc9b6f14b62bca781c8/src/main/java/org/remus/giteabot/admin/BotController.java#L90) | [Advisory](https://github.com/tmseidel/ai-git-bot/security/advisories/new) · [Issue](https://github.com/tmseidel/ai-git-bot/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/ai-git-bot_xss_save/SUBMISSION_PLAYBOOK.md) |
-| 5 | ai-git-bot | xss | GitIntegrationController.save | — | 2026-11-13 (2.1d) | d1e8b3b5b52c | [src/main/java/org/remus/giteabot/admin/GitIntegrationController.java:108](https://github.com/tmseidel/ai-git-bot/blob/d1e8b3b5b52c71ada9ba1bc9b6f14b62bca781c8/src/main/java/org/remus/giteabot/admin/GitIntegrationController.java#L108) | [Advisory](https://github.com/tmseidel/ai-git-bot/security/advisories/new) · [Issue](https://github.com/tmseidel/ai-git-bot/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/ai-git-bot_xss_save/SUBMISSION_PLAYBOOK.md) |
-| 6 | ai-git-bot | xss | SystemSettingsController.mcpToolSelection | — | 2026-11-13 (2.1d) | d1e8b3b5b52c | [src/main/java/org/remus/giteabot/systemsettings/SystemSettingsController.java:93](https://github.com/tmseidel/ai-git-bot/blob/d1e8b3b5b52c71ada9ba1bc9b6f14b62bca781c8/src/main/java/org/remus/giteabot/systemsettings/SystemSettingsController.java#L93) | [Advisory](https://github.com/tmseidel/ai-git-bot/security/advisories/new) · [Issue](https://github.com/tmseidel/ai-git-bot/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/ai-git-bot_xss_mcpToolSelection/SUBMISSION_PLAYBOOK.md) |
-| 7 | animaworks | jndi_injection | get_approval_page | — | 2026-11-15 (0.6d) | 104f809b1ec1 | [server/routes/approve.py:26](https://github.com/xuiltul/animaworks/blob/104f809b1ec11b1111c7f354d61053b1e07865a6/server/routes/approve.py#L26) | [Advisory](https://github.com/xuiltul/animaworks/security/advisories/new) · [Issue](https://github.com/xuiltul/animaworks/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/animaworks_jndi_injection_get_approval_page/SUBMISSION_PLAYBOOK.md) |
+| 1 | agentic-soc-platform | mass_assignment | SIEMAdaptiveQueryView.post | — | 2026-09-29 (47.7d) | 2da9bb33a62b | [backend/apps/agent_api/views.py:343](https://github.com/FunnyWolf/agentic-soc-platform/blob/2da9bb33a62bcc73fbfac364b1051da069b457ee/backend/apps/agent_api/views.py#L343) | [Advisory](https://github.com/FunnyWolf/agentic-soc-platform/security/advisories/new) · [Issue](https://github.com/FunnyWolf/agentic-soc-platform/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/agentic-soc-platform_mass_assignment_post/SUBMISSION_PLAYBOOK.md) |
+| 2 | agentic-soc-platform | mass_assignment | SIEMDiscoverFieldsView.post | — | 2026-09-29 (47.7d) | 2da9bb33a62b | [backend/apps/agent_api/views.py:343](https://github.com/FunnyWolf/agentic-soc-platform/blob/2da9bb33a62bcc73fbfac364b1051da069b457ee/backend/apps/agent_api/views.py#L343) | [Advisory](https://github.com/FunnyWolf/agentic-soc-platform/security/advisories/new) · [Issue](https://github.com/FunnyWolf/agentic-soc-platform/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/agentic-soc-platform_mass_assignment_post/SUBMISSION_PLAYBOOK.md) |
+| 3 | agentic-soc-platform | mass_assignment | SIEMESQLQueryView.post | — | 2026-09-29 (47.7d) | 2da9bb33a62b | [backend/apps/agent_api/views.py:343](https://github.com/FunnyWolf/agentic-soc-platform/blob/2da9bb33a62bcc73fbfac364b1051da069b457ee/backend/apps/agent_api/views.py#L343) | [Advisory](https://github.com/FunnyWolf/agentic-soc-platform/security/advisories/new) · [Issue](https://github.com/FunnyWolf/agentic-soc-platform/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/agentic-soc-platform_mass_assignment_post/SUBMISSION_PLAYBOOK.md) |
+| 4 | agentic-soc-platform | mass_assignment | SIEMKeywordSearchView.post | — | 2026-09-29 (47.7d) | 2da9bb33a62b | [backend/apps/agent_api/views.py:343](https://github.com/FunnyWolf/agentic-soc-platform/blob/2da9bb33a62bcc73fbfac364b1051da069b457ee/backend/apps/agent_api/views.py#L343) | [Advisory](https://github.com/FunnyWolf/agentic-soc-platform/security/advisories/new) · [Issue](https://github.com/FunnyWolf/agentic-soc-platform/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/agentic-soc-platform_mass_assignment_post/SUBMISSION_PLAYBOOK.md) |
+| 5 | agentic-soc-platform | mass_assignment | SIEMSPLQueryView.post | — | 2026-09-29 (47.7d) | 2da9bb33a62b | [backend/apps/agent_api/views.py:343](https://github.com/FunnyWolf/agentic-soc-platform/blob/2da9bb33a62bcc73fbfac364b1051da069b457ee/backend/apps/agent_api/views.py#L343) | [Advisory](https://github.com/FunnyWolf/agentic-soc-platform/security/advisories/new) · [Issue](https://github.com/FunnyWolf/agentic-soc-platform/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/agentic-soc-platform_mass_assignment_post/SUBMISSION_PLAYBOOK.md) |
+| 6 | dify-for-dsl | ssrf | generate_video | — | 2026-11-11 (4.3d) | d835ecfa6cbe | [py/geekaiapp/g_jiekou.py:653](https://github.com/wwwzhouhui/dify-for-dsl/blob/d835ecfa6cbe45a70326e4e3336bbf73f2c68a17/py/geekaiapp/g_jiekou.py#L653) | [Advisory](https://github.com/wwwzhouhui/dify-for-dsl/security/advisories/new) · [Issue](https://github.com/wwwzhouhui/dify-for-dsl/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/dify-for-dsl_ssrf_generate_video/SUBMISSION_PLAYBOOK.md) |
+| 7 | dify-for-dsl | ssrf | generate_video | — | 2026-11-11 (4.3d) | d835ecfa6cbe | [py/geekaiapp/jimeng_video_service.py:73](https://github.com/wwwzhouhui/dify-for-dsl/blob/d835ecfa6cbe45a70326e4e3336bbf73f2c68a17/py/geekaiapp/jimeng_video_service.py#L73) | [Advisory](https://github.com/wwwzhouhui/dify-for-dsl/security/advisories/new) · [Issue](https://github.com/wwwzhouhui/dify-for-dsl/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/dify-for-dsl_ssrf_generate_video/SUBMISSION_PLAYBOOK.md) |
+| 8 | dify-for-dsl | ssrf | gjld_audio | — | 2026-11-11 (4.3d) | d835ecfa6cbe | [py/geekaiapp/g_jiekou.py:172](https://github.com/wwwzhouhui/dify-for-dsl/blob/d835ecfa6cbe45a70326e4e3336bbf73f2c68a17/py/geekaiapp/g_jiekou.py#L172) | [Advisory](https://github.com/wwwzhouhui/dify-for-dsl/security/advisories/new) · [Issue](https://github.com/wwwzhouhui/dify-for-dsl/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/dify-for-dsl_ssrf_gjld_audio/SUBMISSION_PLAYBOOK.md) |
+| 9 | dify-for-dsl | ssrf | jm_image | — | 2026-11-11 (4.3d) | d835ecfa6cbe | [py/geekaiapp/g_jiekou.py:242](https://github.com/wwwzhouhui/dify-for-dsl/blob/d835ecfa6cbe45a70326e4e3336bbf73f2c68a17/py/geekaiapp/g_jiekou.py#L242) | [Advisory](https://github.com/wwwzhouhui/dify-for-dsl/security/advisories/new) · [Issue](https://github.com/wwwzhouhui/dify-for-dsl/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/dify-for-dsl_ssrf_jm_image/SUBMISSION_PLAYBOOK.md) |
+| 10 | dify-for-dsl | ssrf | jm_image | — | 2026-11-11 (4.3d) | d835ecfa6cbe | [py/geekaiapp/wenshengtu1/jm1_jiekou.py:25](https://github.com/wwwzhouhui/dify-for-dsl/blob/d835ecfa6cbe45a70326e4e3336bbf73f2c68a17/py/geekaiapp/wenshengtu1/jm1_jiekou.py#L25) | [Advisory](https://github.com/wwwzhouhui/dify-for-dsl/security/advisories/new) · [Issue](https://github.com/wwwzhouhui/dify-for-dsl/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/dify-for-dsl_ssrf_jm_image/SUBMISSION_PLAYBOOK.md) |
+| 11 | product-apim | xss | PeopleRestService.addPerson | — | 2026-11-12 (3.7d) | 239049b850ce | [all-in-one-apim/modules/integration/tests-common/backend-service/jaxrs-app/src/main/java/org/wso2/am/integration/services/jaxrs/peoplesample/PeopleRestService.java:45](https://github.com/wso2/product-apim/blob/239049b850ce1a437e5a83899b8262a3a7f4ff7d/all-in-one-apim/modules/integration/tests-common/backend-service/jaxrs-app/src/main/java/org/wso2/am/integration/services/jaxrs/peoplesample/PeopleRestService.java#L45) | [Advisory](https://github.com/wso2/product-apim/security/advisories/new) · [Issue](https://github.com/wso2/product-apim/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/product-apim_xss_addPerson/SUBMISSION_PLAYBOOK.md) |
 
 ## 板块 B｜🔴 自动拦截 / 不可交单
 
 | # | 仓库 | 类目 | 根因 | 状态 | 命中证据 | 拦截原因 | 官方链接 |
 |---|---|---|---|---|---|---|---|
-| 1 | MuckScraper | authz | ai_task_status | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 2 | MuckScraper | authz | deep_report_route | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 3 | MuckScraper | authz | delete_ingestion_block | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 4 | MuckScraper | authz | delete_pipeline_schedule | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 5 | MuckScraper | authz | delete_rss_feed | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 6 | MuckScraper | authz | delete_scheduled_fetch | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 7 | MuckScraper | authz | edit_prompt | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 8 | MuckScraper | authz | enrich_story_balance | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 9 | MuckScraper | authz | rate_article | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 10 | MuckScraper | authz | rerank_outlet | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 11 | MuckScraper | authz | rescrape_article_route | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 12 | MuckScraper | authz | reset_prompt | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 13 | MuckScraper | authz | reset_user_password | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 14 | MuckScraper | authz | restart_container | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 15 | MuckScraper | authz | scrape_article_route | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 16 | MuckScraper | authz | summarize_article_route | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 17 | MuckScraper | authz | summarize_story_route | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 18 | MuckScraper | authz | update_ingestion_block | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 19 | MuckScraper | authz | update_pipeline_schedule | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 20 | MuckScraper | authz | update_prompt | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 21 | MuckScraper | authz | update_rss_feed | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 22 | MuckScraper | authz | update_scheduled_fetch | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 23 | MuckScraper | authz | update_topic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 24 | MuckScraper | authz | view_story | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 25 | MuckScraper | log_injection | add_ingestion_block | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 26 | MuckScraper | log_injection | add_pipeline_schedule | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 27 | MuckScraper | log_injection | add_rss_feed | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 28 | MuckScraper | log_injection | add_scheduled_fetch | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 29 | MuckScraper | log_injection | add_topic | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 30 | MuckScraper | log_injection | backfill_control | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 31 | MuckScraper | log_injection | deep_report_route | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 32 | MuckScraper | log_injection | fetch_articles | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 33 | MuckScraper | log_injection | rate_article | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 34 | MuckScraper | log_injection | rerank_outlet | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 35 | MuckScraper | log_injection | rescrape_article_route | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 36 | MuckScraper | log_injection | scrape_article_route | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 37 | MuckScraper | log_injection | summarize_article_route | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 38 | MuckScraper | log_injection | summarize_story_route | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 39 | MuckScraper | log_injection | toggle_analyze_all_stories | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 40 | MuckScraper | log_injection | toggle_auto_article_deep_analysis | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 41 | MuckScraper | log_injection | unblock_domain | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 42 | MuckScraper | log_injection | wake_ollama | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 43 | ai-git-bot | authz | AiIntegrationController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 44 | ai-git-bot | authz | AiIntegrationController.editForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 45 | ai-git-bot | authz | AiIntegrationController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 46 | ai-git-bot | authz | BotController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 47 | ai-git-bot | authz | BotController.editForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 48 | ai-git-bot | authz | BotController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 49 | ai-git-bot | authz | BotController.selectedBuiltinTools | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 50 | ai-git-bot | authz | BotController.selectedMcpTools | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 51 | ai-git-bot | authz | DeploymentTargetController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 52 | ai-git-bot | authz | DeploymentTargetController.editForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 53 | ai-git-bot | authz | DeploymentTargetController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 54 | ai-git-bot | authz | EventHookController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 55 | ai-git-bot | authz | EventHookController.deliveries | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 56 | ai-git-bot | authz | EventHookController.editForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 57 | ai-git-bot | authz | EventHookController.retryDelivery | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 58 | ai-git-bot | authz | EventHookController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 59 | ai-git-bot | authz | EventHookController.toggle | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 60 | ai-git-bot | authz | GitIntegrationController.confirmSshSetup | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 61 | ai-git-bot | authz | GitIntegrationController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 62 | ai-git-bot | authz | GitIntegrationController.editForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 63 | ai-git-bot | authz | GitIntegrationController.previewSshSetup | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 64 | ai-git-bot | authz | GitIntegrationController.retryDelete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 65 | ai-git-bot | authz | GitIntegrationController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 66 | ai-git-bot | authz | IssueWorkflowConfigurationController.cloneForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 67 | ai-git-bot | authz | IssueWorkflowConfigurationController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 68 | ai-git-bot | authz | IssueWorkflowConfigurationController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 69 | ai-git-bot | authz | IssueWorkflowConfigurationController.saveWorkflowSelection | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 70 | ai-git-bot | authz | IssueWorkflowConfigurationController.selectedWorkflows | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 71 | ai-git-bot | authz | IssueWorkflowConfigurationController.workflowSelection | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 72 | ai-git-bot | authz | SetupController.createAdmin | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 73 | ai-git-bot | authz | SystemSettingsController.botToolSelection | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 74 | ai-git-bot | authz | SystemSettingsController.cloneBotToolForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 75 | ai-git-bot | authz | SystemSettingsController.cloneForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 76 | ai-git-bot | authz | SystemSettingsController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 77 | ai-git-bot | authz | SystemSettingsController.deleteBotTool | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 78 | ai-git-bot | authz | SystemSettingsController.deleteMcp | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 79 | ai-git-bot | authz | SystemSettingsController.editBotToolForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 80 | ai-git-bot | authz | SystemSettingsController.editForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 81 | ai-git-bot | authz | SystemSettingsController.editMcpForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 82 | ai-git-bot | authz | SystemSettingsController.mcpToolSelection | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 83 | ai-git-bot | authz | SystemSettingsController.preview | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 84 | ai-git-bot | authz | SystemSettingsController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 85 | ai-git-bot | authz | SystemSettingsController.saveBotTool | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 86 | ai-git-bot | authz | SystemSettingsController.saveBotToolSelection | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 87 | ai-git-bot | authz | SystemSettingsController.saveMcp | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 88 | ai-git-bot | authz | SystemSettingsController.saveMcpToolSelection | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 89 | ai-git-bot | authz | UnifiedWebhookController.handleWebhook | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 90 | ai-git-bot | authz | WorkflowCallbackController.callback | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 91 | ai-git-bot | authz | WorkflowCallbackController.log | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 92 | ai-git-bot | authz | WorkflowConfigurationController.cloneForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 93 | ai-git-bot | authz | WorkflowConfigurationController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 94 | ai-git-bot | authz | WorkflowConfigurationController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 95 | ai-git-bot | authz | WorkflowConfigurationController.saveWorkflowSelection | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 96 | ai-git-bot | authz | WorkflowConfigurationController.selectedWorkflows | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 97 | ai-git-bot | authz | WorkflowConfigurationController.workflowSelection | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 98 | animaworks | authz | ask_ack | **UNKNOWN** | — | LOCAL_UNIX_SOCKET_SERVER: AF_UNIX 本地控制通道（0700/0600 + 对端 UID 校验），设计上不可从网络到达 | — |
-| 99 | animaworks | authz | ask_cancel | **UNKNOWN** | — | LOCAL_UNIX_SOCKET_SERVER: AF_UNIX 本地控制通道（0700/0600 + 对端 UID 校验），设计上不可从网络到达 | — |
-| 100 | animaworks | authz | ask_status | **UNKNOWN** | — | LOCAL_UNIX_SOCKET_SERVER: AF_UNIX 本地控制通道（0700/0600 + 对端 UID 校验），设计上不可从网络到达 | — |
-| 101 | animaworks | authz | cancel_remake_preview | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 102 | animaworks | authz | chat | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 103 | animaworks | authz | chat_stream | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 104 | animaworks | authz | clear_conversation | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 105 | animaworks | authz | compact_session | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 106 | animaworks | authz | compress_conversation | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 107 | animaworks | authz | delete_anima | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 108 | animaworks | authz | delete_user | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 109 | animaworks | authz | disable_anima | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 110 | animaworks | authz | enable_anima | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 111 | animaworks | authz | episode_calendar | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 112 | animaworks | authz | generate_assets | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 113 | animaworks | authz | generate_expression_on_demand | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 114 | animaworks | authz | get_active_stream | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 115 | animaworks | authz | get_activity_group | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 116 | animaworks | authz | get_anima_aliases | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 117 | animaworks | authz | get_anima_config | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 118 | animaworks | authz | get_anima_detail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 119 | animaworks | authz | get_anima_state | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 120 | animaworks | authz | get_anima_summary | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 121 | animaworks | authz | get_approval_page | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 122 | animaworks | authz | get_asset | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 123 | animaworks | authz | get_asset_metadata | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 124 | animaworks | authz | get_attachment | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 125 | animaworks | authz | get_attachment_preview | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 126 | animaworks | authz | get_channel_info | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 127 | animaworks | authz | get_channel_mentions | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 128 | animaworks | authz | get_channel_messages | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 129 | animaworks | authz | get_channel_reads | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 130 | animaworks | authz | get_conversation | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 131 | animaworks | authz | get_conversation_background | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 132 | animaworks | authz | get_conversation_history | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 133 | animaworks | authz | get_conversation_tool_calls | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 134 | animaworks | authz | get_episode | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 135 | animaworks | authz | get_face_asset | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 136 | animaworks | authz | get_knowledge | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 137 | animaworks | authz | get_procedure | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 138 | animaworks | authz | get_session_detail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 139 | animaworks | authz | get_stream_progress | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 140 | animaworks | authz | get_transcript | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 141 | animaworks | authz | greet | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 142 | animaworks | authz | interrupt_anima | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 143 | animaworks | authz | list_episodes | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 144 | animaworks | authz | list_knowledge | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 145 | animaworks | authz | list_procedures | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 146 | animaworks | authz | list_sessions | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 147 | animaworks | authz | mark_channel_read | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 148 | animaworks | authz | memory_connection_entity | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 149 | animaworks | authz | memory_connections | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 150 | animaworks | authz | memory_graph | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 151 | animaworks | authz | memory_stats | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 152 | animaworks | authz | post_to_channel | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 153 | animaworks | authz | put_discord_channel_members | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 154 | animaworks | authz | read_log | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 155 | animaworks | authz | record_voice_call | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 156 | animaworks | authz | regenerate_asset_step | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 157 | animaworks | authz | reload_anima_config | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 158 | animaworks | authz | remake_preview | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 159 | animaworks | authz | rename_anima | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 160 | animaworks | authz | repair_anima_bootstrap | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 161 | animaworks | authz | reply_to_notification | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 162 | animaworks | authz | resolve_interaction | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 163 | animaworks | authz | restart_anima | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 164 | animaworks | authz | start_anima | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 165 | animaworks | authz | submit_approval | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 166 | animaworks | authz | trigger_heartbeat | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 167 | animaworks | authz | update_anima_aliases | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 168 | animaworks | authz | update_anima_background_model | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 169 | animaworks | authz | update_anima_identity | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 170 | animaworks | authz | update_anima_injection | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 171 | animaworks | authz | update_anima_model | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 172 | animaworks | authz | update_anima_role | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 173 | animaworks | authz | update_channel_settings | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 174 | animaworks | authz | vault_delete_shared | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 175 | animaworks | authz | vault_reissue_hub_token | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 176 | animaworks | authz | vault_rollback_shared | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 177 | animaworks | authz | vault_set_shared | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 178 | animaworks | authz | voice_websocket | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 179 | animaworks | log_injection | add_user | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 180 | animaworks | log_injection | delete_anima | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 181 | animaworks | log_injection | get_asset_metadata | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 182 | animaworks | log_injection | phone_media_stream | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 183 | animaworks | log_injection | remake_preview | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 184 | animaworks | log_injection | rename_anima | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 185 | animaworks | log_injection | voice_websocket | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 186 | animaworks | log_injection | websocket_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 1 | damai | authz | AllRuleController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 2 | damai | authz | ApiDataController.pageList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 3 | damai | authz | AreaController.getById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 4 | damai | authz | AreaController.selectByIdList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 5 | damai | authz | BroadcastController.call | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 6 | damai | authz | ChannelDataController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 7 | damai | authz | ChannelDataController.getByCode | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 8 | damai | authz | DepthRuleController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 9 | damai | authz | DepthRuleController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 10 | damai | authz | DepthRuleController.updateStatus | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 11 | damai | authz | OrderController.cancel | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 12 | damai | authz | OrderController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 13 | damai | authz | OrderController.getCache | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 14 | damai | authz | OrderController.pay | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 15 | damai | authz | OrderController.payCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 16 | damai | authz | OrderController.selectList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 17 | damai | authz | PayController.commonPay | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 18 | damai | authz | PayController.detail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 19 | damai | authz | PayController.notify | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 20 | damai | authz | PayController.refund | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 21 | damai | authz | PayController.tradeCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 22 | damai | authz | ProgramCategoryController.saveBatch | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 23 | damai | authz | ProgramCategoryController.selectByParentProgramCategoryId | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 24 | damai | authz | ProgramCategoryController.selectByType | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 25 | damai | authz | ProgramController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 26 | damai | authz | ProgramController.recommendList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 27 | damai | authz | ProgramController.search | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 28 | damai | authz | ProgramController.selectHomeList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 29 | damai | authz | ProgramController.selectPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 30 | damai | authz | ProgramShowTimeController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 31 | damai | authz | RuleController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 32 | damai | authz | RuleController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 33 | damai | authz | RuleController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 34 | damai | authz | RuleController.updateStatus | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 35 | damai | authz | SeatController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 36 | damai | authz | SeatController.batchAdd | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 37 | damai | authz | SeatController.relateInfo | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 38 | damai | authz | TestController.reset | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 39 | damai | authz | TicketCategoryController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 40 | damai | authz | TicketCategoryController.detail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 41 | damai | authz | TicketCategoryController.selectListByProgram | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 42 | damai | authz | TicketUserController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 43 | damai | authz | TicketUserController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 44 | damai | authz | TicketUserController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 45 | damai | authz | UserCaptchaController.getCaptcha | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 46 | damai | authz | UserCaptchaController.verifyCaptcha | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 47 | damai | authz | UserController.authentication | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 48 | damai | authz | UserController.exist | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 49 | damai | authz | UserController.logout | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 50 | damai | authz | UserController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 51 | damai | authz | UserController.updateEmail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 52 | damai | authz | UserController.updateMobile | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 53 | damai | authz | UserController.updatePassword | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 54 | dify-for-dsl | authz | get_course_top_students | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 55 | dify-for-dsl | authz | get_student_scores | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 56 | dify-for-dsl | cmdi | upload_video | **UNKNOWN** | — | NO_CMD_SINK: 入口文件无任何命令执行调用（os.system/subprocess/asyncio.create_subprocess），cmdi 来自切片里未被入口调用的辅助函数 | — |
+| 57 | dify-for-dsl | log_injection | api | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 58 | dify-for-dsl | log_injection | generate_audio | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 59 | dify-for-dsl | log_injection | generate_edit_image | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 60 | dify-for-dsl | log_injection | generate_edit_image | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 61 | dify-for-dsl | log_injection | generate_edit_image | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 62 | dify-for-dsl | log_injection | generate_hidream_e1 | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 63 | dify-for-dsl | log_injection | generate_image | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 64 | dify-for-dsl | log_injection | generate_image | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 65 | dify-for-dsl | log_injection | generate_image | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 66 | dify-for-dsl | log_injection | process_data | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 67 | dify-for-dsl | log_injection | process_data | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 68 | dify-for-dsl | unrestricted_upload | upload | **UNKNOWN** | — | NON_EXECUTABLE_UPLOAD: 已防路径穿越 / 已做扩展名白名单+固定命名，落盘目录非 Web 静态挂载（无 StaticFiles/addResourceHandlers 指向上传目录），上传物不可执行 | — |
+| 69 | dify-for-dsl | unrestricted_upload | upload_video | **UNKNOWN** | — | NON_EXECUTABLE_UPLOAD: 已防路径穿越 / 已做扩展名白名单+固定命名，落盘目录非 Web 静态挂载（无 StaticFiles/addResourceHandlers 指向上传目录），上传物不可执行 | — |
+| 70 | dify-plus | authz | AccountSessionByIdApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 71 | dify-plus | authz | AgentConfigDownloadRequestApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 72 | dify-plus | authz | AgentConfigEnvApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 73 | dify-plus | authz | AgentConfigManifestApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 74 | dify-plus | authz | AgentConfigNoteApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 75 | dify-plus | authz | AgentConfigPushApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 76 | dify-plus | authz | AgentConfigSkillInspectApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 77 | dify-plus | authz | AnnotationReplyActionStatusApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 78 | dify-plus | authz | AnnotationUpdateDeleteApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 79 | dify-plus | authz | ApiKeyAuthDataSourceBindingDelete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 80 | dify-plus | authz | AppDslCheckDependenciesApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 81 | dify-plus | authz | AppDslImportConfirmApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 82 | dify-plus | authz | AppRunApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 83 | dify-plus | authz | AppRunTaskStopApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 84 | dify-plus | authz | AppSite | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 85 | dify-plus | authz | AppSiteAccessTokenReset | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 86 | dify-plus | authz | ChatStopApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 87 | dify-plus | authz | CompletionStopApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 88 | dify-plus | authz | ConsoleWorkflowPauseDetailsApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 89 | dify-plus | authz | ConversationApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 90 | dify-plus | authz | ConversationDetailApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 91 | dify-plus | authz | ConversationPinApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 92 | dify-plus | authz | ConversationUnPinApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 93 | dify-plus | authz | ConversationVariablesApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 94 | dify-plus | authz | DatasetMetadataBuiltInFieldServiceApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 95 | dify-plus | authz | DocumentApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 96 | dify-plus | authz | DocumentDownloadApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 97 | dify-plus | authz | DocumentListApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 98 | dify-plus | authz | EndUserApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 99 | dify-plus | authz | EnterpriseAppDSLExport | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 100 | dify-plus | authz | EnterpriseAppDSLImport | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 101 | dify-plus | authz | FilePreviewApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 102 | dify-plus | authz | FilePreviewApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 103 | dify-plus | authz | FilePreviewApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 104 | dify-plus | authz | GrantedFileContentApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 105 | dify-plus | authz | ImagePreviewApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 106 | dify-plus | authz | InstalledAppWorkflowTaskStopApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 107 | dify-plus | authz | MessageFeedbackApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 108 | dify-plus | authz | MessageFeedbackApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 109 | dify-plus | authz | MessageMoreLikeThisApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 110 | dify-plus | authz | MessageSuggestedApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 111 | dify-plus | authz | MessageSuggestedQuestionApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 112 | dify-plus | authz | ModelProviderIconApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 113 | dify-plus | authz | OAuthDataSourceSync | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 114 | dify-plus | authz | OpenApiWorkflowEventsApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 115 | dify-plus | authz | OpenApiWorkflowHumanInputFormApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 116 | dify-plus | authz | PartnerTenants | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 117 | dify-plus | authz | PermittedExternalAppDescribeApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 118 | dify-plus | authz | PublishedSkillPullApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 119 | dify-plus | authz | RecentAppListApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 120 | dify-plus | authz | RecommendedAppApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 121 | dify-plus | authz | SavedMessageApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 122 | dify-plus | authz | ToolFileApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 123 | dify-plus | authz | TraceAppConfigApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 124 | dify-plus | authz | WorkflowEventsApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 125 | dify-plus | authz | WorkflowRunArchiveDownloadApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 126 | dify-plus | authz | WorkflowRunArchiveDownloadFileApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 127 | dify-plus | authz | WorkflowRunDetailApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 128 | dify-plus | authz | WorkflowRunNodeExecutionListApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 129 | dify-plus | authz | WorkspaceAgentSkillBindingsApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 130 | dify-plus | authz | WorkspaceByIdApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 131 | dify-plus | authz | WorkspaceMemberApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 132 | dify-plus | authz | WorkspaceSkillApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 133 | dify-plus | authz | WorkspaceSkillAssistMessageApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 134 | dify-plus | authz | WorkspaceSkillDuplicateApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 135 | dify-plus | authz | WorkspaceSkillExportApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 136 | dify-plus | authz | WorkspaceSkillFileContentApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 137 | dify-plus | authz | WorkspaceSkillFilePreviewApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 138 | dify-plus | authz | WorkspaceSkillFilesApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 139 | dify-plus | authz | WorkspaceSkillFilesCheckApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 140 | dify-plus | authz | WorkspaceSkillPublishApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 141 | dify-plus | authz | WorkspaceSkillReferencesApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 142 | dify-plus | authz | WorkspaceSkillRestoreApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 143 | dify-plus | authz | WorkspaceSkillVersionApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 144 | dify-plus | authz | WorkspaceSkillVersionsApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 145 | dify-plus | authz | WorkspaceSwitchApi | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 146 | dify-plus | authz | get_run_events | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 147 | dify-plus | authz | get_run_status | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 148 | dify-plus | authz | handle_webhook | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 149 | dify-plus | authz | handle_webhook_debug | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 150 | dify-plus | authz | stream_run_events | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 151 | dify-plus | cmdi | health | **UNKNOWN** | — | NO_CMD_SINK: 入口文件无任何命令执行调用（os.system/subprocess/asyncio.create_subprocess），cmdi 来自切片里未被入口调用的辅助函数 | — |
+| 152 | product-apim | authz | PeopleRestService.addPerson | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 153 | product-apim | authz | PeopleRestService.addPerson#2 | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 154 | product-apim | authz | PeopleRestService.addPersonQueryParam | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 155 | product-apim | authz | PeopleRestService.deletePerson | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 156 | product-apim | authz | PeopleRestService.getPeople#2 | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 157 | product-apim | authz | PeopleRestService.updatePerson | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 158 | product-apim | authz | PeopleRestService.updatePersonQueryParam | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 159 | product-apim | log_injection | recommend_apis | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 160 | product-apim | log_injection | recommend_apis | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 161 | product-apim | log_injection | recommend_apis | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 162 | product-apim | log_injection | recommend_apis | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
 
 ## 对账
 
 | 板块 | 行数 |
 |---|---|
-| A（ZERO_RECORD_FRESH） | 7 |
-| B（其余状态） | 186 |
-| 合计 | 193 |
+| A（ZERO_RECORD_FRESH） | 11 |
+| B（其余状态） | 162 |
+| 合计 | 173 |
