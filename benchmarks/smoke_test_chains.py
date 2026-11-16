@@ -14162,6 +14162,63 @@ check("M423：new InitialContext().lookup(name) 仍判 JNDI",
           "public void f(String name) throws Exception { "
           "new InitialContext().lookup(name); }"), True)
 
+print("\n[343] M427/M428：run 快照 / DTO 排除 / JAX-RS JSON / 配置变量 SSRF")
+_M343_TMP = Path(_ws_mkdtemp("m343_"))
+
+
+def _m343_run():
+    return _dh310.run(repos=[], languages=("python",), limit=1, min_stars=300,
+                      state_path=_M343_TMP / "s.json",
+                      report=_M343_TMP / "R.md",
+                      json_path=_M343_TMP / "J.json",
+                      packs_dir=_M343_TMP / "packs",
+                      runs_dir=_M343_TMP / "runs", offline=True,
+                      cooldown_days=0)
+
+
+_M343_R1 = _m343_run()
+_M343_R2 = _m343_run()
+_M343_SNAPS = sorted((_M343_TMP / "runs").glob("*_LIVE_HUNT_REPORT.md"))
+check("M427：两轮 run 生成 2 份独立快照", len(_M343_SNAPS) >= 2, True)
+check("M427：快照路径互不覆盖",
+      (_M343_R1.get("run_snapshot") != _M343_R2.get("run_snapshot"),
+       bool(_M343_R1.get("run_snapshot"))), (True, True))
+
+check("M428：Pydantic 输入 DTO 不判 mass_assignment",
+      _rd395.mass_assignment_verdict(
+          "def f(request):\n    return KeywordSearchInput(**request.data)\n"),
+      False)
+check("M428：ORM create(**request.data) 仍判 mass_assignment",
+      _rd395.mass_assignment_verdict(
+          "def f(request):\n    User.objects.create(**request.data)\n"),
+      True)
+
+_M343_JAXRS = '''@Path("/people")
+public class PeopleRestService {
+    @Produces({MediaType.APPLICATION_JSON})
+    @PUT
+    public Person addPerson(@FormParam("email") final String email) {
+        return peopleService.addPerson(email);
+    }
+}'''
+check("M428：@Produces(APPLICATION_JSON) 不判 xss",
+      _rd395.xss_verdict(_M343_JAXRS), False)
+check("M428：tests-common 测试夹具被拦截",
+      wild_noise.classify(
+          {"category": "xss", "unit": "PeopleRestService.addPerson",
+           "file": "modules/integration/tests-common/backend-service/"
+                   "PeopleRestService.java"}, None).get("code"),
+      wild_noise.TEST_FIXTURE_ONLY)
+
+check("M428：*_api_url 配置变量不判 SSRF",
+      _rd395.ssrf_verdict(
+          "def f():\n    return requests.post(siliconflow_api_url + "
+          "'/audio/speech', json={})\n"), False)
+check("M428：请求体 URL 仍判 SSRF",
+      _rd395.ssrf_verdict(
+          "def f(request1):\n    return requests.post("
+          "request1.image_generation_url, json={})\n"), True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

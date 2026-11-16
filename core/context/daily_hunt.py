@@ -473,6 +473,39 @@ def _header(ledger: list[dict], scout: dict, *, days: int,
     return "\n".join(lines)
 
 
+def _snapshot_dir(report: Path, runs_dir: Path | str | None) -> Path:
+    """M427：默认与主报告同根的 benchmarks/results/daily_hunt_runs。"""
+    if runs_dir:
+        return Path(runs_dir)
+    return Path(report).parent / "benchmarks" / "results" / "daily_hunt_runs"
+
+
+def _snapshot_stem(started: str, base: Path) -> str:
+    run_id = str(started).replace("-", "").replace(":", "").replace(" ", "_")
+    stem = run_id
+    n = 1
+    while (base / f"{stem}_LIVE_HUNT_REPORT.md").exists():
+        n += 1
+        stem = f"{run_id}_{n}"
+    return stem
+
+
+def _prune_snapshots(base: Path, keep: int = 30) -> None:
+    """M427：只保留最近 keep 份快照（report + json 成对删除）。"""
+    try:
+        reports = sorted(base.glob("*_LIVE_HUNT_REPORT.md"),
+                         key=lambda p: p.stat().st_mtime, reverse=True)
+    except OSError:
+        return
+    for old in reports[keep:]:
+        for p in (old, old.with_name(
+                old.name.replace("_LIVE_HUNT_REPORT.md", "_daily_hunt.json"))):
+            try:
+                p.unlink()
+            except OSError:
+                pass
+
+
 def run(*, languages=("java", "python", "solidity"), days: int = 14,
         limit: int = 10, min_stars: int = 150, max_stars: int = 10000,
         max_roots: int = 5, state_path: Path | str | None = None,
@@ -483,6 +516,7 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
         repo_timeout: int = 900, cooldown_days: int = DEFAULT_COOLDOWN_DAYS,
         min_units: int = 8,
         recent_boost: bool = True,
+        runs_dir: Path | str | None = None,
         scout_fn=None, sync_fn=None, dedup_fn=None,
         repos: list[str] | None = None) -> dict:
     """M286 主流程；scout_fn / sync_fn 可注入（冒烟测试不联网）。"""
@@ -721,7 +755,15 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
                 "records": records, "summary": summary, "daily": daily_meta,
                 "state_path": str(state_path), "report": str(report),
                 "json": str(json_path), "evicted": evicted,
-                "evict_skipped": evict_skipped}
+                "evict_skipped": evict_skipped, "run_snapshot": ""}
+
+    # M427：每次 run 落一份不可变快照，开发/发版顺手跑不会覆盖定时巡猎产出。
+    _snap_base = _snapshot_dir(report, runs_dir)
+    _snap_base.mkdir(parents=True, exist_ok=True)
+    _snap_stem = _snapshot_stem(started, _snap_base)
+    _snap_report = _snap_base / f"{_snap_stem}_LIVE_HUNT_REPORT.md"
+    _snap_json = _snap_base / f"{_snap_stem}_daily_hunt.json"
+    daily_meta["run_snapshot"] = str(_snap_report)
 
     live_hunt_report.write_outputs(
         records, report, json_path, packs_dir, generated_at=finished,
@@ -731,10 +773,17 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
                              cooldown_skipped=cooldown_skipped,
                              incomplete_dedup=incomplete_dedup),
         with_confidence=True, extra={"daily": daily_meta})
+    try:
+        shutil.copyfile(report, _snap_report)
+        shutil.copyfile(json_path, _snap_json)
+        _prune_snapshots(_snap_base)
+    except OSError:
+        daily_meta["run_snapshot"] = ""
     save_state(state_path, state)
 
     return {"ok": True, "dry_run": False, "scout": scout, "ledger": ledger,
             "records": records, "summary": summary, "daily": daily_meta,
             "state_path": str(state_path), "report": str(report),
             "json": str(json_path), "evicted": evicted,
-            "evict_skipped": evict_skipped}
+            "evict_skipped": evict_skipped,
+            "run_snapshot": daily_meta.get("run_snapshot", "")}

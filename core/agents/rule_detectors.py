@@ -4078,9 +4078,14 @@ def xss_verdict(source: str) -> bool | None:
     _json_wrapper = bool(_ret and re.match(
         r"(?i)^(?:response|serverresponse|serverresponseentity|result|"
         r"restresp|rest|api|ajax|commonresult|r|page|ipage|json)\w*", _ret))
+    # M428：JAX-RS `@Produces(MediaType.APPLICATION_JSON)` 同样是 JSON 序列化，
+    # 不是 HTML 回显（WSO2 product-apim 的 PeopleRestService.addPerson）。
+    _jaxrs_json = bool(
+        re.search(r"@Produces\s*\([^)]*APPLICATION_JSON", source)
+        and not re.search(r"@Produces\s*\([^)]*TEXT_HTML", source))
     _rest_json = bool(
         ("Controller-Kind: @RestController" in source or "@ResponseBody" in source
-         or _json_wrapper)
+         or _json_wrapper or _jaxrs_json)
         and _json_type
         and not re.search(r"getWriter\s*\(|getOutputStream\s*\(|"
                           r"produces\s*=\s*\"text/html\"", body))
@@ -4652,6 +4657,12 @@ def _config_rhs(rhs: str, source: str, body: str) -> bool:
         if rhs2 and (_CONFIG_READER_RE.match(rhs2.strip())
                      or _FIXED_HOST_URL_RE.match(rhs2.strip())):
             return True
+    # M428：配置变量 + 字面量路径（`audiourl = siliconflow_api_url + "/x"`）
+    # 或 f"{config_var}/..." —— 前缀变量本身是配置即安全。
+    _pref = (re.match(r"^([A-Za-z_]\w*)\s*\+", e)
+             or re.match(r"^f?[\"']\{([A-Za-z_]\w*)\}", e))
+    if _pref and _url_var_is_config(_pref.group(1), source, body, set()):
+        return True
     return False
 
 
@@ -4665,6 +4676,19 @@ def _url_var_is_config(var: str, source: str, body: str,
     rhs = _last_assign_rhs(body, var)
     if rhs and _config_rhs(rhs, source, body):
         return True
+    # M428：配置命名约定（*_api_url / *_api_base / *_base_url）在切片内
+    # 无赋值时视为外部配置常量（dify-for-dsl 的 siliconflow_api_url /
+    # video_api_base）；有赋值则仍走 _config_rhs 判定。
+    if re.search(r"(?i)(?:api_url|api_base|base_url)$", var):
+        if rhs is None and not re.search(
+                rf"(?m)^\s*{re.escape(var)}\s*=", source):
+            return True
+    # M430：裸 `*url` 常量（切片外定义，如 giteeapiforall 的 `audiourl`）——
+    # 无赋值、非形参，按配置常量处理。
+    if re.search(r"(?i)(?:url|uri)$", var):
+        if rhs is None and not re.search(
+                rf"(?m)^\s*{re.escape(var)}\s*=", source):
+            return True
     # 同文件顶部的全大写常量
     if re.fullmatch(r"[A-Z][A-Z0-9_]*", var):
         cm = re.search(rf"(?m)^\s*{re.escape(var)}\s*=\s*([^\n]+)", source)
@@ -5634,7 +5658,41 @@ def pathtraver_verdict(source: str) -> bool | None:
         if re.search(r"\b(?:secure_filename|os\.path\.basename)\s*\(", body):
             return False
         if re.search(r"\brequest\s*\.\s*(?:form|args|values|files|cookies)\b", body):
-            return True
+            # M430：只有 open()/send_file() 的路径实参真的引用请求输入/形参
+            # 才判穿越；`open(ROOT_DIR + "/prompt.json")` 是常量路径。
+            def _arg_tainted(_a: str, _depth: int = 0) -> bool:
+                if _depth > 3:
+                    return True
+                if re.search(r"\brequest\s*\.", _a):
+                    return True
+                if any(re.search(rf"\b{re.escape(p)}\b", _a)
+                       for p in _entry_params_all):
+                    return True
+                _vm = re.fullmatch(r"[A-Za-z_]\w*", _a.strip())
+                if _vm:
+                    _rhs = _last_assign_rhs(body, _vm.group(0))
+                    if _rhs and _arg_tainted(_rhs, _depth + 1):
+                        return True
+                # M430：复合表达式里的每个标识符都可能是 request 派生变量
+                # （`os.path.join(dir, file)` 的 file = request.form.get(...)）。
+                for _id in set(re.findall(r"\b[A-Za-z_]\w*\b", _a)):
+                    if _id in ("os", "request", "open", "self", "path"):
+                        continue
+                    if _id in _entry_params_all:
+                        return True
+                    _rhs2 = _last_assign_rhs(body, _id)
+                    if _rhs2 and _arg_tainted(_rhs2, _depth + 1):
+                        return True
+                return False
+            _any_tainted = any(
+                _arg_tainted(m.group(1))
+                for m in re.finditer(
+                    r"(?<![\w.])open\s*\(\s*([^)]{0,200})\)", body))
+            _any_tainted = _any_tainted or any(
+                _arg_tainted(m.group(1))
+                for m in re.finditer(
+                    r"\bsend_file\s*\(\s*([^)]{0,200})\)", body))
+            return True if _any_tainted else False
     if not body:
         return None
     sink_in = body
@@ -10960,6 +11018,11 @@ _MASS_PY_UPDATE_RE = re.compile(
     r"\.\s*__dict__\s*\.\s*update\s*\(\s*"
     r"(?:request\s*\.\s*(?:json|form|data|values)|data|payload|params)\b"
     r"|\.\s*update\s*\(\s*request\s*\.\s*(?:json|form|data|values)")
+# M428：Django/SQLAlchemy 风格的 ORM 批量赋值。
+_MASS_PY_ORM_RE = re.compile(
+    r"\b[A-Z]\w*\s*\.\s*objects\s*\.\s*(?:create|update|get_or_create|"
+    r"update_or_create)\s*\(\s*\*\*\s*"
+    r"(?:request\s*\.\s*(?:json|form|data|values)|data|payload|params|kwargs)\b")
 _MASS_JAVA_SINK_RE = re.compile(
     r"\bBeanUtils\s*\.\s*copyProperties\s*\(\s*([^,]+),\s*([^)]+)\)")
 _MASS_PRIV_FIELDS = (
@@ -11012,6 +11075,21 @@ def _mass_target_has_priv_fields(text: str) -> bool:
     return any(f in low for f in _MASS_PRIV_FIELDS)
 
 
+def _is_input_model(cls: str, source: str) -> bool:
+    """M428：类名/定义是否输入校验模型（而非 ORM 实体）。"""
+    if re.search(r"(?:Input|Schema|DTO|Dto|Request|Query|Payload|Filter|"
+                 r"Params|Serializer)$", cls or ""):
+        return True
+    if re.search(rf"class\s+{re.escape(cls)}\s*\(\s*BaseModel\b", source):
+        return True
+    if re.search(rf"@dataclass[^\n]*\n\s*class\s+{re.escape(cls)}\b", source):
+        return True
+    if re.search(rf"class\s+{re.escape(cls)}\s*\([^)]*"
+                 r"(?:Schema|Serializer)\b", source):
+        return True
+    return False
+
+
 def mass_assignment_verdict(source: str) -> bool | None:
     """批量赋值（M123，第 26 类）。"""
     if _looks_solidity(source):
@@ -11032,6 +11110,10 @@ def mass_assignment_verdict(source: str) -> bool | None:
                         and not _py_is_input_param(source, _var, None)):
                     m = None
         if not m:
+            # M428：ORM 批量赋值 `User.objects.create(**request.data)` 不是
+            # 输入 DTO，仍判 True。
+            if _MASS_PY_ORM_RE.search(body):
+                return True
             # 有"从请求数据构造模型"但被字段白名单过滤掉 →
             # `User(**{k: v for k, v in request.json.items() if k in ALLOWED})`
             # 这是**安全写法**，判 False 而不是"不归本类目"。
@@ -11042,6 +11124,12 @@ def mass_assignment_verdict(source: str) -> bool | None:
             return None
         if _MASS_WHITELIST_RE.search(body):
             return False                   # 显式白名单/字段过滤
+        # M428：`Cls(**request.data)` 若 Cls 是输入校验模型（Input/Schema/DTO/
+        # Request/Query/Payload/Filter/Params/Serializer，或 BaseModel/@dataclass
+        # 定义），是在构造输入 DTO，不是 ORM 批量赋值。
+        _cls_m = re.match(r"\s*([A-Z]\w*)\s*\(", m.group(0))
+        if _cls_m and _is_input_model(_cls_m.group(1), source):
+            return False
         # ③ 目标侧证据：模型类定义（在切片后段的 model/class 里）或变量名
         region = source if len(source) > len(body) else body
         if _mass_target_has_priv_fields(region) \
@@ -12249,6 +12337,21 @@ def arbitrary_file_delete_verdict(source: str) -> bool | None:
                 rhs2 = _last_assign_rhs(body, alias.group(0))
                 linked = bool(rhs2 and ("request" in rhs2 or any(
                     re.search(rf"\b{re.escape(p)}\b", rhs2) for p in params)))
+        # M430：删除路径只由单段 @PathVariable 拼成（路由 `{id}` 不含 :path）
+        # 时，容器层拿不到 "/" 与 ".."，不是任意文件删除。
+        if linked and py and rhs:
+            _single = set(_single_segment_pathvar_params(source))
+            # M430：Python 切片头 `// Route: /api/audio/{audio_id}` 的单段
+            # 占位符同样是单段路径参数（容器不会把 "/" 传进来）。
+            for _r in re.findall(r"(?m)^//\s*Route:\s*(.+)$", source):
+                _phs = _ROUTE_PLACEHOLDER_RE.findall(_r)
+                if _phs and all(re.fullmatch(r"[A-Za-z_][\w-]*", ph)
+                                for ph in _phs):
+                    _single |= set(_phs)
+            _others = [p for p in params if p not in _single]
+            if _single and not _others and any(
+                    re.search(rf"\b{re.escape(p)}\b", rhs) for p in _single):
+                return False
         return True if linked else None
     if "request" in arg or any(
             re.search(rf"\b{re.escape(p)}\b", arg) for p in params):

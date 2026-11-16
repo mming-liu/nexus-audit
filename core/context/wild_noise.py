@@ -62,6 +62,9 @@ NON_EXECUTABLE_UPLOAD = "NON_EXECUTABLE_UPLOAD"
 SERVER_BUILT_REDIRECT = "SERVER_BUILT_REDIRECT"
 REFERER_OPEN_REDIRECT = "REFERER_OPEN_REDIRECT"
 SAFE_REDIRECT_GUARD = "SAFE_REDIRECT_GUARD"
+# M428：测试夹具/集成测试后端（tests-common / fixtures / integration-tests）
+# 不是生产入口，直接拦截，避免测试用 PeopleRestService 占 A 板。
+TEST_FIXTURE_ONLY = "TEST_FIXTURE_ONLY"
 SHORTLINK_BY_DESIGN = "SHORTLINK_BY_DESIGN"
 # M387：第三方 Webhook/公众号验签挑战串（echostr / hub.challenge）原样回显。
 # 它不是浏览器 HTML 页面，不能按反射型 XSS 交单；也不能在 rule_detectors
@@ -615,6 +618,12 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
     if "demo" in file or "demo" in unit.lower():
         return {"blocked": True, "code": DEMO_CONTROLLER,
                 "reason": "demo/示例入口（非生产代码）"}
+    # M428：测试夹具 / 集成测试后端不是生产入口（WSO2 product-apim 的
+    # modules/integration/tests-common/backend-service）。
+    if re.search(r"(?:^|/)(?:tests?-common|test-fixtures?|fixtures?|"
+                 r"integration-tests?)(?:/|$)", file):
+        return {"blocked": True, "code": TEST_FIXTURE_ONLY,
+                "reason": "测试夹具/集成测试后端代码，不是生产入口"}
 
     # M361：WebSocket 前置鉴权。accept() 前校验会话并 close(4401/1008) 的
     # WS 入口不是未授权候选（redcell 5 条 authz 在此归零）。

@@ -218,10 +218,57 @@ def _comment_flags(lines: list[str]) -> list[bool]:
     return out
 
 
-def _method_span(lines: list[str], name: str) -> tuple[int, int] | None:
-    """在 HEAD 文本里定位方法；返回 0-based (start,end)。"""
-    pat = re.compile(rf"\b{re.escape(name)}\s*\(")
+def _class_span(lines: list[str], cls: str) -> tuple[int, int] | None:
+    """M429：定位类体行区间（0-based，含声明行）。
+
+    同名方法（多个 View 类都写 `def post`）必须先在类体内找，否则
+    `_method_span` 会永远命中文件里第一个 `post`。
+    """
+    pat = re.compile(rf"^\s*class\s+{re.escape(cls)}\b")
+    start = None
     for i, ln in enumerate(lines):
+        if pat.search(ln):
+            start = i
+            break
+    if start is None:
+        return None
+    if "{" in lines[start]:
+        depth = 0
+        seen = False
+        for k in range(start, min(len(lines), start + 4000)):
+            depth += lines[k].count("{") - lines[k].count("}")
+            if "{" in lines[k]:
+                seen = True
+            if seen and depth <= 0:
+                return start, k
+        return start, len(lines) - 1
+    base = len(lines[start]) - len(lines[start].lstrip())
+    end = len(lines) - 1
+    for k in range(start + 1, len(lines)):
+        s = lines[k]
+        if not s.strip():
+            continue
+        ind = len(s) - len(s.lstrip())
+        if ind <= base and not s.lstrip().startswith(("@", "#")):
+            end = k - 1
+            break
+    return start, end
+
+
+def _method_span(lines: list[str], name: str,
+                 cls: str = "") -> tuple[int, int] | None:
+    """在 HEAD 文本里定位方法；返回 0-based (start,end)。
+
+    M429：给了 `cls` 时先缩到类体内再找，修同名方法行号错位。
+    """
+    lo, hi = 0, len(lines)
+    if cls:
+        _cs = _class_span(lines, cls)
+        if _cs:
+            lo, hi = _cs
+    pat = re.compile(rf"\b{re.escape(name)}\s*\(")
+    for i in range(lo, hi):
+        ln = lines[i]
         if not pat.search(ln):
             continue
         # 必须像方法声明，不能是调用：行首有修饰符/返回类型，或以 function/def 开头
@@ -271,8 +318,10 @@ def verify_unit_alive_on_head(repo: Path, rel_path: str, unit_name: str,
         return {"status": "PATCHED_UPSTREAM", "reason": "file_missing_on_head",
                 "head_sha": head, "line": 0}
     lines = text.splitlines()
-    name = unit_name.split(".")[-1].split("#")[0].strip()
-    span = _method_span(lines, name)
+    _parts = [p for p in unit_name.split(".") if p]
+    name = _parts[-1].split("#")[0].strip() if _parts else ""
+    cls = _parts[-2] if len(_parts) >= 2 else ""
+    span = _method_span(lines, name, cls=cls)
     if span is None:
         return {"status": "PATCHED_UPSTREAM",
                 "reason": "unit_not_found_on_head", "head_sha": head,
