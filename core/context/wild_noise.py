@@ -61,6 +61,7 @@ NON_EXECUTABLE_UPLOAD = "NON_EXECUTABLE_UPLOAD"
 # M383：redir 三类野仓降噪 —— 服务端构造跳转 / Referer 自引用 / 短链设计。
 SERVER_BUILT_REDIRECT = "SERVER_BUILT_REDIRECT"
 REFERER_OPEN_REDIRECT = "REFERER_OPEN_REDIRECT"
+SAFE_REDIRECT_GUARD = "SAFE_REDIRECT_GUARD"
 SHORTLINK_BY_DESIGN = "SHORTLINK_BY_DESIGN"
 # M387：第三方 Webhook/公众号验签挑战串（echostr / hub.challenge）原样回显。
 # 它不是浏览器 HTML 页面，不能按反射型 XSS 交单；也不能在 rule_detectors
@@ -107,6 +108,9 @@ SOLIDITY_ONLY = frozenset({
     "tx_origin", "delegatecall_untrusted", "signature_replay",
     "unchecked_erc20_return", "oracle_stale_price",
 })
+
+# M423：只在 Java 里成立的类目（JNDI / SpEL）；落到 .py 入口一定是判据串了语言。
+JAVA_ONLY = frozenset({"jndi_injection", "spel"})
 
 PUBLIC_PREFIXES = ("/app-api/", "/public/", "/open-api/")
 
@@ -646,6 +650,15 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
                                "originalUrl，不是开放重定向缺陷")}
         _rsrc = _read(repo_root, _rf)
         if _rsrc:
+            if _rf.endswith(".py"):
+                # M423：同源跳转 helper（_local_next / netloc 判空）兜底。
+                from core.agents.rule_detectors import (
+                    _PY_REDIR_GUARD_RE as _py_guard)
+                if _py_guard.search(_rsrc):
+                    return {"blocked": True, "code": SAFE_REDIRECT_GUARD,
+                            "reason": ("Python 跳转目标经 _local_next / "
+                                       "netloc 等同源校验 helper 处理，"
+                                       "不是开放重定向")}
             _block = (_java_method_block(_rsrc, _ru.rsplit(".", 1)[-1])
                       if _rf.endswith(".java") else _rsrc)
             _targets = _redir_targets(_block)
@@ -720,6 +733,11 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
             ".sol"):
         return {"blocked": True, "code": RULE_LANGUAGE_MISMATCH,
                 "reason": (f"{record.get('category')} 是 Solidity 类目，"
+                           f"入口文件是 {Path(file).suffix or '未知类型'}")}
+    if str(record.get("category") or "") in JAVA_ONLY and not file.endswith(
+            ".java"):
+        return {"blocked": True, "code": RULE_LANGUAGE_MISMATCH,
+                "reason": (f"{record.get('category')} 是 Java 专属类目，"
                            f"入口文件是 {Path(file).suffix or '未知类型'}")}
 
     src = _read(repo_root, str(record.get("file") or ""))

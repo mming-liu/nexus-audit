@@ -600,10 +600,7 @@ DESERIAL_SAFE_RE = re.compile(
 # Map/List/集合/JsonNode 这类“可承载任意类型”的目标才保留原有判据；
 # 具体 Model/DTO/VO/Entity 且无 default typing / 无 Id.CLASS|NAME 时判安全。
 _TYPED_READ_VALUE_RE = re.compile(r"\breadValue\s*\(([^;]{0,600})\)", re.S)
-_TYPED_TARGET_SAFE = {
-    "Object", "Serializable", "Map", "HashMap", "List", "ArrayList",
-    "Collection", "Iterable", "JsonNode", "ObjectNode", "ArrayNode",
-}
+_TYPED_TARGET_SAFE = {"Object", "Serializable"}
 _UNSAFE_TYPE_INFO_RE = re.compile(
     r"@JsonTypeInfo\s*\([^)]*Id\.(?:CLASS|NAME|MINIMAL_CLASS)", re.S)
 _SAFE_TYPE_INFO_RE = re.compile(
@@ -619,13 +616,27 @@ def _typed_read_value_safe(source: str, body: str) -> bool:
     if _SAFE_TYPE_INFO_RE.search(source):
         return True
     # TypeReference<List<ExecutionReference>> 同样是具体类型绑定；
-    # 只有 Map/Object 这类可承载任意类型的泛型才保留原判据。
+    # 只有 Object/Serializable 这类可承载任意类型的根才保留原判据。
+    # M423：Map/List/JsonNode/Collection 在未开 default typing 时只会
+    # 解析为 LinkedHashMap/ArrayList/JsonNode，不会实例化 Gadget。
     for tr in re.finditer(r"new\s+TypeReference\s*<\s*([^>]+)>", source):
         inner = tr.group(1)
         concrete = [x for x in re.findall(r"\b[A-Z]\w+\b", inner)
                     if x not in _TYPED_TARGET_SAFE]
         if concrete:
             return True
+    # M423：菱形 `new TypeReference<>() {}` —— 看赋值左侧声明类型；
+    # Map/List/JsonNode 等容器 → 安全，Object/Serializable → 仍不安全。
+    _diamond = re.search(
+        r"([A-Za-z_][\w.]*)\s*(?:<[^;=]*>)?\s+\w+\s*=\s*[^;]*?"
+        r"new\s+TypeReference\s*<\s*>\s*\(\s*\)", source, re.S)
+    if _diamond:
+        _base = _diamond.group(1).split(".")[-1]
+        if _base in _TYPED_TARGET_SAFE:
+            return False
+        return True
+    if re.search(r"new\s+TypeReference\s*<\s*>\s*\(\s*\)", source):
+        return True
     for m in _TYPED_READ_VALUE_RE.finditer(body):
         args = m.group(1)
         tm = re.search(r",\s*([A-Za-z_][\w.]*)\.class\s*$", args.strip(), re.S)
@@ -4024,6 +4035,19 @@ def _vendor_form_response(source: str) -> bool:
     return bool(_VENDOR_FORM_RE.search(_all_evidence(source)))
 
 
+def _view_only_controller(source: str) -> bool:
+    """M424：@Controller 纯视图控制器（无 @ResponseBody / 无直接写响应）。"""
+    if "Controller-Kind: @Controller" not in source:
+        return False
+    # 注释里的 `// @ResponseBody` 是切片证据说明，不是真注解。
+    _code = re.sub(r"//[^\n]*", "", source)
+    if re.search(r"@ResponseBody\b", _code):
+        return False
+    if re.search(r"getWriter\s*\(|getOutputStream\s*\(", _code):
+        return False
+    return True
+
+
 def xss_verdict(source: str) -> bool | None:
     body = entry_body(source)
     if not body:
@@ -4129,6 +4153,11 @@ def xss_verdict(source: str) -> bool | None:
             return False               # 读取点没有回显，链路不闭合
         if XSS_ENCODE_RE.search(reader):
             return False               # 读取点做了输出编码
+        # M424：纯视图 @Controller 的读取端只是返回模板名；只有模板里
+        # 真有不转义渲染才构成 XSS。
+        if (_view_only_controller(source)
+                and not any(_template_render(source).values())):
+            return False
         return True
 
     # 2b) 存储型，介质是数据库：写入方与读取方共用同一个仓储字段。
@@ -4155,6 +4184,11 @@ def xss_verdict(source: str) -> bool | None:
             if readers:
                 joined = "\n".join(readers)
                 if _db_echo(joined) and not XSS_ENCODE_RE.search(joined):
+                    # M424：纯视图 @Controller 的读取端返回模板名；模板
+                    # 没有不转义渲染时，DB 里的值不会以 HTML 执行。
+                    if (_view_only_controller(source)
+                            and not any(_template_render(source).values())):
+                        return False
                     return True
         # 写入端经 Service 转调（`xssService.insertOne(...)` → `xssMapper.insertAll(...)`）：
         # 切片器已经把那层实现体贴进 `// ---- 跨文件证据：insertOne() 的接口实现类
@@ -4166,6 +4200,9 @@ def xss_verdict(source: str) -> bool | None:
             if readers:
                 joined = "\n".join(readers)
                 if _db_echo(joined) and not XSS_ENCODE_RE.search(joined):
+                    if (_view_only_controller(source)
+                            and not any(_template_render(source).values())):
+                        return False
                     return True
         # 落在这里的两种情况都必须交模型，不能判 False：
         #   a) 有写入、但读取点没把值原样交进响应体（或根本没找到读取点）
@@ -4326,7 +4363,10 @@ _PY_REDIR_GUARD_RE = re.compile(
     r"url_has_allowed_host_and_scheme\s*\(|"
     r"\bis_safe_url\s*\(|"
     r"\bis_safe_redirect\s*\(|"
-    r"\.\s*netloc\s*(?:==|!=)|"
+    # M423：`_local_next(...)` / `_safe_next(...)` / `sanitize_redirect(...)`
+    r"\b_?(?:local|safe)_(?:next|redirect|url)\s*\(|"
+    r"\b(?:sanitize|validate)_(?:next|redirect|url)\s*\(|"
+    r"\.\s*netloc\b|"
     r"\ballowed_hosts\s*=|"
     r"\bALLOWED_(?:REDIRECT|HOSTS)\w*")
 # 以**单个** `/` 开头的字面量前缀 → 结果必然同源
@@ -4369,8 +4409,8 @@ def _py_redir_verdict(source: str) -> bool | None:
         return None
     if not _PY_REDIR_SINK_RE.search(body):
         return None                      # 没有跳转 API → 不归本类目管
-    if _PY_REDIR_GUARD_RE.search(body):
-        return False                     # 已有同源/白名单校验
+    if _PY_REDIR_GUARD_RE.search(body) or _PY_REDIR_GUARD_RE.search(source):
+        return False                     # 已有同源/白名单校验（含切片里的 helper 实现体）
     params = _py_func_params(source)
     verdicts: list[bool | None] = []
     for m in _PY_REDIR_SINK_RE.finditer(body):
@@ -12077,6 +12117,15 @@ _JNDI_ABORT_RE = re.compile(r"\b(?:throw|return|raise)\b")
 
 def jndi_injection_verdict(source: str) -> bool | None:
     """第 39 类（M219）：外部字符串直接进 JNDI lookup。"""
+    # M423：JNDI 是 Java 专属漏洞；Python/Solidity 的普通 `.lookup()`
+    # 不是 JNDI，直接退 None（animaworks 的 rtr.lookup(callback_id)）。
+    if _looks_python(source) or _looks_solidity(source):
+        return None
+    if not re.search(
+            r"\b(?:InitialContext|DirContext|InitialDirContext|Context|"
+            r"JndiTemplate|JndiObjectFactoryBean|JndiLookup|javax\.naming)\b",
+            source):
+        return None
     body = entry_body(source) or source
     m = _JNDI_LOOKUP_RE.search(body)
     if not m:

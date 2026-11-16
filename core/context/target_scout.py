@@ -156,7 +156,7 @@ NEW_GEN_KEYWORDS: dict[str, tuple[str, ...]] = {
              'mybatis-plus "lims"', '"spring-boot" "report"',
              'mybatis-plus "bi"',
              # M419：2024–2026 高频 AI/Web 应用词（第 2 页顺延用）。
-             '"ollama"', '"dify"', '"vllm"', '"openwebui"', '"comfyui"',
+             '"ollama"', '"dify"', '"vllm"', '"openwebui"', '"fastgpt"',
              '"langgraph"', '"crewai"', '"autogen"', '"studio"', '"panel"',
              '"gateway"', '"console"', '"portal"', '"nas"', '"webhook"'),
     "python": ('fastapi "rag"', 'fastapi "agent"', 'fastapi "mcp"',
@@ -166,7 +166,7 @@ NEW_GEN_KEYWORDS: dict[str, tuple[str, ...]] = {
                'django "his"', 'flask "iot"', 'fastapi "report"',
                'fastapi "bi"', 'django "erp"',
                # M419：同上，扩充到 30 词并保留前 15 词顺序。
-               '"ollama"', '"dify"', '"vllm"', '"openwebui"', '"comfyui"',
+               '"ollama"', '"dify"', '"vllm"', '"openwebui"', '"fastgpt"',
                '"langgraph"', '"crewai"', '"autogen"', '"studio"', '"panel"',
                '"gateway"', '"console"', '"portal"', '"nas"', '"webhook"'),
 }

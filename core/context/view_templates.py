@@ -66,18 +66,9 @@ _MODEL_PUT_RE = re.compile(
     r"\b(?:model|modelMap|mv|mav|modelAndView)\s*\.\s*"
     r"(?:addAttribute|put|addObject)\s*\(\s*\"(?P<key>[^\"]+)\"\s*,")
 
-# 渲染点：一条语句里出现该键，且该语句含"不转义"指令
-_NOESCAPE_RE = re.compile(
-    r"th:utext\s*=|"
-    r"<#noescape\s*>|"
-    r"\bv-html\s*=|"
-    r"\[\$\{|"                       # Thymeleaf 内联未转义 [[${...}]]
-    r"innerHTML\s*=", re.I)
-_ESCAPE_RE = re.compile(
-    r"th:text\s*=|"
-    r"\$\{[^}]*\}|"                  # Thymeleaf 内联默认转义 + 普通 ${}
-    r"th:attr\s*=|"
-    r"v-text\s*=", re.I)
+# M424：渲染点的转义判定在 find_render_points() 内按 `${k}` 精确匹配，
+# 不再使用整行级 `_NOESCAPE_RE` / `_ESCAPE_RE`（会把同行别处的
+# `th:utext="#{i18n.msg}"` 误当用户数据不转义）。
 
 _MAX_CONTEXT = 3        # 渲染点上下各取几行
 
@@ -151,14 +142,22 @@ def find_render_points(template: Path, keys: list[str],
     hits: list[TemplateHit] = []
     for i, ln in enumerate(lines, 1):
         for k in keys:
-            # 键必须作为一个完整表达式出现：`${html}` / `${ html }` / `#{html}`
-            if not re.search(r"[\$#]\{\s*" + re.escape(k) + r"\s*\}", ln):
+            # M424：键必须作为 `${k}` Model 表达式出现；`#{k}` 是 Thymeleaf
+            # i18n 静态词条，不是模型变量，不能当渲染点。
+            kp = re.escape(k)
+            if not re.search(r"\$\{\s*" + kp + r"(?:\.[A-Za-z0-9_]+)?\s*\}",
+                             ln):
                 continue
-            unescaped = bool(_NOESCAPE_RE.search(ln)) and not _ESCAPE_RE.search(ln)
-            # `th:utext` 与 `[[${}]]` 可能同时出现，此时按"不转义"算 ——
-            # 一处不安全渲染就足以成立。
-            if not unescaped and _NOESCAPE_RE.search(ln):
-                unescaped = True
+            # 不转义指令必须真正包裹 ${k}；同行别处的
+            # `th:utext="#{i18n.msg}"` 不能把 `th:text="${k}"` 连坐成不转义。
+            # M424：`[[${k}]]` 是 Thymeleaf 的**转义**内联（JS 上下文还会
+            # 做 JS 转义），只有 `[(${k})]` 才是不转义内联。
+            unescaped = bool(re.search(
+                r"th:utext\s*=\s*[\"'][^\"']*\$\{\s*" + kp + r"|"
+                r"v-html\s*=\s*[\"'][^\"']*\$\{\s*" + kp + r"|"
+                r"\[\(\$\{\s*" + kp + r"|"
+                r"<#noescape\s*>(?:(?!</#noescape>).){0,200}?\$\{\s*" + kp,
+                ln, re.I | re.S))
             hits.append(TemplateHit(path=str(template), line=i, key=k,
                                     raw=ln.strip(), unescaped=unescaped))
             break

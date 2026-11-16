@@ -14075,6 +14075,93 @@ check("M419：顺延覆盖新增业务词",
 check("M419：顺延第 3 轮起翻 page=2",
       any("&page=2" in u for u in _M341_CALLS), True)
 
+print("\n[342] M423/M424：JNDI 语言隔离 / Jackson Map / Python 同源跳转 / Thymeleaf 模板")
+from core.context import view_templates as _vt342                  # noqa: E402
+
+_M342_REDIR = '''
+from urllib.parse import urlparse
+
+@app.route("/go")
+def go():
+    return redirect(_local_next(request.args.get("next"), "/home"))
+
+def _local_next(value, fallback):
+    if not value or not value.startswith("/") or value.startswith("//") \\
+            or urlparse(value).netloc:
+        return fallback
+    return value
+'''
+check("M423：_local_next + netloc 守卫的 Python 跳转不判 redir",
+      _rd395.redir_verdict(_M342_REDIR), False)
+
+_M342_DESER_SAFE = '''
+public class Hook {
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    public void handle(byte[] rawBody) throws Exception {
+        Map<String, Object> payload = objectMapper.readValue(
+                rawBody, new TypeReference<>() {});
+    }
+}
+'''
+check("M423：Jackson 菱形 TypeReference<Map> 不判 deserial",
+      _rd395.deserial_verdict(_M342_DESER_SAFE), False)
+_M342_DESER_MAP = '''
+public class Hook {
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    public void handle(byte[] rawBody) throws Exception {
+        Object payload = objectMapper.readValue(rawBody, Map.class);
+    }
+}
+'''
+check("M423：readValue(..., Map.class) 无多态不判 deserial",
+      _rd395.deserial_verdict(_M342_DESER_MAP), False)
+_M342_DESER_VULN = '''
+public class Hook {
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    public void handle(byte[] rawBody) throws Exception {
+        objectMapper.enableDefaultTyping();
+        Object payload = objectMapper.readValue(rawBody, Object.class);
+    }
+}
+'''
+check("M423：开启 DefaultTyping + Object.class 仍判 deserial",
+      _rd395.deserial_verdict(_M342_DESER_VULN), True)
+
+_M342_TPL = Path(_ws_mkdtemp("m342_tpl_")) / "form.html"
+_M342_TPL.write_text(
+    '<span th:text="${form}"></span>\n'
+    '<span th:utext="#{i18n.helpText}"></span>\n', encoding="utf-8")
+_M342_HITS = _vt342.find_render_points(_M342_TPL, ["form"])
+check("M424：th:utext=#{i18n} 不把 th:text=${form} 连坐成不转义",
+      bool(_M342_HITS) and all(not h.unescaped for h in _M342_HITS), True)
+_M342_TPL2 = Path(_ws_mkdtemp("m342_tpl2_")) / "vuln.html"
+_M342_TPL2.write_text('<p th:utext="${form}"></p>\n', encoding="utf-8")
+_M342_HITS2 = _vt342.find_render_points(_M342_TPL2, ["form"])
+check("M424：th:utext=${form} 仍判不转义",
+      bool(_M342_HITS2) and _M342_HITS2[0].unescaped, True)
+
+_M342_CTRL = '''
+// Full-Route: /settings/save
+// Controller-Kind: @Controller
+public String save(@ModelAttribute Form form, Model model) {
+    model.addAttribute("form", form);
+    return "form";
+}
+'''
+check("M424：纯视图 @Controller 返回模板名不判 xss",
+      _rd395.xss_verdict(_M342_CTRL), False)
+
+check("M423：Python rtr.lookup(token) 不判 JNDI",
+      _rd395.jndi_injection_verdict("def f(token):\n    return rtr.lookup(token)\n"),
+      None)
+check("M423：无 JNDI 上下文的 Java router.lookup(id) 不判 JNDI",
+      _rd395.jndi_injection_verdict(
+          "public void f(String id) { router.lookup(id); }"), None)
+check("M423：new InitialContext().lookup(name) 仍判 JNDI",
+      _rd395.jndi_injection_verdict(
+          "public void f(String name) throws Exception { "
+          "new InitialContext().lookup(name); }"), True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
