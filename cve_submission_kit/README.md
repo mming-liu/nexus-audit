@@ -20,4 +20,12 @@
 
 该文件只含代码定位与防御补丁，不含攻击载荷或 `curl` 攻击命令。
 
+## v1.5.20 新增候选（防御修复包，未提交）
+
+| # | 单 | 文件 | 披露入口 | CWE | 状态 |
+|---|---|---|---|---|---|
+| 7 | dify-for-dsl 未授权 SSRF | [07_dify_for_dsl.md](07_dify_for_dsl.md) | GitHub Issue / 私密 Security Advisory（仓库无 SECURITY.md） | CWE-918 | 待用户决定是否提交 |
+
+该文件只含代码定位与防御补丁，不含攻击载荷或 `curl` 攻击命令。
+
 每份都包含：Step 1 提交入口、Step 2 GitHub 标题/描述、Step 3 CVE.org 六框、Step 3B CVE Services 逐框值、过审三要素、固定答法、提交前检查。
