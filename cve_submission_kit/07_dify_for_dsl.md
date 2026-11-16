@@ -1,7 +1,9 @@
 # 候选 07：wwwzhouhui/dify-for-dsl 未授权 SSRF（防御修复包）
 
-> 模板版本：v1.5.20 ｜ 状态：**待用户决定是否通过 GitHub Issue / 私密 Advisory 提交**
+> 模板版本：v1.5.20 ｜ 状态：**已提交（Issue #23，2026-11-17；仓库未开启私密报告）**
 > 审计 HEAD：`d835ecfa6cbe45a70326e4e3336bbf73f2c68a17`（2026-11-11 23:58 +0800）
+> 提交入口：GitHub Issue（私密报告已关闭，API 返回 403）
+> 提交地址：https://github.com/wwwzhouhui/dify-for-dsl/issues/23
 > 仓库：https://github.com/wwwzhouhui/dify-for-dsl ｜ Stars：3,884（2026-11-16）
 > 说明：本文件**只含代码定位与防御补丁**，不含任何攻击载荷或 `curl` 攻击命令。
 

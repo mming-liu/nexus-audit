@@ -16,7 +16,7 @@
 
 | # | 单 | 文件 | 披露入口 | CWE | 状态 |
 |---|---|---|---|---|---|
-| 6 | android-agent 未授权目录删除 | [06_android_agent.md](06_android_agent.md) | GitHub Private Security Advisory / security@ghostinthedroid.com | CWE-22 / CWE-862 | 待用户通过 GitHub Private Security Advisory 私密提交 |
+| 6 | android-agent 未授权目录删除 | [06_android_agent.md](06_android_agent.md) | GitHub Private Security Advisory / security@ghostinthedroid.com | CWE-22 / CWE-862 | **已提交：GHSA-368h-5897-269p（2026-11-17，triage）** |
 
 该文件只含代码定位与防御补丁，不含攻击载荷或 `curl` 攻击命令。
 
@@ -24,7 +24,7 @@
 
 | # | 单 | 文件 | 披露入口 | CWE | 状态 |
 |---|---|---|---|---|---|
-| 7 | dify-for-dsl 未授权 SSRF | [07_dify_for_dsl.md](07_dify_for_dsl.md) | GitHub Issue / 私密 Security Advisory（仓库无 SECURITY.md） | CWE-918 | 待用户决定是否提交 |
+| 7 | dify-for-dsl 未授权 SSRF | [07_dify_for_dsl.md](07_dify_for_dsl.md) | GitHub Issue / 私密 Security Advisory（仓库无 SECURITY.md） | CWE-918 | **已提交：Issue #23（2026-11-17；私密报告已关闭）** |
 
 该文件只含代码定位与防御补丁，不含攻击载荷或 `curl` 攻击命令。
 

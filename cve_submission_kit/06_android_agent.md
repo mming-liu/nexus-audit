@@ -1,7 +1,9 @@
 # 候选 06：ghost-in-the-droid/android-agent 未授权目录删除（防御修复包）
 
-> 模板版本：v1.5.17 ｜ 状态：**待用户通过 GitHub Private Security Advisory 私密提交**
+> 模板版本：v1.5.17 ｜ 状态：**已提交（GHSA-368h-5897-269p，2026-11-17，triage）**
 > 审计 HEAD：`8974838fd74c06944583c9dcea66570bc4c5c161`（2026-11-14 21:21:24 +0100）
+> 提交入口：GitHub Private Security Advisory（2026-11-16T23:29:30Z 创建）
+> 提交地址：https://github.com/ghost-in-the-droid/android-agent/security/advisories/GHSA-368h-5897-269p
 > 仓库：https://github.com/ghost-in-the-droid/android-agent
 > Stars：422（2026-11-15 搜索结果）｜ LICENSE：MIT ｜ 默认分支：`main`
 > 说明：本文件**只含代码定位与防御补丁**，不含任何攻击载荷、利用脚本或
