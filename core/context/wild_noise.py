@@ -62,6 +62,10 @@ NON_EXECUTABLE_UPLOAD = "NON_EXECUTABLE_UPLOAD"
 SERVER_BUILT_REDIRECT = "SERVER_BUILT_REDIRECT"
 REFERER_OPEN_REDIRECT = "REFERER_OPEN_REDIRECT"
 SAFE_REDIRECT_GUARD = "SAFE_REDIRECT_GUARD"
+# M435：类级/基类级鉴权注解（@Permission / @SaCheckLogin / @PreAuthorize /
+# @RequiresPermissions）覆盖到的 authz 入口 —— 框架已在类层面做了鉴权，
+# 不是"裸 authz"（SPMS RoleController 继承 BaseController 的 @Permission）。
+AUTHZ_CLASS_OR_BASE_GUARD = "AUTHZ_CLASS_OR_BASE_GUARD"
 # M428：测试夹具/集成测试后端（tests-common / fixtures / integration-tests）
 # 不是生产入口，直接拦截，避免测试用 PeopleRestService 占 A 板。
 TEST_FIXTURE_ONLY = "TEST_FIXTURE_ONLY"
@@ -148,6 +152,115 @@ def _read(repo_root: Path | None, rel: str) -> str:
         return path.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return ""
+
+
+# ---------------- M435：Java 类级/基类级鉴权注解 ----------------
+_JAVA_AUTHZ_ANN_RE = re.compile(
+    r"@(?:Permission|SaCheckLogin|PreAuthorize|RequiresPermissions)\b")
+_JAVA_ANON_ANN_RE = re.compile(
+    r"@(?:Anonymous|IgnoreToken|PermitAll)\b|"
+    r"@Permission\s*\(\s*authorize\s*=\s*false\s*\)")
+
+
+def _java_annotations_before(lines: list[str], idx: int) -> str:
+    """声明行之前的注解块（含多行注解/注释的简单回扫）。"""
+    out: list[str] = []
+    j = idx - 1
+    while j >= 0:
+        s = lines[j].strip()
+        if not s:
+            if out:
+                break
+            j -= 1
+            continue
+        if (s.startswith("@") or s.startswith("//") or s.startswith("*")
+                or s.startswith("/*") or s.endswith("*/")):
+            out.append(s)
+            j -= 1
+            continue
+        if out and (s.endswith(")") or s.endswith(",") or s.endswith("{")):
+            out.append(s)
+            j -= 1
+            continue
+        break
+    return "\n".join(reversed(out))
+
+
+def _java_method_and_class(lines: list[str], method: str):
+    """返回 (方法行, 类声明行, 类名, 父类名)。"""
+    mi = -1
+    for i, ln in enumerate(lines):
+        if re.search(rf"\b{re.escape(method)}\s*\(", ln):
+            mi = i
+            break
+    if mi < 0:
+        return -1, -1, "", ""
+    for j in range(mi, -1, -1):
+        m = re.search(r"\bclass\s+(\w+)", lines[j])
+        if m:
+            parent = ""
+            pm = re.search(r"\bextends\s+([\w.]+)", lines[j])
+            if pm:
+                parent = pm.group(1).split(".")[-1]
+            return mi, j, m.group(1), parent
+    return mi, -1, "", ""
+
+
+def _repo_has_authz_framework(repo_root: Path) -> bool:
+    """仓内是否有成规模的类级鉴权注解或 AirPower/Spring Security 线索。"""
+    count = 0
+    for p in repo_root.rglob("*.java"):
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if "@Permission" in text or "@SaCheckLogin" in text:
+            count += 1
+            if count >= 3:
+                return True
+    for name in ("pom.xml", "build.gradle", "build.gradle.kts"):
+        for p in repo_root.rglob(name):
+            try:
+                text = p.read_text(encoding="utf-8", errors="ignore").lower()
+            except OSError:
+                continue
+            if "airpower" in text or "spring-security" in text:
+                return True
+    return False
+
+
+def _java_authz_class_guard(repo_root: Path | None, rel: str,
+                            unit: str) -> bool:
+    """当前类或其 `extends Base*` 父类是否有类级鉴权注解（M435）。"""
+    if repo_root is None:
+        return False
+    text = _read(repo_root, rel)
+    if not text:
+        return False
+    lines = text.splitlines()
+    method = (unit or "").rsplit(".", 1)[-1].split("#")[0]
+    mi, ci, _cls, parent = _java_method_and_class(lines, method)
+    if mi < 0 or ci < 0:
+        return False
+    if _JAVA_ANON_ANN_RE.search(_java_annotations_before(lines, mi)):
+        return False
+    if _JAVA_AUTHZ_ANN_RE.search(_java_annotations_before(lines, ci)):
+        return _repo_has_authz_framework(Path(repo_root))
+    if parent:
+        for p in Path(repo_root).rglob(parent + ".java"):
+            try:
+                plines = p.read_text(
+                    encoding="utf-8", errors="ignore").splitlines()
+            except OSError:
+                continue
+            for i, ln in enumerate(plines):
+                if re.search(rf"\bclass\s+{re.escape(parent)}\b", ln):
+                    if _JAVA_AUTHZ_ANN_RE.search(
+                            _java_annotations_before(plines, i)):
+                        return _repo_has_authz_framework(Path(repo_root))
+                    break
+            break
+    return False
 
 
 def _ws_handler_block(src: str, unit: str) -> str:
@@ -633,6 +746,15 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
             return {"blocked": True, "code": WS_AUTH_PRESENT,
                     "reason": ("WebSocket 路由在 accept() 前校验会话并 "
                                "close(4401/1008)：鉴权存在，不是未授权入口")}
+
+    # M435：类级/基类级鉴权注解（AirPower @Permission / Sa-Token @SaCheckLogin /
+    # Spring @PreAuthorize / Shiro @RequiresPermissions）。
+    if (record.get("category") == "authz" and file.endswith(".java")
+            and _java_authz_class_guard(
+                repo_root, str(record.get("file") or ""), unit)):
+        return {"blocked": True, "code": AUTHZ_CLASS_OR_BASE_GUARD,
+                "reason": ("当前类或继承基类挂有类级 @Permission/鉴权注解，"
+                           "框架已在类层面鉴权")}
 
     # M387：Webhook 验签挑战串回显（echostr / hub.challenge）。
     if record.get("category") == "xss":

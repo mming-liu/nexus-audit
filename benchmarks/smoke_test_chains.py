@@ -14270,6 +14270,60 @@ check("M433：vLLM 推理引擎 fork 判工具库",
       target_scout.is_tool_lib("org/vllm-deepseek-v4-sm89", "vLLM fork"),
       True)
 
+print("\n[345] M435：类级/基类级 @Permission 鉴权识别")
+_M345 = Path(_ws_mkdtemp("m345_")) / "repo"
+_M345_JAVA = _M345 / "src" / "main" / "java" / "app"
+_M345_JAVA.mkdir(parents=True, exist_ok=True)
+(_M345_JAVA / "BaseController.java").write_text(
+    "package app;\n"
+    "@Permission\n"
+    "public class BaseController<T> {\n"
+    "}\n", encoding="utf-8")
+(_M345_JAVA / "RoleController.java").write_text(
+    "package app;\n"
+    "public class RoleController extends BaseController<Role> {\n"
+    "    @PostMapping(\"authorizeMenu\")\n"
+    "    public Json authorizeMenu(RoleEntity role) {\n"
+    "        service.authorizeMenu(role);\n"
+    "        return Json.success();\n"
+    "    }\n"
+    "    @PostMapping(\"authorizePermission\")\n"
+    "    public Json authorizePermission(RoleEntity role) {\n"
+    "        service.authorizePermission(role);\n"
+    "        return Json.success();\n"
+    "    }\n"
+    "}\n", encoding="utf-8")
+(_M345_JAVA / "UserController.java").write_text(
+    "package app;\n@Permission\npublic class UserController {}\n",
+    encoding="utf-8")
+(_M345_JAVA / "OrderController.java").write_text(
+    "package app;\n@Permission\npublic class OrderController {}\n",
+    encoding="utf-8")
+_M345_REC = wild_noise.classify(
+    {"category": "authz", "unit": "RoleController.authorizeMenu",
+     "file": "src/main/java/app/RoleController.java"}, _M345)
+check("M435：父类 BaseController 的类级 @Permission 覆盖子类入口",
+      (_M345_REC.get("blocked"), _M345_REC.get("code")),
+      (True, wild_noise.AUTHZ_CLASS_OR_BASE_GUARD))
+
+_M345B = Path(_ws_mkdtemp("m345b_")) / "repo"
+_M345B_JAVA = _M345B / "src" / "main" / "java" / "app"
+_M345B_JAVA.mkdir(parents=True, exist_ok=True)
+(_M345B_JAVA / "ApiController.java").write_text(
+    "package app;\n"
+    "public class ApiController {\n"
+    "    @PreAuthorize(\"hasRole('ADMIN')\")\n"
+    "    public void safe() { }\n"
+    "    public void vulnerable(String name) {\n"
+    "        service.delete(name);\n"
+    "    }\n"
+    "}\n", encoding="utf-8")
+_M345B_REC = wild_noise.classify(
+    {"category": "authz", "unit": "ApiController.vulnerable",
+     "file": "src/main/java/app/ApiController.java"}, _M345B)
+check("M435：无父类类级注解、仅兄弟 @PreAuthorize 反差不拦截",
+      _M345B_REC.get("blocked"), False)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
