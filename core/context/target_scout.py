@@ -209,6 +209,8 @@ _TOOL_LIB_RE = re.compile(
     r"huey|celery|defectdojo|spring-boot-admin|home[-_]?assistant|"
     r"hacs|custom_components|esphome|comfyui|sd-webui|stable-diffusion|"
     r"gradio|streamlit|jupyter|notebook|mcp-server|"
+    # M433：纯推理引擎 fork（vLLM 等）不是业务后台，侦察阶段直接丢。
+    r"vllm|sglang|tensorrt-llm|llama\.cpp|"
     # M420：粘连型纯 SDK/脚手架（agentkit/toolkit/devkit）没有 Web 路由，
     # 侦察阶段直接丢，别浪费克隆与实扫名额（whatsapp-agentkit 教训）。
     r"agentkit|agent-kit|toolkit|toolkits|starter-kit|starterkit|"

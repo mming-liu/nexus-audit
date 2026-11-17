@@ -39,6 +39,7 @@ benchmarks/results/llm_root_triage.jsonl
 # M286 每日巡猎账本与产物（每天重写，不入库）
 benchmarks/results/daily_hunt_state.json
 benchmarks/results/daily_hunt.json
+benchmarks/results/daily_hunt_runs/
 benchmarks/results/daily_hunt_packs/
 
 # M299 临时扫描报告（scan --report 的默认落点，随手生成，不入库）

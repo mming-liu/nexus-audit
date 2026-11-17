@@ -272,6 +272,10 @@ def hash_is_weak(alg: str) -> bool | None:
 # Cipher.getInstance("ALG") 直接字面量（可能跨行、可能带 provider 第二参数）
 CIPHER_LITERAL = re.compile(r'Cipher\s*\.\s*getInstance\s*\(\s*"([A-Za-z0-9/_\-]+)"', re.I)
 HASH_LITERAL = re.compile(r'MessageDigest\s*\.\s*getInstance\s*\(\s*"([A-Za-z0-9/_\-]+)"', re.I)
+# M431：工具类调用名本身即算法（MD5Utils.MD5Encode / DigestUtils.md5Hex）。
+_HASH_CALL_ALG_RE = re.compile(
+    r"\b(?:MD5|SHA-?1|SHA-?256|SHA-?512)(?:Utils|Util|Hex|Encode|Digest|Hash)?\w*\s*\(",
+    re.I)
 PROP_REF = re.compile(r'getProperty\s*\(\s*"([^"]+)"')
 
 
@@ -287,6 +291,18 @@ def extract_hash_alg(source: str, config: dict[str, str] | None = None) -> str |
     m = HASH_LITERAL.search(source)
     if m:
         return m.group(1)
+    # M431：`MD5Utils.MD5Encode(...)` 这类 helper 调用名即算法。
+    m2 = _HASH_CALL_ALG_RE.search(source)
+    if m2:
+        _raw = m2.group(0).split("(")[0].upper().replace("-", "")
+        if "MD5" in _raw:
+            return "MD5"
+        if "SHA1" in _raw:
+            return "SHA-1"
+        if "SHA256" in _raw:
+            return "SHA-256"
+        if "SHA512" in _raw:
+            return "SHA-512"
     return _from_config(source, config, hints=("hashalg", "hash", "digest"))
 
 
@@ -744,7 +760,9 @@ EXPR_SINK_RE = re.compile(
     r"ImageMath\s*\.\s*eval\s*\(|(?<![\w.])eval\s*\(|"
     # 裸 `.getValue()` 太宽：Cookie.getValue() / Map.Entry.getValue() 都会
     # 命中（RuoYi 实测 2 条 FP）。只认 SpEL 表达式变量名的接收者。
-    r"\b(?:ex|exp|expr|expression|spel|parser)\w*\s*\.\s*"
+    # M434：`\w*` 会把 executionReadinessService.evaluate(...) 这类业务方法
+    # 当成 SpEL（EAF 实测）—— 只允许数字后缀，不再吞掉任意单词。
+    r"\b(?:ex|exp|expr|expression|spel|parser)\d*\s*\.\s*"
     r"(?:getValue|evaluate)\s*\(", re.I)
 EXPR_STANDARD_CTX_RE = re.compile(r"new\s+StandardEvaluationContext\s*\(", re.I)
 EXPR_SIMPLE_CTX_RE = re.compile(r"SimpleEvaluationContext|"
@@ -4429,6 +4447,43 @@ def _py_redir_verdict(source: str) -> bool | None:
     return None
 
 
+_REPO_LOOKUP_RE = re.compile(
+    r"\b\w*(?:Service|Mapper|Dao|Repository)\s*\.\s*\w+\s*\(", re.I)
+
+
+def _redir_repo_sourced(body: str) -> bool:
+    """M432：跳转目标是否来自内部仓储/服务查询（fileService.getById(id)）。"""
+    if re.search(r"getParameter\s*\(|getHeader\s*\(|getQueryString\s*\(",
+                 body):
+        return False
+    if not _REPO_LOOKUP_RE.search(body):
+        return False
+    targets: list[str] = []
+    for m in re.finditer(r"sendRedirect\s*\(\s*([^;]{0,300}?)\s*\)\s*;",
+                         body, re.S):
+        targets.append(m.group(1))
+    for m in re.finditer(r"[\"']redirect:\s*[\"']\s*\+([^;]{0,300})", body):
+        targets.append(m.group(1))
+    for t in targets:
+        if _REPO_LOOKUP_RE.search(t):
+            return True
+        vm = re.fullmatch(r"\s*([A-Za-z_]\w*)\s*", t)
+        if vm:
+            rhs = _last_assign_rhs(body, vm.group(1))
+            if rhs and _REPO_LOOKUP_RE.search(rhs):
+                return True
+        # M432：目标表达式引用局部变量，而该变量赋自仓储查询
+        # （`FileEntity file = service.get(fileId)` → `file.getUrl()`）。
+        for _id in set(re.findall(r"\b[A-Za-z_]\w*\b", t)):
+            _rhs = _last_assign_rhs(body, _id)
+            if _rhs and _REPO_LOOKUP_RE.search(_rhs):
+                return True
+            if re.search(rf"\b{re.escape(_id)}\s*=\s*[^;]*"
+                         rf"{_REPO_LOOKUP_RE.pattern}", body):
+                return True
+    return False
+
+
 def redir_verdict(source: str) -> bool | None:
     if _looks_python(source):
         return _py_redir_verdict(source)
@@ -4483,6 +4538,10 @@ def redir_verdict(source: str) -> bool | None:
 
     # 有 Location 下发，且经过白名单 → 安全
     if REDIR_WHITELIST_RE.search(body):
+        return False
+    # M432：目标来自内部仓储/服务查询（*Service/*Mapper/*Dao/*Repository），
+    # 入口只拿主键标识、不读 request 参数 → 服务端内部资源查找跳转。
+    if _redir_repo_sourced(body):
         return False
     return True
 
@@ -12406,6 +12465,21 @@ def verdict(category: str, source: str) -> bool | None:
 
     if category == "hash":
         alg = extract_hash_alg(source, cfg)
+        if not alg:
+            return None
+        # M431：入口域归属（同 M122）。切片会把 Hop 2/3 的 MD5/SHA 调用贴进
+        # 证据段；入口 Controller 里没有哈希/摘要/口令编码调用时，弱哈希属于
+        # 别的方法，算到当前入口头上就是假阳（qihang-erp-open 4 条）。
+        _region = _entry_region(source)
+        _body = entry_body(_region)
+        if not re.search(
+                r"MessageDigest\s*\.\s*getInstance|DigestUtils\s*\.|"
+                r"MD5Utils\s*\.|\bHashing\b|hashlib\s*\.|hmac\s*\.|"
+                r"PasswordEncoder|"
+                r"\b(?:md5|sha1|sha256|sha512|hash|digest|encrypt|"
+                r"encodePassword)\w*\s*\(",
+                _body, re.I):
+            return None
         return hash_is_weak(alg) if alg else None
 
     if category == "weakrand":

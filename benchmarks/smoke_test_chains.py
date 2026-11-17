@@ -14219,6 +14219,57 @@ check("M428：请求体 URL 仍判 SSRF",
           "def f(request1):\n    return requests.post("
           "request1.image_generation_url, json={})\n"), True)
 
+print("\n[344] M431/M432/M433：hash 入口域 / redir 仓储取址 / vLLM fork")
+_M344_HASH_HOP = '''
+// Full-Route: /api/order/add
+// Controller-Kind: @RestController
+public class OrderController {
+    @PostMapping("/add")
+    public Result add(@RequestBody OrderDTO dto) {
+        orderService.save(dto);
+        return Result.ok();
+    }
+}
+// ---- 跨文件证据：MD5Utils.md5() 的实现体 ----
+public class MD5Utils {
+    public static String md5(String s) {
+        MessageDigest md = MessageDigest.getInstance("MD5");
+        return Hex.encodeHexString(md.digest(s.getBytes()));
+    }
+}
+'''
+check("M431：MD5 只出现在 Hop 证据段、入口无哈希调用 → None",
+      _rd395.verdict("hash", _M344_HASH_HOP), None)
+_M344_HASH_ENTRY = '''
+// Full-Route: /api/login
+public class LoginController {
+    @PostMapping("/login")
+    public String login(String password) {
+        return MD5Utils.MD5Encode(password, "UTF-8");
+    }
+}
+'''
+check("M431：入口直接调用 MD5Utils.MD5Encode 仍判 True",
+      _rd395.verdict("hash", _M344_HASH_ENTRY), True)
+
+_M344_REDIR = '''
+// Full-Route: /file/url
+public class FileController {
+    @GetMapping("/url")
+    public void getFileUrl(@RequestParam("id") String id,
+                           HttpServletResponse response) throws IOException {
+        FileEntity file = fileService.getById(Long.parseLong(id));
+        response.sendRedirect(file.getUrl());
+    }
+}
+'''
+check("M432：fileService.getById(id).getUrl() 内部查库跳转不判 redir",
+      _rd395.redir_verdict(_M344_REDIR), False)
+
+check("M433：vLLM 推理引擎 fork 判工具库",
+      target_scout.is_tool_lib("org/vllm-deepseek-v4-sm89", "vLLM fork"),
+      True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

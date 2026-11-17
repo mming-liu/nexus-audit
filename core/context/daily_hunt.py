@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import stat
 import time
@@ -192,6 +193,19 @@ def _root_view(rc: dict, repo: Path) -> dict:
     }
 
 
+_PRIV_ASSIGN_RE = re.compile(
+    r"(?i)authorize(?:menu|permission)|"
+    r"(?:grant|assign)(?:role|permission)s?|"
+    r"/roles?(?:/|$)|/permissions?(?:/|$)")
+
+
+def _is_privilege_assignment(view: dict) -> bool:
+    """M433：角色/权限分配写接口 —— 高危，不按裸 authz 压 B。"""
+    text = " ".join([str(view.get("unit") or ""),
+                     " ".join(str(r) for r in (view.get("routes") or []))])
+    return bool(_PRIV_ASSIGN_RE.search(text))
+
+
 def is_bare_wild_authz(view: dict, promo: dict | None = None) -> bool:
     """野仓裸 authz：无兄弟鉴权反差（非 HIGH）且无 /admin 路由（M367）。
 
@@ -202,6 +216,9 @@ def is_bare_wild_authz(view: dict, promo: dict | None = None) -> bool:
     if str(view.get("category") or "") != "authz":
         return False
     if str((promo or {}).get("level") or "") == "HIGH":
+        return False
+    # M433：角色/权限分配写接口保留人工复核入口。
+    if _is_privilege_assignment(view):
         return False
     routes = [str(r).lower() for r in (view.get("routes") or [])]
     return not any("/admin" in r for r in routes)
@@ -403,6 +420,9 @@ def downgrade_wild_authz(record: dict) -> bool:
     if record.get("category") != "authz":
         return False
     if str(record.get("confidence") or "") == "HIGH":
+        return False
+    # M433：角色/权限分配写接口保留人工复核入口。
+    if _is_privilege_assignment(record):
         return False
     routes = [str(r).lower() for r in (record.get("routes") or [])]
     if any("/admin" in r for r in routes):
