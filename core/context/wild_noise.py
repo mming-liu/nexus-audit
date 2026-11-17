@@ -159,7 +159,9 @@ _JAVA_AUTHZ_ANN_RE = re.compile(
     r"@(?:Permission|SaCheckLogin|PreAuthorize|RequiresPermissions)\b")
 _JAVA_ANON_ANN_RE = re.compile(
     r"@(?:Anonymous|IgnoreToken|PermitAll)\b|"
-    r"@Permission\s*\(\s*authorize\s*=\s*false\s*\)")
+    r"@Permission\s*\(\s*authorize\s*=\s*false\s*\)|"
+    r"\blogin\s*=\s*false\b|"
+    r"\bauthorize\s*=\s*false\b")
 
 
 def _java_annotations_before(lines: list[str], idx: int) -> str:
@@ -247,7 +249,9 @@ def _java_authz_class_guard(repo_root: Path | None, rel: str,
     if _JAVA_AUTHZ_ANN_RE.search(_java_annotations_before(lines, ci)):
         return _repo_has_authz_framework(Path(repo_root))
     if parent:
+        _found_parent = False
         for p in Path(repo_root).rglob(parent + ".java"):
+            _found_parent = True
             try:
                 plines = p.read_text(
                     encoding="utf-8", errors="ignore").splitlines()
@@ -260,6 +264,13 @@ def _java_authz_class_guard(repo_root: Path | None, rel: str,
                         return _repo_has_authz_framework(Path(repo_root))
                     break
             break
+        # M440：父类来自外部 Maven/Gradle Jar（AirPower），本地无源码 ——
+        # 文件显式 import cn.hamm.airpower. 且 extends *Controller 时，
+        # 未标 @Anonymous/login=false/authorize=false 即视为框架类级鉴权覆盖。
+        if not _found_parent and re.search(
+                r"import\s+cn\.hamm\.airpower\.", text) and re.search(
+                r"\bextends\s+\w*Controller\b", text):
+            return True
     return False
 
 

@@ -736,7 +736,11 @@ _GENERIC_METHODS = frozenset({
 })
 _GENERIC_CLASSES = frozenset({
     "BaseController", "CommonController", "IndexController",
-    "ApiController", "TestController",
+    "ApiController", "TestController", "FileController",
+    "UserController", "RoleController", "AuthController",
+    "LoginController", "UploadController", "AdminController",
+    "SystemController", "MenuController", "DictController",
+    "DeptController", "ConfigController",
 })
 
 
@@ -973,6 +977,11 @@ def dedup(slug: str, category: str, unit: str, *,
     # 当成"已报过"。
     issue_hits = [x for x in (issues.get("items") or [])
                   if _issue_dup_evidence(unit, file, x)]
+    # M439：sources.total 对齐 M365 过滤后的真实证据命中数；原始搜索命中
+    # 数保留在 raw_total，消除"total>0 却判 FRESH"的对账歧义。
+    issues["raw_total"] = int(issues.get("total") or 0)
+    issues["total"] = len(issue_hits)
+    issues["ids"] = [x.get("id") for x in issue_hits][:5]
 
     if cve_hit:
         status = STATUS_CVE
@@ -1020,6 +1029,10 @@ def dedup(slug: str, category: str, unit: str, *,
         # awesome-list "Add X" 都曾把真根因压成"重复"）。
         _gissue_hits = [x for x in (global_issues.get("items") or [])
                         if _issue_dup_evidence(unit, file, x)]
+        # M439：全网 Issue 同样对齐过滤后口径。
+        global_issues["raw_total"] = int(global_issues.get("total") or 0)
+        global_issues["total"] = len(_gissue_hits)
+        global_issues["ids"] = [x.get("id") for x in _gissue_hits][:5]
         _gissue_hit = bool(_gissue_hits)
         if _gadv_cve:
             status = STATUS_CVE

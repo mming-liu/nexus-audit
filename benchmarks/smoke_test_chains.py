@@ -14324,6 +14324,71 @@ _M345B_REC = wild_noise.classify(
 check("M435：无父类类级注解、仅兄弟 @PreAuthorize 反差不拦截",
       _M345B_REC.get("blocked"), False)
 
+print("\n[346] M439/M440：泛化 Controller 类名 / sources.total 对齐 / AirPower 外部基类")
+check("M439：FileController.getFileUrl 判非独特组合",
+      _cd340._is_distinctive("FileController", "getFileUrl"), False)
+
+_M346_CACHE = Path(_ws_mkdtemp("m346_dedup_"))
+_M346_ISSUES = {"ok": True, "total": 1, "ids": [], "url": "",
+                "error": "",
+                "items": [{"id": 1, "title": "支持ip和jimeng",
+                           "text": "支持ip和jimeng", "url": ""}]}
+_M346_OK0 = {"ok": True, "total": 0, "ids": [], "url": "", "error": ""}
+_M346_PATCHES = [
+    _mock395.patch.object(_cd340, "CACHE", _M346_CACHE),
+    _mock395.patch.object(_cd340, "query_nvd",
+                          side_effect=lambda *_a, **_k: dict(_M346_OK0)),
+    _mock395.patch.object(_cd340, "query_github_issues",
+                          side_effect=lambda *_a, **_k: dict(_M346_ISSUES)),
+    _mock395.patch.object(_cd340, "query_github_advisories",
+                          side_effect=lambda *_a, **_k: dict(_M346_OK0)),
+    _mock395.patch.object(_cd340, "query_github_global_advisories",
+                          side_effect=lambda *_a, **_k: dict(_M346_OK0)),
+    _mock395.patch.object(_cd340, "query_github_issues_global",
+                          side_effect=lambda *_a, **_k: dict(_M346_OK0)),
+    _mock395.patch.object(_cd340, "query_github_issues_global_file",
+                          side_effect=lambda *_a, **_k: dict(_M346_OK0)),
+    _mock395.patch.object(_cd340, "_local_match",
+                          side_effect=lambda *_a, **_k: []),
+]
+for _p346 in _M346_PATCHES:
+    _p346.start()
+try:
+    _M346_RES = _cd340.dedup(
+        slug="acme/m439", category="ssrf", unit="FileController.getFileUrl",
+        file="app/FileController.java", use_cache=True, allow_online=True)
+finally:
+    for _p346 in _M346_PATCHES:
+        _p346.stop()
+_M346_ISSUE_SRC = (_M346_RES.get("sources") or {}).get("github_issues") or {}
+check("M439：功能 Issue 不构成重复，FRESH 且 total 对齐过滤后为 0",
+      (_M346_RES.get("status"), _M346_ISSUE_SRC.get("total"),
+       _M346_ISSUE_SRC.get("raw_total")),
+      ("ZERO_RECORD_FRESH", 0, 1))
+
+_M346B = Path(_ws_mkdtemp("m346b_")) / "repo"
+_M346B_SRC = _M346B / "src"
+_M346B_SRC.mkdir(parents=True, exist_ok=True)
+(_M346B_SRC / "RoleController.java").write_text(
+    "package app;\n"
+    "import cn.hamm.airpower.curd.CurdController;\n"
+    "public class RoleController extends CurdController {\n"
+    "    public void authorizeMenu(String x) { }\n"
+    "    @Permission(login = false)\n"
+    "    public void publicMenu(String x) { }\n"
+    "}\n", encoding="utf-8")
+_M346B_REC = wild_noise.classify(
+    {"category": "authz", "unit": "RoleController.authorizeMenu",
+     "file": "src/RoleController.java"}, _M346B)
+check("M440：外部 AirPower 基类 + import 判类级鉴权",
+      (_M346B_REC.get("blocked"), _M346B_REC.get("code")),
+      (True, wild_noise.AUTHZ_CLASS_OR_BASE_GUARD))
+_M346B_PUB = wild_noise.classify(
+    {"category": "authz", "unit": "RoleController.publicMenu",
+     "file": "src/RoleController.java"}, _M346B)
+check("M440：@Permission(login = false) 显式放行不拦截",
+      _M346B_PUB.get("blocked"), False)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
