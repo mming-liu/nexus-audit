@@ -66,6 +66,8 @@ SAFE_REDIRECT_GUARD = "SAFE_REDIRECT_GUARD"
 # @RequiresPermissions）覆盖到的 authz 入口 —— 框架已在类层面做了鉴权，
 # 不是"裸 authz"（SPMS RoleController 继承 BaseController 的 @Permission）。
 AUTHZ_CLASS_OR_BASE_GUARD = "AUTHZ_CLASS_OR_BASE_GUARD"
+# M449：野仓 securecookie 低危（缺 Secure 标记）统一压 B，不占 A 板。
+LOW_SEVERITY_SECURECOOKIE = "LOW_SEVERITY_SECURECOOKIE"
 # M428：测试夹具/集成测试后端（tests-common / fixtures / integration-tests）
 # 不是生产入口，直接拦截，避免测试用 PeopleRestService 占 A 板。
 TEST_FIXTURE_ONLY = "TEST_FIXTURE_ONLY"
@@ -156,7 +158,12 @@ def _read(repo_root: Path | None, rel: str) -> str:
 
 # ---------------- M435：Java 类级/基类级鉴权注解 ----------------
 _JAVA_AUTHZ_ANN_RE = re.compile(
-    r"@(?:Permission|SaCheckLogin|PreAuthorize|RequiresPermissions)\b")
+    r"@(?:Permission|SaCheckLogin|SaCheckPermission|PreAuthorize|"
+    r"RequiresPermissions|RequiresAuthentication|RequiresUser|"
+    r"CsPermission|HasPermission)\b")
+_JAVA_METHOD_GUARD_RE = re.compile(
+    r"@(?:SaCheckPermission|PreAuthorize|RequiresPermissions|"
+    r"CsPermission|HasPermission)\b")
 _JAVA_ANON_ANN_RE = re.compile(
     r"@(?:Anonymous|IgnoreToken|PermitAll)\b|"
     r"@Permission\s*\(\s*authorize\s*=\s*false\s*\)|"
@@ -226,8 +233,39 @@ def _repo_has_authz_framework(repo_root: Path) -> bool:
                 text = p.read_text(encoding="utf-8", errors="ignore").lower()
             except OSError:
                 continue
-            if "airpower" in text or "spring-security" in text:
+            if "airpower" in text or "spring-security" in text or "shiro" in text:
                 return True
+    return False
+
+
+def _repo_has_global_auth_filter(repo_root: Path) -> bool:
+    """M449：Shiro/Spring 全局鉴权链（filterChainDefinitionMap + authc、
+    或 addPathPatterns(\"/**\") + 鉴权 interceptor）。"""
+    for p in repo_root.rglob("*.java"):
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if "filterChainDefinitionMap" in text and "authc" in text:
+            return True
+        if ('addPathPatterns("/**")' in text
+                and re.search(r"(?:Auth|Permission|Token|Security)\w*Interceptor",
+                              text)):
+            return True
+    return False
+
+
+def _py_authz_guard_present(source: str, body: str) -> bool:
+    """M449：FastAPI Depends(...) / WS token 鉴权 / 显式 verify_* 守卫。"""
+    for m in re.finditer(r"Depends\s*\(\s*(\w+)", body):
+        if re.search(r"(?:auth|admin|user|login|token|session|permission|"
+                     r"principal|current)", m.group(1), re.I):
+            return True
+    if re.search(r"\bget_current_\w+\s*\(", body):
+        return True
+    if re.search(r"\b(?:verify|require|check)_(?:auth|token|jwt|session|"
+                 r"user|admin|permission|principal)\w*\s*\(", body, re.I):
+        return True
     return False
 
 
@@ -246,8 +284,14 @@ def _java_authz_class_guard(repo_root: Path | None, rel: str,
         return False
     if _JAVA_ANON_ANN_RE.search(_java_annotations_before(lines, mi)):
         return False
+    # M449：方法级权限注解（CordysCRM @CsPermission / Shiro / Sa-Token）。
+    if _JAVA_METHOD_GUARD_RE.search(_java_annotations_before(lines, mi)):
+        return True
     if _JAVA_AUTHZ_ANN_RE.search(_java_annotations_before(lines, ci)):
         return _repo_has_authz_framework(Path(repo_root))
+    # M449：仓级全局鉴权链（Shiro authc / 全路径 interceptor）覆盖所有入口。
+    if _repo_has_global_auth_filter(Path(repo_root)):
+        return True
     if parent:
         _found_parent = False
         for p in Path(repo_root).rglob(parent + ".java"):
@@ -757,6 +801,19 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
             return {"blocked": True, "code": WS_AUTH_PRESENT,
                     "reason": ("WebSocket 路由在 accept() 前校验会话并 "
                                "close(4401/1008)：鉴权存在，不是未授权入口")}
+
+    # M449：野仓 securecookie（缺 Secure 标记）是低危加固项，统一归 B。
+    if record.get("category") == "securecookie":
+        return {"blocked": True, "code": LOW_SEVERITY_SECURECOOKIE,
+                "reason": "Cookie 缺 Secure 标记，低危加固项归 B 板"}
+
+    # M449：FastAPI Depends(...) / WS token 鉴权 / 显式 verify_* 守卫。
+    if (record.get("category") == "authz" and file.endswith(".py")):
+        _psrc = _read(repo_root, str(record.get("file") or ""))
+        if _psrc and _py_authz_guard_present(_psrc, _ws_handler_block(_psrc, unit)):
+            return {"blocked": True, "code": AUTHZ_CLASS_OR_BASE_GUARD,
+                    "reason": ("入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / "
+                               "显式 verify_* 守卫")}
 
     # M435：类级/基类级鉴权注解（AirPower @Permission / Sa-Token @SaCheckLogin /
     # Spring @PreAuthorize / Shiro @RequiresPermissions）。

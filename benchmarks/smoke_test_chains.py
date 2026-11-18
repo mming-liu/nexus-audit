@@ -14502,6 +14502,45 @@ async def analyze_template(file: UploadFile = File(...)):
 check("M446：上传文件名只用于解析、open 为常量日志路径 → None",
       _rd395.unrestricted_upload_verdict(_M347_UPLOAD), None)
 
+print("\n[348] M448/M449：仓级查重 / Python Depends 鉴权 / securecookie 归 B")
+check("M448：offline 级查重返回 UNKNOWN",
+      _cd340.dedup_repo_level("acme/repo", "authz", "Foo.bar",
+                              allow_online=False)["status"], "UNKNOWN")
+_M348_ADV = {"ok": True, "total": 1, "ids": ["GHSA-aaaa"],
+             "url": "https://api.github.com/repos/acme/repo/security-advisories",
+             "items": [{"id": "GHSA-aaaa",
+                        "text": "path traversal in Foo.bar endpoint"}]}
+_M348_CACHE = Path(_ws_mkdtemp("m348_dedup_")) / "repo_level.json"
+with _mock395.patch.object(_cd340, "REPO_LEVEL_CACHE", _M348_CACHE), \
+        _mock395.patch.object(_cd340, "query_github_advisories",
+                              side_effect=lambda *_a, **_k: dict(_M348_ADV)):
+    _r348a = _cd340.dedup_repo_level("acme/repo", "pathtraver", "Foo.bar")
+    _r348b = _cd340.dedup_repo_level("acme/repo", "pathtraver", "Other.baz")
+check("M448：级公告命中 → DUPLICATE_ISSUE_OR_GHSA",
+      _r348a.get("status"), _cd340.STATUS_ISSUE)
+check("M448：级公告不匹配 → FRESH",
+      _r348b.get("status"), _cd340.STATUS_FRESH)
+
+_M348_PY = '''
+from fastapi import Depends
+@router.get("/admin/users")
+async def list_users(admin=Depends(get_current_admin)):
+    return {"ok": True}
+'''
+_M348_ROOT = Path(_ws_mkdtemp("m348py2_")) / "repo"
+_M348_ROOT.mkdir(parents=True, exist_ok=True)
+(_M348_ROOT / "routes.py").write_text(_M348_PY, encoding="utf-8")
+_r348py = wild_noise.classify(
+    {"category": "authz", "unit": "list_users", "file": "routes.py"},
+    _M348_ROOT)
+check("M449：Python Depends(get_current_admin) 拦截为 AUTHZ_CLASS_OR_BASE_GUARD",
+      (_r348py.get("blocked"), _r348py.get("code")),
+      (True, wild_noise.AUTHZ_CLASS_OR_BASE_GUARD))
+check("M449：securecookie 低危归 B 板",
+      wild_noise.classify(
+          {"category": "securecookie", "unit": "X.y", "file": "X.java"},
+          None)["code"], wild_noise.LOW_SEVERITY_SECURECOOKIE)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

@@ -1136,3 +1136,69 @@ def dedup(slug: str, category: str, unit: str, *,
     if use_cache:
         _cache_put(cpath, rec)
     return rec
+
+# ---------------- M448：仓级 CVE/GHSA 查重（零 search 配额） ----------------
+REPO_LEVEL_CACHE = CACHE / "_repo_level.json"
+
+
+def dedup_repo_level(slug: str, category: str, unit: str, *,
+                     file: str = "", aliases: list[str] | None = None,
+                     allow_online: bool = True) -> dict:
+    """仓级查重：只读 /repos/{slug}/security-advisories，不消耗 search 配额。
+
+    用于 B 板短路记录（本地降噪/裸 authz 压 B 的项）——这些项原本完全
+    不查重，报告无法区分"已被仓级公告覆盖"与"未知"。结果按
+    slug|category|unit|file 缓存 24h，同一仓多个根因只发一次请求。
+    """
+    key = f"{slug}|{category}|{unit}|{file}"
+    cache = _cache_get(REPO_LEVEL_CACHE) or {}
+    hit = cache.get(key)
+    if isinstance(hit, dict) and time.time() - float(hit.get("ts") or 0) < 86400:
+        res = dict(hit.get("res") or {})
+        res["from_cache"] = True
+        return res
+    if not allow_online:
+        res = {"status": STATUS_UNKNOWN, "reason": "OFFLINE_REPO_LEVEL",
+               "sources": {},
+               "coverage": {"checked": [], "failed": ["repo_advisories"],
+                            "skipped": ["offline"]}}
+    else:
+        adv = query_github_advisories(slug)
+        src = {"repo_advisories": {
+            "ok": bool(adv.get("ok")),
+            "total": int(adv.get("total") or 0),
+            "ids": list(adv.get("ids") or [])[:5],
+            "url": adv.get("url", ""),
+            "error": adv.get("error", ""),
+        }}
+        if not adv.get("ok"):
+            res = {"status": STATUS_UNKNOWN,
+                   "reason": f"REPO_ADVISORIES_UNAVAILABLE: {adv.get('error', '')}",
+                   "sources": src,
+                   "coverage": {"checked": ["repo_advisories"],
+                                "failed": ["repo_advisories"], "skipped": []}}
+        else:
+            toks = [str(t) for t in [unit, file, *(aliases or [])] if t]
+            text = " ".join(str(x.get("text") or "")
+                            for x in (adv.get("items") or [])).lower()
+            hits = [x for x in (adv.get("items") or [])
+                    if any(t.lower() in text for t in toks)]
+            if hits:
+                res = {"status": STATUS_ISSUE,
+                       "reason": "REPO_LEVEL_GHSA: " + ", ".join(
+                           str(x.get("id") or "") for x in hits[:3]),
+                       "sources": src,
+                       "matched": [x.get("id") for x in hits[:5]],
+                       "coverage": {"checked": ["repo_advisories"],
+                                    "failed": [], "skipped": []}}
+            else:
+                res = {"status": STATUS_FRESH,
+                       "reason": "REPO_LEVEL_NO_MATCH", "sources": src,
+                       "coverage": {"checked": ["repo_advisories"],
+                                    "failed": [], "skipped": []}}
+    cache[key] = {"ts": time.time(), "res": res}
+    try:
+        _cache_put(REPO_LEVEL_CACHE, cache)
+    except OSError:
+        pass
+    return res

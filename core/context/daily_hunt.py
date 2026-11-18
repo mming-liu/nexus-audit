@@ -232,11 +232,14 @@ def is_incomplete_dedup(record: dict) -> bool:
 
 
 def noise_record(repo: Path, slug: str, rc: dict, head: dict,
-                 max_head_age_days: int, noise: dict) -> dict:
+                 max_head_age_days: int, noise: dict,
+                 repo_dedup: dict | None = None) -> dict:
     """本地降噪命中的记录骨架（M304/M359）：0 次联网，直接进 B 板留证。
 
     M359：短路记录也要写**标准化** coverage —— 下游（报告/人工复核）不能
     把"没联网查"误读成"查过且干净"。
+    M448：B 板短路记录接入仓级 CVE/GHSA 查重（零 search 配额）；命中
+    仓级公告时改判 DUPLICATE_ISSUE_OR_GHSA，否则保持 UNKNOWN。
     """
     rec = live_hunt._base_record(repo, slug, rc, head, max_head_age_days)
     rec["status"] = cve_dedup.STATUS_UNKNOWN
@@ -244,6 +247,13 @@ def noise_record(repo: Path, slug: str, rc: dict, head: dict,
     rec["reason"] = f"{noise.get('code', '')}: {noise.get('reason', '')}"
     rec["coverage"] = {"checked": [], "failed": [],
                        "skipped": ["local_noise_shortcircuit"]}
+    if repo_dedup:
+        rec["coverage"] = dict(repo_dedup.get("coverage") or rec["coverage"])
+        rec["repo_dedup"] = {"status": repo_dedup.get("status", ""),
+                             "reason": repo_dedup.get("reason", "")}
+        if repo_dedup.get("status") == cve_dedup.STATUS_ISSUE:
+            rec["status"] = cve_dedup.STATUS_ISSUE
+            rec["reason"] = str(repo_dedup.get("reason") or rec["reason"])
     if rec["head_sha"]:
         rec["permalink"] = upstream_sync.head_permalink(
             slug, rec["head_sha"], rec["file"], rec["line"])
@@ -323,8 +333,17 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
         rec["recent_90d"] = _is_recent_file(rec.get("file", ""), recent)
 
     # 噪音项：0 网络请求、不占 --max-roots 名额，直接进板块 B 留证。
+    # M448：联网模式下补一次仓级 CVE/GHSA 查重（不消耗 search 配额）。
     for rc, noise in blocked_roots:
-        recs.append(noise_record(repo, slug, rc, head, max_head_age_days, noise))
+        _repo_dedup = None
+        if dedup_online:
+            _unit = str(rc.get("unit") or rc.get("unit_name") or "")
+            _file = str(rc.get("file") or rc.get("file_path") or "")
+            _repo_dedup = cve_dedup.dedup_repo_level(
+                slug, str(rc.get("category") or ""), _unit,
+                file=_file, allow_online=True)
+        recs.append(noise_record(repo, slug, rc, head, max_head_age_days,
+                                 noise, repo_dedup=_repo_dedup))
 
     fresh_keys: list[str] = []
     new: list[dict] = []
