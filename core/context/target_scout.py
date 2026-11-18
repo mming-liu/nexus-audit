@@ -155,19 +155,21 @@ NEW_GEN_KEYWORDS: dict[str, tuple[str, ...]] = {
              'mybatis-plus "mes"', '"spring-boot" "his"',
              'mybatis-plus "lims"', '"spring-boot" "report"',
              'mybatis-plus "bi"',
-             # M419：2024–2026 高频 AI/Web 应用词（第 2 页顺延用）。
-             '"ollama"', '"dify"', '"vllm"', '"openwebui"', '"fastgpt"',
-             '"langgraph"', '"crewai"', '"autogen"', '"studio"', '"panel"',
-             '"gateway"', '"console"', '"portal"', '"nas"', '"webhook"'),
+             # M443：去掉与 _TOOL_LIB_RE 冲突的 ollama/dify/vllm/openwebui/
+             # fastgpt/langgraph/crewai/autogen（搜回来 100% 被 is_tool_lib
+             # 丢掉），换成通用 Web 业务词，避免 Java 轨连续 0 命中烧预算。
+             '"admin"', '"cms"', '"erp"', '"crm"', '"mall"', '"oa"',
+             '"shop"', '"pay"', '"studio"', '"panel"', '"gateway"',
+             '"console"', '"portal"', '"nas"', '"webhook"'),
     "python": ('fastapi "rag"', 'fastapi "agent"', 'fastapi "mcp"',
                'fastapi "workflow"', 'fastapi "text2sql"',
                'fastapi "chatbi"', 'fastapi "knowledge-base"',
                'fastapi "lowcode"', 'django "wms"', 'django "mes"',
                'django "his"', 'flask "iot"', 'fastapi "report"',
                'fastapi "bi"', 'django "erp"',
-               # M419：同上，扩充到 30 词并保留前 15 词顺序。
-               '"ollama"', '"dify"', '"vllm"', '"openwebui"', '"fastgpt"',
-               '"langgraph"', '"crewai"', '"autogen"', '"studio"', '"panel"',
+               # M443：同上，去掉工具库冲突词，换成通用 Web 业务词。
+               '"fastapi"', '"django"', '"flask"', '"admin"', '"cms"',
+               '"erp"', '"crm"', '"mall"', '"studio"', '"panel"',
                '"gateway"', '"console"', '"portal"', '"nas"', '"webhook"'),
 }
 # M339：新生代“框架+业务词”全干时的回退词。上一版回退到裸框架名，
@@ -791,8 +793,9 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                     spec["fallback"] = "business_word"
                     queries.append(alt_q)
                     break
-        # 轮转到 page 2..4 但该页为空时回退第 1 页，避免空手而归。
-        if (page > 1 and int(data.get("total_count") or 0) == 0
+        # M444：page>1 可能因总匹配数不足而返回空 items（total_count>0），
+        # 此时必须回退第 1 页，不能只看 total_count。
+        if (page > 1 and not (data.get("items") or [])
                 and not rate_limited):
             ok, data, err = _fetch(search_url(spec["query"], 1, per_page))
             if not ok or not isinstance(data, dict):
@@ -824,7 +827,8 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
         except (TypeError, ValueError):
             total_count = 0
         extra = 0
-        while (excluded and len(parsed) < 2 and extra < max_extra
+        while ((excluded or scanned_at) and len(parsed) < 2
+               and extra < max_extra
                and total_count > (page + extra) * per_page
                and not rate_limited and not budget_exhausted):
             nxt = page + extra + 1
@@ -839,6 +843,11 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
             more, d2, t2 = _parse_search(datap, spec["language"])
             if excluded:
                 more = [x for x in more if x.get("slug") not in excluded]
+            # M444：翻页结果同样要排除未变老仓（pushed_at <= scanned_at）。
+            if scanned_at:
+                _b2 = len(more)
+                more = [x for x in more if not _pushed_before(x, scanned_at)]
+                dropped_unchanged += _b2 - len(more)
             parsed += more
             dropped += d2
             dropped_tool += t2
@@ -866,6 +875,7 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                    page: int = 1) -> str:
         """M403：执行一条顺延查询；返回 ok / err / stop。"""
         nonlocal dropped, dropped_tool, rate_limited, budget_exhausted
+        nonlocal online_ok, dropped_unchanged
         queries.append(q)
         specs.append({"language": lang, "track": track,
                       "qualifier": qualifier, "query": q, "page": page,
@@ -880,12 +890,39 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                 rate_limited = True
                 return "stop"
             return "err"
+        online_ok += 1
         parsed, drop, drop_tool = _parse_search(data, lang)
         if excluded:
             parsed = [x for x in parsed if x.get("slug") not in excluded]
         if scanned_at:
+            _b = len(parsed)
             parsed = [x for x in parsed
                       if not _pushed_before(x, scanned_at)]
+            dropped_unchanged += _b - len(parsed)
+        # M444：page=1 过滤后不足 2 个且总匹配数仍超过一页时，按需补抓
+        # page=2（而不是无条件 page=2 拿空 items）。
+        if (page == 1 and len(parsed) < 2
+                and int(data.get("total_count") or 0) > per_page
+                and not rate_limited and not budget_exhausted):
+            ok2, data2, err2 = _fetch(search_url(q, 2, per_page))
+            if ok2 and isinstance(data2, dict):
+                online_ok += 1
+                more2, d3, t3 = _parse_search(data2, lang)
+                if excluded:
+                    more2 = [x for x in more2
+                             if x.get("slug") not in excluded]
+                if scanned_at:
+                    _b3 = len(more2)
+                    more2 = [x for x in more2
+                             if not _pushed_before(x, scanned_at)]
+                    dropped_unchanged += _b3 - len(more2)
+                parsed += more2
+                dropped += d3
+                dropped_tool += t3
+                if more2:
+                    specs[-1]["page_used"] = 2
+            elif err2 == BUDGET_EXHAUSTED:
+                budget_exhausted = True
         buckets[lang] += parsed
         dropped += drop
         dropped_tool += drop_tool
@@ -914,11 +951,9 @@ def scout_daily(languages: list[str] | tuple[str, ...] = ("java", "python",
                     NEW_GEN_PUSHED_SINCE, limit, keyword,
                     created_since=NEW_GEN_CREATED_SINCE,
                     star_range=NEW_GEN_STARS)
-                # M419：第 3 轮起翻到第 2 页，避免 15→30 词扩了但只看
-                # 第 1 页、老仓仍占满结果。
-                _page = 2 if extra_rounds >= 3 else 1
+                # M444：始终先抓第 1 页，由 _topup_one 内部按需补 page=2。
                 if _topup_one(lang, "new_gen", q, keyword,
-                              page=_page) == "stop":
+                              page=1) == "stop":
                     _stop = True
                     break
             # ② 传统轨下一顺位词（跨过当天主查询用掉的 traditional_terms 个）。

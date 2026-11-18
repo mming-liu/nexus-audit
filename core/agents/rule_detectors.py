@@ -4449,6 +4449,10 @@ def _py_redir_verdict(source: str) -> bool | None:
 
 _REPO_LOOKUP_RE = re.compile(
     r"\b\w*(?:Service|Mapper|Dao|Repository)\s*\.\s*\w+\s*\(", re.I)
+# M446：跳转目标取自服务端配置/上下文（oidcConfig.getXxx / *ContextUtil.getXxx）。
+_CONFIG_GET_RE = re.compile(
+    r"\b\w*(?:Config|Configuration|Properties|Settings|ContextUtil)\w*"
+    r"\s*\.\s*get\w+\s*\(", re.I)
 
 
 def _redir_repo_sourced(body: str) -> bool:
@@ -4456,7 +4460,7 @@ def _redir_repo_sourced(body: str) -> bool:
     if re.search(r"getParameter\s*\(|getHeader\s*\(|getQueryString\s*\(",
                  body):
         return False
-    if not _REPO_LOOKUP_RE.search(body):
+    if not (_REPO_LOOKUP_RE.search(body) or _CONFIG_GET_RE.search(body)):
         return False
     targets: list[str] = []
     for m in re.finditer(r"sendRedirect\s*\(\s*([^;]{0,300}?)\s*\)\s*;",
@@ -4478,8 +4482,19 @@ def _redir_repo_sourced(body: str) -> bool:
             _rhs = _last_assign_rhs(body, _id)
             if _rhs and _REPO_LOOKUP_RE.search(_rhs):
                 return True
+            if _rhs and _CONFIG_GET_RE.search(_rhs):
+                return True
+            if _rhs:
+                for _id2 in set(re.findall(r"\b[A-Za-z_]\w*\b", _rhs)):
+                    _rhs2 = _last_assign_rhs(body, _id2)
+                    if _rhs2 and (_REPO_LOOKUP_RE.search(_rhs2)
+                                  or _CONFIG_GET_RE.search(_rhs2)):
+                        return True
             if re.search(rf"\b{re.escape(_id)}\s*=\s*[^;]*"
                          rf"{_REPO_LOOKUP_RE.pattern}", body):
+                return True
+            if re.search(rf"\b{re.escape(_id)}\s*=\s*[^;]*"
+                         rf"{_CONFIG_GET_RE.pattern}", body):
                 return True
     return False
 
@@ -11894,6 +11909,22 @@ def unrestricted_upload_verdict(source: str) -> bool | None:
             return None
         if not _UPLOAD_PY_SINK_RE.search(scope):
             return None
+        # M446：sink 必须真的把上传文件名落盘；仅常量路径 open（日志文件）
+        # 不算（movo analyze_template 的 /tmp/askai_backend_error.log）。
+        _alias = set(re.findall(r"(\w+)\s*=\s*[^\n;]*\.filename", scope))
+        _alias |= set(re.findall(r"(\w+)\.filename", scope))
+        for _ in range(2):
+            for _var, _rhs in re.findall(r"(\w+)\s*=\s*([^\n;]+)", scope):
+                if any(re.search(rf"\b{re.escape(a)}\b", _rhs)
+                       for a in _alias):
+                    _alias.add(_var)
+        _sink_args = " ".join(re.findall(
+            r"\b(?:open|save|write_bytes|copyfileobj|copy|write)\s*\(([^)]*)\)",
+            scope))
+        if _alias and not any(
+                re.search(rf"\b{re.escape(a)}\b", _sink_args)
+                for a in _alias):
+            return None
         if _upload_has_guard(scope, python=True):
             return False
         if _UPLOAD_GENERATED_RE.search(scope):
@@ -12238,8 +12269,20 @@ def regex_dos_verdict(source: str) -> bool | None:
         arg = m.group(1).strip()
         if re.fullmatch(r"[\"'][^\"']*[\"']", arg) or "re.escape" in arg:
             return False
-        if re.search(r"request\s*\.", arg) or re.fullmatch(r"[A-Za-z_]\w*", arg):
+        if re.search(r"request\s*\.", arg):
             return True
+        if re.fullmatch(r"[A-Za-z_]\w*", arg):
+            # M446：裸标识符先看是否入口形参/局部 tainted 赋值；导入的常量
+            # （ARCHIVE_NAME_PATTERN）不是用户可控正则模式。
+            if arg in _py_func_params(source):
+                return True
+            _rhs = _last_assign_rhs(body, arg)
+            if _rhs:
+                if (re.fullmatch(r"[\"'][^\"']*[\"']", _rhs.strip())
+                        or "re.escape" in _rhs):
+                    return False
+                return None
+            return False
         return None
     m = _JAVA_REGEX_COMPILE_RE.search(body) or _JAVA_REGEX_MATCHES_RE.search(body)
     if not m:

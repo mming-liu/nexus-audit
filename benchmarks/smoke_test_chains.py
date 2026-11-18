@@ -14072,8 +14072,8 @@ _M341_NEW_WORDS = ("fastapi", "litestar", "sanic", "aiohttp", "tornado",
                    "console", "platform", "server", "webhook")
 check("M419：顺延覆盖新增业务词",
       any(w in u for u in _M341_CALLS for w in _M341_NEW_WORDS), True)
-check("M419：顺延第 3 轮起翻 page=2",
-      any("&page=2" in u for u in _M341_CALLS), True)
+check("M419：顺延查询先抓 page=1（M444 按需翻页）",
+      any("&page=" not in u for u in _M341_CALLS), True)
 
 print("\n[342] M423/M424：JNDI 语言隔离 / Jackson Map / Python 同源跳转 / Thymeleaf 模板")
 from core.context import view_templates as _vt342                  # noqa: E402
@@ -14388,6 +14388,119 @@ _M346B_PUB = wild_noise.classify(
      "file": "src/RoleController.java"}, _M346B)
 check("M440：@Permission(login = false) 显式放行不拦截",
       _M346B_PUB.get("blocked"), False)
+
+print("\n[347] M443/M444：关键词去冲突 / 空页回退 / more scanned_at 过滤")
+_bad347 = [(lang, kw) for lang in ("java", "python")
+           for kw in target_scout.NEW_GEN_KEYWORDS[lang]
+           if target_scout.is_tool_lib(kw.strip('"'), kw.strip('"'))]
+check("M443：30 个新生代词均不与 _TOOL_LIB_RE 冲突", _bad347, [])
+
+_orig_get347 = target_scout._get
+_unquote347 = __import__("urllib.parse", fromlist=["unquote"]).unquote
+
+
+def _mk347(url):
+    return _unquote347(str(url))
+
+
+def _get347_empty2(url, timeout=20.0):
+    if "page=2" in _mk347(url):
+        return True, {"total_count": 12, "items": []}, ""
+    return True, {"total_count": 12, "items": [{
+        "full_name": "org/real-erp-web", "description": "erp web",
+        "has_issues": True, "stargazers_count": 500,
+        "pushed_at": "2026-11-16T10:00:00Z", "topics": [],
+        "language": "Java"}]}, ""
+
+
+target_scout._get = _get347_empty2
+try:
+    _r347a = target_scout.scout_daily(
+        ["java"], limit=1, terms_per_language=1, allow_online=True,
+        today=_dt309.date(2026, 11, 17),
+        cache_dir=Path(_ws_mkdtemp("m347a_cache_")))
+finally:
+    target_scout._get = _orig_get347
+check("M444：page=2 空 items 自动回退 page=1 并拿到候选",
+      [x["slug"] for x in _r347a["items"]], ["org/real-erp-web"])
+
+
+def _get347_more(url, timeout=20.0):
+    q = _mk347(url)
+    if "page=2" in q:
+        return True, {"total_count": 100, "items": [
+            {"full_name": "org/a", "description": "a", "has_issues": True,
+             "stargazers_count": 500, "pushed_at": "2026-11-16T10:00:00Z",
+             "topics": [], "language": "Java"},
+            {"full_name": "org/b", "description": "b", "has_issues": True,
+             "stargazers_count": 500, "pushed_at": "2026-11-16T10:00:00Z",
+             "topics": [], "language": "Java"}]}, ""
+    if "page=3" in q:
+        return True, {"total_count": 100, "items": [
+            {"full_name": "org/old", "description": "old", "has_issues": True,
+             "stargazers_count": 500, "pushed_at": "2026-11-01T00:00:00Z",
+             "topics": [], "language": "Java"},
+            {"full_name": "org/fresh", "description": "fresh",
+             "has_issues": True, "stargazers_count": 500,
+             "pushed_at": "2026-11-16T10:00:00Z", "topics": [],
+             "language": "Java"}]}, ""
+    return True, {"total_count": 100, "items": []}, ""
+
+
+target_scout._get = _get347_more
+try:
+    _r347b = target_scout.scout_daily(
+        ["java"], limit=1, terms_per_language=1, allow_online=True,
+        today=_dt309.date(2026, 11, 17),
+        exclude_slugs={"org/a", "org/b"},
+        scanned_at={"org/old": "2026-11-17T00:00:00"},
+        cache_dir=Path(_ws_mkdtemp("m347b_cache_")))
+finally:
+    target_scout._get = _orig_get347
+_slugs347 = [x["slug"] for x in _r347b["items"]]
+check("M444：翻页 more 排除未变项且保留新项",
+      ("org/old" not in _slugs347, "org/fresh" in _slugs347), (True, True))
+check("M444：未变项计入 dropped_unchanged",
+      _r347b.get("dropped_unchanged", 0) >= 1, True)
+
+_M347_REGEX = '''
+import re
+from app.constants import ARCHIVE_NAME_PATTERN
+def delete_backup(name):
+    if not re.fullmatch(ARCHIVE_NAME_PATTERN, name):
+        raise ValueError("bad")
+    return name
+'''
+check("M446：导入常量作正则模式不判 regex_dos",
+      _rd395.regex_dos_verdict(_M347_REGEX), False)
+
+_M347_REDIR = '''
+public class OidcController {
+    @GetMapping("/oauth2/minio-sso")
+    public void minioSso(@RequestParam("session_token") String sessionToken,
+                         HttpServletResponse response) throws IOException {
+        String minioConsoleUrl = RequestContextUtil.getMinioConsoleUrl(
+                oidcConfig.getMinioConsolePort());
+        String minioLoginUrl = minioConsoleUrl + "/login/openid";
+        response.sendRedirect(minioLoginUrl);
+    }
+}
+'''
+check("M446：配置/上下文取址的跳转不判 redir",
+      _rd395.redir_verdict(_M347_REDIR), False)
+
+_M347_UPLOAD = '''
+from fastapi import UploadFile
+@router.post("/analyze")
+async def analyze_template(file: UploadFile = File(...)):
+    content = await file.read()
+    filename = file.filename or "unknown.txt"
+    with open("/tmp/error.log", "a") as f:
+        f.write("err")
+    return await service.parse(filename, content)
+'''
+check("M446：上传文件名只用于解析、open 为常量日志路径 → None",
+      _rd395.unrestricted_upload_verdict(_M347_UPLOAD), None)
 
 check("M148：失败清单为空", len(FAILS), 0)
 
