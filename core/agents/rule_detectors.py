@@ -4088,6 +4088,14 @@ def xss_verdict(source: str) -> bool | None:
     _ret_m = re.search(
         r"\b(?:public|protected|private)\s+([\w<>\[\],.?]+)\s+\w+\s*\(", body)
     _ret = _ret_m.group(1) if _ret_m else ""
+    # M453：Spring MVC 视图返回（ModelAndView/ModelMap/View + setViewName）
+    # 不是直接 HTML 回显；模板是否转义由 view_templates 单独判定（pig 的
+    # ftl/login.ftl 与 confirm.ftl 全部 ${x?html}，判 XSS 是假阳）。
+    if (_ret in ("ModelAndView", "ModelMap", "View")
+            and re.search(r"setViewName\s*\(|new\s+[\w.]*ModelAndView\s*\(",
+                          body)
+            and not re.search(r"getWriter\s*\(|getOutputStream\s*\(", body)):
+        return None
     _json_type = bool(_ret and _ret not in (
         "String", "CharSequence", "byte[]", "void", "Object",
         "ModelAndView", "ModelMap", "View"))

@@ -14509,17 +14509,17 @@ check("M448：offline 级查重返回 UNKNOWN",
 _M348_ADV = {"ok": True, "total": 1, "ids": ["GHSA-aaaa"],
              "url": "https://api.github.com/repos/acme/repo/security-advisories",
              "items": [{"id": "GHSA-aaaa",
-                        "text": "path traversal in Foo.bar endpoint"}]}
+                        "text": "path traversal in upload_document endpoint"}]}
 _M348_CACHE = Path(_ws_mkdtemp("m348_dedup_")) / "repo_level.json"
 with _mock395.patch.object(_cd340, "REPO_LEVEL_CACHE", _M348_CACHE), \
         _mock395.patch.object(_cd340, "query_github_advisories",
                               side_effect=lambda *_a, **_k: dict(_M348_ADV)):
-    _r348a = _cd340.dedup_repo_level("acme/repo", "pathtraver", "Foo.bar")
-    _r348b = _cd340.dedup_repo_level("acme/repo", "pathtraver", "Other.baz")
+    _r348a = _cd340.dedup_repo_level("acme/repo", "pathtraver", "upload_document")
+    _r348b = _cd340.dedup_repo_level("acme/repo", "pathtraver", "other_endpoint")
 check("M448：级公告命中 → DUPLICATE_ISSUE_OR_GHSA",
       _r348a.get("status"), _cd340.STATUS_ISSUE)
-check("M448：级公告不匹配 → FRESH",
-      _r348b.get("status"), _cd340.STATUS_FRESH)
+check("M448：级公告不匹配 → UNKNOWN",
+      _r348b.get("status"), _cd340.STATUS_UNKNOWN)
 
 _M348_PY = '''
 from fastapi import Depends
@@ -14540,6 +14540,69 @@ check("M449：securecookie 低危归 B 板",
       wild_noise.classify(
           {"category": "securecookie", "unit": "X.y", "file": "X.java"},
           None)["code"], wild_noise.LOW_SEVERITY_SECURECOOKIE)
+
+print("\n[349] M451：仓级多源查重（local seed + CIRCL + GHSA，零 search 配额）")
+_M349_CACHE = Path(_ws_mkdtemp("m349_dedup_")) / "repo_level.json"
+_M349_CIRCL = {"ok": True, "total": 1, "ids": ["CVE-2026-108110"],
+               "url": "https://cve.circl.lu/api/search/acme/movo",
+               "error": "",
+               "items": [{"id": "CVE-2026-108110",
+                          "text": "CVE-2026-108110 upload_chat_document "
+                                  "in acme/movo allows unauthorized upload"}]}
+_M349_EMPTY = {"ok": True, "total": 0, "ids": [], "url": "", "error": "",
+               "items": []}
+_M349_CALLS = {"circl": 0, "adv": 0}
+
+
+def _circl349(_slug):
+    _M349_CALLS["circl"] += 1
+    return dict(_M349_CIRCL)
+
+
+def _adv349(_slug):
+    _M349_CALLS["adv"] += 1
+    return dict(_M349_EMPTY)
+
+
+_cd340._REPO_LEVEL_SRC.clear()
+with _mock395.patch.object(_cd340, "REPO_LEVEL_CACHE", _M349_CACHE), \
+        _mock395.patch.object(_cd340, "_local_match",
+                              side_effect=lambda *_a, **_k: []), \
+        _mock395.patch.object(_cd340, "query_circl", side_effect=_circl349), \
+        _mock395.patch.object(_cd340, "query_github_advisories",
+                              side_effect=_adv349), \
+        _mock395.patch.object(_cd340, "query_github_global_advisories",
+                              side_effect=lambda *_a, **_k: dict(_M349_EMPTY)):
+    _r349 = None
+    for _ in range(10):
+        _r349 = _cd340.dedup_repo_level(
+            "acme/movo", "authz", "upload_chat_document",
+            file="documents.py")
+    _r349b = _cd340.dedup_repo_level(
+        "acme/movo", "authz", "other_document", file="documents.py")
+check("M451：CIRCL 命中 → DUPLICATE_CVE 且 matched_ids 含 CVE",
+      (_r349.get("status"), "CVE-2026-108110" in (_r349.get("matched_ids") or [])),
+      (_cd340.STATUS_CVE, True))
+check("M451：未命中方法保持 UNKNOWN 且 coverage 含 circl",
+      (_r349b.get("status"), "circl" in (_r349b.get("coverage") or {}).get("checked", [])),
+      (_cd340.STATUS_UNKNOWN, True))
+check("M451：10 次调用 + 同库另一方法，CIRCL/公告源各只打 1 次",
+      (_M349_CALLS["circl"], _M349_CALLS["adv"]), (1, 1))
+
+_M349_VIEW = '''
+@RestController
+public class PigTokenEndpoint {
+    @GetMapping("/token/login")
+    public ModelAndView require(ModelAndView modelAndView,
+            @RequestParam String error) {
+        modelAndView.setViewName("ftl/login");
+        modelAndView.addObject("error", error);
+        return modelAndView;
+    }
+}
+'''
+check("M453：ModelAndView 视图返回不判 XSS",
+      _rd395.xss_verdict(_M349_VIEW), None)
 
 check("M148：失败清单为空", len(FAILS), 0)
 

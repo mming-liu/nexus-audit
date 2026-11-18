@@ -1137,18 +1137,20 @@ def dedup(slug: str, category: str, unit: str, *,
         _cache_put(cpath, rec)
     return rec
 
-# ---------------- M448：仓级 CVE/GHSA 查重（零 search 配额） ----------------
+# ---------------- M448/M451：仓级 CVE/GHSA 查重（零 search 配额） ----------------
 REPO_LEVEL_CACHE = CACHE / "_repo_level.json"
+# 同仓多根因只查一次底层源（CIRCL / 仓公告）；M452 断言底层调用 1 次。
+_REPO_LEVEL_SRC: dict[str, dict] = {}
 
 
 def dedup_repo_level(slug: str, category: str, unit: str, *,
                      file: str = "", aliases: list[str] | None = None,
                      allow_online: bool = True) -> dict:
-    """仓级查重：只读 /repos/{slug}/security-advisories，不消耗 search 配额。
+    """仓级多源查重：local seed + CIRCL + 仓公告 + 全局 GHSA。
 
-    用于 B 板短路记录（本地降噪/裸 authz 压 B 的项）——这些项原本完全
-    不查重，报告无法区分"已被仓级公告覆盖"与"未知"。结果按
-    slug|category|unit|file 缓存 24h，同一仓多个根因只发一次请求。
+    M451：先本地种子（0 网络）；在线只走仓级缓存接口（CIRCL 按仓、
+    /repos/{slug}/security-advisories、/advisories 全局库），0 次
+    GitHub Search 配额、0 次 NVD。逐条用 _unit_in_text 精确匹配方法名。
     """
     key = f"{slug}|{category}|{unit}|{file}"
     cache = _cache_get(REPO_LEVEL_CACHE) or {}
@@ -1157,48 +1159,98 @@ def dedup_repo_level(slug: str, category: str, unit: str, *,
         res = dict(hit.get("res") or {})
         res["from_cache"] = True
         return res
+
+    def _finish(res: dict) -> dict:
+        cache[key] = {"ts": time.time(), "res": res}
+        try:
+            _cache_put(REPO_LEVEL_CACHE, cache)
+        except OSError:
+            pass
+        return res
+
+    local = _local_match(slug, list(aliases or []), category, unit)
+    if local:
+        ids = [str(x.get("id") or "") for x in local if x.get("id")]
+        urls = [str(x.get("url") or "") for x in local if x.get("url")]
+        is_cve = any(i.upper().startswith("CVE-") for i in ids)
+        return _finish({
+            "status": STATUS_CVE if is_cve else STATUS_ISSUE,
+            "reason": f"REPO_LEVEL_{'CVE' if is_cve else 'GHSA'}: "
+                      + ", ".join(ids[:3]),
+            "matched_ids": ids[:5], "evidence_urls": urls[:5],
+            "sources": {"local_seed": {"ok": True, "total": len(local),
+                                       "ids": ids[:5]}},
+            "coverage": {"checked": ["local_seed"], "failed": [], "skipped": []},
+        })
+
     if not allow_online:
-        res = {"status": STATUS_UNKNOWN, "reason": "OFFLINE_REPO_LEVEL",
-               "sources": {},
-               "coverage": {"checked": [], "failed": ["repo_advisories"],
-                            "skipped": ["offline"]}}
+        return _finish({
+            "status": STATUS_UNKNOWN, "reason": "OFFLINE_REPO_LEVEL",
+            "matched_ids": [], "evidence_urls": [], "sources": {},
+            "coverage": {"checked": ["local_seed"],
+                         "failed": ["online_sources"], "skipped": ["offline"]},
+        })
+
+    if slug not in _REPO_LEVEL_SRC:
+        _REPO_LEVEL_SRC[slug] = {
+            "circl": query_circl(slug),
+            "adv": query_github_advisories(slug),
+        }
+    circl = _REPO_LEVEL_SRC[slug]["circl"]
+    adv = _REPO_LEVEL_SRC[slug]["adv"]
+    global_adv = query_github_global_advisories(slug, unit, file)
+
+    sources = {
+        "local_seed": {"ok": True, "total": 0, "ids": []},
+        "circl": {"ok": bool(circl.get("ok")),
+                  "total": int(circl.get("total") or 0),
+                  "ids": list(circl.get("ids") or [])[:5],
+                  "url": circl.get("url", ""),
+                  "error": circl.get("error", "")},
+        "repo_advisories": {"ok": bool(adv.get("ok")),
+                            "total": int(adv.get("total") or 0),
+                            "ids": list(adv.get("ids") or [])[:5],
+                            "url": adv.get("url", ""),
+                            "error": adv.get("error", "")},
+        "github_global_advisories": {
+            "ok": bool(global_adv.get("ok")),
+            "total": int(global_adv.get("total") or 0),
+            "ids": list(global_adv.get("ids") or [])[:5],
+            "url": global_adv.get("url", ""),
+            "error": global_adv.get("error", "")},
+    }
+    checked: list[str] = ["local_seed"]
+    failed: list[str] = []
+    cve_hits: list[str] = []
+    ghsa_hits: list[str] = []
+    urls: list[str] = []
+    for name, src in (("circl", circl), ("repo_advisories", adv),
+                      ("github_global_advisories", global_adv)):
+        if not src.get("ok"):
+            failed.append(name)
+            continue
+        checked.append(name)
+        for x in (src.get("items") or []):
+            if not _unit_in_text(unit, file, str(x.get("text") or "")):
+                continue
+            _id = str(x.get("id") or "")
+            if _id.upper().startswith("CVE-"):
+                cve_hits.append(_id)
+            elif _id.upper().startswith("GHSA-"):
+                ghsa_hits.append(_id)
+            if src.get("url"):
+                urls.append(str(src.get("url")))
+    if cve_hits:
+        res = {"status": STATUS_CVE,
+               "reason": "REPO_LEVEL_CVE: " + ", ".join(cve_hits[:3]),
+               "matched_ids": cve_hits[:5], "evidence_urls": urls[:5]}
+    elif ghsa_hits:
+        res = {"status": STATUS_ISSUE,
+               "reason": "REPO_LEVEL_GHSA: " + ", ".join(ghsa_hits[:3]),
+               "matched_ids": ghsa_hits[:5], "evidence_urls": urls[:5]}
     else:
-        adv = query_github_advisories(slug)
-        src = {"repo_advisories": {
-            "ok": bool(adv.get("ok")),
-            "total": int(adv.get("total") or 0),
-            "ids": list(adv.get("ids") or [])[:5],
-            "url": adv.get("url", ""),
-            "error": adv.get("error", ""),
-        }}
-        if not adv.get("ok"):
-            res = {"status": STATUS_UNKNOWN,
-                   "reason": f"REPO_ADVISORIES_UNAVAILABLE: {adv.get('error', '')}",
-                   "sources": src,
-                   "coverage": {"checked": ["repo_advisories"],
-                                "failed": ["repo_advisories"], "skipped": []}}
-        else:
-            toks = [str(t) for t in [unit, file, *(aliases or [])] if t]
-            text = " ".join(str(x.get("text") or "")
-                            for x in (adv.get("items") or [])).lower()
-            hits = [x for x in (adv.get("items") or [])
-                    if any(t.lower() in text for t in toks)]
-            if hits:
-                res = {"status": STATUS_ISSUE,
-                       "reason": "REPO_LEVEL_GHSA: " + ", ".join(
-                           str(x.get("id") or "") for x in hits[:3]),
-                       "sources": src,
-                       "matched": [x.get("id") for x in hits[:5]],
-                       "coverage": {"checked": ["repo_advisories"],
-                                    "failed": [], "skipped": []}}
-            else:
-                res = {"status": STATUS_FRESH,
-                       "reason": "REPO_LEVEL_NO_MATCH", "sources": src,
-                       "coverage": {"checked": ["repo_advisories"],
-                                    "failed": [], "skipped": []}}
-    cache[key] = {"ts": time.time(), "res": res}
-    try:
-        _cache_put(REPO_LEVEL_CACHE, cache)
-    except OSError:
-        pass
-    return res
+        res = {"status": STATUS_UNKNOWN, "reason": "REPO_LEVEL_NO_MATCH",
+               "matched_ids": [], "evidence_urls": []}
+    res["sources"] = sources
+    res["coverage"] = {"checked": checked, "failed": failed, "skipped": []}
+    return _finish(res)
