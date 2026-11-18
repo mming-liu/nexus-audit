@@ -2,442 +2,316 @@
 
 > 机器事实源：benchmarks/results/daily_hunt.json。本报告的 A/B 行数必须与 JSON 计数一致；ZERO_RECORD_FRESH 只代表四个来源**实际查过且 0 命中**，不代表漏洞一定成立，更不代表人工已核验。
 
-- 生成时间：2026-11-18 07:44:45
-- 总条数：389 ｜ 板块 A：**6** ｜ 板块 B：**383**
-- 状态计数：ZERO_RECORD_FRESH 6 / DUPLICATE_CVE 0 / DUPLICATE_ISSUE_OR_GHSA 0 / PATCHED_UPSTREAM 0 / STALE_REPO 0 / UNKNOWN 383
+- 生成时间：2026-11-19 07:46:50
+- 总条数：263 ｜ 板块 A：**2** ｜ 板块 B：**261**
+- 状态计数：ZERO_RECORD_FRESH 2 / DUPLICATE_CVE 0 / DUPLICATE_ISSUE_OR_GHSA 0 / PATCHED_UPSTREAM 0 / STALE_REPO 0 / UNKNOWN 261
 
-<!-- live_hunt_counts: {"BOARD_A": 6, "BOARD_B": 383, "DUPLICATE_CVE": 0, "DUPLICATE_ISSUE_OR_GHSA": 0, "PATCHED_UPSTREAM": 0, "STALE_REPO": 0, "UNKNOWN": 383, "ZERO_RECORD_FRESH": 6} -->
+<!-- live_hunt_counts: {"BOARD_A": 2, "BOARD_B": 261, "DUPLICATE_CVE": 0, "DUPLICATE_ISSUE_OR_GHSA": 0, "PATCHED_UPSTREAM": 0, "STALE_REPO": 0, "UNKNOWN": 261, "ZERO_RECORD_FRESH": 2} -->
 
 ## 今日巡猎（daily-hunt）
 
 > 自动流水线：近 21 天有提交的 java/python 仓 → 同 HEAD 直接跳过 → 只报新引入或尚未导出的 ZERO_RECORD_FRESH 根因；本次即扫即焚 0 个缓存。
 
-- 候选仓：14 ｜ 实扫：7 ｜ 跳过：7 ｜ 失败：0 ｜ 候选来源：github_search
-- 本次新增根因：389 ｜ 板块 A：6 ｜ 拦截进 B：383
-- 证据不足未列：5 条（NVD 熔断 / 全网 Issue 限流，未宣称 FRESH，需人工复核）
+- 候选仓：13 ｜ 实扫：5 ｜ 跳过：8 ｜ 失败：0 ｜ 候选来源：github_search
+- 本次新增根因：263 ｜ 板块 A：2 ｜ 拦截进 B：261
+- 证据不足未列：0 条（NVD 熔断 / 全网 Issue 限流，未宣称 FRESH，需人工复核）
 - 冷却期免克隆：0 个（--cooldown-days 7：距上次扫描不足 7 天的仓直接 0 秒顺延）
 - 侦察免克隆排除（未变老仓）：1 个
+- 侦察告警：java: ConnectError: [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)
 
 | 仓库 | HEAD | 结果 | 新增 |
 |---|---|---|---|
-| 1Panel-dev/CordysCRM | 46e8d44768e8 | SCANNED | 222 |
-| DAB-LABS/HAIR | 77ff5c9032c8 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
-| WuKongOpenSource/Wukong-AICRM | c33e89853b66 | SCANNED | 2 |
-| yilecoding/fastapi-react-admin | 764f9f9678d1 | SKIPPED (all_local_or_demo) | 0 |
-| Kizzuwatnaa/DLSS5-Autopilot | d7d249503ac1 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
-| himovo/movo | 520ca606a5b6 | SCANNED | 46 |
-| chigwell/telegram-mcp | 0d27284a5e99 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
-| fastapiadmin/FastapiAdmin | 92a6f03d3bb5 | SCANNED | 9 |
-| Case211/remnawave-admin | e2d8510caf08 | SCANNED | 10 |
-| AhmadHassan-BTed/ShopifyAutoAuth | 93af05ad5787 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
-| lalitgehani/SnackBase | 9d50937c59b0 | SCANNED | 100 |
-| praveen-ks-2001/hermes-agent-template | c35500cc9791 | SCANNED | 0 |
-| interplains/zero-breach | 1c7e9b6df81e | SKIPPED (ZERO_ENTRY_LIB) | 0 |
-| jonaslejon/ad-autopwn | 6e9486f57b18 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| flowable/flowable-engine | 63f9cbfa3f48 | SCANNED | 81 |
+| wodrake/ERP-AGENT-open-source | 84b94a537ce0 | SCANNED | 5 |
+| oshi/oshi | 2eba26995b81 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| avansaber/erpclaw | aea97950a7d7 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| Loophole-LLC/Bastillion | 30efb971aa50 | SKIPPED (low_units_4) | 0 |
+| xuliang2024/minitv | 3e0dc7aa98d0 | SCANNED | 8 |
+| webbukkit/dynmap | 93b454efb880 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| yarsa/nepal-compliance | fbb9e95be233 | SKIPPED (low_units_7) | 0 |
+| 88250/symphony | c3e204806f98 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| google/jimfs | ea4ffa030a61 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| pig-mesh/pig | 193997016e39 | SCANNED | 169 |
+| apache/avro | 7b7dec155e53 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| yux567890/mall | 6430cbff307a | SCANNED | 0 |
 
 ## 板块 A｜🟢 可直接交单的 ZERO_RECORD_FRESH
 
 | # | 仓库 | 类目 | 根因 | 置信度 | HEAD 提交日期 | HEAD | 源码行 | 提单入口 | 本地手册 |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | SnackBase | regex_dos | delete_backup | — | 2026-11-09 (8.4d) | 9d50937c59b0 | [src/snackbase/infrastructure/api/routes/backups_router.py:279](https://github.com/lalitgehani/SnackBase/blob/9d50937c59b030e696e9d72755b1f902f447ec86/src/snackbase/infrastructure/api/routes/backups_router.py#L279) | [Advisory](https://github.com/lalitgehani/SnackBase/security/advisories/new) · [Issue](https://github.com/lalitgehani/SnackBase/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/SnackBase_regex_dos_delete_backup/SUBMISSION_PLAYBOOK.md) |
-| 2 | SnackBase | regex_dos | download_backup | — | 2026-11-09 (8.4d) | 9d50937c59b0 | [src/snackbase/infrastructure/api/routes/backups_router.py:309](https://github.com/lalitgehani/SnackBase/blob/9d50937c59b030e696e9d72755b1f902f447ec86/src/snackbase/infrastructure/api/routes/backups_router.py#L309) | [Advisory](https://github.com/lalitgehani/SnackBase/security/advisories/new) · [Issue](https://github.com/lalitgehani/SnackBase/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/SnackBase_regex_dos_download_backup/SUBMISSION_PLAYBOOK.md) |
-| 3 | SnackBase | regex_dos | upload_backup | — | 2026-11-09 (8.4d) | 9d50937c59b0 | [src/snackbase/infrastructure/api/routes/backups_router.py:92](https://github.com/lalitgehani/SnackBase/blob/9d50937c59b030e696e9d72755b1f902f447ec86/src/snackbase/infrastructure/api/routes/backups_router.py#L92) | [Advisory](https://github.com/lalitgehani/SnackBase/security/advisories/new) · [Issue](https://github.com/lalitgehani/SnackBase/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/SnackBase_regex_dos_upload_backup/SUBMISSION_PLAYBOOK.md) |
-| 4 | Wukong-AICRM | redir | OidcController.minioSso | — | 2026-09-11 (67.9d) | c33e89853b66 | [backend/src/main/java/com/kakarote/ai_crm/controller/OidcController.java:249](https://github.com/WuKongOpenSource/Wukong-AICRM/blob/c33e89853b66812e3c5e1604d4057d59e83c544b/backend/src/main/java/com/kakarote/ai_crm/controller/OidcController.java#L249) | [Advisory](https://github.com/WuKongOpenSource/Wukong-AICRM/security/advisories/new) · [Issue](https://github.com/WuKongOpenSource/Wukong-AICRM/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/Wukong-AICRM_redir_minioSso/SUBMISSION_PLAYBOOK.md) |
-| 5 | Wukong-AICRM | securecookie | OidcController.minioSso | — | 2026-09-11 (67.9d) | c33e89853b66 | [backend/src/main/java/com/kakarote/ai_crm/controller/OidcController.java:249](https://github.com/WuKongOpenSource/Wukong-AICRM/blob/c33e89853b66812e3c5e1604d4057d59e83c544b/backend/src/main/java/com/kakarote/ai_crm/controller/OidcController.java#L249) | [Advisory](https://github.com/WuKongOpenSource/Wukong-AICRM/security/advisories/new) · [Issue](https://github.com/WuKongOpenSource/Wukong-AICRM/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/Wukong-AICRM_securecookie_minioSso/SUBMISSION_PLAYBOOK.md) |
-| 6 | movo | unrestricted_upload | analyze_template | — | 2026-11-17 (0.4d) | 520ca606a5b6 | [services/chat-api/app/api/endpoints/skills.py:148](https://github.com/himovo/movo/blob/520ca606a5b6325c6a72229d16d20fa1ad54a40d/services/chat-api/app/api/endpoints/skills.py#L148) | [Advisory](https://github.com/himovo/movo/security/advisories/new) · [Issue](https://github.com/himovo/movo/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/movo_unrestricted_upload_analyze_template/SUBMISSION_PLAYBOOK.md) |
+| 1 | pig | xss | PigTokenEndpoint.confirm | — | 2026-11-08 (10.9d) | 193997016e39 | [pig-auth/src/main/java/com/pig4cloud/pig/auth/endpoint/PigTokenEndpoint.java:111](https://github.com/pig-mesh/pig/blob/193997016e39c2158a11c6da3ec1fc9fa3162a9d/pig-auth/src/main/java/com/pig4cloud/pig/auth/endpoint/PigTokenEndpoint.java#L111) | [Advisory](https://github.com/pig-mesh/pig/security/advisories/new) · [Issue](https://github.com/pig-mesh/pig/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/pig_xss_confirm/SUBMISSION_PLAYBOOK.md) |
+| 2 | pig | xss | PigTokenEndpoint.require | — | 2026-11-08 (10.9d) | 193997016e39 | [pig-auth/src/main/java/com/pig4cloud/pig/auth/endpoint/PigTokenEndpoint.java:92](https://github.com/pig-mesh/pig/blob/193997016e39c2158a11c6da3ec1fc9fa3162a9d/pig-auth/src/main/java/com/pig4cloud/pig/auth/endpoint/PigTokenEndpoint.java#L92) | [Advisory](https://github.com/pig-mesh/pig/security/advisories/new) · [Issue](https://github.com/pig-mesh/pig/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/pig_xss_require/SUBMISSION_PLAYBOOK.md) |
 
 ## 板块 B｜🔴 自动拦截 / 不可交单
 
 | # | 仓库 | 类目 | 根因 | 状态 | 命中证据 | 拦截原因 | 官方链接 |
 |---|---|---|---|---|---|---|---|
-| 1 | CordysCRM | authz | AnalyticsController.query | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 2 | CordysCRM | authz | AnalyticsController.schema | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 3 | CordysCRM | authz | ApprovalActionController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 4 | CordysCRM | authz | ApprovalActionController.approve | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 5 | CordysCRM | authz | ApprovalActionController.back | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 6 | CordysCRM | authz | ApprovalActionController.batchApprove | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 7 | CordysCRM | authz | ApprovalActionController.batchReject | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 8 | CordysCRM | authz | ApprovalActionController.getResubmitNodes | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 9 | CordysCRM | authz | ApprovalActionController.reject | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 10 | CordysCRM | authz | ApprovalActionController.revoke | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 11 | CordysCRM | authz | ApprovalCommentController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 12 | CordysCRM | authz | ApprovalCommentController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 13 | CordysCRM | authz | ApprovalCommentController.page | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 14 | CordysCRM | authz | ApprovalCommentController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 15 | CordysCRM | authz | ApprovalFlowController.getByFormType | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 16 | CordysCRM | authz | ApprovalResourceController.batchPush | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 17 | CordysCRM | authz | ApprovalResourceController.getHistoryInstanceDetail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 18 | CordysCRM | authz | ApprovalResourceController.getRecordDetail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 19 | CordysCRM | authz | ApprovalResourceController.push | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 20 | CordysCRM | authz | ApprovalResourceController.resourceDetail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 21 | CordysCRM | authz | ApprovalResourceController.revoke | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 22 | CordysCRM | authz | ApprovalTodoController.ccPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 23 | CordysCRM | authz | ApprovalTodoController.initiatedPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 24 | CordysCRM | authz | ApprovalTodoController.mentionPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 25 | CordysCRM | authz | ApprovalTodoController.processedPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 26 | CordysCRM | authz | ApprovalTodoController.todo | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 27 | CordysCRM | authz | BusinessTitleController.revoke | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 28 | CordysCRM | authz | ClueController.batchDelete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 29 | CordysCRM | authz | ClueController.batchToPool | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 30 | CordysCRM | authz | ClueController.batchTransfer | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 31 | CordysCRM | authz | ClueController.batchTransition | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 32 | CordysCRM | authz | ClueController.chart | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 33 | CordysCRM | authz | ClueController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 34 | CordysCRM | authz | ClueController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 35 | CordysCRM | authz | ClueController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 36 | CordysCRM | authz | ClueController.preCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 37 | CordysCRM | authz | ClueController.realImport | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 38 | CordysCRM | authz | ClueController.toPool | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 39 | CordysCRM | authz | ClueController.transfer | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 40 | CordysCRM | authz | ClueController.transform | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 41 | CordysCRM | authz | ClueController.transitionCustomerList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 42 | CordysCRM | authz | ContractController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 43 | CordysCRM | authz | ContractController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 44 | CordysCRM | authz | ContractController.getFormSnapshot | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 45 | CordysCRM | authz | ContractController.getSnapshot | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 46 | CordysCRM | authz | ContractController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 47 | CordysCRM | authz | ContractController.sortModule | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 48 | CordysCRM | authz | ContractInvoiceController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 49 | CordysCRM | authz | ContractInvoiceController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 50 | CordysCRM | authz | ContractInvoiceController.getFormSnapshot | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 51 | CordysCRM | authz | ContractInvoiceController.getSnapshot | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 52 | CordysCRM | authz | ContractInvoiceController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 53 | CordysCRM | authz | ContractInvoiceController.preCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 54 | CordysCRM | authz | ContractInvoiceController.realImport | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 55 | CordysCRM | authz | ContractPaymentPlanController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 56 | CordysCRM | authz | ContractPaymentPlanController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 57 | CordysCRM | authz | ContractPaymentPlanController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 58 | CordysCRM | authz | ContractPaymentPlanController.preCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 59 | CordysCRM | authz | ContractPaymentPlanController.realImport | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 60 | CordysCRM | authz | ContractPaymentRecordController.batchDelete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 61 | CordysCRM | authz | ContractPaymentRecordController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 62 | CordysCRM | authz | ContractPaymentRecordController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 63 | CordysCRM | authz | ContractPaymentRecordController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 64 | CordysCRM | authz | ContractPaymentRecordController.preCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 65 | CordysCRM | authz | ContractPaymentRecordController.realImport | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 66 | CordysCRM | authz | ContractPaymentRecordController.searchStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 67 | CordysCRM | authz | CustomFormController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 68 | CordysCRM | authz | CustomFormController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 69 | CordysCRM | authz | CustomFormController.getAdmins | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 70 | CordysCRM | authz | CustomFormDataController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 71 | CordysCRM | authz | CustomFormDataController.batchDelete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 72 | CordysCRM | authz | CustomFormDataController.batchUpdate | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 73 | CordysCRM | authz | CustomFormDataController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 74 | CordysCRM | authz | CustomFormDataController.downloadImportTpl | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 75 | CordysCRM | authz | CustomFormDataController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 76 | CordysCRM | authz | CustomFormDataController.getTabEnableConfig | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 77 | CordysCRM | authz | CustomFormDataController.hasCreatePermission | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 78 | CordysCRM | authz | CustomFormDataController.importPreCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 79 | CordysCRM | authz | CustomFormDataController.page | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 80 | CordysCRM | authz | CustomFormDataController.realImport | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 81 | CordysCRM | authz | CustomFormDataController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 82 | CordysCRM | authz | CustomFormRoleController.addUsers | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 83 | CordysCRM | authz | CustomFormRoleController.getDeptUserTree | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 84 | CordysCRM | authz | CustomFormRoleController.listByFormId | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 85 | CordysCRM | authz | CustomFormRoleController.listUsersByRole | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 86 | CordysCRM | authz | CustomFormRoleController.removeUsers | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 87 | CordysCRM | authz | CustomFormUserViewController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 88 | CordysCRM | authz | CustomFormUserViewController.detail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 89 | CordysCRM | authz | CustomFormUserViewController.editPos | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 90 | CordysCRM | authz | CustomFormUserViewController.enable | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 91 | CordysCRM | authz | CustomFormUserViewController.fixed | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 92 | CordysCRM | authz | CustomFormUserViewController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 93 | CordysCRM | authz | CustomerCollaborationController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 94 | CordysCRM | authz | CustomerCollaborationController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 95 | CordysCRM | authz | CustomerCollaborationController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 96 | CordysCRM | authz | CustomerContactController.batchDelete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 97 | CordysCRM | authz | CustomerContactController.batchUpdate | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 98 | CordysCRM | authz | CustomerContactController.chart | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 99 | CordysCRM | authz | CustomerContactController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 100 | CordysCRM | authz | CustomerContactController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 101 | CordysCRM | authz | CustomerContactController.list#2 | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 102 | CordysCRM | authz | CustomerContactController.preCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 103 | CordysCRM | authz | CustomerContactController.realImport | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 104 | CordysCRM | authz | CustomerRelationController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 105 | CordysCRM | authz | CustomerRelationController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 106 | CordysCRM | authz | CustomerRelationController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 107 | CordysCRM | authz | CustomerRelationController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 108 | CordysCRM | authz | CustomerRelationController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 109 | CordysCRM | authz | DetailTabDataController.cluePage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 110 | CordysCRM | authz | DetailTabDataController.clueStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 111 | CordysCRM | authz | DetailTabDataController.contactPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 112 | CordysCRM | authz | DetailTabDataController.contactStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 113 | CordysCRM | authz | DetailTabDataController.contractPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 114 | CordysCRM | authz | DetailTabDataController.contractPaymentPlanPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 115 | CordysCRM | authz | DetailTabDataController.contractPaymentPlanStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 116 | CordysCRM | authz | DetailTabDataController.contractPaymentRecordPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 117 | CordysCRM | authz | DetailTabDataController.contractPaymentRecordStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 118 | CordysCRM | authz | DetailTabDataController.contractStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 119 | CordysCRM | authz | DetailTabDataController.customFormStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 120 | CordysCRM | authz | DetailTabDataController.customerPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 121 | CordysCRM | authz | DetailTabDataController.customerStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 122 | CordysCRM | authz | DetailTabDataController.followPlanPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 123 | CordysCRM | authz | DetailTabDataController.followPlanStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 124 | CordysCRM | authz | DetailTabDataController.followRecordPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 125 | CordysCRM | authz | DetailTabDataController.followRecordStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 126 | CordysCRM | authz | DetailTabDataController.invoicePage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 127 | CordysCRM | authz | DetailTabDataController.invoiceStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 128 | CordysCRM | authz | DetailTabDataController.opportunityPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 129 | CordysCRM | authz | DetailTabDataController.opportunityStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 130 | CordysCRM | authz | DetailTabDataController.orderPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 131 | CordysCRM | authz | DetailTabDataController.orderPage#2 | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 132 | CordysCRM | authz | DetailTabDataController.orderStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 133 | CordysCRM | authz | DetailTabDataController.quotationPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 134 | CordysCRM | authz | DetailTabDataController.quotationStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 135 | CordysCRM | authz | ExportTaskCenterController.cancel | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 136 | CordysCRM | authz | ExportTaskCenterController.download | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 137 | CordysCRM | authz | ExportTaskCenterController.queryList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 138 | CordysCRM | authz | FollowUpPlanCommentController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 139 | CordysCRM | authz | FollowUpPlanCommentController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 140 | CordysCRM | authz | FollowUpPlanController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 141 | CordysCRM | authz | FollowUpPlanController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 142 | CordysCRM | authz | FollowUpPlanController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 143 | CordysCRM | authz | FollowUpPlanController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 144 | CordysCRM | authz | FollowUpRecordCommentController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 145 | CordysCRM | authz | FollowUpRecordCommentController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 146 | CordysCRM | authz | FollowUpRecordController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 147 | CordysCRM | authz | FollowUpRecordController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 148 | CordysCRM | authz | FollowUpRecordController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 149 | CordysCRM | authz | FollowUpRecordController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 150 | CordysCRM | authz | GlobalSearchController.globalSearchCount | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 151 | CordysCRM | authz | LocaleLanguageController.localeLanguageChange | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 152 | CordysCRM | authz | McpController.getMcpField | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 153 | CordysCRM | authz | ModuleController.getModuleList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 154 | CordysCRM | authz | ModuleFieldController.checkRepeat | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 155 | CordysCRM | authz | ModuleFieldController.getDatasourceRefDetail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 156 | CordysCRM | authz | ModuleFieldController.getDeptUserTree | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 157 | CordysCRM | authz | ModuleFieldController.getFieldList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 158 | CordysCRM | authz | ModuleFieldController.getSourceFormConfig | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 159 | CordysCRM | authz | ModuleFieldController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 160 | CordysCRM | authz | ModuleFieldController.list#2 | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 161 | CordysCRM | authz | ModuleFieldController.refreshStatisticField | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 162 | CordysCRM | authz | ModuleFieldController.sourceBusinessTitlePage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 163 | CordysCRM | authz | ModuleFieldController.sourceCluePage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 164 | CordysCRM | authz | ModuleFieldController.sourceContactPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 165 | CordysCRM | authz | ModuleFieldController.sourceContractPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 166 | CordysCRM | authz | ModuleFieldController.sourceCustomFormDataPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 167 | CordysCRM | authz | ModuleFieldController.sourceCustomerPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 168 | CordysCRM | authz | ModuleFieldController.sourceOpportunityPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 169 | CordysCRM | authz | ModuleFieldController.sourceOpportunityQuotationPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 170 | CordysCRM | authz | ModuleFieldController.sourcePlanPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 171 | CordysCRM | authz | ModuleFieldController.sourceRecordPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 172 | CordysCRM | authz | NotificationController.countNotification | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 173 | CordysCRM | authz | NotificationController.listNotification | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 174 | CordysCRM | authz | NotificationController.read | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 175 | CordysCRM | authz | OpportunityController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 176 | CordysCRM | authz | OpportunityController.batchTransfer | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 177 | CordysCRM | authz | OpportunityController.batchUpdate | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 178 | CordysCRM | authz | OpportunityController.chart | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 179 | CordysCRM | authz | OpportunityController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 180 | CordysCRM | authz | OpportunityController.deleteOpportunity | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 181 | CordysCRM | authz | OpportunityController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 182 | CordysCRM | authz | OpportunityController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 183 | CordysCRM | authz | OpportunityController.list#2 | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 184 | CordysCRM | authz | OpportunityController.preCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 185 | CordysCRM | authz | OpportunityController.realImport | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 186 | CordysCRM | authz | OpportunityController.searchStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 187 | CordysCRM | authz | OpportunityController.sortModule | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 188 | CordysCRM | authz | OpportunityController.transfer | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 189 | CordysCRM | authz | OpportunityController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 190 | CordysCRM | authz | OpportunityQuotationController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 191 | CordysCRM | authz | OpportunityQuotationController.approve | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 192 | CordysCRM | authz | OpportunityQuotationController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 193 | CordysCRM | authz | OpportunityQuotationController.download | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 194 | CordysCRM | authz | OpportunityQuotationController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 195 | CordysCRM | authz | OpportunityQuotationController.getFormSnapshot | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 196 | CordysCRM | authz | OpportunityQuotationController.getSnapshot | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 197 | CordysCRM | authz | OpportunityQuotationController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 198 | CordysCRM | authz | OpportunityQuotationController.revoke | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 199 | CordysCRM | authz | OpportunityQuotationController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 200 | CordysCRM | authz | OpportunityQuotationController.voidQuotation | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 201 | CordysCRM | authz | OrderController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 202 | CordysCRM | authz | OrderController.download | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 203 | CordysCRM | authz | OrderController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 204 | CordysCRM | authz | OrderController.getFormSnapshot | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 205 | CordysCRM | authz | OrderController.getSnapshot | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 206 | CordysCRM | authz | OrderController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 207 | CordysCRM | authz | OrderController.preCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 208 | CordysCRM | authz | OrderController.realImport | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 209 | CordysCRM | authz | OrderController.searchStatistic | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 210 | CordysCRM | authz | OrderController.sortModule | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 211 | CordysCRM | authz | OrganizationSettingsController.getThirdConfigByType | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 212 | CordysCRM | authz | OrganizationUserController.getUserList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 213 | CordysCRM | authz | PersonalCenterController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 214 | CordysCRM | authz | PersonalCenterController.sendCode | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 215 | CordysCRM | authz | PoolClueController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 216 | CordysCRM | authz | PoolClueController.preCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 217 | CordysCRM | authz | PoolClueController.realImport | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 218 | CordysCRM | authz | PoolCustomerController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 219 | CordysCRM | authz | PoolCustomerController.preCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 220 | CordysCRM | authz | PoolCustomerController.realImport | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 221 | CordysCRM | authz | SseController.close | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 222 | CordysCRM | authz | SseController.subscribe | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 223 | FastapiAdmin | authz | clear_monitor_cache_key_controller | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 224 | FastapiAdmin | authz | clear_monitor_cache_name_controller | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 225 | FastapiAdmin | authz | delete_online_controller | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 226 | FastapiAdmin | authz | get_monitor_cache_key_controller | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 227 | FastapiAdmin | authz | get_monitor_cache_value_controller | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 228 | FastapiAdmin | log_injection | login_for_access_token_controller | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 229 | FastapiAdmin | log_injection | register_controller | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 230 | FastapiAdmin | log_injection | transfer_stream_controller | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 231 | FastapiAdmin | log_injection | websocket_chat_controller | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 232 | SnackBase | authz | authorize | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 233 | SnackBase | authz | callback | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 234 | SnackBase | authz | dispatch_delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 235 | SnackBase | authz | dispatch_get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 236 | SnackBase | authz | dispatch_patch | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 237 | SnackBase | authz | dispatch_post | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 238 | SnackBase | authz | dispatch_put | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 239 | SnackBase | log_injection | accept_invitation | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 240 | SnackBase | log_injection | acs | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 241 | SnackBase | log_injection | aggregate_collection | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 242 | SnackBase | log_injection | authorize | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 243 | SnackBase | log_injection | batch_create_records | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 244 | SnackBase | log_injection | batch_delete_records | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 245 | SnackBase | log_injection | batch_update_records | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 246 | SnackBase | log_injection | callback | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 247 | SnackBase | log_injection | cancel_instance | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 248 | SnackBase | log_injection | cancel_invitation | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 249 | SnackBase | log_injection | cancel_job | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 250 | SnackBase | log_injection | create_api_key | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 251 | SnackBase | log_injection | create_backup_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 252 | SnackBase | log_injection | create_codelist | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 253 | SnackBase | log_injection | create_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 254 | SnackBase | log_injection | create_hook | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 255 | SnackBase | log_injection | create_invitation | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 256 | SnackBase | log_injection | create_macro | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 257 | SnackBase | log_injection | create_record | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 258 | SnackBase | log_injection | create_role | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 259 | SnackBase | log_injection | create_user | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 260 | SnackBase | log_injection | create_value | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 261 | SnackBase | log_injection | create_workflow | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 262 | SnackBase | log_injection | deactivate_user | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 263 | SnackBase | log_injection | delete_backup | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 264 | SnackBase | log_injection | delete_collection | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 265 | SnackBase | log_injection | delete_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 266 | SnackBase | log_injection | delete_hook | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 267 | SnackBase | log_injection | delete_macro | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 268 | SnackBase | log_injection | delete_record | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 269 | SnackBase | log_injection | delete_role | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 270 | SnackBase | log_injection | delete_webhook | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 271 | SnackBase | log_injection | delete_workflow | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 272 | SnackBase | log_injection | deploy_function | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 273 | SnackBase | log_injection | download_file | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 274 | SnackBase | log_injection | export_collections | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 275 | SnackBase | log_injection | forgot_password | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 276 | SnackBase | log_injection | generate_migrations | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 277 | SnackBase | log_injection | get_collection | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 278 | SnackBase | log_injection | get_collection_names | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 279 | SnackBase | log_injection | get_collection_rules | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 280 | SnackBase | log_injection | get_current_migration | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 281 | SnackBase | log_injection | get_email_log | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 282 | SnackBase | log_injection | get_email_template | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 283 | SnackBase | log_injection | get_migration_history | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 284 | SnackBase | log_injection | get_role | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 285 | SnackBase | log_injection | import_collections | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 286 | SnackBase | log_injection | list_collections | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 287 | SnackBase | log_injection | list_invitations | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 288 | SnackBase | log_injection | list_migrations | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 289 | SnackBase | log_injection | list_records | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 290 | SnackBase | log_injection | list_roles | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 291 | SnackBase | log_injection | login | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 292 | SnackBase | log_injection | metadata | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 293 | SnackBase | log_injection | migrate_field_encryption | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 294 | SnackBase | log_injection | plan_migrations | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 295 | SnackBase | log_injection | refresh_tokens | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 296 | SnackBase | log_injection | register | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 297 | SnackBase | log_injection | render_email_template | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 298 | SnackBase | log_injection | resend_invitation | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 299 | SnackBase | log_injection | resend_user_verification | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 300 | SnackBase | log_injection | reset_password | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 301 | SnackBase | log_injection | reset_user_password | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 302 | SnackBase | log_injection | resume_instance_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 303 | SnackBase | log_injection | retry_job | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 304 | SnackBase | log_injection | reveal_record_secrets | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 305 | SnackBase | log_injection | revoke_api_key | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 306 | SnackBase | log_injection | send_test_email | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 307 | SnackBase | log_injection | set_override | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 308 | SnackBase | log_injection | sso | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 309 | SnackBase | log_injection | test_macro | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 310 | SnackBase | log_injection | toggle_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 311 | SnackBase | log_injection | toggle_hook | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 312 | SnackBase | log_injection | toggle_workflow | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 313 | SnackBase | log_injection | trigger_hook | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 314 | SnackBase | log_injection | trigger_workflow | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 315 | SnackBase | log_injection | update_collection | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 316 | SnackBase | log_injection | update_collection_rules | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 317 | SnackBase | log_injection | update_configuration_status | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 318 | SnackBase | log_injection | update_email_template | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 319 | SnackBase | log_injection | update_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 320 | SnackBase | log_injection | update_hook | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 321 | SnackBase | log_injection | update_macro | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 322 | SnackBase | log_injection | update_role | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 323 | SnackBase | log_injection | update_webhook | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 324 | SnackBase | log_injection | update_workflow | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 325 | SnackBase | log_injection | upload_file | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 326 | SnackBase | log_injection | verify_user_email | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 327 | SnackBase | log_injection | websocket_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 328 | SnackBase | sqli | list_collections | **UNKNOWN** | — | NO_SQL_SINK: 入口函数体（含其可达辅助函数）里没有任何 SQL 执行语句（.execute/.executemany/.executescript），sqli 来自切片里未被入口调用的辅助函数 | — |
-| 329 | movo | authz | active_task_suspension | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 330 | movo | authz | answer_question | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 331 | movo | authz | append_messages | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 332 | movo | authz | browser_auth_status | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 333 | movo | authz | chat_completions | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 334 | movo | authz | chat_message_events | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 335 | movo | authz | decide_approval | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 336 | movo | authz | delete_scheduled_job | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 337 | movo | authz | delete_session | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 338 | movo | authz | desktop_conversation_binding | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 339 | movo | authz | desktop_conversation_runtime_rebind | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 340 | movo | authz | desktop_git_state | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 341 | movo | authz | desktop_turn_cancel | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 342 | movo | authz | desktop_turn_events | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 343 | movo | authz | desktop_turn_start | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 344 | movo | authz | dispose_task | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 345 | movo | authz | document_index_callback | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 346 | movo | authz | document_parse_callback | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 347 | movo | authz | download | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 348 | movo | authz | download | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 349 | movo | authz | export | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 350 | movo | authz | freeze_task | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 351 | movo | authz | get_knowledge_source_chunk | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 352 | movo | authz | get_knowledge_source_document | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 353 | movo | authz | get_knowledge_source_preview | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 354 | movo | authz | get_processing_job | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 355 | movo | authz | get_session | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 356 | movo | authz | list_scheduled_job_runs | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 357 | movo | authz | mark_task_suspension_manual_ready | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 358 | movo | authz | pending_approvals | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 359 | movo | authz | pending_questions | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 360 | movo | authz | preview_content | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 361 | movo | authz | preview_conversion_callback | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 362 | movo | authz | put_group | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 363 | movo | authz | record_desktop_question_answer | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 364 | movo | authz | recording_stream | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 365 | movo | authz | remove_group | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 366 | movo | authz | resume_task | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 367 | movo | authz | run_scheduled_job_now | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 368 | movo | authz | skill_environment_record | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 369 | movo | authz | update_scheduled_job | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 370 | movo | authz | update_session | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 371 | movo | authz | upload_chat_document | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 372 | movo | authz | upload_chat_image | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 373 | movo | log_injection | execute | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
-| 374 | remnawave-admin | authz | delete_channel | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 375 | remnawave-admin | authz | delete_notification | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 376 | remnawave-admin | authz | oauth_del_link | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 377 | remnawave-admin | authz | receive_connections | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 378 | remnawave-admin | authz | revoke_admin_session | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 379 | remnawave-admin | authz | terminal_websocket | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 380 | remnawave-admin | authz | unregister_device_by_id | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 381 | remnawave-admin | authz | update_channel | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 382 | remnawave-admin | authz | update_device | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 383 | remnawave-admin | log_injection | install_plugin | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 1 | ERP-AGENT-open-source | authz | chat_history | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 2 | ERP-AGENT-open-source | authz | chat_resume | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 3 | ERP-AGENT-open-source | authz | chat_state | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 4 | ERP-AGENT-open-source | authz | get_messages | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 5 | ERP-AGENT-open-source | authz | session_probe | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 6 | flowable-engine | authz | AppDefinitionResource.executeAppDefinitionAction | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 7 | flowable-engine | authz | AppDefinitionResource.getAppDefinition | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 8 | flowable-engine | authz | AppDefinitionResourceDataResource.getAppDefinitionResource | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 9 | flowable-engine | authz | AppDeploymentResource.deleteAppDeployment | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 10 | flowable-engine | authz | AppDeploymentResourceCollectionResource.getDeploymentResources | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 11 | flowable-engine | authz | AppDeploymentResourceDataResource.getAppDeploymentResource | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 12 | flowable-engine | authz | AppDeploymentResourceResource.getDeploymentResource | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 13 | flowable-engine | authz | AppModelResource.getModelJsonResource | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 14 | flowable-engine | authz | BatchPartCollectionResource.getBatches | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 15 | flowable-engine | authz | BatchPartResource.getBatchPartDocument | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 16 | flowable-engine | authz | BatchResource.deleteJob | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 17 | flowable-engine | authz | BatchResource.getBatchDocument | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 18 | flowable-engine | authz | BatchResource.getBatchSummary | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 19 | flowable-engine | authz | CaseDefinitionResource.batchMigrateHistoricInstancesOfCaseDefinition | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 20 | flowable-engine | authz | CaseDefinitionResource.batchMigrateInstancesOfCaseDefinition | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 21 | flowable-engine | authz | CaseDefinitionResource.migrateHistoricInstancesOfCaseDefinition | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 22 | flowable-engine | authz | CaseDefinitionResource.migrateInstancesOfCaseDefinition | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 23 | flowable-engine | authz | CaseInstanceIdentityLinkResource.deleteIdentityLink | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 24 | flowable-engine | authz | CaseInstanceResource.getStageOverview | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 25 | flowable-engine | authz | CaseInstanceResource.migrateCaseInstance | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 26 | flowable-engine | authz | CaseInstanceResource.updateCaseInstance | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 27 | flowable-engine | authz | CaseInstanceResource.validateCaseInstanceMigration | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 28 | flowable-engine | authz | CaseInstanceVariableResource.deleteVariable | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 29 | flowable-engine | authz | DeploymentResource.deleteDeployment | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 30 | flowable-engine | authz | DeploymentResource.deleteDeployment | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 31 | flowable-engine | authz | DeploymentResource.deleteDeployment | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 32 | flowable-engine | authz | DeploymentResourceCollectionResource.getDeploymentResources | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 33 | flowable-engine | authz | DeploymentResourceResource.getDeploymentResource | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 34 | flowable-engine | authz | DmnDeploymentResource.deleteDmnDeployment | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 35 | flowable-engine | authz | ExecutionVariableResource.deleteVariable | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 36 | flowable-engine | authz | ExternalWorkerUnacquireJobResource.unaquireJob | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 37 | flowable-engine | authz | FormDataResource.getFormData | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 38 | flowable-engine | authz | GroupMembershipResource.deleteMembership | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 39 | flowable-engine | authz | GroupMembershipResource.deleteMembership | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 40 | flowable-engine | authz | HistoricCaseInstanceResource.migrateHistoricCaseInstance | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 41 | flowable-engine | authz | HistoricProcessInstanceCommentResource.deleteComment | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 42 | flowable-engine | authz | HistoricProcessInstanceCommentResource.getComment | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 43 | flowable-engine | authz | HistoricProcessInstanceResource.deleteProcessInstance | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 44 | flowable-engine | authz | HistoricTaskInstanceIdentityLinkCollectionResource.getTaskIdentityLinks | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 45 | flowable-engine | authz | HistoricTaskInstanceResource.deleteTaskInstance | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 46 | flowable-engine | authz | HistoricTaskInstanceResource.deleteTaskInstance | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 47 | flowable-engine | authz | JobResource.deleteDeadLetterJob | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 48 | flowable-engine | authz | JobResource.deleteHistoryJob | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 49 | flowable-engine | authz | JobResource.deleteHistoryJob | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 50 | flowable-engine | authz | JobResource.deleteJob | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 51 | flowable-engine | authz | JobResource.deleteSuspendedJob | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 52 | flowable-engine | authz | JobResource.deleteTimerJob | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 53 | flowable-engine | authz | PlanItemInstanceResource.performPlanItemInstanceAction | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 54 | flowable-engine | authz | PlanItemInstanceVariableResource.deleteVariable | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 55 | flowable-engine | authz | PrivilegeCollectionResource.addGroupPrivilege | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 56 | flowable-engine | authz | PrivilegeCollectionResource.addUserPrivilege | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 57 | flowable-engine | authz | PrivilegeCollectionResource.deleteGroupPrivilege | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 58 | flowable-engine | authz | PrivilegeCollectionResource.deleteUserPrivilege | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 59 | flowable-engine | authz | PrivilegeCollectionResource.getGroups | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 60 | flowable-engine | authz | PrivilegeCollectionResource.getUsers | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 61 | flowable-engine | authz | ProcessDefinitionResource.batchMigrateInstancesOfProcessDefinition | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 62 | flowable-engine | authz | ProcessDefinitionResource.migrateInstancesOfProcessDefinition | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 63 | flowable-engine | authz | ProcessInstanceIdentityLinkResource.deleteIdentityLink | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 64 | flowable-engine | authz | ProcessInstanceResource.deleteProcessInstance | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 65 | flowable-engine | authz | ProcessInstanceResource.injectActivityInProcessInstance | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 66 | flowable-engine | authz | ProcessInstanceResource.migrateProcessInstance | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 67 | flowable-engine | authz | ProcessInstanceResource.updateProcessInstance | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 68 | flowable-engine | authz | ProcessInstanceResource.validateProcessInstanceMigration | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 69 | flowable-engine | authz | ProcessInstanceVariableResource.deleteVariable | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 70 | flowable-engine | authz | TableColumnsResource.getTableMetaData | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 71 | flowable-engine | authz | TableDataResource.getTableData | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 72 | flowable-engine | authz | TaskAttachmentContentResource.getAttachmentContent | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 73 | flowable-engine | authz | TaskAttachmentResource.deleteAttachment | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 74 | flowable-engine | authz | TaskAttachmentResource.getAttachment | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 75 | flowable-engine | authz | TaskCommentResource.deleteComment | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 76 | flowable-engine | authz | TaskCommentResource.getComment | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 77 | flowable-engine | authz | TaskEventResource.deleteEvent | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 78 | flowable-engine | authz | TaskEventResource.getEvent | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 79 | flowable-engine | authz | TaskIdentityLinkResource.deleteIdentityLink | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 80 | flowable-engine | authz | TaskIdentityLinkResource.deleteIdentityLink | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 81 | flowable-engine | authz | TaskResource.deleteTask | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 82 | flowable-engine | authz | TaskResource.deleteTask | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 83 | flowable-engine | authz | TaskVariableResource.deleteVariable | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 84 | flowable-engine | authz | TaskVariableResource.deleteVariable | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 85 | flowable-engine | authz | UserInfoResource.getUserInfo | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 86 | flowable-engine | authz | UserInfoResource.setUserInfo | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 87 | minitv | authz | change_status | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 同仓主服务仅绑定回环（docker-compose.yml 端口映射 127.0.0.1），子路由继承单机边界，无远程攻击面 | — |
+| 88 | minitv | authz | drama_detail | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 同仓主服务仅绑定回环（docker-compose.yml 端口映射 127.0.0.1），子路由继承单机边界，无远程攻击面 | — |
+| 89 | minitv | authz | drama_play | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 90 | minitv | authz | legal | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 同仓主服务仅绑定回环（docker-compose.yml 端口映射 127.0.0.1），子路由继承单机边界，无远程攻击面 | — |
+| 91 | minitv | authz | one_decision | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 同仓主服务仅绑定回环（docker-compose.yml 端口映射 127.0.0.1），子路由继承单机边界，无远程攻击面 | — |
+| 92 | minitv | authz | preview_drama | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 同仓主服务仅绑定回环（docker-compose.yml 端口映射 127.0.0.1），子路由继承单机边界，无远程攻击面 | — |
+| 93 | minitv | authz | publish_reviewed | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 同仓主服务仅绑定回环（docker-compose.yml 端口映射 127.0.0.1），子路由继承单机边界，无远程攻击面 | — |
+| 94 | minitv | hardcoded_secret | [secret-file] moderation.py | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 同仓主服务仅绑定回环（docker-compose.yml 端口映射 127.0.0.1），子路由继承单机边界，无远程攻击面 | — |
+| 95 | pig | authz | GenCreateTableController.getById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 96 | pig | authz | GenCreateTableController.getPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 97 | pig | authz | GenCreateTableController.removeById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 98 | pig | authz | GenCreateTableController.removeById#2 | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 99 | pig | authz | GenCreateTableController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 100 | pig | authz | GenCreateTableController.updateById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 101 | pig | authz | GenDsConfController.getById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 102 | pig | authz | GenDsConfController.getSysDatasourceConfPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 103 | pig | authz | GenDsConfController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 104 | pig | authz | GenDsConfController.updateById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 105 | pig | authz | GenFieldTypeController.getById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 106 | pig | authz | GenFieldTypeController.getFieldTypePage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 107 | pig | authz | GenFieldTypeController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 108 | pig | authz | GenFieldTypeController.updateById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 109 | pig | authz | GenGroupController.getById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 110 | pig | authz | GenGroupController.getgenGroupPage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 111 | pig | authz | GenGroupController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 112 | pig | authz | GenGroupController.updateById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 113 | pig | authz | GenTableController.getColumn | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 114 | pig | authz | GenTableController.getDdl | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 115 | pig | authz | GenTableController.getTable | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 116 | pig | authz | GenTableController.getTable#2 | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 117 | pig | authz | GenTableController.getTablePage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 118 | pig | authz | GenTableController.listTable | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 119 | pig | authz | GenTableController.syncTable | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 120 | pig | authz | GenTableController.updateById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 121 | pig | authz | GenTableController.updateTableField | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 122 | pig | authz | GenTemplateController.getById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 123 | pig | authz | GenTemplateController.getGenTemplatePage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 124 | pig | authz | GenTemplateController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 125 | pig | authz | GenTemplateController.updateById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 126 | pig | authz | GenTemplateGroupController.getById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 127 | pig | authz | GenTemplateGroupController.getgenTemplateGroupPage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 128 | pig | authz | GenTemplateGroupController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 129 | pig | authz | GenTemplateGroupController.updateById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 130 | pig | authz | GeneratorController.checkPath | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 131 | pig | authz | GeneratorController.preview | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 132 | pig | authz | PigTokenEndpoint.checkToken | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 133 | pig | authz | PigTokenEndpoint.removeToken | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 134 | pig | authz | SysApiKeyController.create | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 135 | pig | authz | SysApiKeyController.delete | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 136 | pig | authz | SysApiKeyController.page | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 137 | pig | authz | SysApiKeyController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 138 | pig | authz | SysAreaController.existsByAdcode | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 139 | pig | authz | SysAreaController.getDetails | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 140 | pig | authz | SysAreaController.getManageChildren | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 141 | pig | authz | SysAreaController.getSysAreaPage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 142 | pig | authz | SysAreaController.getSysAreaTree | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 143 | pig | authz | SysAreaController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 144 | pig | authz | SysAreaController.searchManage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 145 | pig | authz | SysAreaController.sort | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 146 | pig | authz | SysAreaController.updateById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 147 | pig | authz | SysClientController.add | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 148 | pig | authz | SysClientController.getOauthClientDetailsPage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 149 | pig | authz | SysClientController.update | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 150 | pig | authz | SysDeptController.getById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 151 | pig | authz | SysDeptController.getDescendantList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 152 | pig | authz | SysDeptController.getOrgTreeUser | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 153 | pig | authz | SysDeptController.getTree | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 154 | pig | authz | SysDeptController.importDept | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 155 | pig | authz | SysDeptController.listOrgTree | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 156 | pig | authz | SysDeptController.removeById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 157 | pig | authz | SysDeptController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 158 | pig | authz | SysDeptController.update | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 159 | pig | authz | SysDictController.removeDictItemById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 160 | pig | authz | SysDictController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 161 | pig | authz | SysDictController.save#2 | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 162 | pig | authz | SysDictController.sortDictItem | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 163 | pig | authz | SysDictController.updateById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 164 | pig | authz | SysDictController.updateById#2 | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 165 | pig | authz | SysFileController.addGroup | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 166 | pig | authz | SysFileController.file | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 167 | pig | authz | SysFileController.getSysFilePage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 168 | pig | authz | SysFileController.innerUpload | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 169 | pig | authz | SysFileController.listGroup | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 170 | pig | authz | SysFileController.moveFileGroup | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 171 | pig | authz | SysFileController.rename | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 172 | pig | authz | SysFileController.updateGroup | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 173 | pig | authz | SysFileController.updateGroup#2 | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 174 | pig | authz | SysFileController.upload | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 175 | pig | authz | SysI18nController.getById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 176 | pig | authz | SysI18nController.getsysI18nPage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 177 | pig | authz | SysI18nController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 178 | pig | authz | SysI18nController.updateById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 179 | pig | authz | SysJobController.getById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 180 | pig | authz | SysJobController.getJobLog | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 181 | pig | authz | SysJobController.removeById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 182 | pig | authz | SysJobController.runJob | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 183 | pig | authz | SysJobController.shutdownJob | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 184 | pig | authz | SysJobController.startJob | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 185 | pig | authz | SysJobController.validate | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 186 | pig | authz | SysJobLogController.getSysJobLogPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 187 | pig | authz | SysLogController.getLogPage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 188 | pig | authz | SysLogController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 189 | pig | authz | SysLogController.saveBatchLogs | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 190 | pig | authz | SysMenuController.getRoleTree | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 191 | pig | authz | SysMenuController.getTree | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 192 | pig | authz | SysMenuController.getUserMenu | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 193 | pig | authz | SysMenuController.removeById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 194 | pig | authz | SysMenuController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 195 | pig | authz | SysMenuController.sort | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 196 | pig | authz | SysMenuController.update | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 197 | pig | authz | SysMessageController.getById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 198 | pig | authz | SysMessageController.getSysMessagePage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 199 | pig | authz | SysMessageController.getUserMessageList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 200 | pig | authz | SysMessageController.getUserMessageList#2 | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 201 | pig | authz | SysMessageController.listHookBizCode | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 202 | pig | authz | SysMessageController.read | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 203 | pig | authz | SysMessageController.removeUserMessage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 204 | pig | authz | SysMessageController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 205 | pig | authz | SysMessageController.send | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 206 | pig | authz | SysMessageController.sendEmail | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 207 | pig | authz | SysMessageController.sendNotice | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 208 | pig | authz | SysMessageController.sendSms | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 209 | pig | authz | SysMessageController.sendSmsCode | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 210 | pig | authz | SysMessageController.sendWebhook | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 211 | pig | authz | SysMessageController.updateById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 212 | pig | authz | SysPublicParamController.getById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 213 | pig | authz | SysPublicParamController.getSysPublicParamPage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 214 | pig | authz | SysPublicParamController.publicKey | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 215 | pig | authz | SysPublicParamController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 216 | pig | authz | SysPublicParamController.updateById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 217 | pig | authz | SysRegisterController.forgetUserPassword | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 218 | pig | authz | SysRegisterController.registerUser | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 219 | pig | authz | SysRegisterController.resetUserPassword | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 220 | pig | authz | SysRoleController.export | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 221 | pig | authz | SysRoleController.getById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 222 | pig | authz | SysRoleController.getRoleList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 223 | pig | authz | SysRoleController.getRolePage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 224 | pig | authz | SysRoleController.getRoleWidget | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 225 | pig | authz | SysRoleController.importRole | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 226 | pig | authz | SysRoleController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 227 | pig | authz | SysRoleController.saveRoleMenus | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 228 | pig | authz | SysRoleController.saveRoleWidget | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 229 | pig | authz | SysRoleController.update | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 230 | pig | authz | SysScheduleController.getById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 231 | pig | authz | SysScheduleController.getSchedulePage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 232 | pig | authz | SysScheduleController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 233 | pig | authz | SysScheduleController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 234 | pig | authz | SysScheduleController.updateById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 235 | pig | authz | SysSensitiveWordController.getSysSensitiveWordPage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 236 | pig | authz | SysSensitiveWordController.match | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 237 | pig | authz | SysSensitiveWordController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 238 | pig | authz | SysSensitiveWordController.updateById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 239 | pig | authz | SysSocialDetailsController.bindSocial | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 240 | pig | authz | SysSocialDetailsController.getSocialDetailsPage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 241 | pig | authz | SysSocialDetailsController.getUserInfo | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 242 | pig | authz | SysSocialDetailsController.info | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 243 | pig | authz | SysSocialDetailsController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 244 | pig | authz | SysSocialDetailsController.updateById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 245 | pig | authz | SysSystemConfigController.getDetails | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 246 | pig | authz | SysSystemConfigController.getSysSystemConfigPage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 247 | pig | authz | SysSystemConfigController.save | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 248 | pig | authz | SysSystemConfigController.updateById | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 249 | pig | authz | SysSystemInfoController.clarity | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 250 | pig | authz | SysSystemInfoController.updateSiteConfig | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 251 | pig | authz | SysTokenController.getTokenPage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 252 | pig | authz | SysUserController.export | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 253 | pig | authz | SysUserController.getUserPage | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 254 | pig | authz | SysUserController.importUser | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 255 | pig | authz | SysUserController.listAncestorUsers | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 256 | pig | authz | SysUserController.lockUser | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 257 | pig | authz | SysUserController.unbinding | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 258 | pig | authz | SysUserController.updateUser | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 当前类或继承基类挂有类级 @Permission/鉴权注解，框架已在类层面鉴权 | — |
+| 259 | pig | authz | SysUserController.updateUserInfo | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 260 | pig | authz | SysUserController.user | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 261 | pig | authz | SysUserController.user#2 | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
 
 ## 对账
 
 | 板块 | 行数 |
 |---|---|
-| A（ZERO_RECORD_FRESH） | 6 |
-| B（其余状态） | 383 |
-| 合计 | 389 |
+| A（ZERO_RECORD_FRESH） | 2 |
+| B（其余状态） | 261 |
+| 合计 | 263 |
