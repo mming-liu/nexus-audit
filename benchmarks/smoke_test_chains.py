@@ -14604,6 +14604,46 @@ public class PigTokenEndpoint {
 check("M453：ModelAndView 视图返回不判 XSS",
       _rd395.xss_verdict(_M349_VIEW), None)
 
+print("\n[350] M455/M456：workflow 仅手动触发 + noise_record 接 STATUS_CVE")
+_WF_ROOT = Path(__file__).resolve().parent.parent / ".github" / "workflows"
+_WF_BAD = []
+for _wf in ("nexus-audit-ci.yml", "nexus-audit.yml", "nexus-audit-pr.yml"):
+    _t = (_WF_ROOT / _wf).read_text(encoding="utf-8")
+    if ("workflow_dispatch:" not in _t
+            or __import__("re").search(r"^\s*(?:push|pull_request):", _t,
+                                       __import__("re").M)):
+        _WF_BAD.append(_wf)
+check("M455：三个 workflow 仅保留 workflow_dispatch（无 push/PR 自动触发）",
+      _WF_BAD, [])
+
+_M350_ROOT = Path(_ws_mkdtemp("m350_")) / "repo"
+(_M350_ROOT / "src").mkdir(parents=True, exist_ok=True)
+(_M350_ROOT / "src" / "Foo.java").write_text(
+    "public class Foo { public void bar() {} }\n", encoding="utf-8")
+_M350_REC = _dh316.noise_record(
+    _M350_ROOT, "acme/m350",
+    {"category": "authz", "unit": "Foo.bar", "file": "src/Foo.java",
+     "line": 1},
+    {"head_sha": "a" * 40, "head_commit_date": "2026-11-18",
+     "branch": "main"},
+    180, {"code": "UNVERIFIED_WILD_AUTHZ", "reason": "test"},
+    repo_dedup={
+        "status": "DUPLICATE_CVE",
+        "matched_ids": ["CVE-2026-111343"],
+        "evidence_urls": ["https://cve.circl.lu/cve/CVE-2026-111343"],
+        "sources": {"circl": {"ok": True, "total": 1}},
+        "checked_at": "2026-11-19 08:00:00",
+        "reason": "REPO_LEVEL_CVE: CVE-2026-111343",
+        "coverage": {"checked": ["circl"], "failed": [], "skipped": []},
+    })
+check("M456：STATUS_CVE 同步进主状态与命中证据",
+      (_M350_REC.get("status"), _M350_REC.get("matched_ids")),
+      ("DUPLICATE_CVE", ["CVE-2026-111343"]))
+check("M456：sources / checked_at 留证且 noise_code 保留",
+      (bool(_M350_REC.get("sources")), bool(_M350_REC.get("checked_at")),
+       _M350_REC.get("noise_code")),
+      (True, True, "UNVERIFIED_WILD_AUTHZ"))
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

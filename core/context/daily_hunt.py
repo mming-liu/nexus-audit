@@ -249,11 +249,20 @@ def noise_record(repo: Path, slug: str, rc: dict, head: dict,
                        "skipped": ["local_noise_shortcircuit"]}
     if repo_dedup:
         rec["coverage"] = dict(repo_dedup.get("coverage") or rec["coverage"])
-        rec["repo_dedup"] = {"status": repo_dedup.get("status", ""),
-                             "reason": repo_dedup.get("reason", "")}
-        if repo_dedup.get("status") == cve_dedup.STATUS_ISSUE:
-            rec["status"] = cve_dedup.STATUS_ISSUE
-            rec["reason"] = str(repo_dedup.get("reason") or rec["reason"])
+        if repo_dedup.get("sources"):
+            rec["sources"] = dict(repo_dedup["sources"])
+        if repo_dedup.get("checked_at"):
+            rec["checked_at"] = str(repo_dedup["checked_at"])
+        rec["repo_dedup"] = {
+            "status": repo_dedup.get("status", ""),
+            "reason": repo_dedup.get("reason", ""),
+        }
+        if repo_dedup.get("status") in (cve_dedup.STATUS_CVE,
+                                        cve_dedup.STATUS_ISSUE):
+            rec["status"] = repo_dedup["status"]
+            rec["matched_ids"] = list(repo_dedup.get("matched_ids") or [])
+            rec["evidence_urls"] = list(repo_dedup.get("evidence_urls") or [])
+            rec["reason"] = (f"{rec['reason']}（{repo_dedup.get('reason') or rec['status']}）")
     if rec["head_sha"]:
         rec["permalink"] = upstream_sync.head_permalink(
             slug, rec["head_sha"], rec["file"], rec["line"])

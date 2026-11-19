@@ -1161,6 +1161,9 @@ def dedup_repo_level(slug: str, category: str, unit: str, *,
         return res
 
     def _finish(res: dict) -> dict:
+        # M456：所有返回分支都带 checked_at / sources，便于报告留证。
+        res.setdefault("checked_at", time.strftime("%Y-%m-%d %H:%M:%S"))
+        res.setdefault("sources", {})
         cache[key] = {"ts": time.time(), "res": res}
         try:
             _cache_put(REPO_LEVEL_CACHE, cache)
