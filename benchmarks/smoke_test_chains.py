@@ -13830,8 +13830,8 @@ check("M407：无上传入参 + 固定域名下载解压 → VENDOR_ARCHIVE_EXTR
                            "file": "svc.py"}, _M338_ZIP_DIR).get("code"),
       wild_noise.VENDOR_ARCHIVE_EXTRACT)
 
-check("M408/M412：sync_repo 默认 clone_timeout == 180",
-      _us338.sync_repo.__defaults__[-1], 180)
+check("M408/M412：sync_repo 默认 clone_timeout == 120",
+      _us338.sync_repo.__defaults__[-1], 120)
 _M338_SYNC_ROOT = Path(_ws_mkdtemp("m338_sync_"))
 _M338_CLONES: list[str] = []
 
@@ -13916,8 +13916,8 @@ _M339_AND_REC = wild_noise.classify(
 check("M411：0.0.0.0 无鉴权的删除入口不被降噪",
       _M339_AND_REC.get("blocked"), False)
 
-check("M412：sync_repo 默认 clone_timeout == 180",
-      _us338.sync_repo.__defaults__[-1], 180)
+check("M412：sync_repo 默认 clone_timeout == 120",
+      _us338.sync_repo.__defaults__[-1], 120)
 
 print("\n[340] M415：缓存四源仲裁往返 / 旧缓存降级 / 鉴权基石类目豁免")
 from core.context import cve_dedup as _cd340                    # noqa: E402
@@ -14643,6 +14643,102 @@ check("M456：sources / checked_at 留证且 noise_code 保留",
       (bool(_M350_REC.get("sources")), bool(_M350_REC.get("checked_at")),
        _M350_REC.get("noise_code")),
       (True, True, "UNVERIFIED_WILD_AUTHZ"))
+
+print("\n[351] M459/M460：representative 单元 / 通用文件名 / 更新包 / size / 缓存 flush")
+check("M459：通用文件名 admin 不单独连坐 CVE",
+      _cd340._unit_in_text("", "mcpgateway/admin.py",
+                           "Vulnerability in admin panel"), False)
+
+_M351_ROOT = Path(_ws_mkdtemp("m351_repo_")) / "repo"
+(_M351_ROOT / "svc").mkdir(parents=True, exist_ok=True)
+(_M351_ROOT / "svc" / "admin.py").write_text("def admin_get_logs():\n    pass\n",
+                                             encoding="utf-8")
+_M351_RC = {"representative": "admin_get_logs", "file": "svc/admin.py",
+            "line": 1, "category": "authz"}
+_M351_SEEN = {}
+
+
+def _m351_scan(_repo, timeout=0):
+    return {"roots": [dict(_M351_RC)]}
+
+
+def _m351_dedup(slug, category, unit, **kw):
+    _M351_SEEN["unit"] = unit
+    return {"status": "UNKNOWN", "reason": "test"}
+
+
+with _mock395.patch.object(_dh316.upstream_sync, "local_head",
+                           side_effect=lambda *_a, **_k: {
+                               "head_sha": "a" * 40,
+                               "head_commit_date": "2026-11-19",
+                               "branch": "main"}), \
+        _mock395.patch.object(_dh316.live_hunt, "scan_repo",
+                              side_effect=_m351_scan), \
+        _mock395.patch.object(_dh316.live_hunt, "run_one",
+                              side_effect=lambda *_a, **_k: []), \
+        _mock395.patch.object(_dh316.wild_noise, "classify",
+                              side_effect=lambda *_a, **_k: {
+                                  "blocked": True, "code": "X",
+                                  "reason": "test"}), \
+        _mock395.patch.object(_dh316.cve_dedup, "dedup_repo_level",
+                              side_effect=_m351_dedup), \
+        _mock395.patch.object(_dh316.cve_dedup, "flush_repo_level_cache",
+                              side_effect=lambda: None):
+    _dh316.process_repo("acme/m351", _M351_ROOT, dedup_online=True)
+check("M459：process_repo 用 representative 作为 dedup unit",
+      _M351_SEEN.get("unit"), "admin_get_logs")
+
+_M351_WB = Path(".cache/upstream/ithtelab__workbuddy-manager")
+_M351_UP = wild_noise.classify(
+    {"category": "unrestricted_upload", "unit": "upload_update_package",
+     "file": "server/routers/system.py",
+     "line": 70},
+    _M351_WB if _M351_WB.is_dir() else None)
+check("M459：upload_update_package 不按 NON_EXECUTABLE_UPLOAD 压 B",
+      _M351_UP.get("code") != wild_noise.NON_EXECUTABLE_UPLOAD, True)
+
+_M351_PAYLOAD = {"items": [
+    {"full_name": "acme/big", "size": 250000, "stargazers_count": 500,
+     "language": "Python", "pushed_at": "2026-11-19", "description": "big",
+     "has_issues": True, "topics": []},
+    {"full_name": "acme/normal", "size": 12000, "stargazers_count": 500,
+     "language": "Python", "pushed_at": "2026-11-19", "description": "ok",
+     "has_issues": True, "topics": []}]}
+_M351_ITEMS, _M351_DROP, _M351_TOOL = target_scout._parse_search(
+    _M351_PAYLOAD, "python")
+check("M460：>150 MB 巨型库被剔除、正常库保留",
+      ([x["slug"] for x in _M351_ITEMS], _M351_TOOL),
+      (["acme/normal"], 1))
+
+_M351_PUTS = []
+_cd340._REPO_LEVEL_CACHE_MEMO = None
+_cd340._REPO_LEVEL_MEMO_PATH = None
+_cd340._REPO_LEVEL_DIRTY = False
+with _mock395.patch.object(_cd340, "REPO_LEVEL_CACHE",
+                           Path(_ws_mkdtemp("m351_dedup_")) / "r.json"), \
+        _mock395.patch.object(_cd340, "_cache_put",
+                              side_effect=lambda *_a, **_k: _M351_PUTS.append(1)), \
+        _mock395.patch.object(_cd340, "_local_match",
+                              side_effect=lambda *_a, **_k: []), \
+        _mock395.patch.object(_cd340, "query_circl",
+                              side_effect=lambda *_a, **_k: {
+                                  "ok": True, "total": 0, "ids": [],
+                                  "items": [], "url": "", "error": ""}), \
+        _mock395.patch.object(_cd340, "query_github_advisories",
+                              side_effect=lambda *_a, **_k: {
+                                  "ok": True, "total": 0, "ids": [],
+                                  "items": [], "url": "", "error": ""}), \
+        _mock395.patch.object(_cd340, "query_github_global_advisories",
+                              side_effect=lambda *_a, **_k: {
+                                  "ok": True, "total": 0, "ids": [],
+                                  "items": [], "url": "", "error": ""}):
+    for _i in range(20):
+        _cd340.dedup_repo_level("acme/r351", "authz", f"unit_{_i}",
+                                allow_online=True)
+    _M351_BEFORE = len(_M351_PUTS)
+    _cd340.flush_repo_level_cache()
+check("M460：20 次 dedup 只在 flush 时写盘 1 次",
+      (_M351_BEFORE, len(_M351_PUTS)), (0, 1))
 
 check("M148：失败清单为空", len(FAILS), 0)
 

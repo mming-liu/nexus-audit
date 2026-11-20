@@ -686,10 +686,13 @@ def _unit_in_text(unit: str, file: str, text: str) -> bool:
     if key and len(key) > 3 and re.search(
             rf"(?<![A-Za-z0-9_]){re.escape(key)}(?![A-Za-z0-9_])", t):
         return True
-    if _class_wide_match(unit, file, text):
-        return True
-    return bool(not key and stem and len(stem) > 3 and re.search(
-        rf"(?<![A-Za-z0-9_]){re.escape(stem)}(?![A-Za-z0-9_])", t))
+    if not (not key and stem in _GENERIC_FILE_STEMS):
+        if _class_wide_match(unit, file, text):
+            return True
+    return bool(not key and stem and len(stem) > 3
+                and stem not in _GENERIC_FILE_STEMS
+                and re.search(rf"(?<![A-Za-z0-9_]){re.escape(stem)}"
+                              rf"(?![A-Za-z0-9_])", t))
 
 
 # M365：Issue 证据门禁。旧实现只要 `repo:<slug> <method>` 或全网搜索
@@ -789,7 +792,7 @@ def _is_distinctive(class_name: str, method_name: str) -> bool:
 # 靠这一条挡住，不能因为"文件名独特"就去搜 "autocve" "fastapi"）。
 _GENERIC_FILE_STEMS = frozenset({
     "fastapi", "flask", "django", "views", "routes", "api", "app",
-    "main", "index",
+    "main", "index", "admin",
     # M365：2026-11-13 实盘里 `"MimirQ" "datasets"` / `"apowerb" "tools"`
     # 这类"通用文件名"查询只会捞到 Dependabot 与 awesome-list，补进停用表。
     "tools", "utils", "helpers", "config", "settings", "models", "model",
@@ -1141,6 +1144,30 @@ def dedup(slug: str, category: str, unit: str, *,
 REPO_LEVEL_CACHE = CACHE / "_repo_level.json"
 # 同仓多根因只查一次底层源（CIRCL / 仓公告）；M452 断言底层调用 1 次。
 _REPO_LEVEL_SRC: dict[str, dict] = {}
+# M460：进程级内存缓存 + 脏标记；循环内只改内存，flush 时写盘一次。
+_REPO_LEVEL_CACHE_MEMO: dict | None = None
+_REPO_LEVEL_MEMO_PATH: str | None = None
+_REPO_LEVEL_DIRTY = False
+
+
+def _repo_level_memo() -> dict:
+    global _REPO_LEVEL_CACHE_MEMO, _REPO_LEVEL_MEMO_PATH
+    path = str(REPO_LEVEL_CACHE)
+    if _REPO_LEVEL_CACHE_MEMO is None or _REPO_LEVEL_MEMO_PATH != path:
+        _REPO_LEVEL_CACHE_MEMO = _cache_get(REPO_LEVEL_CACHE) or {}
+        _REPO_LEVEL_MEMO_PATH = path
+    return _REPO_LEVEL_CACHE_MEMO
+
+
+def flush_repo_level_cache() -> None:
+    """把内存中的仓级查重缓存落盘一次（M460）。"""
+    global _REPO_LEVEL_DIRTY
+    if _REPO_LEVEL_DIRTY and _REPO_LEVEL_CACHE_MEMO is not None:
+        try:
+            _cache_put(REPO_LEVEL_CACHE, _REPO_LEVEL_CACHE_MEMO)
+        except OSError:
+            pass
+        _REPO_LEVEL_DIRTY = False
 
 
 def dedup_repo_level(slug: str, category: str, unit: str, *,
@@ -1152,8 +1179,8 @@ def dedup_repo_level(slug: str, category: str, unit: str, *,
     /repos/{slug}/security-advisories、/advisories 全局库），0 次
     GitHub Search 配额、0 次 NVD。逐条用 _unit_in_text 精确匹配方法名。
     """
-    key = f"{slug}|{category}|{unit}|{file}"
-    cache = _cache_get(REPO_LEVEL_CACHE) or {}
+    key = f"v2|{slug}|{category}|{unit}|{file}"
+    cache = _repo_level_memo()
     hit = cache.get(key)
     if isinstance(hit, dict) and time.time() - float(hit.get("ts") or 0) < 86400:
         res = dict(hit.get("res") or {})
@@ -1162,13 +1189,11 @@ def dedup_repo_level(slug: str, category: str, unit: str, *,
 
     def _finish(res: dict) -> dict:
         # M456：所有返回分支都带 checked_at / sources，便于报告留证。
+        global _REPO_LEVEL_DIRTY
         res.setdefault("checked_at", time.strftime("%Y-%m-%d %H:%M:%S"))
         res.setdefault("sources", {})
         cache[key] = {"ts": time.time(), "res": res}
-        try:
-            _cache_put(REPO_LEVEL_CACHE, cache)
-        except OSError:
-            pass
+        _REPO_LEVEL_DIRTY = True          # M460：只标脏，flush 时写盘
         return res
 
     local = _local_match(slug, list(aliases or []), category, unit)

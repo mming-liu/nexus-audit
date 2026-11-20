@@ -346,13 +346,16 @@ def process_repo(slug: str, repo: Path, entry: dict | None = None, *,
     for rc, noise in blocked_roots:
         _repo_dedup = None
         if dedup_online:
-            _unit = str(rc.get("unit") or rc.get("unit_name") or "")
+            _unit = str(rc.get("unit_name") or rc.get("representative")
+                        or rc.get("unit") or "")
             _file = str(rc.get("file") or rc.get("file_path") or "")
             _repo_dedup = cve_dedup.dedup_repo_level(
                 slug, str(rc.get("category") or ""), _unit,
                 file=_file, allow_online=True)
         recs.append(noise_record(repo, slug, rc, head, max_head_age_days,
                                  noise, repo_dedup=_repo_dedup))
+    if dedup_online:
+        cve_dedup.flush_repo_level_cache()
 
     fresh_keys: list[str] = []
     new: list[dict] = []

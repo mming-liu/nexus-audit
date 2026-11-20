@@ -103,7 +103,7 @@ def _current_branch(dest: Path, slug: str) -> str:
 
 
 def sync_repo(slug: str, dest_root: Path = CACHE_ROOT,
-              depth: int = 50, clone_timeout: int = 180) -> dict:
+              depth: int = 50, clone_timeout: int = 120) -> dict:
     """轻量浅克隆/fetch 到缓存目录；返回 head_sha / branch / path（M392）。
 
     首次克隆不再先发 `ls-remote` 探测默认分支（瞬断会盲退 main，非 main 仓

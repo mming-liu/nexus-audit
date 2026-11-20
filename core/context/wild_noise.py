@@ -58,6 +58,10 @@ UPLOAD_SERVING_ONLY = "UPLOAD_SERVING_ONLY"
 # M375：落盘目录不是 Web 根/静态目录（无 StaticFiles / addResourceHandlers），
 # 上传物只能被内部读取 —— 同上，压 B。
 NON_EXECUTABLE_UPLOAD = "NON_EXECUTABLE_UPLOAD"
+# M459：系统更新/插件/固件包上传是"可执行包"面，不能按不可执行普通文件压 B。
+_EXEC_PACKAGE_UPLOAD_RE = re.compile(
+    r"(?:update_package|upgrade|firmware|install_plugin|install_skill|"
+    r"hotfix|patch_package)", re.I)
 # M383：redir 三类野仓降噪 —— 服务端构造跳转 / Referer 自引用 / 短链设计。
 SERVER_BUILT_REDIRECT = "SERVER_BUILT_REDIRECT"
 REFERER_OPEN_REDIRECT = "REFERER_OPEN_REDIRECT"
@@ -903,7 +907,9 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
     # 落点必须在 wild_noise（有 repo_root 才能看全局挂载）；放进
     # rule_detectors 的单函数切片会误伤 PyGoat/Hello-Java-Sec 等基准靶场。
     if (record.get("category") == "unrestricted_upload"
-            and repo_root is not None and file.endswith((".py", ".java"))):
+            and repo_root is not None and file.endswith((".py", ".java"))
+            and not _EXEC_PACKAGE_UPLOAD_RE.search(
+                f"{unit} {record.get('file') or ''}")):
         _up_src = _read(repo_root, str(record.get("file") or ""))
         if _up_src:
             # M379：入口把校验/落盘委托给 service 时，把 Hop1/Hop2 拼回证据面。

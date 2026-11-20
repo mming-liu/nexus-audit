@@ -429,6 +429,10 @@ def _parse_search(payload: dict,
             continue
         desc = (it.get("description") or "")[:200]
         topics = [t for t in (it.get("topics") or []) if isinstance(t, str)]
+        # M460：>150 MB 巨型仓/monorepo 克隆必超时，侦察阶段直接剔除。
+        if int(it.get("size") or 0) > 150000:
+            dropped_tool += 1
+            continue
         if is_tutorial(slug, desc, topics):
             dropped += 1
             continue
