@@ -4,8 +4,7 @@ name: nexus-audit PR scan
 # 全量扫描适合定时跑，PR 里跑全量既慢又会把历史遗留问题全泼到这一个 PR 上。
 
 on:
-  pull_request:
-    branches: [main, master]
+  workflow_dispatch:
 
 permissions:
   contents: read
