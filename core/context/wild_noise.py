@@ -393,11 +393,30 @@ _PUBLIC_BIND_RE = re.compile(
 _PUBLIC_CLI_HOST_RE = re.compile(
     r"(?:--host|--bind|-b)[ =][\"']?(?:0\.0\.0\.0|::)\b", re.I)
 # compose 端口映射：`127.0.0.1:8080:8080` 是回环，裸 `8080:8080` 是公网。
+# M463：主机 IP 前缀必须**可选**。v1.5.28 及之前的正则写死了 `host:port:port`
+# 三段式，标准公网映射 `- "8000:8000"` 只有两段，根本匹配不到 —— 于是
+# `elif not host_ip: public_hit = ...` 成了 100% 死代码。akb 的主
+# `docker-compose.yaml` 发布 `9000:9000` / `9001:9001`，却因为
+# `eval/longmemeval/docker-compose.yaml` 里的 `127.0.0.1:18000:8000` 被判成
+# 整仓 LOCAL_LOOPBACK_ONLY，18 条记录误压 B 板。
 _PORT_MAP_RE = re.compile(
-    r"^\s*-\s*[\"']?([0-9A-Za-z_.:\[\]-]*?):(\d+):(\d+)[\"']?\s*$", re.M)
+    r"^\s*-\s*[\"']?(?:([0-9A-Za-z_.:\[\]-]+):)?(\d+):(\d+)"
+    r"(?:/(?:tcp|udp))?[\"']?\s*(?:#.*)?$",
+    re.M)
 _SCAN_SKIP_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__",
                    "site-packages", "dist", "build", "tests", "test",
-                   "docs", "examples", "example"}
+                   "docs", "examples", "example",
+                   # M463：评测 / 基准 / CI / 脚本目录里的 compose 是"跑分环境"，
+                   # 不是生产部署面。akb 的 eval/longmemeval/docker-compose.yaml
+                   # 只写了 loopback 映射，曾把整个仓连带判成单机服务。
+                   "eval", "evals", "benchmark", "benchmarks",
+                   "scripts", "hack", "ci"}
+# M463：云原生部署清单（k8s / helm / charts）本身就是"要部署到集群"的
+# 显式证据。有清单的仓不可能因为本地 compose 写了 loopback 就变成单机
+# 工具 —— akb 的 deploy/k8s、deploy/helm 正是这种仓。
+_ORCHESTRATION_DIRS = ("deploy/k8s", "k8s", "deploy/helm", "helm",
+                       "deploy/charts", "charts", "deploy/manifests",
+                       "manifests")
 _REPO_LOOPBACK_MEMO: dict[str, tuple[bool, str]] = {}
 
 # ---------------- M375：上传落盘面（是否可服务/可执行） ----------------
@@ -540,6 +559,26 @@ def _repo_serves_uploads(repo_root: Path | None) -> bool:
     return found
 
 
+def _has_orchestration_manifests(root: Path) -> bool:
+    """仓内是否有 k8s / helm / charts 部署清单（M463）。
+
+    只要清单目录里至少有一个 `.yaml` / `.yml`，就说明这个仓的服务是按
+    "部署到集群"设计的 —— 本地 compose 的回环映射只是开发便利，不能据此
+    把整仓判成单机工具。
+    """
+    for rel in _ORCHESTRATION_DIRS:
+        d = root / rel
+        if not d.is_dir():
+            continue
+        try:
+            for p in d.rglob("*"):
+                if p.is_file() and p.suffix.lower() in (".yaml", ".yml"):
+                    return True
+        except OSError:
+            continue
+    return False
+
+
 def _repo_loopback_only(repo_root: Path | None) -> tuple[bool, str]:
     """整仓是否只监听本机回环（M359）。
 
@@ -555,6 +594,11 @@ def _repo_loopback_only(repo_root: Path | None) -> tuple[bool, str]:
         key = str(root)
     if key in _REPO_LOOPBACK_MEMO:
         return _REPO_LOOPBACK_MEMO[key]
+
+    # M463：云原生部署清单优先于本地回环证据（akb 的 deploy/k8s + deploy/helm）。
+    if _has_orchestration_manifests(root):
+        _REPO_LOOPBACK_MEMO[key] = (False, "")
+        return False, ""
 
     loop_hit = ""
     public_hit = ""
@@ -597,7 +641,10 @@ def _repo_loopback_only(repo_root: Path | None) -> tuple[bool, str]:
                     host_ip = m.group(1)
                     if host_ip in ("127.0.0.1", "::1", "localhost"):
                         loop_hit = loop_hit or f"{rel} 端口映射 {host_ip}"
-                    elif not host_ip:
+                    elif host_ip in (None, "", "0.0.0.0", "::"):
+                        # M463：裸 `8000:8000` / `0.0.0.0:8000:8000` /
+                        # `[::]:8000:8000` 都是公网映射。旧正则只认三段式，
+                        # 这一段永远到不了（死代码）。
                         public_hit = f"{rel} 端口映射 {m.group(2)}:{m.group(3)}"
                         break
                 if public_hit:
@@ -957,8 +1004,13 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
                            "无远程攻击面")}
     # M359：文件本身没写 loopback，但同仓主服务入口已经证明整仓只监听
     # 本机时，子路由继承 LOCAL_LOOPBACK_ONLY（消除同仓分类撕裂）。
+    # M463：hardcoded_secret 不继承。凭据一旦提交进仓库，任何能读仓的人
+    # （含把仓 clone 到本机跑的人）都拿到了它，"本机服务"不是它的信任边界；
+    # 而且 11-21 的 akb 实测里，压掉 `[secret-file] docker-compose.keycloak.yaml`
+    # 的证据文件是 `eval/longmemeval/docker-compose.yaml` —— 理由和对象根本
+    # 不是同一个部署面。
     _repo_loop, _repo_ev = _repo_loopback_only(repo_root)
-    if _repo_loop:
+    if _repo_loop and str(record.get("category") or "") != "hardcoded_secret":
         return {"blocked": True, "code": LOCAL_LOOPBACK_ONLY,
                 "reason": (f"同仓主服务仅绑定回环（{_repo_ev}），"
                            f"子路由继承单机边界，无远程攻击面")}

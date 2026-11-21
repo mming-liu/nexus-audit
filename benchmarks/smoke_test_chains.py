@@ -14740,6 +14740,69 @@ with _mock395.patch.object(_cd340, "REPO_LEVEL_CACHE",
 check("M460：20 次 dedup 只在 flush 时写盘 1 次",
       (_M351_BEFORE, len(_M351_PUTS)), (0, 1))
 
+print("\n[352] M463/M464：compose 公网端口映射 / eval 目录 / hardcoded_secret / 弱哈希非安全用途")
+_M352_BASE = Path(_ws_mkdtemp("m352_repo_"))
+_M352_PUB = _M352_BASE / "pub"
+(_M352_PUB / "eval" / "longmemeval").mkdir(parents=True)
+(_M352_PUB / "docker-compose.yaml").write_text(
+    'services:\n  api:\n    ports:\n      - "8000:8000"\n', encoding="utf-8")
+(_M352_PUB / "eval" / "longmemeval" / "docker-compose.yaml").write_text(
+    'services:\n  mcp:\n    ports:\n      - "127.0.0.1:8080:8080"\n',
+    encoding="utf-8")
+check("M463：_PORT_MAP_RE 命中裸 8000:8000（主机 IP 前缀可选）",
+      (bool(wild_noise._PORT_MAP_RE.search('- "8000:8000"')),
+       wild_noise._PORT_MAP_RE.search('- "8000:8000"').groups()),
+      (True, (None, "8000", "8000")))
+wild_noise._REPO_LOOPBACK_MEMO.clear()
+check("M463：主 compose 公网映射 + eval 目录回环 compose 不再判 LOCAL_LOOPBACK_ONLY",
+      wild_noise._repo_loopback_only(_M352_PUB), (False, ""))
+
+_M352_LOOP = _M352_BASE / "loop"
+_M352_LOOP.mkdir()
+(_M352_LOOP / "docker-compose.yaml").write_text(
+    'services:\n  mcp:\n    ports:\n      - "127.0.0.1:8080:8080"\n',
+    encoding="utf-8")
+wild_noise._REPO_LOOPBACK_MEMO.clear()
+check("M463：纯回环映射仍判 LOCAL_LOOPBACK_ONLY（防放宽）",
+      wild_noise._repo_loopback_only(_M352_LOOP)[0], True)
+
+_M352_K8S = _M352_BASE / "k8s_repo"
+(_M352_K8S / "k8s").mkdir(parents=True)
+(_M352_K8S / "k8s" / "deploy.yaml").write_text("kind: Deployment\n",
+                                               encoding="utf-8")
+(_M352_K8S / "docker-compose.yaml").write_text(
+    'services:\n  mcp:\n    ports:\n      - "127.0.0.1:8080:8080"\n',
+    encoding="utf-8")
+wild_noise._REPO_LOOPBACK_MEMO.clear()
+check("M463：存在 k8s 清单时不判 LOCAL_LOOPBACK_ONLY（部署到集群）",
+      wild_noise._repo_loopback_only(_M352_K8S), (False, ""))
+
+wild_noise._REPO_LOOPBACK_MEMO.clear()
+check("M463：hardcoded_secret 不被同服务 LOCAL_LOOPBACK_ONLY 压掉",
+      wild_noise.classify(
+          {"category": "hardcoded_secret",
+           "unit": "[secret-file] docker-compose.keycloak.yaml",
+           "file": "docker-compose.keycloak.yaml", "line": 1},
+          _M352_LOOP).get("code"), "")
+
+_M352_NOSEC = ('def get_kg_timeline(request):\n'
+               '    cache_key = f"kg:timeline:'
+               '{hashlib.sha1(payload.encode()).hexdigest()}"  # nosec B324\n'
+               '    return cache_key\n')
+check("M464：cache_key + # nosec B324 的 sha1 不判弱哈希",
+      verdict("hash", _M352_NOSEC), False)
+_M352_UFS = ('def embedding_key(text_content):\n'
+             '    cache_key = hashlib.md5(text_content.encode(), '
+             'usedforsecurity=False).hexdigest()\n'
+             '    return cache_key\n')
+check("M464：usedforsecurity=False 的 md5 不判弱哈希",
+      verdict("hash", _M352_UFS), False)
+check("M464：hashlib.md5(password) 仍判弱哈希（防放宽）",
+      verdict(
+          "hash",
+          "def store(password):\n"
+          "    return hashlib.md5(password.encode()).hexdigest()\n"), True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

@@ -320,6 +320,60 @@ def _from_config(source: str, config: dict[str, str] | None, hints: tuple[str, .
     return None
 
 
+# ---------------- M464：非密码学弱哈希（缓存键 / ETag / 去重指纹） ----------------
+# `hashlib.md5/sha1` 不只用于口令与签名：缓存键、ETag/条件请求校验、
+# 内容指纹、去重摘要用的也是它，而这些场景不承担对抗性预映像安全。
+# 11-21 的 fojin 两条 A 板（get_kg_timeline / get_kg_lineage_arcs）就是
+# `cache_key = f"kg:timeline:{hashlib.sha1(...).hexdigest()}"  # nosec B324`。
+#
+# 判据分两层，都只对 **Python 的 hashlib 弱哈希调用**生效（Java 的
+# MessageDigest/DigestUtils 仍走原逻辑）：
+#   1) 显式声明：该调用行带 `# nosec`（bandit B324）或调用参数带
+#      `usedforsecurity=False`（hashlib 官方非安全用途开关）。
+#   2) 上下文推断：入口体里**所有**弱哈希调用都落在缓存键 / ETag / 指纹
+#      语境，且整段没有任何 password/token/secret/sign/hmac/auth 字样。
+# 任何一条不满足就退回原判定 —— 宁可漏压一条缓存键，也不放过口令哈希。
+_PY_WEAK_HASH_CALL_RE = re.compile(
+    r"hashlib\s*\.\s*(?:md5|sha1)\s*\(", re.I)
+_HASH_NOSEC_RE = re.compile(r"#\s*nosec\b", re.I)
+_HASH_USED_FOR_SECURITY_FALSE_RE = re.compile(
+    r"usedforsecurity\s*=\s*False", re.I)
+_HASH_NON_SECURITY_CONTEXT_RE = re.compile(
+    r"cache|etag|W/\"|fingerprint|content_hash|checksum|dedup", re.I)
+_HASH_SECURITY_CONTEXT_RE = re.compile(
+    r"password|passwd|pwd|token|secret|sign|hmac|auth", re.I)
+
+
+def _weak_hash_is_non_security(region: str, body: str) -> bool:
+    """M464：入口域里的弱哈希是否只用于缓存/指纹等非密码学用途。
+
+    `region` 是**未剥注释**的入口段（能看见 `# nosec B324`），`body` 是剥完
+    注释的入口方法体（用来做上下文归属）。
+    """
+    if not _PY_WEAK_HASH_CALL_RE.search(region or ""):
+        return False
+    # 1) 显式声明优先：入口段里每一处弱哈希调用都带 nosec / usedforsecurity=False。
+    _calls = [ln for ln in region.splitlines()
+              if _PY_WEAK_HASH_CALL_RE.search(ln)]
+    if _calls and all(_HASH_NOSEC_RE.search(ln)
+                      or _HASH_USED_FOR_SECURITY_FALSE_RE.search(ln)
+                      for ln in _calls):
+        return True
+    # 2) 上下文推断：先排除任何安全语义，再要求每处调用都在缓存/指纹语境。
+    lines = (body or "").splitlines()
+    hit_idx = [i for i, ln in enumerate(lines)
+               if _PY_WEAK_HASH_CALL_RE.search(ln)]
+    if not hit_idx:
+        return False
+    if _HASH_SECURITY_CONTEXT_RE.search(body or ""):
+        return False
+    for i in hit_idx:
+        ctx = " ".join(lines[max(0, i - 2): i + 1])
+        if not _HASH_NON_SECURITY_CONTEXT_RE.search(ctx):
+            return False
+    return True
+
+
 def parse_config_block(source: str) -> dict[str, str]:
     """解析切片尾部注入的 `// key = value` 配置块。"""
     out: dict[str, str] = {}
@@ -12531,6 +12585,11 @@ def verdict(category: str, source: str) -> bool | None:
                 r"encodePassword)\w*\s*\(",
                 _body, re.I):
             return None
+        # M464：缓存键 / ETag / 去重指纹上的弱哈希是非密码学用途；
+        # `# nosec B324` / `usedforsecurity=False` 是开发者显式声明。
+        # 二者都不占板块 A 的交单席位（fojin 2 条由此归零）。
+        if _weak_hash_is_non_security(_region, _body):
+            return False
         return hash_is_weak(alg) if alg else None
 
     if category == "weakrand":
