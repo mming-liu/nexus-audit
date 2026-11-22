@@ -474,17 +474,26 @@ def _counts(records: list[dict]) -> dict:
 def _header(ledger: list[dict], scout: dict, *, days: int,
             languages: list[str], evicted: list[str], summary: dict,
             blocked: int, cooldown_days: int = 0,
-            cooldown_skipped: int = 0, incomplete_dedup: int = 0) -> str:
+            cooldown_skipped: int = 0, incomplete_dedup: int = 0,
+            candidates: int = 0) -> str:
     scanned = [x for x in ledger if x["result"] == "SCANNED"]
     skipped = [x for x in ledger if x["result"] == "SKIPPED"]
     failed = [x for x in ledger if x["result"] == "FAILED"]
+    # M467：「候选仓」与「已处理」是两个不同的数：侦察返回 N 个候选，但
+    # limit 截断 / 缺 slug 的候选不一定会进账本。两者相等时保持旧的简洁写法
+    # （兼容既有断言），不等时把两个数都亮出来，避免"候选 14、账本 12"的
+    # 报告与 JSON（daily_meta.candidates / daily_meta.processed）口径撕裂。
+    if candidates and candidates != len(ledger):
+        _cand = f"候选仓：{candidates}（已处理 {len(ledger)}）"
+    else:
+        _cand = f"候选仓：{len(ledger)}"
     lines = [
         "## 今日巡猎（daily-hunt）", "",
         f"> 自动流水线：近 {days} 天有提交的 {'/'.join(languages)} 仓 → "
         f"同 HEAD 直接跳过 → 只报新引入或尚未导出的 ZERO_RECORD_FRESH 根因；"
         f"本次即扫即焚 {len(evicted)} 个缓存。",
         "",
-        f"- 候选仓：{len(ledger)} ｜ 实扫：{len(scanned)} ｜ "
+        f"- {_cand} ｜ 实扫：{len(scanned)} ｜ "
         f"跳过：{len(skipped)} ｜ 失败：{len(failed)} ｜ "
         f"候选来源：{scout.get('source', '') or '—'}",
         f"- 本次新增根因：{summary['total']} ｜ 板块 A：{summary['board_a']} ｜ "
@@ -640,6 +649,12 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
             break
         slug = str(item.get("slug") or "").strip()
         if not slug:
+            # M467：缺 slug 的候选不再静默丢弃。旧实现直接 continue，于是
+            # 侦察返回的候选数（items）与账本行数（ledger）出现差额，报告
+            # 头部只报账本数、JSON 报候选数，两个口径对不上。记一条
+            # SKIPPED 让 daily_meta["processed"] == len(ledger) 覆盖它。
+            ledger.append({"slug": "(missing_slug)", "result": "SKIPPED",
+                           "reason": "missing_slug"})
             continue
         entry = dict(state["repos"].get(slug) or {})
         # M299：克隆前冷却期 —— 不足 N 天就免克隆跳过，把名额让给新候选。
@@ -776,7 +791,11 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
     daily_meta = {
         "started_at": started, "generated_at": finished,
         "languages": lang_list, "days": days,
+        # M467：两个口径分开报 —— candidates 是侦察返回的候选总数，
+        # processed 是真正走进账本（实扫 / 跳过 / 失败）的条数。报告头部
+        # 与这里取同一份数，缺 slug 的候选现在也占一行 SKIPPED。
         "candidates": len(items),
+        "processed": len(ledger),
         "scanned": sum(1 for x in ledger if x["result"] == "SCANNED"),
         "skipped": sum(1 for x in ledger if x["result"] == "SKIPPED"),
         "failed": sum(1 for x in ledger if x["result"] == "FAILED"),
@@ -822,7 +841,8 @@ def run(*, languages=("java", "python", "solidity"), days: int = 14,
                              evicted=evicted, summary=summary,
                              blocked=blocked, cooldown_days=cooldown_days,
                              cooldown_skipped=cooldown_skipped,
-                             incomplete_dedup=incomplete_dedup),
+                             incomplete_dedup=incomplete_dedup,
+                             candidates=len(items)),
         with_confidence=True, extra={"daily": daily_meta})
     try:
         shutil.copyfile(report, _snap_report)

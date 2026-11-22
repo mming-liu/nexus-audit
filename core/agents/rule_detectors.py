@@ -3850,8 +3850,25 @@ def jwt_weakness_verdict(source: str) -> bool | None:
     return False if seen else None
 
 
-def hardcoded_secret_verdict(source: str) -> bool | None:
-    body = re.sub(r"//[^\n]*", "", source)
+# M469：YAML 注释行不是配置。`# EXAMPLE_SECRET=changeme-please` 这类
+# "注释里的示例凭据"曾被当成硬编码凭据上报（v1.5.29 遗留）。只对
+# `.yml` / `.yaml` 做整行剥除 —— 其它语言的 `#` 语义各不相同（Python 注释
+# 由各自的切片/注释处理负责），不能共用这条规则。
+_YAML_SECRET_SUFFIXES = (".yml", ".yaml")
+
+
+def _strip_yaml_comment_lines(source: str) -> str:
+    """删掉 YAML 里以 `#` 开头的**纯注释行**（M469）。"""
+    kept = [ln for ln in source.splitlines() if not ln.lstrip().startswith("#")]
+    return "\n".join(kept)
+
+
+def hardcoded_secret_verdict(source: str,
+                             filename: str = "") -> bool | None:
+    body = source
+    if filename and str(filename).lower().endswith(_YAML_SECRET_SUFFIXES):
+        body = _strip_yaml_comment_lines(body)
+    body = re.sub(r"//[^\n]*", "", body)
     body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
     if not re.search(r"(?i)secret|private_?key|signing_?key", body):
         return None                          # 不归本类目管
@@ -4561,6 +4578,83 @@ def _redir_repo_sourced(body: str) -> bool:
     return False
 
 
+def _redir_redirect_targets(body: str) -> list[str]:
+    """入口体里所有会下发 Location 的跳转**目标表达式**（M468）。
+
+    只覆盖"目标表达式本身可见"的三种形态：RedirectView / sendRedirect /
+    `"redirect:" + ...`。裸变量由调用方自行回溯，这里不做。
+    """
+    out: list[str] = []
+    for pat in (
+            r"new\s+(?:[\w.]*\.)?RedirectView\s*\(\s*([^;]{0,300}?)\s*\)\s*;",
+            r"\.\s*sendRedirect\s*\(\s*([^;]{0,300}?)\s*\)\s*;",
+            r"return\s+\"redirect:\s*\"\s*\+\s*([^;]{0,300}?)\s*;"):
+        out.extend(m.group(1).strip() for m in re.finditer(pat, body))
+    return out
+
+
+# M468：跳转 URL 由服务端配置服务拼装。dax-pay 实测形态（切片跨文件证据段）：
+#
+#     String gateway = platformUrlConfigService.getUrlConfig()
+#                           .getPaymentGatewayBaseUrl();
+#     order.setPayUrl(gateway + "/easypay/v1/pay/" + order.getId());
+#     return order.getPayUrl();
+#
+# 入口只有 `return new RedirectView(easyPayPayV1Service.submit(param));` ——
+# 请求里的 returnUrl 只是落库字段，不参与本次 302。旧判据只认
+# getParameter/getHeader 这类"直接读请求"，于是把服务端配置拼出来的
+# 支付网关 URL 判成开放重定向（11-22 的 dax-pay ×2 假阳）。
+_REDIR_URL_PROP_RE = re.compile(
+    r"(?i:url|uri|link|target|redirect|gateway|domain|host)")
+_REDIR_SET_PROP_RE = re.compile(
+    r"\.\s*set([A-Za-z_]\w*)\s*\(\s*([^;]{0,400}?)\)\s*[;.)]")
+
+
+def _redir_config_url_assembled(entry_targets: list[str],
+                               source: str) -> bool:
+    """本次跳转目标是否由服务端配置服务拼装（M468）。
+
+    四条同时成立才算（缺一不可，宁可退回模型也不放宽）：
+      1. 入口跳转目标是内部服务调用（`easyPayPayV1Service.submit(param)`）
+         或配置/URL getter —— 不是直接把请求参数塞进 RedirectView；
+      2. 切片证据面里存在「配置读取 → URL 变量」赋值
+         （`gateway = *ConfigService*.getXxxUrl...()`）；
+      3. 同一份证据里存在该配置变量参与**拼接**的 URL 属性 setter
+         （`order.setPayUrl(gateway + "/..." + id)`）；
+      4. 证据里读得回同一属性的 getter（`return order.getPayUrl()`），
+         说明跳转目标就是它。
+    """
+    if not any(_REPO_LOOKUP_RE.search(t) or _CONFIG_GET_RE.search(t)
+               for t in entry_targets):
+        return False
+    ev = _all_evidence(source)
+    if not ev:
+        return False
+    cfg_vars: set[str] = set()
+    for m in re.finditer(r"\b([A-Za-z_]\w*)\s*=(?!=)\s*([^;\n]{0,400});", ev):
+        rhs = m.group(2)
+        if not _CONFIG_GET_RE.search(rhs):
+            continue
+        # 只认"从配置里取 URL"的读取：普通配置读取（开关/密钥）不算。
+        if not re.search(r"(?i)(?:url|uri|gateway|base|redirect|domain|host)",
+                         rhs):
+            continue
+        cfg_vars.add(m.group(1))
+    if not cfg_vars:
+        return False
+    set_props: set[str] = set()
+    for m in _REDIR_SET_PROP_RE.finditer(ev):
+        prop, rhs = m.group(1), m.group(2)
+        if not _REDIR_URL_PROP_RE.search(prop) or "+" not in rhs:
+            continue
+        if any(re.search(rf"\b{re.escape(v)}\b", rhs) for v in cfg_vars):
+            set_props.add(prop)
+    if not set_props:
+        return False
+    return any(re.search(rf"\.\s*get{re.escape(prop)}\s*\(\s*\)", ev)
+               for prop in set_props)
+
+
 def redir_verdict(source: str) -> bool | None:
     if _looks_python(source):
         return _py_redir_verdict(source)
@@ -4619,6 +4713,10 @@ def redir_verdict(source: str) -> bool | None:
     # M432：目标来自内部仓储/服务查询（*Service/*Mapper/*Dao/*Repository），
     # 入口只拿主键标识、不读 request 参数 → 服务端内部资源查找跳转。
     if _redir_repo_sourced(body):
+        return False
+    # M468：目标委托给内部 service 构造，而切片证据证明该 URL 是
+    # 「服务端配置服务取网关 + 订单主键」拼出来的（dax-pay EasyPay submit）。
+    if _redir_config_url_assembled(_redir_redirect_targets(body), source):
         return False
     return True
 
@@ -5443,8 +5541,66 @@ PATH_SINK_RE = re.compile(
     r"|"
     # M309：只认 Java 的 `new ZipFile(...)`（读压缩包）；Python 的
     # `zipfile.ZipFile(tmp, "w")` 是写临时包，属于 zip_slip 类目，不是路径穿越。
-    r"\.\s*listFiles\s*\(|getResourceAsStream\s*\(|new\s+ZipFile\s*\(",
+    #
+    # M468：`.listFiles(` 从本正则里**移除**，改由 `_path_sink_matches()`
+    # 做接收者归属校验。裸 `\.listFiles\(` 会把纯 DB/R2DBC 分页查询
+    # （`fileService.listFiles(request)`）当成 java.io.File.listFiles()，
+    # 11-22 的 novanova-studio StorageBillingController.listFiles 就是这么
+    # 被判成路径穿越的 —— 入口体里没有任何文件 API。
+    r"getResourceAsStream\s*\(|new\s+ZipFile\s*\(",
     re.I)
+# M468：`.listFiles(` 的精确归属 —— 只有接收者确实是 File 才算文件 sink。
+_LISTFILES_CALL_RE = re.compile(
+    r"(?P<recv>new\s+(?:java\.io\.)?File\s*\([^;{}]{0,300}?\)"
+    r"|[A-Za-z_]\w*\s*\(\s*\)"
+    r"|[A-Za-z_]\w*)\s*\.\s*listFiles\s*\(")
+_FILE_VAR_DECL_RE = re.compile(
+    r"\b(?:java\.io\.)?File\s*(?:\[\s*\])?\s+([A-Za-z_]\w*)\s*(?=[=;,)])")
+
+
+def _listfiles_sink_hit(text: str) -> bool:
+    """`xxx.listFiles(` 的接收者是不是 `java.io.File`（M468）。
+
+    novanova-studio 的 `StorageBillingController.listFiles` 入口体是
+    `return fileService.listFiles(request).map(ApiResponse::ok);` —— 纯
+    R2DBC 分页查询，却因为 `fileService` 后面跟着同名方法命中了旧的
+    `\\.\\s*listFiles\\s*\\(` 而被判路径穿越（A 板第 4 条假阳）。
+
+    认三种接收者形态，其余一律不算文件 sink：
+      · `new File(...).listFiles()`；
+      · 本切片里声明为 `File` / `File[]` 的变量（`File dir = ...`）；
+      · 名字里带 file 的 getter 调用（`getUploadFile().listFiles()`）。
+    """
+    file_vars = set(_FILE_VAR_DECL_RE.findall(text))
+    extends_file = bool(re.search(
+        r"class\s+\w+\s+extends\s+(?:java\.io\.)?File\b", text))
+    for m in _LISTFILES_CALL_RE.finditer(text):
+        recv = re.sub(r"\s+", "", m.group("recv"))
+        if recv.startswith("new"):
+            return True
+        if recv in file_vars:
+            return True
+        if recv in ("this", "super"):
+            if extends_file:
+                return True
+            continue
+        if re.fullmatch(r"[A-Za-z_]\w*\([^)]*\)", recv) and re.search(
+                r"(?i)file", recv):
+            return True
+    return False
+
+
+def _path_sink_matches(text: str):
+    """路径穿越的全部文件 sink 命中：PATH_SINK_RE + 归属校验后的 listFiles。"""
+    out = list(PATH_SINK_RE.finditer(text))
+    if _listfiles_sink_hit(text):
+        out.extend(_LISTFILES_CALL_RE.finditer(text))
+    return out
+
+
+def _path_sink_search(text: str) -> bool:
+    return bool(PATH_SINK_RE.search(text)) or _listfiles_sink_hit(text)
+
 # 真正的路径约束：规范化后再比较，或直接剥掉目录
 PATH_SAFE_RE = re.compile(
     r"getCanonicalPath\s*\(\s*\)\s*\.\s*startsWith\s*\(|"
@@ -5627,7 +5783,7 @@ def _path_sink_param_linked(body: str, source: str,
         return True                # 无形参可判 → 不设门
     for seg in (body, _sibling_methods(source)):
         for line in seg.splitlines():
-            for m in PATH_SINK_RE.finditer(line):
+            for m in _path_sink_matches(line):
                 args = _sink_call_args(line, m.start())
                 ids = set(re.findall(r"\b([A-Za-z_]\w*)\b", args))
                 if ids & params or _PATH_REQUEST_READ_RE.search(args):
@@ -5701,7 +5857,7 @@ def _path_sink_identifiers(text: str) -> set[str]:
     没有 ⇒ 路径与入口外部输入之间没有任何可见的关联。
     """
     out: set[str] = set()
-    for m in PATH_SINK_RE.finditer(text):
+    for m in _path_sink_matches(text):
         start = text.rfind("\n", 0, m.start()) + 1
         end = text.find("\n", m.end())
         line = text[start: end if end >= 0 else len(text)]
@@ -5778,7 +5934,7 @@ def pathtraver_verdict(source: str) -> bool | None:
         return None
     # M313：classpath 常量资源（`getResourceAsStream("stencilset.json")`）没有
     # 外部输入面，不是路径穿越（skyeye 的 getStencilset 被判 True 就是这条）。
-    _sink_all = [m for m in PATH_SINK_RE.finditer(body)
+    _sink_all = [m for m in _path_sink_matches(body)
                  if "IOUtils" not in m.group(0)]
     _stream = [m for m in _sink_all if "getResourceAsStream" in m.group(0)]
     if (_stream and len(_stream) == len(_sink_all)
@@ -5832,7 +5988,7 @@ def pathtraver_verdict(source: str) -> bool | None:
     if not body:
         return None
     sink_in = body
-    if not PATH_SINK_RE.search(body):
+    if not _path_sink_search(body):
         # 入口体没命中 sink 时**不能直接判安全** —— sink 往往在同文件的私有
         # 辅助方法里。`java-sec-code` 的 `getImage(filepath)` 入口体只有一句
         # `return getImgBase64(filepath);`，真正的 `new File` / `Files.readAllBytes`
@@ -5842,7 +5998,7 @@ def pathtraver_verdict(source: str) -> bool | None:
         # 依次退到：同文件私有辅助方法（在 source 的 `// ---- 同文件辅助方法`
         # 段里，但 `entry_body` 截掉了）→ 跨文件辅助段。
         sink_in = _all_evidence(source)
-        if not PATH_SINK_RE.search(sink_in):
+        if not _path_sink_search(sink_in):
             # 到这里才能说"整份切片里都没有文件 API"。
             # 半吊子样本（`if (!Security.checkTraversal(name)) {...}` 只返回字符串）
             # 就是靠这一条与 `download` 那条真漏洞区分开的。
@@ -12523,7 +12679,8 @@ def arbitrary_file_delete_verdict(source: str) -> bool | None:
     return None
 
 
-def verdict(category: str, source: str) -> bool | None:
+def verdict(category: str, source: str, *,
+            filename: str = "") -> bool | None:
     """对配置型类目给出确定性结论：True(有漏洞) / False(安全) / None(证据不足)。"""
     # M395：双向语言门禁（规则层第一道闸，降噪层 wild_noise 是第二道）。
     # 两个方向都要堵：
@@ -12658,7 +12815,7 @@ def verdict(category: str, source: str) -> bool | None:
         return ssrf_verdict(source)
 
     if category == "hardcoded_secret":
-        return hardcoded_secret_verdict(source)
+        return hardcoded_secret_verdict(source, filename=filename)
 
     if category == "jwt_weakness":
         return jwt_weakness_verdict(source)

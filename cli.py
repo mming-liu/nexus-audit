@@ -496,7 +496,8 @@ def _scan_secret_files(repo: Path) -> list:
             text = p.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        if rule_verdict("hardcoded_secret", text) is not True:
+        if rule_verdict("hardcoded_secret", text,
+                        filename=str(p)) is not True:
             continue
         suffix = p.suffix.lower()
         lang = (Language.JAVA_WEB if suffix == ".java"
@@ -6082,7 +6083,11 @@ def cmd_daily_hunt(args) -> int:
                or None))
     d = res["daily"]
     tag = "（dry-run，未落盘）" if res.get("dry_run") else ""
-    print(f"[daily-hunt]{tag} 候选 {d['candidates']} ｜ 实扫 {d['scanned']} ｜ "
+    # M467：候选数与已处理数分开报 —— 11-22 实盘日志是"候选 18 ｜ 实扫 6 ｜
+    # 跳过 8"，三个分项加起来只有 14，差额是缺 slug 被静默丢弃的候选。
+    print(f"[daily-hunt]{tag} 候选 {d['candidates']}（已处理 "
+          f"{d.get('processed', d['scanned'] + d['skipped'] + d['failed'])}）"
+          f" ｜ 实扫 {d['scanned']} ｜ "
           f"跳过 {d['skipped']} ｜ 失败 {d['failed']}")
     print(f"[daily-hunt] 新增根因 {d['new_roots']} ｜ 板块 A {d['board_a']} ｜ "
           f"拦截进 B {d['blocked']} ｜ 即扫即焚 {len(d['evicted'])} 个")

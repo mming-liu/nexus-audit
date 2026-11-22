@@ -66,6 +66,12 @@ _EXEC_PACKAGE_UPLOAD_RE = re.compile(
 SERVER_BUILT_REDIRECT = "SERVER_BUILT_REDIRECT"
 REFERER_OPEN_REDIRECT = "REFERER_OPEN_REDIRECT"
 SAFE_REDIRECT_GUARD = "SAFE_REDIRECT_GUARD"
+# M468：签名认证后的 OAuth 回调中转。入口类名/方法名含 OpenAuth / OAuth /
+# getOpenId，且切片里能看到**商户验签**（paymentSignService.signVerify /
+# verifySign / checkSign / validateSign / SignUtil）—— 验签通过后 redirect_url
+# 才可信，302 到 OAuth 授权页是设计内的中转，不是开放重定向。
+# dax-pay 的 OpenAuthController.getOpenId 就是这个形态（11-22 A 板假阳 #3）。
+SIGNED_OAUTH_RELAY = "SIGNED_OAUTH_RELAY"
 # M435：类级/基类级鉴权注解（@Permission / @SaCheckLogin / @PreAuthorize /
 # @RequiresPermissions）覆盖到的 authz 入口 —— 框架已在类层面做了鉴权，
 # 不是"裸 authz"（SPMS RoleController 继承 BaseController 的 @Permission）。
@@ -75,6 +81,11 @@ LOW_SEVERITY_SECURECOOKIE = "LOW_SEVERITY_SECURECOOKIE"
 # M428：测试夹具/集成测试后端（tests-common / fixtures / integration-tests）
 # 不是生产入口，直接拦截，避免测试用 PeopleRestService 占 A 板。
 TEST_FIXTURE_ONLY = "TEST_FIXTURE_ONLY"
+# M469：开发叠加 compose（docker-compose.keycloak.yaml 这类）里头部显式标注
+# 「OPTIONAL local overlay / NOT part of the default stack / for developing/
+# testing」的文件，里面的凭据是本地开发用的示例值，不是生产硬编码密钥 ——
+# 压 B 板，不占 A 板首杀席位（v1.5.29 遗留的 akb 实测）。
+DEV_OVERLAY_SECRET = "DEV_OVERLAY_SECRET"
 SHORTLINK_BY_DESIGN = "SHORTLINK_BY_DESIGN"
 # M387：第三方 Webhook/公众号验签挑战串（echostr / hub.challenge）原样回显。
 # 它不是浏览器 HTML 页面，不能按反射型 XSS 交单；也不能在 rule_detectors
@@ -158,6 +169,27 @@ def _read(repo_root: Path | None, rel: str) -> str:
         return path.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return ""
+
+
+# ---------------- M469：开发叠加 compose 的示例凭据 ----------------
+# 只认 compose 文件**头部**（前 40 行）的显式声明 —— 文件中间某处提到
+# "for developing" 不算，避免把生产 compose 也误归 B 板。
+_DEV_OVERLAY_MARKER_RE = re.compile(
+    r"(?i)optional\s+local\s+(?:\w+\s+){0,3}overlay|"
+    r"not\s+part\s+of\s+the\s+default\s+stack|"
+    r"for\s+develop(?:ing|ment)\s*/\s*testing|"
+    r"for\s+(?:local\s+)?develop(?:ing|ment)\b|"
+    r"local\s+(?:dev(?:elopment)?\s+)?overlay")
+_COMPOSE_NAME_RE = re.compile(r"(?i)^(?:docker-)?compose(?:[.-].*)?\.ya?ml$")
+
+
+def _dev_overlay_compose(rel: str, src: str) -> bool:
+    """文件是否是「头部显式标注的开发叠加 compose」（M469）。"""
+    name = Path(str(rel or "")).name
+    if not _COMPOSE_NAME_RE.match(name):
+        return False
+    head = "\n".join((src or "").splitlines()[:40])
+    return bool(_DEV_OVERLAY_MARKER_RE.search(head))
 
 
 # ---------------- M435：Java 类级/基类级鉴权注解 ----------------
@@ -461,6 +493,120 @@ _REFERER_HEADER_RE = re.compile(
     r"getHeader\s*\(\s*[\"']referer[\"']\s*\)|"
     r"headers?\s*\.\s*get\s*\(\s*[\"']referer", re.I)
 _SHORTLINK_RE = re.compile(r"(?i)shortlink|getOriginalLink")
+# M468：OAuth 中转入口（只认 unit 里的类名/方法名，路径目录名不算）。
+_OAUTH_ENTRY_RE = re.compile(r"(?i)open_?auth|\boauth\b|get_?open_?id")
+# 商户验签调用的各种写法：verifySign / checkSign / validateSign / signVerify /
+# signCheck / SignUtil（dax-pay 用的是 paymentSignService.signVerify）。
+_MERCHANT_SIGN_RE = re.compile(
+    r"(?i)(?:(?:verify|check|validate)[_ ]?sign\w*|"
+    r"sign(?:Verify|Check|Validate)\w*|\bSignUtil\b)")
+# 入口跳转目标里的「服务字段.方法(」调用 —— 验签通常在做跳转的 Hop 服务方法里。
+_OAUTH_HOP_CALL_RE = re.compile(r"([A-Za-z_]\w*)\s*\.\s*([A-Za-z_]\w*)\s*\(")
+_OAUTH_HOP_MEMO: dict[tuple[str, str], bool] = {}
+
+
+def _java_hop_sign_verified(repo_root: Path | None,
+                            hop_calls: dict[str, set[str]],
+                            src: str = "") -> bool:
+    """跨文件读 Hop 方法实现体，确认里面做了商户验签（M468）。
+
+    hop_calls: {接收者变量名: {方法名}}。先按「字段声明类型 / 接收者首字母大写」
+    定位候选类文件（`openAuthService` → `OpenAuthService.java`），找不到才退回
+    有界内容扫描 —— dax-pay 有 3000+ 个 .java，无脑全仓扫会在 400 个文件处
+    截断，正好错过 daxpay-payment 模块里的 OpenAuthService。
+    """
+    if repo_root is None or not hop_calls:
+        return False
+    root = Path(repo_root)
+    key = (str(root), "|".join(sorted(
+        f"{recv}:{name}" for recv, names in hop_calls.items()
+        for name in sorted(names))))
+    if key in _OAUTH_HOP_MEMO:
+        return _OAUTH_HOP_MEMO[key]
+    # 变量 → 类型：字段声明（`private final OpenAuthService openAuthService;`）
+    type_of = {var: typ for typ, var in re.findall(
+        r"\b([A-Z]\w*(?:<[^>]*>)?)\s+([a-z]\w*)\s*(?=[;=,)])", src)}
+    class_names: set[str] = set()
+    for recv in hop_calls:
+        typ = type_of.get(recv, "")
+        if typ:
+            class_names.add(typ.split("<")[0])
+        class_names.add(recv[:1].upper() + recv[1:])
+    candidates: list[Path] = []
+    for nm in sorted(class_names):
+        if not re.fullmatch(r"[A-Za-z_]\w*", nm):
+            continue
+        try:
+            candidates.extend(root.rglob(f"{nm}.java"))
+            candidates.extend(root.rglob(f"{nm}Impl.java"))
+        except OSError:
+            continue
+    all_names = {name for names in hop_calls.values() for name in names}
+    found = False
+    for p in candidates[:40]:
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for name in all_names:
+            if f"{name}(" in text and _MERCHANT_SIGN_RE.search(
+                    _java_method_block(text, name)):
+                found = True
+                break
+        if found:
+            break
+    if not found:
+        # 回退：有界内容扫描（小仓 / 命名不规则）。
+        scanned = 0
+        for p in root.rglob("*.java"):
+            if any(part in _SCAN_SKIP_DIRS for part in p.parts):
+                continue
+            scanned += 1
+            if scanned > 400:
+                break
+            try:
+                text = p.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if any(f"{name}(" in text for name in all_names) and any(
+                    f"{name}(" in text
+                    and _MERCHANT_SIGN_RE.search(_java_method_block(text, name))
+                    for name in all_names):
+                found = True
+                break
+    _OAUTH_HOP_MEMO[key] = found
+    return found
+
+
+def _oauth_signed_relay(repo_root: Path | None, src: str, unit: str) -> bool:
+    """签名认证后的 OAuth 回调中转（M468）。
+
+    三条证据任一成立即可（都要求入口类名/方法名是 OAuth 入口）：
+      1. 入口方法体里有商户验签调用；
+      2. 入口类内（同一类的其它方法/字段）有商户验签；
+      3. 入口跳转目标调用的 Hop 服务方法里做了商户验签
+         （dax-pay：`openAuthService.generateOpenAuthRedirect` →
+          `paymentSignService.signVerify(param)`）。
+    """
+    if not _OAUTH_ENTRY_RE.search(str(unit or "")) or not src:
+        return False
+    meth = unit.rsplit(".", 1)[-1]
+    block = _java_method_block(src, meth)
+    if _MERCHANT_SIGN_RE.search(block):
+        return True
+    cls = unit.rsplit(".", 1)[0] if "." in unit else ""
+    lines = src.splitlines()
+    span = _class_span(lines, cls) if cls else None
+    if span and _MERCHANT_SIGN_RE.search(
+            "\n".join(lines[span[0]:span[1] + 1])):
+        return True
+    hop_calls: dict[str, set[str]] = {}
+    for m in _OAUTH_HOP_CALL_RE.finditer(block):
+        recv, name = m.group(1), m.group(2)
+        if name == meth:
+            continue
+        hop_calls.setdefault(recv, set()).add(name)
+    return _java_hop_sign_verified(repo_root, hop_calls, src)
 
 
 def _java_method_block(src: str, meth: str) -> str:
@@ -844,6 +990,20 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
         return {"blocked": True, "code": TEST_FIXTURE_ONLY,
                 "reason": "测试夹具/集成测试后端代码，不是生产入口"}
 
+    # M469：开发叠加 compose 的示例凭据压 B（akb 的
+    # `docker-compose.keycloak.yaml` → `# OPTIONAL local Keycloak overlay`）。
+    # M463 让 hardcoded_secret 不再继承 LOCAL_LOOPBACK_ONLY 之后，这类文件
+    # 会直接进 A 板；它需要的是"这是开发叠加"的专属归因，不是回环继承。
+    if str(record.get("category") or "") == "hardcoded_secret":
+        _drel = str(record.get("file") or "")
+        _dsrc = _read(repo_root, _drel)
+        if _dsrc and _dev_overlay_compose(_drel, _dsrc):
+            return {"blocked": True, "code": DEV_OVERLAY_SECRET,
+                    "reason": ("文件头部显式标注 OPTIONAL local overlay / "
+                               "NOT part of the default stack / for "
+                               "developing/testing 的开发叠加 compose，"
+                               "里面的凭据是本地开发示例值")}
+
     # M361：WebSocket 前置鉴权。accept() 前校验会话并 close(4401/1008) 的
     # WS 入口不是未授权候选（redcell 5 条 authz 在此归零）。
     if (record.get("category") == "authz" and file.endswith(".py")):
@@ -900,6 +1060,13 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
                                "originalUrl，不是开放重定向缺陷")}
         _rsrc = _read(repo_root, _rf)
         if _rsrc:
+            # M468：签名认证后的 OAuth 回调中转归 B（dax-pay OpenAuth）。
+            if _oauth_signed_relay(repo_root, _rsrc, _ru):
+                return {"blocked": True, "code": SIGNED_OAUTH_RELAY,
+                        "reason": ("OAuth 中转入口带商户验签（verifySign / "
+                                   "checkSign / signVerify / SignUtil），"
+                                   "验签通过后 302 到授权方是设计内跳转，"
+                                   "redirect_url 不可被未签名请求控制")}
             if _rf.endswith(".py"):
                 # M423：同源跳转 helper（_local_next / netloc 判空）兜底。
                 from core.agents.rule_detectors import (

@@ -14803,6 +14803,180 @@ check("M464：hashlib.md5(password) 仍判弱哈希（防放宽）",
           "def store(password):\n"
           "    return hashlib.md5(password.encode()).hexdigest()\n"), True)
 
+print("\n[353] M467–M469：候选仓口径 / dax-pay 4 条假阳 / dev overlay 凭据")
+
+# --- M467：候选仓（candidates）与已处理（processed）分口径 ---
+_M467_OUT = Path(_ws_mkdtemp("smoke_m467_"))
+_res467a = daily_hunt.run(
+    limit=1, state_path=_M467_OUT / "s.json", report=_M467_OUT / "R.md",
+    json_path=_M467_OUT / "R.json", packs_dir=_M467_OUT / "packs",
+    scout_fn=lambda **kw: {"ok": True, "source": "github_search",
+                           "items": [{"slug": ""}, {"slug": "acme/daily"},
+                                     {"slug": "acme/third"}]},
+    sync_fn=lambda s: {"status": "OK", "path": str(_dh_repo276)},
+    dedup_fn=_fresh276)
+check("M467：缺 slug 的候选入账而不是静默丢弃",
+      _res467a["ledger"][0],
+      {"slug": "(missing_slug)", "result": "SKIPPED", "reason": "missing_slug"})
+check("M467：candidates / processed 分口径",
+      (_res467a["daily"]["candidates"], _res467a["daily"]["processed"]),
+      (3, 2))
+_md467 = (_M467_OUT / "R.md").read_text(encoding="utf-8")
+check("M467：报告头同时亮出候选数与已处理数",
+      "候选仓：3（已处理 2）" in _md467, True)
+_dj467 = json.loads((_M467_OUT / "R.json").read_text(encoding="utf-8"))
+check("M467：JSON 与报告头取同一份数",
+      (_dj467["daily"]["candidates"], _dj467["daily"]["processed"]), (3, 2))
+_res467b = daily_hunt.run(
+    limit=1, state_path=_M467_OUT / "s2.json", report=_M467_OUT / "R2.md",
+    json_path=_M467_OUT / "R2.json", packs_dir=_M467_OUT / "packs2",
+    scout_fn=lambda **kw: {"ok": True, "source": "github_search",
+                           "items": [{"slug": "acme/daily"}]},
+    sync_fn=lambda s: {"status": "OK", "path": str(_dh_repo276)},
+    dedup_fn=_fresh276)
+_md467b = (_M467_OUT / "R2.md").read_text(encoding="utf-8")
+check("M467：两数相等时保持简洁写法（兼容既有断言）",
+      ("候选仓：1 ｜" in _md467b and "（已处理" not in _md467b), True)
+check("M467：相等时 processed == candidates",
+      (_res467b["daily"]["candidates"], _res467b["daily"]["processed"]),
+      (1, 1))
+
+# --- M468-1：dax-pay 支付网关 URL 由服务端配置服务拼装 → redir 不成立 ---
+_M468_DAXPAY = (
+    "// Full-Route: /epay/api/v1/submit.php\n"
+    "@RequestMapping(value = \"/submit.php\", "
+    "method = {RequestMethod.GET, RequestMethod.POST})\n"
+    "public RedirectView submit(EasyPaySubmitV1Param param) {\n"
+    "    return new RedirectView(easyPayPayV1Service.submit(param));\n"
+    "}\n"
+    "// ---- 跨文件证据：submit() 的接口实现类方法体 @ EasyPayPayV1Service.java ----\n"
+    "public String submit(EasyPaySubmitV1Param param) {\n"
+    "    var credential = easyPayCredentialService.getAndCheck(param.getPid());\n"
+    "    easyPayAssistService.checkSignV1(param, credential, param.getSign());\n"
+    "    String gateway = platformUrlConfigService.getUrlConfig()"
+    ".getPaymentGatewayBaseUrl();\n"
+    "    var existing = easyPayOrderManager.findByOutTradeNo("
+    "param.getOutTradeNo());\n"
+    "    if (existing.isPresent()) {\n"
+    "        return gateway + \"/easypay/v1/pay/\" + existing.get().getId();\n"
+    "    }\n"
+    "    var order = newOrder(param.getOutTradeNo(), param.getReturnUrl());\n"
+    "    order.setPayUrl(gateway + \"/easypay/v1/pay/\" + order.getId())\n"
+    "            .setPcCallType(PayBodyTypeEnum.QR_CODE.getCode());\n"
+    "    easyPayOrderManager.save(order);\n"
+    "    return order.getPayUrl();\n"
+    "}\n")
+check("M468：配置服务拼装的支付网关 URL → redir_verdict 判 False",
+      verdict("redir", _M468_DAXPAY), False)
+check("M468：同一证据下目标换成请求参数仍判 True（防放宽）",
+      verdict("redir", _M468_DAXPAY.replace(
+          "return new RedirectView(easyPayPayV1Service.submit(param));",
+          "return new RedirectView(param.getReturnUrl());")), True)
+check("M468：request 参数直通 RedirectView 仍判 True（防放宽）",
+      verdict("redir",
+              "public RedirectView go(@RequestParam String url) {\n"
+              "    return new RedirectView(url);\n"
+              "}\n"), True)
+
+# --- M468-2：商户验签后的 OAuth 中转 → SIGNED_OAUTH_RELAY ---
+_M468_OAUTH = Path(_ws_mkdtemp("smoke_m468_oauth_"))
+(_M468_OAUTH / "OpenAuthController.java").write_text(
+    "package x;\n"
+    "public class OpenAuthController {\n"
+    "    private final OpenAuthService openAuthService;\n"
+    "    @GetMapping(\"/get-openid\")\n"
+    "    public RedirectView getOpenId(@Valid OpenAuthParam param) {\n"
+    "        return new RedirectView(openAuthService"
+    ".generateOpenAuthRedirect(param));\n"
+    "    }\n"
+    "}\n", encoding="utf-8")
+(_M468_OAUTH / "OpenAuthService.java").write_text(
+    "package x;\n"
+    "public class OpenAuthService {\n"
+    "    public String generateOpenAuthRedirect(OpenAuthParam param) {\n"
+    "        merchantContextLoader.initMch(param.getMchNo());\n"
+    "        paymentSignService.signVerify(param);\n"
+    "        return unifiedAuthService.generateAuthUrl(authParam)"
+    ".getAuthUrl();\n"
+    "    }\n"
+    "}\n", encoding="utf-8")
+check("M468：带商户验签的 OAuth 中转判 SIGNED_OAUTH_RELAY",
+      wild_noise.classify({"category": "redir",
+                           "unit": "OpenAuthController.getOpenId",
+                           "file": "OpenAuthController.java"},
+                          _M468_OAUTH)["code"], "SIGNED_OAUTH_RELAY")
+_M468_OAUTH2 = Path(_ws_mkdtemp("smoke_m468_oauth2_"))
+(_M468_OAUTH2 / "OpenAuthController.java").write_text(
+    "package x;\n"
+    "public class OpenAuthController {\n"
+    "    private final OpenAuthService openAuthService;\n"
+    "    @GetMapping(\"/get-openid\")\n"
+    "    public RedirectView getOpenId(OpenAuthParam param) {\n"
+    "        return new RedirectView(openAuthService"
+    ".generateOpenAuthRedirect(param));\n"
+    "    }\n"
+    "}\n", encoding="utf-8")
+check("M468：无验签的 OAuth 跳转不误压（防放宽）",
+      wild_noise.classify({"category": "redir",
+                           "unit": "OpenAuthController.getOpenId",
+                           "file": "OpenAuthController.java"},
+                          _M468_OAUTH2)["blocked"], False)
+
+# --- M468-3：`.listFiles(` 的接收者归属（纯 DB 分页 ≠ File.listFiles） ---
+check("M468：纯 R2DBC 分页 listFiles 不判路径穿越",
+      verdict("pathtraver",
+              "// Full-Route: /api/v1/storage/listFiles\n"
+              "@GetMapping(\"/listFiles\")\n"
+              "public Mono<ApiResponse<JSONObject>> listFiles(\n"
+              "        @Valid @ModelAttribute StorageFileDtos.ListRequest"
+              " request) {\n"
+              "    return fileService.listFiles(request).map(ApiResponse::ok);\n"
+              "}\n"), False)
+check("M468：File.listFiles 的真实遍历仍判 True（防放宽）",
+      verdict("pathtraver",
+              "public String list(@RequestParam String name) {\n"
+              "    File dir = new File(baseDir + name);\n"
+              "    for (File f : dir.listFiles()) { return f.getName(); }\n"
+              "}\n"), True)
+
+# --- M469：YAML `#` 注释行 / 本地 dev overlay 凭据 ---
+_M469_YAML = ("# OPTIONAL local overlay example\n"
+              "# EXAMPLE_SECRET=changeme-please-0123456789\n"
+              "# SIGNING_KEY: \"example-signing-key-0123456789\"\n"
+              "services:\n  app:\n    image: x\n")
+check("M469：YAML 注释行的示例凭据不判 hardcoded_secret",
+      verdict("hardcoded_secret", _M469_YAML,
+              filename="docker-compose.yaml"), None)
+check("M469：YAML 非注释行的真实密钥仍判 True（防放宽）",
+      verdict("hardcoded_secret",
+              _M469_YAML + "    environment:\n"
+              "      JWT_SECRET: \"prod-signing-key-0123456789\"\n",
+              filename="docker-compose.yaml"), True)
+_M469_OVERLAY = Path(_ws_mkdtemp("smoke_m469_overlay_"))
+(_M469_OVERLAY / "docker-compose.keycloak.yaml").write_text(
+    "# OPTIONAL local Keycloak overlay — for developing/testing\n"
+    "# This overlay is NOT part of the default stack.\n"
+    "services:\n"
+    "  keycloak:\n"
+    "    environment:\n"
+    "      KEYCLOAK_CLIENT_SECRET: \"local-akb-dev-secret-0123456789\"\n",
+    encoding="utf-8")
+check("M469：dev overlay compose 的凭据归 DEV_OVERLAY_SECRET",
+      wild_noise.classify({"category": "hardcoded_secret",
+                           "unit": "[secret-file] "
+                                   "docker-compose.keycloak.yaml",
+                           "file": "docker-compose.keycloak.yaml"},
+                          _M469_OVERLAY)["code"], "DEV_OVERLAY_SECRET")
+_M469_PROD = Path(_ws_mkdtemp("smoke_m469_prod_"))
+(_M469_PROD / "docker-compose.yaml").write_text(
+    "services:\n  app:\n    environment:\n"
+    "      JWT_SECRET: \"prod-signing-key-0123456789\"\n", encoding="utf-8")
+check("M469：生产 compose 不归 DEV_OVERLAY_SECRET（防放宽）",
+      wild_noise.classify({"category": "hardcoded_secret",
+                           "unit": "[secret-file] docker-compose.yaml",
+                           "file": "docker-compose.yaml"},
+                          _M469_PROD)["blocked"], False)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
