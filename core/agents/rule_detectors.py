@@ -3797,8 +3797,30 @@ SECRET_ENV_READ_RE = re.compile(
     r"|System\s*\.\s*getProperty\b|@Value\s*\(\s*\"\$\{"
     r"|\.\s*config\s*\.\s*get\s*\(", re.I)
 SECRET_PLACEHOLDER_RE = re.compile(
-    r"(?i)your|changeit|\b123456\b|password|placeholder|dummy|example|xxxxx"
-    r"|\$\{|todo|fixme|insert_|default|已脱敏|\btest\b")
+    r"(?i)your|changeit|changeme|\b123456\b|password|placeholder|dummy|example"
+    r"|\bx{3,}\b|\$\{|todo|fixme|insert_|default|已脱敏|\btest\b")
+# M471：模板占位符与代码片段不是硬编码凭据。tubecli 的 prompt 模板里
+# `"secret": "{{{{totp_secret}}}}"`（f-string 转义后为 `{{totp_secret}}`）
+# 是给 LLM 看的变量占位符，值由运行期替换；chat 模板里的
+# `?secret='+encodeURIComponent('` 也只是 JS 拼接片段。旧判据只剥 `//`/`/* */`
+# 注释、只认少量占位词，于是这两处 len≥16 的"字面量"被当成真实凭据。
+_SECRET_TEMPLATE_RE = re.compile(
+    r"\{\{|\}\}"                      # Jinja / str.format 双花括号
+    r"|\$\{"                          # shell / 模板插值
+    r"|\{[A-Za-z_][\w.]*\}"           # 单花括号 {var}
+    r"|%[sd]"                         # printf / format 占位符
+    r"|<[^<>]{0,40}>"                 # <your_key_here> 这类尖括号占位
+    # 代码片段：以「函数名(」结尾（tubecli 的 `+encodeURIComponent(`）。
+    # 不能简单排除含括号的值 —— DjanGoat 的 Django 真密钥
+    # `+f0x#go-9e-qd(mq0pdn9ma*ls!...` 里就有左括号，会被误伤成占位符。
+    r"|[\w.]\($")
+
+
+def _secret_placeholder(value: str) -> bool:
+    """M471：该字面量是否只是占位符 / 模板 / 代码片段（不是真实凭据）。"""
+    value = value or ""
+    return bool(SECRET_PLACEHOLDER_RE.search(value)
+                or _SECRET_TEMPLATE_RE.search(value))
 SECRET_JWT_CTX_RE = re.compile(
     r"jwt\s*\.\s*(?:encode|decode)|Jwts\s*\.|create_?token"
     r"|config\s*\[[^\]\n]*SECRET_KEY|app\s*\.\s*secret_key", re.I)
@@ -3876,8 +3898,8 @@ def hardcoded_secret_verdict(source: str,
     has_literal = False
     for m in assigns:
         val = m.group("val")
-        if SECRET_PLACEHOLDER_RE.search(val):
-            continue                          # 占位符不算泄露
+        if _secret_placeholder(val):
+            continue                          # 占位符/模板不算泄露
         # 赋值行右侧是 env/config 读取 → 单元只消费不定义
         line_start = body.rfind("\n", 0, m.start()) + 1
         line_end = body.find("\n", m.start())
@@ -3892,7 +3914,7 @@ def hardcoded_secret_verdict(source: str,
         if SECRET_JWT_CTX_RE.search(body):
             return True
         if any(len(m.group("val")) >= 16
-               and not SECRET_PLACEHOLDER_RE.search(m.group("val"))
+               and not _secret_placeholder(m.group("val"))
                for m in assigns):
             return True
         return None                           # 只有短通用密钥 → 交模型
@@ -12563,7 +12585,11 @@ _FILE_DELETE_SAFE_RE = re.compile(
     # M337b：Python pathlib 的标准目录包含校验；creatorhub 的
     # `candidate.relative_to(profiles_dir)` 就是这条。
     r"\.\s*(?:is_)?relative_to\s*\(|"
-    r"deleteFileCheck\s*\(|checkResult\s*\.\s*isFailure\s*\(")
+    r"deleteFileCheck\s*\(|checkResult\s*\.\s*isFailure\s*\("
+    # M471：Werkzeug/Flask 的 safe_join 与项目自定义 _safe_join ——
+    # Maestro 的 delete_output 先 `_safe_join(out_dir, name)`，返回 None 时
+    # 直接 400，路径已被 realpath+前缀校验物理阻断。
+    r"|_?safe_(?:path_?)?join\s*\(")
 # M309：删除目标是本函数刚创建的临时文件（mkstemp/NamedTemporaryFile）时，
 # 路径不是外部输入 —— send_image 的 finally: os.remove(temp_path) 就是这种。
 _TEMP_FILE_ORIGIN_RE = re.compile(

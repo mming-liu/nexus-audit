@@ -890,6 +890,21 @@ _UPLOAD_EXT_WHITELIST_RE = re.compile(
     r"\.\s*suffix\b[^\n]{0,60}\bin\b)", re.I)
 _UPLOAD_GENERATED_NAME_RE = re.compile(
     r"uuid\s*\.\s*uuid4|uuid4\s*\(|secrets\s*\.\s*token_hex", re.I)
+# M472：服务端重写落盘名 —— 上传物不再使用用户原始文件名，路径不可穿越。
+#   Maestro launch.py:         unique_name = f"{uuid.uuid4().hex[:8]}{ext}"
+#   Maestro trajectory_editor: fname = f"{idx:02d}.{ext}"（idx 为服务端计数）
+_UPLOAD_SERVER_INDEX_NAME_RE = re.compile(
+    r"f[\"']\{[^}]{0,60}:\s*0?\d*d\s*\}[^\"']*[\"']")
+# M472：图片先解码再按固定编码重写（PIL `Image.open(...)` → `save(...)`），
+# 落盘内容只能当图片用，不可能原样变成 HTML/脚本。
+_UPLOAD_REENCODE_RE = re.compile(r"\bImage\s*\.\s*open\s*\(", re.I)
+# M472：模型/权重/适配器/更新包加载类上传**不做**"不可执行"降噪 —— 这类
+# 文件可能被反序列化或当插件执行。Maestro 的 import_style 显式豁免，
+# 继续留 A 板等人工白盒结论（v1.5.31 已核：weights_only=True，非 RCE）。
+_MODEL_WEIGHT_UPLOAD_RE = re.compile(
+    r"(?i)(?:import_style|read_upstream_adapter|upstream_adapter|load_model"
+    r"|\badapter\b|checkpoint|\.ckpt|\.safetensors|torch\.load|pickle\.load"
+    r"|weights_only|model_path)")
 _PY_CALL_EXCLUDE = frozenset({
     "if", "for", "while", "with", "return", "print", "len", "str", "int",
     "float", "bool", "dict", "list", "set", "tuple", "open", "range",
@@ -922,6 +937,19 @@ def _py_function_blocks(text: str, names: set[str],
                         tail[head_end:])
         out[name] = tail[:head_end + nxt.start()] if nxt else tail
     return out
+
+
+def _upload_entry_text(src: str, unit: str, file: str) -> str:
+    """上传入口自身的函数体（Python）或整文件（Java）—— M472 归属面。
+
+    不能用 `upload_guard_scope()` 判"服务端重写文件名"：它会把 Hop 里无关
+    函数（Maestro 的 setup.py:save、api.py:join…）一起拼进来，几千行仓库里
+    随便一个 `uuid4()` 都会被算到当前入口头上。
+    """
+    if not str(file or "").endswith(".py"):
+        return src
+    meth = str(unit or "").rsplit(".", 1)[-1]
+    return _py_function_blocks(src, {meth}).get(meth) or src
 
 
 def _repo_def_bodies(repo_root: Path, names: set[str],
@@ -1132,18 +1160,32 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
             _guarded = bool(_UPLOAD_TRAVERSAL_GUARD_RE.search(_scope))
             _whitelisted = bool(_UPLOAD_EXT_WHITELIST_RE.search(_scope)
                                 and _UPLOAD_GENERATED_NAME_RE.search(_scope))
-            if (_guarded or _whitelisted) and not _repo_serves_uploads(repo_root):
+            # M472：上传物由服务端重写落盘名（uuid4/token_hex 随机名、
+            # `f"{序号:02d}.{ext}"` 序号名）或先解码再重编码成图片 ——
+            # 路径不可穿越、落盘内容也不可能是原样脚本（Maestro upload_image
+            # ×2 由此归 B；import_style 等模型加载面上传显式豁免）。
+            _entry = _upload_entry_text(_up_src, unit, file)
+            _renamed = bool(
+                _UPLOAD_GENERATED_NAME_RE.search(_entry)
+                or _UPLOAD_SERVER_INDEX_NAME_RE.search(_entry)
+                or _UPLOAD_REENCODE_RE.search(_entry))
+            _model_loading = bool(_MODEL_WEIGHT_UPLOAD_RE.search(
+                f"{unit} {_entry} {_scope}"))
+            if ((_guarded or _whitelisted or _renamed)
+                    and not _model_loading
+                    and not _repo_serves_uploads(repo_root)):
                 if (_UPLOAD_ATTACHMENT_RE.search(_up_src)
                         or _UPLOAD_ATTACHMENT_RE.search(_scope)
                         or _UPLOAD_RAG_HINT_RE.search(unit)
                         or _UPLOAD_RAG_HINT_RE.search(
                             str(record.get("file") or ""))):
                     return {"blocked": True, "code": UPLOAD_SERVING_ONLY,
-                            "reason": ("已防路径穿越 / 已做扩展名白名单+固定"
-                                       "命名，且下载为 attachment 或仅内部"
+                            "reason": ("已防路径穿越 / 服务端重写落盘名，"
+                                       "且下载为 attachment 或仅内部"
                                        "语料入库，无静态挂载或内联渲染面")}
                 return {"blocked": True, "code": NON_EXECUTABLE_UPLOAD,
-                        "reason": ("已防路径穿越 / 已做扩展名白名单+固定命名，"
+                        "reason": ("已防路径穿越 / 服务端重写落盘名"
+                                   "（uuid4 随机名、序号名或图片重编码），"
                                    "落盘目录非 Web 静态挂载"
                                    "（无 StaticFiles/addResourceHandlers 指向"
                                    "上传目录），上传物不可执行")}

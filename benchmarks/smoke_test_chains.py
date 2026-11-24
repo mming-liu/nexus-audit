@@ -14977,6 +14977,107 @@ check("M469：生产 compose 不归 DEV_OVERLAY_SECRET（防放宽）",
                            "file": "docker-compose.yaml"},
                           _M469_PROD)["blocked"], False)
 
+print("\n[354] M471–M473：模板占位符 / safe_join / 服务端重命名上传")
+
+# --- M471-1：prompt 模板里的占位符不是硬编码凭据（tubecli ×2 假阳） ---
+_M471_PROMPT = (
+    'system_prompt = f"""Generate automation steps.\n'
+    '- fetch_otp: params: {{{{ "secret": "{{{{totp_secret}}}}", '
+    '"save_as": "otp_code" }}}}\n'
+    '- API: GET /api/v1/browser/2fa?secret=\'+encodeURIComponent('
+    "'{{{{totp_secret}}}}')\n"
+    '"""\n'
+    "async def ai_generate_script(request):\n"
+    "    body = await request.json()\n"
+    '    prompt = system_prompt + body.get("prompt", "")\n'
+    "    return prompt\n")
+check("M471：prompt 模板里的 {{totp_secret}} 占位符不判 hardcoded_secret",
+      verdict("hardcoded_secret", _M471_PROMPT) is not True, True)
+check("M471：真实长密钥字面量仍判 True（防放宽）",
+      verdict("hardcoded_secret",
+              'jwt_secret = "s3cr3t-4f8a9c2e1b7d6a5f"\n'
+              "token = jwt.encode(payload, jwt_secret)\n") is True, True)
+check("M471：${...} / <your_...> 占位符同样不判 True",
+      (verdict("hardcoded_secret",
+               'secret_key = "${JWT_SECRET_ENV}"\n') is not True
+       and verdict("hardcoded_secret",
+                   'secret_key = "<your-secret-here>"\n') is not True), True)
+
+# --- M471-2：safe_join 守卫（Maestro delete_output 假阳） ---
+check("M471：_safe_join 守卫 + None 拒绝后 os.remove 不判任意文件删除",
+      verdict("arbitrary_file_delete",
+              "def delete_output(name: str):\n"
+              "    filepath = _safe_join(out_dir, name)\n"
+              "    if filepath is None:\n"
+              "        raise HTTPException(status_code=400,\n"
+              '                            detail="Invalid filename")\n'
+              "    os.remove(filepath)\n") is False, True)
+check("M471：直接 os.remove(请求路径) 仍判 True（防放宽）",
+      verdict("arbitrary_file_delete",
+              "def rm(path):\n    os.remove(path)\n") is True, True)
+
+# --- M472：服务端重命名/重编码落盘归 B，模型加载面上传放行 ---
+_M472_UUID = Path(_ws_mkdtemp("smoke_m472_uuid_"))
+(_M472_UUID / "upload_api.py").write_text(
+    "import os, uuid\n"
+    "def upload_image(request, file):\n"
+    "    ext = os.path.splitext(file.filename or 'img.png')[1].lower()\n"
+    "    unique_name = f\"{uuid.uuid4().hex[:8]}{ext}\"\n"
+    "    with open(os.path.join(upload_dir, unique_name), 'wb') as f:\n"
+    "        f.write(content)\n"
+    "    return {'filename': unique_name}\n", encoding="utf-8")
+check("M472：uuid4 重命名 + 无静态上传挂载 → NON_EXECUTABLE_UPLOAD",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "upload_api.upload_image",
+                           "file": "upload_api.py"}, _M472_UUID)["code"],
+      "NON_EXECUTABLE_UPLOAD")
+_M472_IDX = Path(_ws_mkdtemp("smoke_m472_idx_"))
+(_M472_IDX / "traj_app.py").write_text(
+    "from PIL import Image\n"
+    "def upload_image():\n"
+    "    f = request.files['image']\n"
+    "    img = Image.open(f.stream)\n"
+    "    idx = len(os.listdir(IMAGES_DIR)) + 1\n"
+    "    ext = f.filename.rsplit('.', 1)[-1]\n"
+    "    fname = f\"{idx:02d}.{ext}\"\n"
+    "    img.save(os.path.join(IMAGES_DIR, fname))\n"
+    "    return jsonify({'image_url': fname})\n", encoding="utf-8")
+check("M472：序号命名 + PIL 重编码 + 无静态挂载 → NON_EXECUTABLE_UPLOAD",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "traj_app.upload_image",
+                           "file": "traj_app.py"}, _M472_IDX)["code"],
+      "NON_EXECUTABLE_UPLOAD")
+_M472_MODEL = Path(_ws_mkdtemp("smoke_m472_model_"))
+(_M472_MODEL / "music_api.py").write_text(
+    "from pathlib import Path\nimport uuid\n"
+    "def import_style(name, ar):\n"
+    "    suffix = Path(ar.filename or '').suffix.lower()\n"
+    "    if suffix not in {'.pt', '.safetensors'}:\n"
+    "        raise ValueError('Choose a .pt or .safetensors adapter')\n"
+    "    path = Path(tmp_dir) / f\"{uuid.uuid4().hex}{suffix}\"\n"
+    "    with open(path, 'wb') as f:\n"
+    "        f.write(ar.file.read())\n"
+    "    return read_upstream_adapter(path, 'ar')\n", encoding="utf-8")
+check("M472：模型适配器导入上传保留放行（不压 B）",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "music_api.import_style",
+                           "file": "music_api.py"}, _M472_MODEL)["blocked"],
+      False)
+_M472_STATIC = Path(_ws_mkdtemp("smoke_m472_static_"))
+(_M472_STATIC / "upload_static.py").write_text(
+    "import os, uuid\n"
+    "app.mount('/uploads', StaticFiles(directory='uploads'))\n"
+    "def upload_image(request, file):\n"
+    "    ext = os.path.splitext(file.filename or 'img.png')[1].lower()\n"
+    "    unique_name = f\"{uuid.uuid4().hex[:8]}{ext}\"\n"
+    "    with open(os.path.join('uploads', unique_name), 'wb') as f:\n"
+    "        f.write(content)\n", encoding="utf-8")
+check("M472：静态挂载上传目录时不压 B（防放宽）",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "upload_static.upload_image",
+                           "file": "upload_static.py"},
+                          _M472_STATIC)["blocked"], False)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()
