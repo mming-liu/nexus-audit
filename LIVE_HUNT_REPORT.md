@@ -2,333 +2,450 @@
 
 > 机器事实源：benchmarks/results/daily_hunt.json。本报告的 A/B 行数必须与 JSON 计数一致；ZERO_RECORD_FRESH 只代表四个来源**实际查过且 0 命中**，不代表漏洞一定成立，更不代表人工已核验。
 
-- 生成时间：2026-11-24 09:12:45
-- 总条数：284 ｜ 板块 A：**9** ｜ 板块 B：**275**
-- 状态计数：ZERO_RECORD_FRESH 9 / DUPLICATE_CVE 4 / DUPLICATE_ISSUE_OR_GHSA 0 / PATCHED_UPSTREAM 0 / STALE_REPO 0 / UNKNOWN 271
+- 生成时间：2026-11-25 09:10:27
+- 总条数：397 ｜ 板块 A：**4** ｜ 板块 B：**393**
+- 状态计数：ZERO_RECORD_FRESH 4 / DUPLICATE_CVE 0 / DUPLICATE_ISSUE_OR_GHSA 43 / PATCHED_UPSTREAM 0 / STALE_REPO 0 / UNKNOWN 350
 
-<!-- live_hunt_counts: {"BOARD_A": 9, "BOARD_B": 275, "DUPLICATE_CVE": 4, "DUPLICATE_ISSUE_OR_GHSA": 0, "PATCHED_UPSTREAM": 0, "STALE_REPO": 0, "UNKNOWN": 271, "ZERO_RECORD_FRESH": 9} -->
+<!-- live_hunt_counts: {"BOARD_A": 4, "BOARD_B": 393, "DUPLICATE_CVE": 0, "DUPLICATE_ISSUE_OR_GHSA": 43, "PATCHED_UPSTREAM": 0, "STALE_REPO": 0, "UNKNOWN": 350, "ZERO_RECORD_FRESH": 4} -->
 
 ## 今日巡猎（daily-hunt）
 
 > 自动流水线：近 14 天有提交的 java/python/solidity 仓 → 同 HEAD 直接跳过 → 只报新引入或尚未导出的 ZERO_RECORD_FRESH 根因；本次即扫即焚 0 个缓存。
 
-- 候选仓：22（已处理 10） ｜ 实扫：6 ｜ 跳过：4 ｜ 失败：0 ｜ 候选来源：github_search
-- 本次新增根因：284 ｜ 板块 A：9 ｜ 拦截进 B：275
-- 证据不足未列：1 条（NVD 熔断 / 全网 Issue 限流，未宣称 FRESH，需人工复核）
+- 候选仓：23（已处理 14） ｜ 实扫：6 ｜ 跳过：8 ｜ 失败：0 ｜ 候选来源：github_search
+- 本次新增根因：397 ｜ 板块 A：4 ｜ 拦截进 B：393
+- 证据不足未列：0 条（NVD 熔断 / 全网 Issue 限流，未宣称 FRESH，需人工复核）
 - 冷却期免克隆：0 个（--cooldown-days 7：距上次扫描不足 7 天的仓直接 0 秒顺延）
 - 侦察免克隆排除（未变老仓）：0 个
 
 | 仓库 | HEAD | 结果 | 新增 |
 |---|---|---|---|
-| javashub/CourseArragement | e83d26b0e0cd | SCANNED | 78 |
-| rubiin/tsumiki | 69496094f99b | SKIPPED (ZERO_ENTRY_LIB) | 0 |
-| youlaitech/youlai-boot | 4203ef6dcdd7 | SCANNED | 43 |
-| salitronic/eda-agent | 9c0a14f7795d | SCANNED | 0 |
-| techgenius1/tvOS-Launcher | b14942965c24 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
-| BinceQu/RoboHarness | 8de010092f8a | SCANNED | 2 |
-| opanel-mc/opanel | 8c8df45b0be8 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
-| POLESNIESOVETI12/web-panel-proxy | 148e7eed150a | SKIPPED (ZERO_ENTRY_LIB) | 0 |
-| makunet/maku-boot | 489cb23dbbb7 | SCANNED | 16 |
-| PRVTPRO/Amnezia-Web-Panel | 8e2598c07b8e | SCANNED | 145 |
+| liyupi/yu-picture | 9e6a16e93fe2 | SCANNED | 37 |
+| zgraham1981/Stablecoin-Payment-Gateway | 0e7e9a65dd7e | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| xiaonuobase/Snowy | ec938f39d6e7 | SKIPPED (unchanged_head) | 0 |
+| Yinglianchun/Serein | 43dfa5b7efb7 | SCANNED | 23 |
+| java-up-up/damai | e4c68a1b451e | SCANNED | 53 |
+| aio-libs/multidict | d02731e26acc | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| marshmallow-code/webargs | 686c5cd2cb12 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| agentic-community/mcp-gateway-registry | d344af4beecd | SCANNED | 215 |
+| JJJJSTIYYYY/alira | 13d125f25d84 | SKIPPED (low_units_1) | 0 |
+| niyouqianma/workbuddy2api-hub | 22254ab84752 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| slackapi/bolt-python | 16056a48efcd | SKIPPED (low_units_2) | 0 |
+| shazamio/ShazamIO | ff2d6ea403c7 | SKIPPED (ZERO_ENTRY_LIB) | 0 |
+| schmitech/orbit | 6f1490d063d1 | SCANNED | 61 |
+| dengyie/zcode2api | 7b7162ff4d94 | SCANNED | 8 |
 
 ## 板块 A｜🟢 可直接交单的 ZERO_RECORD_FRESH
 
 | # | 仓库 | 类目 | 根因 | 置信度 | HEAD 提交日期 | HEAD | 源码行 | 提单入口 | 本地手册 |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | CourseArragement | authz | RbacAssignController.assignRoleMenus | — | 2026-11-23 (0.8d) | e83d26b0e0cd | [src/main/java/com/lyk/coursearrange/system/rbac/controller/RbacAssignController.java:42](https://github.com/javashub/CourseArragement/blob/e83d26b0e0cda205bda5e1f020f315210af3140f/src/main/java/com/lyk/coursearrange/system/rbac/controller/RbacAssignController.java#L42) | [Advisory](https://github.com/javashub/CourseArragement/security/advisories/new) · [Issue](https://github.com/javashub/CourseArragement/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/CourseArragement_authz_assignRoleMenus/SUBMISSION_PLAYBOOK.md) |
-| 2 | CourseArragement | authz | RbacAssignController.assignRolePermissions | — | 2026-11-23 (0.8d) | e83d26b0e0cd | [src/main/java/com/lyk/coursearrange/system/rbac/controller/RbacAssignController.java:48](https://github.com/javashub/CourseArragement/blob/e83d26b0e0cda205bda5e1f020f315210af3140f/src/main/java/com/lyk/coursearrange/system/rbac/controller/RbacAssignController.java#L48) | [Advisory](https://github.com/javashub/CourseArragement/security/advisories/new) · [Issue](https://github.com/javashub/CourseArragement/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/CourseArragement_authz_assignRolePermissions/SUBMISSION_PLAYBOOK.md) |
-| 3 | CourseArragement | xss | AdminClassOptionController.create | — | 2026-11-23 (0.8d) | e83d26b0e0cd | [src/main/java/com/lyk/coursearrange/schedule/controller/AdminClassOptionController.java:45](https://github.com/javashub/CourseArragement/blob/e83d26b0e0cda205bda5e1f020f315210af3140f/src/main/java/com/lyk/coursearrange/schedule/controller/AdminClassOptionController.java#L45) | [Advisory](https://github.com/javashub/CourseArragement/security/advisories/new) · [Issue](https://github.com/javashub/CourseArragement/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/CourseArragement_xss_create/SUBMISSION_PLAYBOOK.md) |
-| 4 | CourseArragement | xss | AdminClassOptionController.update | — | 2026-11-23 (0.8d) | e83d26b0e0cd | [src/main/java/com/lyk/coursearrange/schedule/controller/AdminClassOptionController.java:53](https://github.com/javashub/CourseArragement/blob/e83d26b0e0cda205bda5e1f020f315210af3140f/src/main/java/com/lyk/coursearrange/schedule/controller/AdminClassOptionController.java#L53) | [Advisory](https://github.com/javashub/CourseArragement/security/advisories/new) · [Issue](https://github.com/javashub/CourseArragement/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/CourseArragement_xss_update/SUBMISSION_PLAYBOOK.md) |
-| 5 | RoboHarness | pathtraver | api_agent_monitor_image | — | 2026-11-21 (2.8d) | 8de010092f8a | [eval/behavior/behavior_interface/web.py:1943](https://github.com/BinceQu/RoboHarness/blob/8de010092f8abc87f941429274afa8b2056a46e4/eval/behavior/behavior_interface/web.py#L1943) | [Advisory](https://github.com/BinceQu/RoboHarness/security/advisories/new) · [Issue](https://github.com/BinceQu/RoboHarness/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/RoboHarness_pathtraver_api_agent_monitor_image/SUBMISSION_PLAYBOOK.md) |
-| 6 | youlai-boot | authz | FileController.deleteFile | HIGH | 2026-11-22 (1.5d) | 4203ef6dcdd7 | [src/main/java/com/youlai/boot/system/controller/FileController.java:55](https://github.com/youlaitech/youlai-boot/blob/4203ef6dcdd710c0b6a7279312af191914c68459/src/main/java/com/youlai/boot/system/controller/FileController.java#L55) | [Advisory](https://github.com/youlaitech/youlai-boot/security/advisories/new) · [Issue](https://github.com/youlaitech/youlai-boot/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/youlai-boot_authz_deleteFile/SUBMISSION_PLAYBOOK.md) |
-| 7 | youlai-boot | authz | FileController.uploadFile | HIGH | 2026-11-22 (1.5d) | 4203ef6dcdd7 | [src/main/java/com/youlai/boot/system/controller/FileController.java:38](https://github.com/youlaitech/youlai-boot/blob/4203ef6dcdd710c0b6a7279312af191914c68459/src/main/java/com/youlai/boot/system/controller/FileController.java#L38) | [Advisory](https://github.com/youlaitech/youlai-boot/security/advisories/new) · [Issue](https://github.com/youlaitech/youlai-boot/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/youlai-boot_authz_uploadFile/SUBMISSION_PLAYBOOK.md) |
-| 8 | youlai-boot | authz | UserController.bindOrChangeEmail | HIGH | 2026-11-22 (1.5d) | 4203ef6dcdd7 | [src/main/java/com/youlai/boot/system/controller/UserController.java:277](https://github.com/youlaitech/youlai-boot/blob/4203ef6dcdd710c0b6a7279312af191914c68459/src/main/java/com/youlai/boot/system/controller/UserController.java#L277) | [Advisory](https://github.com/youlaitech/youlai-boot/security/advisories/new) · [Issue](https://github.com/youlaitech/youlai-boot/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/youlai-boot_authz_bindOrChangeEmail/SUBMISSION_PLAYBOOK.md) |
-| 9 | youlai-boot | authz | UserController.bindOrChangeMobile | HIGH | 2026-11-22 (1.5d) | 4203ef6dcdd7 | [src/main/java/com/youlai/boot/system/controller/UserController.java:250](https://github.com/youlaitech/youlai-boot/blob/4203ef6dcdd710c0b6a7279312af191914c68459/src/main/java/com/youlai/boot/system/controller/UserController.java#L250) | [Advisory](https://github.com/youlaitech/youlai-boot/security/advisories/new) · [Issue](https://github.com/youlaitech/youlai-boot/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/youlai-boot_authz_bindOrChangeMobile/SUBMISSION_PLAYBOOK.md) |
+| 1 | yu-picture | header_injection | FileController.testDownloadFile | — | 2026-11-23 (1.8d) | 9e6a16e93fe2 | [yu-picture-backend-ddd/src/main/java/com/yupi/yupicture/interfaces/controller/FileController.java:70](https://github.com/liyupi/yu-picture/blob/9e6a16e93fe2e0c3ee9882b253324641fb8c6edb/yu-picture-backend-ddd/src/main/java/com/yupi/yupicture/interfaces/controller/FileController.java#L70) | [Advisory](https://github.com/liyupi/yu-picture/security/advisories/new) · [Issue](https://github.com/liyupi/yu-picture/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/yu-picture_header_injection_testDownloadFile/SUBMISSION_PLAYBOOK.md) |
+| 2 | yu-picture | unrestricted_upload | FileController.testUploadFile | — | 2026-11-23 (1.8d) | 9e6a16e93fe2 | [yu-picture-backend-ddd/src/main/java/com/yupi/yupicture/interfaces/controller/FileController.java:36](https://github.com/liyupi/yu-picture/blob/9e6a16e93fe2e0c3ee9882b253324641fb8c6edb/yu-picture-backend-ddd/src/main/java/com/yupi/yupicture/interfaces/controller/FileController.java#L36) | [Advisory](https://github.com/liyupi/yu-picture/security/advisories/new) · [Issue](https://github.com/liyupi/yu-picture/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/yu-picture_unrestricted_upload_testUploadFile/SUBMISSION_PLAYBOOK.md) |
+| 3 | yu-picture | unrestricted_upload | FileController.testUploadFile | — | 2026-11-23 (1.8d) | 9e6a16e93fe2 | [yu-picture-backend/src/main/java/com/yupi/yupicturebackend/controller/FileController.java:37](https://github.com/liyupi/yu-picture/blob/9e6a16e93fe2e0c3ee9882b253324641fb8c6edb/yu-picture-backend/src/main/java/com/yupi/yupicturebackend/controller/FileController.java#L37) | [Advisory](https://github.com/liyupi/yu-picture/security/advisories/new) · [Issue](https://github.com/liyupi/yu-picture/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/yu-picture_unrestricted_upload_testUploadFile/SUBMISSION_PLAYBOOK.md) |
+| 4 | yu-picture | xss | FileController.testUploadFile | — | 2026-11-23 (1.8d) | 9e6a16e93fe2 | [yu-picture-backend-ddd/src/main/java/com/yupi/yupicture/interfaces/controller/FileController.java:36](https://github.com/liyupi/yu-picture/blob/9e6a16e93fe2e0c3ee9882b253324641fb8c6edb/yu-picture-backend-ddd/src/main/java/com/yupi/yupicture/interfaces/controller/FileController.java#L36) | [Advisory](https://github.com/liyupi/yu-picture/security/advisories/new) · [Issue](https://github.com/liyupi/yu-picture/issues/new) · [CVE.org](https://www.cve.org/ReportRequest/ReportRequestForNonCNAs) | [SUBMISSION_PLAYBOOK.md](benchmarks/results/daily_hunt_packs/yu-picture_xss_testUploadFile/SUBMISSION_PLAYBOOK.md) |
 
 ## 板块 B｜🔴 自动拦截 / 不可交单
 
 | # | 仓库 | 类目 | 根因 | 状态 | 命中证据 | 拦截原因 | 官方链接 |
 |---|---|---|---|---|---|---|---|
-| 1 | Amnezia-Web-Panel | authz | api_add_connection | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 2 | Amnezia-Web-Panel | authz | api_add_user_connection | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 3 | Amnezia-Web-Panel | authz | api_awg_plugin_changelog | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 4 | Amnezia-Web-Panel | authz | api_awg_plugin_status | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 5 | Amnezia-Web-Panel | authz | api_awg_plugin_update | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 6 | Amnezia-Web-Panel | authz | api_awg_plugin_update_cancel | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 7 | Amnezia-Web-Panel | authz | api_awg_plugin_update_status | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 8 | Amnezia-Web-Panel | authz | api_awg_settings_get | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 9 | Amnezia-Web-Panel | authz | api_awg_settings_save | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 10 | Amnezia-Web-Panel | authz | api_backup_restore | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
-| 11 | Amnezia-Web-Panel | authz | api_cheburcheck_get | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 12 | Amnezia-Web-Panel | authz | api_cheburcheck_run | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 13 | Amnezia-Web-Panel | authz | api_check_protocol_port | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 14 | Amnezia-Web-Panel | authz | api_check_server | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 15 | Amnezia-Web-Panel | authz | api_clear_conn_warnings | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 16 | Amnezia-Web-Panel | authz | api_clear_server | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 17 | Amnezia-Web-Panel | authz | api_container_toggle | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 18 | Amnezia-Web-Panel | authz | api_delete_server | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 19 | Amnezia-Web-Panel | authz | api_delete_user | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 20 | Amnezia-Web-Panel | authz | api_docker_ipv6_apply | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 21 | Amnezia-Web-Panel | authz | api_edit_connection | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 22 | Amnezia-Web-Panel | authz | api_edit_server | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 23 | Amnezia-Web-Panel | authz | api_exit_link | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 24 | Amnezia-Web-Panel | authz | api_exit_link_check_egress | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 25 | Amnezia-Web-Panel | authz | api_exit_link_dns | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 26 | Amnezia-Web-Panel | authz | api_exit_link_failover | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 27 | Amnezia-Web-Panel | authz | api_exit_link_failover_check | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 28 | Amnezia-Web-Panel | authz | api_exit_link_status | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 29 | Amnezia-Web-Panel | authz | api_exit_peer_add | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 30 | Amnezia-Web-Panel | authz | api_exit_peer_remove | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 31 | Amnezia-Web-Panel | authz | api_exit_peers | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 32 | Amnezia-Web-Panel | authz | api_exit_relink | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 33 | Amnezia-Web-Panel | authz | api_exit_transit_version | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 34 | Amnezia-Web-Panel | authz | api_exit_unlink | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 35 | Amnezia-Web-Panel | authz | api_get_connection_config | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 36 | Amnezia-Web-Panel | authz | api_get_connections | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 37 | Amnezia-Web-Panel | authz | api_get_server_clients | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 38 | Amnezia-Web-Panel | authz | api_get_user_connections | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 39 | Amnezia-Web-Panel | authz | api_host_tuning | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 40 | Amnezia-Web-Panel | authz | api_install_progress | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 41 | Amnezia-Web-Panel | authz | api_install_protocol | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 42 | Amnezia-Web-Panel | authz | api_instance_copy_cancel | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 43 | Amnezia-Web-Panel | authz | api_instance_copy_preflight | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 44 | Amnezia-Web-Panel | authz | api_instance_copy_start | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 45 | Amnezia-Web-Panel | authz | api_instance_copy_status | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 46 | Amnezia-Web-Panel | authz | api_instance_ipv6 | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 47 | Amnezia-Web-Panel | authz | api_ip_status | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 48 | Amnezia-Web-Panel | authz | api_ipv4_egress | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 49 | Amnezia-Web-Panel | authz | api_ipv4_ingress | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 50 | Amnezia-Web-Panel | authz | api_ipv4_ingress_recreate | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 51 | Amnezia-Web-Panel | authz | api_ipv4_status | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 52 | Amnezia-Web-Panel | authz | api_ipv6_operation | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 53 | Amnezia-Web-Panel | authz | api_mail_send_user | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 54 | Amnezia-Web-Panel | authz | api_my_connection_config | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
-| 55 | Amnezia-Web-Panel | authz | api_my_connection_delete | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
-| 56 | Amnezia-Web-Panel | authz | api_nginx_site_get | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 57 | Amnezia-Web-Panel | authz | api_nginx_site_save | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 58 | Amnezia-Web-Panel | authz | api_orphan_recovery_preview | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 59 | Amnezia-Web-Panel | authz | api_peer_poll_interval | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 60 | Amnezia-Web-Panel | authz | api_protocol_backup_create | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 61 | Amnezia-Web-Panel | authz | api_protocol_backup_delete | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 62 | Amnezia-Web-Panel | authz | api_protocol_backup_download | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 63 | Amnezia-Web-Panel | authz | api_protocol_backup_restore | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 64 | Amnezia-Web-Panel | authz | api_protocol_backup_upload | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 65 | Amnezia-Web-Panel | authz | api_protocol_backups_list | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 66 | Amnezia-Web-Panel | authz | api_reboot_server | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 67 | Amnezia-Web-Panel | authz | api_remove_connection | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 68 | Amnezia-Web-Panel | authz | api_rename_connection | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 69 | Amnezia-Web-Panel | authz | api_rename_protocol | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 70 | Amnezia-Web-Panel | authz | api_revoke_token | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 71 | Amnezia-Web-Panel | authz | api_rkn_scans | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 72 | Amnezia-Web-Panel | authz | api_rkn_scans_clear | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 73 | Amnezia-Web-Panel | authz | api_rknblock_enable | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 74 | Amnezia-Web-Panel | authz | api_rknblock_install | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 75 | Amnezia-Web-Panel | authz | api_rknblock_install_status | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 76 | Amnezia-Web-Panel | authz | api_rknblock_options | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 77 | Amnezia-Web-Panel | authz | api_rknblock_repair | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 78 | Amnezia-Web-Panel | authz | api_rknblock_uninstall | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 79 | Amnezia-Web-Panel | authz | api_rknblock_update | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 80 | Amnezia-Web-Panel | authz | api_save_connection_config | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 81 | Amnezia-Web-Panel | authz | api_server_config | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 82 | Amnezia-Web-Panel | authz | api_server_ipv6_preference | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 83 | Amnezia-Web-Panel | authz | api_server_stats | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 84 | Amnezia-Web-Panel | authz | api_set_connection_speed | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 85 | Amnezia-Web-Panel | authz | api_set_protocol_public_endpoint | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 86 | Amnezia-Web-Panel | authz | api_share_config | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 87 | Amnezia-Web-Panel | authz | api_smartroute_dns | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 88 | Amnezia-Web-Panel | authz | api_smartroute_dns_servers | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 89 | Amnezia-Web-Panel | authz | api_smartroute_enable | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 90 | Amnezia-Web-Panel | authz | api_smartroute_install | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 91 | Amnezia-Web-Panel | authz | api_smartroute_install_status | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 92 | Amnezia-Web-Panel | authz | api_smartroute_own_subnets | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 93 | Amnezia-Web-Panel | authz | api_smartroute_split | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 94 | Amnezia-Web-Panel | authz | api_smartroute_status | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 95 | Amnezia-Web-Panel | authz | api_smartroute_uninstall | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 96 | Amnezia-Web-Panel | authz | api_smartroute_update | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 97 | Amnezia-Web-Panel | authz | api_socks5_get_credentials | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 98 | Amnezia-Web-Panel | authz | api_socks5_update_credentials | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 99 | Amnezia-Web-Panel | authz | api_srv_warp_dns | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 100 | Amnezia-Web-Panel | authz | api_srv_warp_exit_egress | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 101 | Amnezia-Web-Panel | authz | api_srv_warp_failover | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 102 | Amnezia-Web-Panel | authz | api_srv_warp_force_unlink | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 103 | Amnezia-Web-Panel | authz | api_srv_warp_install | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 104 | Amnezia-Web-Panel | authz | api_srv_warp_link | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 105 | Amnezia-Web-Panel | authz | api_srv_warp_reissue | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 106 | Amnezia-Web-Panel | authz | api_srv_warp_repair | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 107 | Amnezia-Web-Panel | authz | api_srv_warp_status | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 108 | Amnezia-Web-Panel | authz | api_srv_warp_switch | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 109 | Amnezia-Web-Panel | authz | api_srv_warp_uninstall | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 110 | Amnezia-Web-Panel | authz | api_srv_warp_unlink | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 111 | Amnezia-Web-Panel | authz | api_ssh_cooldown | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 112 | Amnezia-Web-Panel | authz | api_ssh_trust_confirm | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 113 | Amnezia-Web-Panel | authz | api_subscription_reset | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 114 | Amnezia-Web-Panel | authz | api_toggle_connection | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 115 | Amnezia-Web-Panel | authz | api_toggle_user | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 116 | Amnezia-Web-Panel | authz | api_torrent_plugin_enabled | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 117 | Amnezia-Web-Panel | authz | api_torrent_plugin_install | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 118 | Amnezia-Web-Panel | authz | api_torrent_plugin_marks_clear | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 119 | Amnezia-Web-Panel | authz | api_torrent_plugin_mode | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 120 | Amnezia-Web-Panel | authz | api_torrent_plugin_refresh | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 121 | Amnezia-Web-Panel | authz | api_torrent_plugin_settings | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 122 | Amnezia-Web-Panel | authz | api_torrent_plugin_state | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 123 | Amnezia-Web-Panel | authz | api_torrent_plugin_uninstall | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 124 | Amnezia-Web-Panel | authz | api_uninstall_protocol | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 125 | Amnezia-Web-Panel | authz | api_unlink_user_connection | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 126 | Amnezia-Web-Panel | authz | api_update_user | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 127 | Amnezia-Web-Panel | authz | api_used_ports | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 128 | Amnezia-Web-Panel | authz | api_user_share_setup | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 129 | Amnezia-Web-Panel | authz | api_wgeasy_import | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 130 | Amnezia-Web-Panel | authz | api_wgeasy_preview | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 131 | Amnezia-Web-Panel | authz | api_xray_core_version | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 132 | Amnezia-Web-Panel | authz | api_xray_encryption_state | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 133 | Amnezia-Web-Panel | authz | api_xray_encryption_toggle | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 134 | Amnezia-Web-Panel | authz | api_xray_fingerprint_get | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 135 | Amnezia-Web-Panel | authz | api_xray_fingerprint_save | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 136 | Amnezia-Web-Panel | authz | api_xray_selfsteal_apply | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 137 | Amnezia-Web-Panel | authz | api_xray_selfsteal_plan | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 138 | Amnezia-Web-Panel | authz | api_xray_update | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 139 | Amnezia-Web-Panel | log_injection | api_add_user_connection | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 140 | Amnezia-Web-Panel | log_injection | api_check_protocol_port | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 141 | Amnezia-Web-Panel | log_injection | api_duckdns_apply | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 142 | Amnezia-Web-Panel | log_injection | api_install_protocol | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 143 | Amnezia-Web-Panel | log_injection | api_rename_connection | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 144 | Amnezia-Web-Panel | log_injection | api_rknblock_repair | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 145 | Amnezia-Web-Panel | log_injection | api_uninstall_protocol | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
-| 146 | CourseArragement | authz | AdminClassOptionController.create | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 147 | CourseArragement | authz | AdminClassOptionController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 148 | CourseArragement | authz | AdminClassOptionController.options | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 149 | CourseArragement | authz | AdminClassOptionController.page | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 150 | CourseArragement | authz | AdminClassOptionController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 151 | CourseArragement | authz | BaseResourceExcelController.exportClassrooms | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 152 | CourseArragement | authz | BaseResourceExcelController.exportCourses | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 153 | CourseArragement | authz | BaseResourceExcelController.exportStudents | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 154 | CourseArragement | authz | BaseResourceExcelController.exportTeachbuilds | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 155 | CourseArragement | authz | BaseResourceExcelController.exportTeachers | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 156 | CourseArragement | authz | BaseResourceExcelController.importClassrooms | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 157 | CourseArragement | authz | BaseResourceExcelController.importCourses | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 158 | CourseArragement | authz | BaseResourceExcelController.importStudents | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 159 | CourseArragement | authz | BaseResourceExcelController.importTeachbuilds | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 160 | CourseArragement | authz | BaseResourceExcelController.importTeachers | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 161 | CourseArragement | authz | ClassTaskExcelController.importClassTasks | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 162 | CourseArragement | authz | OrgCampusController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 163 | CourseArragement | authz | OrgCampusController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 164 | CourseArragement | authz | OrgCollegeController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 165 | CourseArragement | authz | OrgCollegeController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 166 | CourseArragement | authz | OrgStageController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 167 | CourseArragement | authz | OrgStageController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 168 | CourseArragement | authz | RbacAssignController.assignUserRoles | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 169 | CourseArragement | authz | RbacAssignController.assignedRoleMenus | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 170 | CourseArragement | authz | RbacAssignController.assignedRolePermissions | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 171 | CourseArragement | authz | RbacAssignController.assignedUserRoles | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 172 | CourseArragement | authz | RbacAssignController.batchAssignUserRoles | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 173 | CourseArragement | authz | ResourceClassroomController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 174 | CourseArragement | authz | ResourceClassroomController.detail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 175 | CourseArragement | authz | ResourceClassroomController.page | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 176 | CourseArragement | authz | ResourceClassroomController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 177 | CourseArragement | authz | ResourceCourseController.changeStatus | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 178 | CourseArragement | authz | ResourceCourseController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 179 | CourseArragement | authz | ResourceCourseController.detail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 180 | CourseArragement | authz | ResourceCourseController.page | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 181 | CourseArragement | authz | ResourceCourseController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 182 | CourseArragement | authz | ResourceStudentController.changeStatus | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 183 | CourseArragement | authz | ResourceStudentController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 184 | CourseArragement | authz | ResourceStudentController.detail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 185 | CourseArragement | authz | ResourceStudentController.nextCode | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 186 | CourseArragement | authz | ResourceStudentController.page | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 187 | CourseArragement | authz | ResourceStudentController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 188 | CourseArragement | authz | ResourceTeacherController.changeStatus | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 189 | CourseArragement | authz | ResourceTeacherController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 190 | CourseArragement | authz | ResourceTeacherController.detail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 191 | CourseArragement | authz | ResourceTeacherController.page | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 192 | CourseArragement | authz | ResourceTeacherController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 193 | CourseArragement | authz | SchedulePlanController.adjust | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 194 | CourseArragement | authz | SchedulePlanController.adjustLogs | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 195 | CourseArragement | authz | SchedulePlanController.byClass | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 196 | CourseArragement | authz | SchedulePlanController.byTeacher | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 197 | CourseArragement | authz | ScheduleTaskController.createExecution | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 198 | CourseArragement | authz | ScheduleTaskController.deleteStandard | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 199 | CourseArragement | authz | ScheduleTaskController.getExecutionDetail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 200 | CourseArragement | authz | ScheduleTaskController.listExecutions | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 201 | CourseArragement | authz | ScheduleTaskController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 202 | CourseArragement | authz | SysMenuController.changeStatus | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 203 | CourseArragement | authz | SysMenuController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 204 | CourseArragement | authz | SysMenuController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 205 | CourseArragement | authz | SysPermissionController.changeStatus | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 206 | CourseArragement | authz | SysPermissionController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 207 | CourseArragement | authz | SysPermissionController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 208 | CourseArragement | authz | SysRoleController.changeStatus | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 209 | CourseArragement | authz | SysRoleController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 210 | CourseArragement | authz | SysRoleController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 211 | CourseArragement | authz | SysUserController.changeStatus | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 212 | CourseArragement | authz | SysUserController.save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 213 | CourseArragement | authz | SystemConfigController.createScheduleRule | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 214 | CourseArragement | authz | SystemConfigController.getScheduleConfig | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 215 | CourseArragement | authz | SystemConfigController.getScheduleConfigByRuleId | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 216 | CourseArragement | authz | SystemConfigController.listFeatureToggles | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 217 | CourseArragement | authz | SystemConfigController.updateFeatureToggles | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 218 | CourseArragement | authz | SystemConfigController.updateScheduleRule | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 219 | CourseArragement | authz | SystemConfigController.updateTimeSlots | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 220 | RoboHarness | authz | api_plan_grasp_image | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 221 | maku-boot | authz | SysAuthController.mobile | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 222 | maku-boot | authz | SysAuthController.sendCode | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 223 | maku-boot | authz | SysAuthController.third | **DUPLICATE_CVE** | CVE-2026-110123 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_CVE: CVE-2026-110123） | https://cve.circl.lu/api/search/makunet/maku-boot |
-| 224 | maku-boot | authz | SysAuthController.token | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 225 | maku-boot | authz | SysMailConfigController.list | **DUPLICATE_CVE** | CVE-2026-110123 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_CVE: CVE-2026-110123） | https://cve.circl.lu/api/search/makunet/maku-boot |
-| 226 | maku-boot | authz | SysOrgController.listByPid | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 227 | maku-boot | authz | SysOrgController.nameList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 228 | maku-boot | authz | SysPostController.nameList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 229 | maku-boot | authz | SysPostController.page | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 230 | maku-boot | authz | SysRoleController.nameList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 231 | maku-boot | authz | SysSmsConfigController.list | **DUPLICATE_CVE** | CVE-2026-110123 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_CVE: CVE-2026-110123） | https://cve.circl.lu/api/search/makunet/maku-boot |
-| 232 | maku-boot | authz | SysThirdLoginController.renderAuth | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 233 | maku-boot | authz | SysThirdLoginController.unBind | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 234 | maku-boot | authz | SysUserController.nameList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 235 | maku-boot | authz | SysUserController.orgUserList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 236 | maku-boot | authz | SysUserController.page | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 237 | youlai-boot | authz | CodegenController.deleteGenConfig | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 238 | youlai-boot | authz | CodegenController.downloadZip | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 239 | youlai-boot | authz | CodegenController.fillConfig | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 240 | youlai-boot | authz | CodegenController.getGenTableFormData | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 241 | youlai-boot | authz | CodegenController.getTablePage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 242 | youlai-boot | authz | CodegenController.getTablePreviewData | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 243 | youlai-boot | authz | CodegenController.saveGenConfig | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 244 | youlai-boot | authz | DeptController.getDeptForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 245 | youlai-boot | authz | FormController.getFormDefinitionForm | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 246 | youlai-boot | authz | FormController.getFormDefinitionPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 247 | youlai-boot | authz | FormController.getFormMenu | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 248 | youlai-boot | authz | FormController.getFormRender | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 249 | youlai-boot | authz | FormController.getPublicFormRender | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 250 | youlai-boot | authz | MenuController.aiFillMenu | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 251 | youlai-boot | authz | MenuController.getMenuOptions | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 252 | youlai-boot | authz | OidcUserIdentityController.getIdentity | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 253 | youlai-boot | authz | OidcUserIdentityController.removeIdentity | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 254 | youlai-boot | authz | OidcUserIdentityController.setIdentity | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 255 | youlai-boot | authz | QrCodeAuthController.status | **DUPLICATE_CVE** | CVE-2026-110216、CVE-2026-110215、CVE-2026-7672 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_CVE: CVE-2026-110216, CVE-2026-110215, CVE-2026-7672） | https://cve.circl.lu/api/search/youlaitech/youlai-boot、https://cve.circl.lu/api/search/youlaitech/youlai-boot、https://cve.circl.lu/api/search/youlaitech/youlai-boot |
-| 256 | youlai-boot | authz | RoleController.getRoleMenuIds | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 257 | youlai-boot | authz | SmsAuthController.sendCode | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 258 | youlai-boot | authz | UserController.changeCurrentUserPassword | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 259 | youlai-boot | authz | UserController.sendEmailCode | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 260 | youlai-boot | authz | UserController.sendMobileCode | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 261 | youlai-boot | authz | UserController.unbindEmail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 262 | youlai-boot | authz | UserController.unbindMobile | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 263 | youlai-boot | authz | WorkflowDefinitionController.listProcessStages | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 264 | youlai-boot | authz | WorkflowInstanceController.getInstanceDetail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 265 | youlai-boot | authz | WorkflowInstanceController.getInstancePage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 266 | youlai-boot | authz | WorkflowInstanceController.getProcessDiagram | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 267 | youlai-boot | authz | WorkflowInstanceController.startProcess | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 268 | youlai-boot | authz | WorkflowTaskController.completeTask | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 269 | youlai-boot | authz | WorkflowTaskController.getDoneTaskPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 270 | youlai-boot | authz | WorkflowTaskController.getTaskDetail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 271 | youlai-boot | authz | WorkflowTaskController.getTodoTaskPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 272 | youlai-boot | authz | WorkflowTaskController.listRejectTargets | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 273 | youlai-boot | authz | WorkflowTaskController.rejectTask | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 274 | youlai-boot | authz | WorkflowTaskController.summarizeTask | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
-| 275 | youlai-boot | authz | WxMaAuthController.silentLogin | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 1 | Serein | authz | active_leaf | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 2 | Serein | authz | call | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 3 | Serein | authz | chat | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 4 | Serein | authz | delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 5 | Serein | authz | delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 6 | Serein | authz | delete_memo | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 7 | Serein | authz | dream | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 8 | Serein | authz | edges | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 9 | Serein | authz | edit_memo | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 10 | Serein | authz | history | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 11 | Serein | authz | history | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 12 | Serein | authz | inbox | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 13 | Serein | authz | pending_detail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 14 | Serein | authz | pipeline_attempt | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 15 | Serein | authz | proposals | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 16 | Serein | authz | read_persona | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 17 | Serein | authz | restore | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 18 | Serein | authz | review | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 19 | Serein | authz | revision_materials | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 20 | Serein | authz | save | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 21 | Serein | authz | shadows | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 22 | Serein | authz | status_memo | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 23 | Serein | authz | write | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 24 | damai | authz | AllRuleController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 25 | damai | authz | ApiDataController.pageList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 26 | damai | authz | AreaController.getById | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 27 | damai | authz | AreaController.selectByIdList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 28 | damai | authz | BroadcastController.call | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 29 | damai | authz | ChannelDataController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 30 | damai | authz | ChannelDataController.getByCode | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 31 | damai | authz | DepthRuleController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 32 | damai | authz | DepthRuleController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 33 | damai | authz | DepthRuleController.updateStatus | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 34 | damai | authz | OrderController.cancel | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 35 | damai | authz | OrderController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 36 | damai | authz | OrderController.getCache | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 37 | damai | authz | OrderController.pay | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 38 | damai | authz | OrderController.payCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 39 | damai | authz | OrderController.selectList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 40 | damai | authz | PayController.commonPay | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 41 | damai | authz | PayController.detail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 42 | damai | authz | PayController.notify | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 43 | damai | authz | PayController.refund | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 44 | damai | authz | PayController.tradeCheck | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 45 | damai | authz | ProgramCategoryController.saveBatch | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 46 | damai | authz | ProgramCategoryController.selectByParentProgramCategoryId | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 47 | damai | authz | ProgramCategoryController.selectByType | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 48 | damai | authz | ProgramController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 49 | damai | authz | ProgramController.recommendList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 50 | damai | authz | ProgramController.search | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 51 | damai | authz | ProgramController.selectHomeList | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 52 | damai | authz | ProgramController.selectPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 53 | damai | authz | ProgramShowTimeController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 54 | damai | authz | RuleController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 55 | damai | authz | RuleController.get | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 56 | damai | authz | RuleController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 57 | damai | authz | RuleController.updateStatus | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 58 | damai | authz | SeatController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 59 | damai | authz | SeatController.batchAdd | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 60 | damai | authz | SeatController.relateInfo | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 61 | damai | authz | TestController.reset | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 62 | damai | authz | TicketCategoryController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 63 | damai | authz | TicketCategoryController.detail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 64 | damai | authz | TicketCategoryController.selectListByProgram | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 65 | damai | authz | TicketUserController.add | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 66 | damai | authz | TicketUserController.delete | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 67 | damai | authz | TicketUserController.list | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 68 | damai | authz | UserCaptchaController.getCaptcha | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 69 | damai | authz | UserCaptchaController.verifyCaptcha | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 70 | damai | authz | UserController.authentication | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 71 | damai | authz | UserController.exist | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 72 | damai | authz | UserController.logout | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 73 | damai | authz | UserController.update | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 74 | damai | authz | UserController.updateEmail | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 75 | damai | authz | UserController.updateMobile | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 76 | damai | authz | UserController.updatePassword | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 77 | mcp-gateway-registry | authz | add_ai_catalog_source | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 78 | mcp-gateway-registry | authz | add_anthropic_server | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 79 | mcp-gateway-registry | authz | add_asor_agent | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 80 | mcp-gateway-registry | authz | add_aws_registry | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 81 | mcp-gateway-registry | authz | add_openapi_target | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 82 | mcp-gateway-registry | authz | add_quarantine | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 83 | mcp-gateway-registry | authz | add_server_to_groups_api | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 84 | mcp-gateway-registry | authz | api_check_availability | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 85 | mcp-gateway-registry | authz | api_check_prices | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 86 | mcp-gateway-registry | authz | api_reserve_flight | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 87 | mcp-gateway-registry | authz | create_group_api | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 88 | mcp-gateway-registry | authz | create_pingfederate_user | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 89 | mcp-gateway-registry | authz | delete_backend_session | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 90 | mcp-gateway-registry | authz | delete_custom_entity | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 91 | mcp-gateway-registry | authz | delete_custom_type | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 92 | mcp-gateway-registry | authz | delete_federation_config | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 93 | mcp-gateway-registry | authz | delete_group_api | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 94 | mcp-gateway-registry | authz | delete_m2m_client | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 95 | mcp-gateway-registry | authz | delete_openapi_server | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 96 | mcp-gateway-registry | authz | delete_openapi_target | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 97 | mcp-gateway-registry | authz | delete_peer | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 98 | mcp-gateway-registry | authz | delete_rate_limit | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 99 | mcp-gateway-registry | authz | delete_rate_limit_membership | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 100 | mcp-gateway-registry | authz | delete_user_group | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 101 | mcp-gateway-registry | authz | disable_peer | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 102 | mcp-gateway-registry | authz | edit_server_submit | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 103 | mcp-gateway-registry | authz | enable_peer | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 104 | mcp-gateway-registry | authz | export_logs | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 105 | mcp-gateway-registry | authz | flush_metrics | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 106 | mcp-gateway-registry | authz | get_agent_batch_job | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 107 | mcp-gateway-registry | authz | get_backend_session | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 108 | mcp-gateway-registry | authz | get_client_groups | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 109 | mcp-gateway-registry | authz | get_client_groups | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 110 | mcp-gateway-registry | authz | get_custom_entity | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 111 | mcp-gateway-registry | authz | get_custom_entity_rating | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 112 | mcp-gateway-registry | authz | get_custom_type | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 113 | mcp-gateway-registry | authz | get_federation_config | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 114 | mcp-gateway-registry | authz | get_group_api | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 115 | mcp-gateway-registry | authz | get_m2m_client | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 116 | mcp-gateway-registry | authz | get_openapi_server | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 117 | mcp-gateway-registry | authz | get_openapi_target | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 118 | mcp-gateway-registry | authz | get_peer | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 119 | mcp-gateway-registry | authz | get_peer_connections | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 120 | mcp-gateway-registry | authz | get_peer_shared_resources | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 121 | mcp-gateway-registry | authz | get_peer_status | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 122 | mcp-gateway-registry | authz | get_rate_limit | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 123 | mcp-gateway-registry | authz | get_rate_limit_membership | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 124 | mcp-gateway-registry | authz | get_user_group | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 125 | mcp-gateway-registry | authz | internal_add_server_to_groups | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 126 | mcp-gateway-registry | authz | internal_create_group | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 127 | mcp-gateway-registry | authz | internal_register_service | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 128 | mcp-gateway-registry | authz | internal_remove_server_from_groups | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 129 | mcp-gateway-registry | authz | list_my_credentials | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 130 | mcp-gateway-registry | authz | management_delete_group | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 131 | mcp-gateway-registry | authz | management_delete_user | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 132 | mcp-gateway-registry | authz | management_get_group | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 133 | mcp-gateway-registry | authz | management_update_group | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 134 | mcp-gateway-registry | authz | management_update_user_groups | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 135 | mcp-gateway-registry | authz | mcp_proxy | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 136 | mcp-gateway-registry | authz | patch_m2m_client | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 137 | mcp-gateway-registry | authz | patch_user_group | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 138 | mcp-gateway-registry | authz | put_rate_limit | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 139 | mcp-gateway-registry | authz | put_rate_limit_membership | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 140 | mcp-gateway-registry | authz | query_logs | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 141 | mcp-gateway-registry | authz | rate_custom_entity | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 142 | mcp-gateway-registry | authz | rate_limit_status | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 143 | mcp-gateway-registry | authz | register_service | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 144 | mcp-gateway-registry | authz | register_service_api | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 145 | mcp-gateway-registry | authz | remove_ai_catalog_source | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 146 | mcp-gateway-registry | authz | remove_anthropic_server | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 147 | mcp-gateway-registry | authz | remove_asor_agent | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 148 | mcp-gateway-registry | authz | remove_aws_registry | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 149 | mcp-gateway-registry | authz | remove_quarantine | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 150 | mcp-gateway-registry | authz | remove_server_from_groups_api | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 151 | mcp-gateway-registry | authz | run_cleanup | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 152 | mcp-gateway-registry | authz | save_federation_config | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 153 | mcp-gateway-registry | authz | serve_branding_file | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 154 | mcp-gateway-registry | authz | set_rate_limit_enabled | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 155 | mcp-gateway-registry | authz | store_backend_session | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 156 | mcp-gateway-registry | authz | sync_ai_catalog | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 157 | mcp-gateway-registry | authz | sync_federation | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 158 | mcp-gateway-registry | authz | sync_peer | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 159 | mcp-gateway-registry | authz | update_client_groups | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 160 | mcp-gateway-registry | authz | update_client_groups | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 161 | mcp-gateway-registry | authz | update_custom_entity | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 162 | mcp-gateway-registry | authz | update_custom_entity_upstream_headers | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 163 | mcp-gateway-registry | authz | update_custom_type | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 164 | mcp-gateway-registry | authz | update_federation_config | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 165 | mcp-gateway-registry | authz | update_openapi_server | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 166 | mcp-gateway-registry | authz | update_openapi_target | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 167 | mcp-gateway-registry | authz | update_peer | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 168 | mcp-gateway-registry | authz | update_peer_token | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 169 | mcp-gateway-registry | authz | update_retention_policy | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 170 | mcp-gateway-registry | authz | validate_client_session | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 171 | mcp-gateway-registry | log_injection | add_ai_catalog_source | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 172 | mcp-gateway-registry | log_injection | add_anthropic_server | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 173 | mcp-gateway-registry | log_injection | add_asor_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 174 | mcp-gateway-registry | log_injection | add_aws_registry | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 175 | mcp-gateway-registry | log_injection | add_server_to_groups_api | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 176 | mcp-gateway-registry | log_injection | api_cancel_reservation | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 177 | mcp-gateway-registry | log_injection | api_check_availability | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 178 | mcp-gateway-registry | log_injection | api_check_prices | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 179 | mcp-gateway-registry | log_injection | api_confirm_booking | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 180 | mcp-gateway-registry | log_injection | api_create_trip_plan | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 181 | mcp-gateway-registry | log_injection | api_discover_agents | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 182 | mcp-gateway-registry | log_injection | api_get_reservation | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 183 | mcp-gateway-registry | log_injection | api_process_payment | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 184 | mcp-gateway-registry | log_injection | api_recommendations | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 185 | mcp-gateway-registry | log_injection | api_reserve_flight | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 186 | mcp-gateway-registry | log_injection | api_search_flights | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 187 | mcp-gateway-registry | log_injection | check_agent_health | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 188 | mcp-gateway-registry | log_injection | clear_security_pending_local | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 189 | mcp-gateway-registry | log_injection | collect_metrics | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 190 | mcp-gateway-registry | log_injection | create_client_session | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 191 | mcp-gateway-registry | log_injection | create_group_api | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 192 | mcp-gateway-registry | log_injection | create_peer | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 193 | mcp-gateway-registry | log_injection | delete_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 194 | mcp-gateway-registry | log_injection | delete_federation_config | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 195 | mcp-gateway-registry | log_injection | delete_group_api | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 196 | mcp-gateway-registry | log_injection | delete_peer | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 197 | mcp-gateway-registry | log_injection | disable_peer | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 198 | mcp-gateway-registry | log_injection | discover_agents_by_skills | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 199 | mcp-gateway-registry | log_injection | discover_agents_semantic | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 200 | mcp-gateway-registry | log_injection | edit_server_form | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 201 | mcp-gateway-registry | log_injection | edit_server_submit | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 202 | mcp-gateway-registry | log_injection | egress_callback | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 203 | mcp-gateway-registry | log_injection | enable_peer | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 204 | mcp-gateway-registry | log_injection | export_agents | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 205 | mcp-gateway-registry | log_injection | export_audit_events | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 206 | mcp-gateway-registry | log_injection | export_config | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 207 | mcp-gateway-registry | log_injection | export_security_scans | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 208 | mcp-gateway-registry | log_injection | export_servers | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 209 | mcp-gateway-registry | log_injection | generate_user_token | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 210 | mcp-gateway-registry | log_injection | generate_user_token | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 211 | mcp-gateway-registry | log_injection | get_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 212 | mcp-gateway-registry | log_injection | get_audit_event | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 213 | mcp-gateway-registry | log_injection | get_audit_events | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 214 | mcp-gateway-registry | log_injection | get_federation_config | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 215 | mcp-gateway-registry | log_injection | get_group_api | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 216 | mcp-gateway-registry | log_injection | get_peer | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 217 | mcp-gateway-registry | log_injection | get_peer_connections | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 218 | mcp-gateway-registry | log_injection | get_peer_shared_resources | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 219 | mcp-gateway-registry | log_injection | get_peer_status | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 220 | mcp-gateway-registry | log_injection | get_server_canonical | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 221 | mcp-gateway-registry | log_injection | get_server_details | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 222 | mcp-gateway-registry | log_injection | get_server_version | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
+| 223 | mcp-gateway-registry | log_injection | get_servers_json | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 224 | mcp-gateway-registry | log_injection | get_service_tools | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 225 | mcp-gateway-registry | log_injection | get_service_tools_api | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 226 | mcp-gateway-registry | log_injection | internal_add_server_to_groups | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 227 | mcp-gateway-registry | log_injection | internal_create_group | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 228 | mcp-gateway-registry | log_injection | internal_delete_group | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 229 | mcp-gateway-registry | log_injection | internal_list_groups | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 230 | mcp-gateway-registry | log_injection | internal_register_service | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 231 | mcp-gateway-registry | log_injection | internal_remove_server_from_groups | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 232 | mcp-gateway-registry | log_injection | internal_remove_service | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 233 | mcp-gateway-registry | log_injection | internal_toggle_service | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 234 | mcp-gateway-registry | log_injection | list_agents | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 235 | mcp-gateway-registry | log_injection | list_federation_configs | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 236 | mcp-gateway-registry | log_injection | list_groups_api | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 237 | mcp-gateway-registry | log_injection | list_peers | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 238 | mcp-gateway-registry | log_injection | list_server_versions | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
+| 239 | mcp-gateway-registry | log_injection | list_servers | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
+| 240 | mcp-gateway-registry | log_injection | list_skills | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 241 | mcp-gateway-registry | log_injection | list_virtual_servers | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 242 | mcp-gateway-registry | log_injection | management_create_m2m_user | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 243 | mcp-gateway-registry | log_injection | management_update_user_groups | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 244 | mcp-gateway-registry | log_injection | mcp_proxy | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 245 | mcp-gateway-registry | log_injection | oauth2_callback | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 246 | mcp-gateway-registry | log_injection | oauth2_callback | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 247 | mcp-gateway-registry | log_injection | oauth2_login | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 248 | mcp-gateway-registry | log_injection | oauth2_login_redirect | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 249 | mcp-gateway-registry | log_injection | oauth2_logout | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 250 | mcp-gateway-registry | log_injection | patch_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 251 | mcp-gateway-registry | log_injection | patch_server_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 252 | mcp-gateway-registry | log_injection | pull_agent_card | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 253 | mcp-gateway-registry | log_injection | rate_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 254 | mcp-gateway-registry | log_injection | rate_server | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 255 | mcp-gateway-registry | log_injection | rate_skill | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 256 | mcp-gateway-registry | log_injection | read_root | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 257 | mcp-gateway-registry | log_injection | record_export_audit_event | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 258 | mcp-gateway-registry | log_injection | refresh_service | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 259 | mcp-gateway-registry | log_injection | register_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 260 | mcp-gateway-registry | log_injection | register_service | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 261 | mcp-gateway-registry | log_injection | register_service_api | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 262 | mcp-gateway-registry | log_injection | reload_scopes | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 263 | mcp-gateway-registry | log_injection | remove_ai_catalog_source | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 264 | mcp-gateway-registry | log_injection | remove_anthropic_server | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 265 | mcp-gateway-registry | log_injection | remove_asor_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 266 | mcp-gateway-registry | log_injection | remove_aws_registry | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 267 | mcp-gateway-registry | log_injection | remove_server_from_groups_api | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 268 | mcp-gateway-registry | log_injection | remove_server_version | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 269 | mcp-gateway-registry | log_injection | remove_service_api | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 270 | mcp-gateway-registry | log_injection | rescan_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 271 | mcp-gateway-registry | log_injection | rescan_server | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 272 | mcp-gateway-registry | log_injection | save_federation_config | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 273 | mcp-gateway-registry | log_injection | set_cloud_provider_hint | **UNKNOWN** | — | LOCAL_LOOPBACK_ONLY: 显式仅允许 loopback 客户端的单机工作台（LocalAccessMiddleware / 127.0.0.1 校验），无远程攻击面 | — |
+| 274 | mcp-gateway-registry | log_injection | set_default_version | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 275 | mcp-gateway-registry | log_injection | sync_federation | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 276 | mcp-gateway-registry | log_injection | sync_peer | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 277 | mcp-gateway-registry | log_injection | toggle_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 278 | mcp-gateway-registry | log_injection | toggle_service_api | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 279 | mcp-gateway-registry | log_injection | toggle_service_route | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 280 | mcp-gateway-registry | log_injection | update_agent | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 281 | mcp-gateway-registry | log_injection | update_custom_type | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 282 | mcp-gateway-registry | log_injection | update_federation_config | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 283 | mcp-gateway-registry | log_injection | update_peer | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 284 | mcp-gateway-registry | log_injection | update_peer_token | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 285 | mcp-gateway-registry | log_injection | update_server_auth_credential | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 286 | mcp-gateway-registry | log_injection | update_server_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 287 | mcp-gateway-registry | log_injection | update_skill | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 288 | mcp-gateway-registry | log_injection | validate_request | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 289 | mcp-gateway-registry | log_injection | vend_egress_token | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 290 | mcp-gateway-registry | log_injection | vend_generic_upstream_headers | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 291 | mcp-gateway-registry | log_injection | websocket_endpoint | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 292 | orbit | authz | associate_prompt_with_api_key | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 293 | orbit | authz | chat_endpoint | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-5wx2-h979-qq6w、GHSA-vmr6-q95v-7f9q、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-5wx2-h979-qq6w, GHSA-vmr6-q95v-7f9q） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 294 | orbit | authz | clear_chat_history | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 295 | orbit | authz | create_thread | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-5wx2-h979-qq6w、GHSA-vmr6-q95v-7f9q、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-5wx2-h979-qq6w, GHSA-vmr6-q95v-7f9q） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 296 | orbit | authz | delete_adapter | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-5wx2-h979-qq6w、GHSA-x7j2-phmx-4wmj、GHSA-f946-p3h8-h2f2、GHSA-w9xh-99x5-vrw5、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-5wx2-h979-qq6w, GHSA-x7j2-phmx-4wmj, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 297 | orbit | authz | delete_conversation_with_files | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 298 | orbit | authz | delete_mcp_server | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 299 | orbit | authz | delete_prompt | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 300 | orbit | authz | delete_skill | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 301 | orbit | authz | delete_thread | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-5wx2-h979-qq6w、GHSA-vmr6-q95v-7f9q、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-5wx2-h979-qq6w, GHSA-vmr6-q95v-7f9q） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 302 | orbit | authz | export_adapter | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-5wx2-h979-qq6w、GHSA-x7j2-phmx-4wmj、GHSA-f946-p3h8-h2f2、GHSA-w9xh-99x5-vrw5、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-5wx2-h979-qq6w, GHSA-x7j2-phmx-4wmj, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 303 | orbit | authz | get_adapter_config_file | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-5wx2-h979-qq6w、GHSA-x7j2-phmx-4wmj、GHSA-f946-p3h8-h2f2、GHSA-w9xh-99x5-vrw5、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-5wx2-h979-qq6w, GHSA-x7j2-phmx-4wmj, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 304 | orbit | authz | get_adapter_edit_form | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-5wx2-h979-qq6w、GHSA-x7j2-phmx-4wmj、GHSA-f946-p3h8-h2f2、GHSA-w9xh-99x5-vrw5、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-5wx2-h979-qq6w, GHSA-x7j2-phmx-4wmj, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 305 | orbit | authz | get_adapter_entry | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-5wx2-h979-qq6w、GHSA-x7j2-phmx-4wmj、GHSA-f946-p3h8-h2f2、GHSA-w9xh-99x5-vrw5、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-5wx2-h979-qq6w, GHSA-x7j2-phmx-4wmj, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 306 | orbit | authz | get_admin_job_status | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 307 | orbit | authz | get_api_key_quota | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 308 | orbit | authz | get_api_key_status | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 309 | orbit | authz | get_chat_history | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-vmr6-q95v-7f9q、GHSA-mqqp-549x-j92q | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-vmr6-q95v-7f9q, GHSA-mqqp-549x-j92q） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 310 | orbit | authz | get_observability_usage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 311 | orbit | authz | get_session_feedback | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-5wx2-h979-qq6w、GHSA-vmr6-q95v-7f9q、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-5wx2-h979-qq6w, GHSA-vmr6-q95v-7f9q） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 312 | orbit | authz | get_skill | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 313 | orbit | authz | get_thread | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-5wx2-h979-qq6w、GHSA-vmr6-q95v-7f9q、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-5wx2-h979-qq6w, GHSA-vmr6-q95v-7f9q） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 314 | orbit | authz | list_admin_audit_events | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 315 | orbit | authz | openai_chat_completions | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-5wx2-h979-qq6w、GHSA-vmr6-q95v-7f9q、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-5wx2-h979-qq6w, GHSA-vmr6-q95v-7f9q） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 316 | orbit | authz | post_admin_login | **UNKNOWN** | — | AUTHZ_CLASS_OR_BASE_GUARD: 入口挂有 Depends(...) 鉴权依赖 / WS token 校验 / 显式 verify_* 守卫 | — |
+| 317 | orbit | authz | reset_api_key_quota | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 318 | orbit | authz | save_adapter_config_file | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-5wx2-h979-qq6w、GHSA-x7j2-phmx-4wmj、GHSA-f946-p3h8-h2f2、GHSA-w9xh-99x5-vrw5、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-5wx2-h979-qq6w, GHSA-x7j2-phmx-4wmj, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 319 | orbit | authz | save_adapter_entry | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-5wx2-h979-qq6w、GHSA-x7j2-phmx-4wmj、GHSA-f946-p3h8-h2f2、GHSA-w9xh-99x5-vrw5、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-5wx2-h979-qq6w, GHSA-x7j2-phmx-4wmj, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 320 | orbit | authz | submit_feedback | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-5wx2-h979-qq6w、GHSA-vmr6-q95v-7f9q、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-5wx2-h979-qq6w, GHSA-vmr6-q95v-7f9q） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 321 | orbit | authz | test_adapter_query | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-5wx2-h979-qq6w、GHSA-x7j2-phmx-4wmj、GHSA-f946-p3h8-h2f2、GHSA-w9xh-99x5-vrw5、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-5wx2-h979-qq6w, GHSA-x7j2-phmx-4wmj, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 322 | orbit | authz | toggle_adapter_enabled | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-5wx2-h979-qq6w、GHSA-x7j2-phmx-4wmj、GHSA-f946-p3h8-h2f2、GHSA-w9xh-99x5-vrw5、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-5wx2-h979-qq6w, GHSA-x7j2-phmx-4wmj, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 323 | orbit | authz | update_api_key | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 324 | orbit | authz | update_api_key_quota | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 325 | orbit | authz | update_config_section | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 326 | orbit | authz | update_mcp_server | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 327 | orbit | authz | update_skill | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 328 | orbit | log_injection | chat_endpoint | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-5wx2-h979-qq6w、GHSA-vmr6-q95v-7f9q、GHSA-6v6x-gmh6-p6r2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-5wx2-h979-qq6w, GHSA-vmr6-q95v-7f9q） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 329 | orbit | log_injection | delete_adapter | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-5wx2-h979-qq6w、GHSA-x7j2-phmx-4wmj、GHSA-f946-p3h8-h2f2、GHSA-w9xh-99x5-vrw5、GHSA-6v6x-gmh6-p6r2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-5wx2-h979-qq6w, GHSA-x7j2-phmx-4wmj, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 330 | orbit | log_injection | delete_api_key | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 331 | orbit | log_injection | delete_file | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 332 | orbit | log_injection | get_adapter_full_history | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-5wx2-h979-qq6w | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-5wx2-h979-qq6w） | https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 333 | orbit | log_injection | get_adapter_history | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-5wx2-h979-qq6w | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-5wx2-h979-qq6w） | https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 334 | orbit | log_injection | get_api_key_detail | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 335 | orbit | log_injection | get_api_key_status | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 336 | orbit | log_injection | get_file_content | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 337 | orbit | log_injection | get_user_by_username | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 338 | orbit | log_injection | list_user_sessions | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 339 | orbit | log_injection | login | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-vmr6-q95v-7f9q、GHSA-x7j2-phmx-4wmj | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-vmr6-q95v-7f9q, GHSA-x7j2-phmx-4wmj） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 340 | orbit | log_injection | post_admin_login_2fa | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 341 | orbit | log_injection | query_file | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 342 | orbit | log_injection | rename_api_key | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 343 | orbit | log_injection | renew_api_key | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 344 | orbit | log_injection | reprocess_file | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 345 | orbit | log_injection | reset_api_key_quota | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 346 | orbit | log_injection | revoke_user_session | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 347 | orbit | log_injection | stop_chat_stream | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-5wx2-h979-qq6w、GHSA-vmr6-q95v-7f9q、GHSA-6v6x-gmh6-p6r2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-5wx2-h979-qq6w, GHSA-vmr6-q95v-7f9q） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 348 | orbit | log_injection | tail_log_file | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 349 | orbit | log_injection | update_api_key | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 350 | orbit | log_injection | update_api_key_quota | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2、GHSA-6v6x-gmh6-p6r2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 351 | orbit | log_injection | upload_file | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-xxrm-2pxg-6j3f、GHSA-mqqp-549x-j92q、GHSA-f946-p3h8-h2f2 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-xxrm-2pxg-6j3f, GHSA-mqqp-549x-j92q, GHSA-f946-p3h8-h2f2） | https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories、https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 352 | orbit | log_injection | websocket_metrics | **DUPLICATE_ISSUE_OR_GHSA** | GHSA-8vxv-44px-mpw4 | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项（REPO_LEVEL_GHSA: GHSA-8vxv-44px-mpw4） | https://api.github.com/repos/schmitech/orbit/security-advisories |
+| 353 | yu-picture | authz | PictureController.doPictureReview | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 354 | yu-picture | authz | PictureController.doPictureReview | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 355 | yu-picture | authz | PictureController.listPictureByPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 356 | yu-picture | authz | PictureController.listPictureByPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 357 | yu-picture | authz | PictureController.listPictureVOByPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 358 | yu-picture | authz | PictureController.listPictureVOByPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 359 | yu-picture | authz | PictureController.listPictureVOByPageWithCache | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 360 | yu-picture | authz | PictureController.listPictureVOByPageWithCache | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 361 | yu-picture | authz | PictureController.uploadPictureByBatch | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 362 | yu-picture | authz | PictureController.uploadPictureByBatch | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 363 | yu-picture | authz | SpaceAnalyzeController.getSpaceCategoryAnalyze | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 364 | yu-picture | authz | SpaceAnalyzeController.getSpaceCategoryAnalyze | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 365 | yu-picture | authz | SpaceAnalyzeController.getSpaceRankAnalyze | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 366 | yu-picture | authz | SpaceAnalyzeController.getSpaceRankAnalyze | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 367 | yu-picture | authz | SpaceAnalyzeController.getSpaceSizeAnalyze | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 368 | yu-picture | authz | SpaceAnalyzeController.getSpaceSizeAnalyze | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 369 | yu-picture | authz | SpaceAnalyzeController.getSpaceTagAnalyze | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 370 | yu-picture | authz | SpaceAnalyzeController.getSpaceTagAnalyze | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 371 | yu-picture | authz | SpaceAnalyzeController.getSpaceUsageAnalyze | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 372 | yu-picture | authz | SpaceAnalyzeController.getSpaceUsageAnalyze | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 373 | yu-picture | authz | SpaceAnalyzeController.getSpaceUserAnalyze | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 374 | yu-picture | authz | SpaceAnalyzeController.getSpaceUserAnalyze | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 375 | yu-picture | authz | SpaceController.addSpace | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 376 | yu-picture | authz | SpaceController.addSpace | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 377 | yu-picture | authz | SpaceController.listSpaceByPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 378 | yu-picture | authz | SpaceController.listSpaceByPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 379 | yu-picture | authz | SpaceController.listSpaceVOByPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 380 | yu-picture | authz | SpaceController.listSpaceVOByPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 381 | yu-picture | authz | UserController.deleteUser | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 382 | yu-picture | authz | UserController.listUserVOByPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 383 | yu-picture | authz | UserController.listUserVOByPage | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 384 | yu-picture | log_injection | FileController.testDownloadFile | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 385 | yu-picture | log_injection | FileController.testDownloadFile | **UNKNOWN** | — | LOW_SEVERITY_LOG_INJECTION: CWE-117 日志伪造（CRLF 注入）属低危，不作为首杀交单项 | — |
+| 386 | zcode2api | authz | claim_job_result | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 387 | zcode2api | authz | claim_preview | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 388 | zcode2api | authz | coding_limits | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 389 | zcode2api | authz | edit_account | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 390 | zcode2api | authz | login_poll | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 391 | zcode2api | authz | refresh_one | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 392 | zcode2api | authz | rotate_fingerprint | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
+| 393 | zcode2api | authz | set_enabled | **UNKNOWN** | — | UNVERIFIED_WILD_AUTHZ: 无兄弟鉴权反差且非 /admin 入口，野仓模式不直接进 A | — |
 
 ## 对账
 
 | 板块 | 行数 |
 |---|---|
-| A（ZERO_RECORD_FRESH） | 9 |
-| B（其余状态） | 275 |
-| 合计 | 284 |
+| A（ZERO_RECORD_FRESH） | 4 |
+| B（其余状态） | 393 |
+| 合计 | 397 |
