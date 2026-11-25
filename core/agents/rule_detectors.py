@@ -4344,6 +4344,14 @@ def xss_verdict(source: str) -> bool | None:
     if _UPLOAD_SINK_RE.search(body) and XSS_UPLOAD_EXT_RE.search(body):
         if XSS_UPLOAD_EXT_ALLOWED_RE.search(body):
             return None            # 有枚举但要对每个分支逐个核实，交模型
+        # M475：上传物持久化在外部对象存储（COS/OSS/S3/MinIO），且入口返回
+        # JSON 包装体（`BaseResponse<String>`）：本应用从不按上传扩展名解析
+        # 这些字节，浏览器拿不到"同源 HTML 页面" —— 不是本应用的 XSS。
+        # yu-picture `FileController.testUploadFile` 的 `cosManager.putObject(...)`
+        # + `ResultUtils.success(filepath)` 即此形态。
+        if (_OBJECT_STORAGE_SINK_RE.search(body)
+                and _JSON_WRAPPER_RETURN_RE.search(body)):
+            return False
         return True
 
     # 3) 存储型，介质不在串接建模范围内：写进数据库（Mapper/DAO/Repository）。
@@ -4382,6 +4390,16 @@ XSS_UPLOAD_EXT_RE = re.compile(
 XSS_UPLOAD_EXT_ALLOWED_RE = re.compile(
     r"switch\s*\(\s*\w*(?:type|suffix|ext)\w*\s*\)|"
     r"\b(?:allowed|whitelist|whiteList|ALLOWED|exts|suffixes)\w*\s*\.\s*contains\s*\(", re.I)
+# M475：上传物交给**外部对象存储**（腾讯 COS / 阿里 OSS / AWS S3 / MinIO SDK）。
+# yu-picture 的 `cosManager.putObject(filepath, file)`：文件持久化到 COS，
+# 本应用不按上传扩展名提供静态解析。
+_OBJECT_STORAGE_SINK_RE = re.compile(
+    r"(?i)\b(?:putObject|putObjectRequest|cosClient|cosManager|ossClient|"
+    r"s3Client|minioClient|uploadObject)\b")
+# 管理面 JSON 包装体返回值（不是 HTML 回显）。
+_JSON_WRAPPER_RETURN_RE = re.compile(
+    r"\b(?:BaseResponse|Result|ApiResponse|AjaxResult|CommonResult|"
+    r"ResultUtils\.success)\s*[<(]")
 
 
 # 持久层写入：仓库类调用的通用形态（MyBatis Mapper / DAO / JPA Repository）。

@@ -15078,6 +15078,122 @@ check("M472：静态挂载上传目录时不压 B（防放宽）",
                            "file": "upload_static.py"},
                           _M472_STATIC)["blocked"], False)
 
+print("\n[355] M475–M477：对象存储上传不判 XSS / 管理员专属入口降噪")
+
+# --- M475：上传物进外部对象存储 + JSON 包装体返回 → 不是本应用的 XSS ---
+_M475_XSS = (
+    "// Full-Route: /file/test/upload\n"
+    "// Controller-Kind: @RestController\n"
+    "    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)\n"
+    "    @PostMapping(\"/test/upload\")\n"
+    "    public BaseResponse<String> testUploadFile(\n"
+    "            @RequestPart(\"file\") MultipartFile multipartFile) {\n"
+    "        String filename = multipartFile.getOriginalFilename();\n"
+    "        String filepath = String.format(\"/test/%s\", filename);\n"
+    "        File file = File.createTempFile(filepath, null);\n"
+    "        multipartFile.transferTo(file);\n"
+    "        cosManager.putObject(filepath, file);\n"
+    "        return ResultUtils.success(filepath);\n"
+    "    }\n")
+check("M475：上传到 COS + JSON 包装体返回不判 XSS",
+      verdict("xss", _M475_XSS), False)
+check("M475：同形态但只落本地（无对象存储）仍判 True（防放宽）",
+      verdict("xss", _M475_XSS.replace(
+          "        cosManager.putObject(filepath, file);\n", "")), True)
+check("M475：对象存储 + 扩展名白名单仍退 None（防放宽）",
+      verdict("xss", _M475_XSS.replace(
+          '        String filename = multipartFile.getOriginalFilename();\n',
+          '        String filename = multipartFile.getOriginalFilename();\n'
+          '        if (!allowed.contains(filename)) { return null; }\n')),
+      None)
+
+# --- M475：管理员角色注解 + 同仓 AOP 实锤 → ADMIN_ONLY_ENDPOINT ---
+_M475_CTRL = (
+    "package x;\n"
+    "@RestController\n"
+    "public class FileController {\n"
+    "  @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)\n"
+    "  @GetMapping(\"/test/download\")\n"
+    "  public void testDownloadFile(String filepath, HttpServletResponse resp) {\n"
+    "    resp.setHeader(\"Content-Disposition\", \"attachment; filename=\""
+    " + filepath);\n"
+    "  }\n"
+    "}\n")
+_M475_ASPECT = (
+    "package x;\n"
+    "@Aspect\n@Component\n"
+    "public class AuthInterceptor {\n"
+    "  @Around(\"@annotation(authCheck)\")\n"
+    "  public Object doInterceptor(ProceedingJoinPoint jp, AuthCheck authCheck) "
+    "throws Throwable {\n"
+    "    if (!UserRoleEnum.ADMIN.equals(userRoleEnum)) {\n"
+    "      throw new BusinessException(ErrorCode.NO_AUTH_ERROR);\n"
+    "    }\n"
+    "    return jp.proceed();\n"
+    "  }\n"
+    "}\n")
+_M475_REPO = Path(_ws_mkdtemp("smoke_m475_admin_"))
+(_M475_REPO / "FileController.java").write_text(_M475_CTRL, encoding="utf-8")
+(_M475_REPO / "AuthInterceptor.java").write_text(_M475_ASPECT,
+                                                 encoding="utf-8")
+check("M475：@AuthCheck(ADMIN) + AOP 角色校验 → ADMIN_ONLY_ENDPOINT",
+      wild_noise.classify({"category": "header_injection",
+                           "unit": "FileController.testDownloadFile",
+                           "file": "FileController.java"},
+                          _M475_REPO)["code"], "ADMIN_ONLY_ENDPOINT")
+_M475_DEAD = Path(_ws_mkdtemp("smoke_m475_dead_"))
+(_M475_DEAD / "FileController.java").write_text(_M475_CTRL, encoding="utf-8")
+check("M475：仅注解、无 AOP 切面证据 → 不降噪（防放宽）",
+      wild_noise.classify({"category": "header_injection",
+                           "unit": "FileController.testDownloadFile",
+                           "file": "FileController.java"},
+                          _M475_DEAD)["blocked"], False)
+_M475_PUBLIC = Path(_ws_mkdtemp("smoke_m475_public_"))
+(_M475_PUBLIC / "AuthInterceptor.java").write_text(_M475_ASPECT,
+                                                   encoding="utf-8")
+(_M475_PUBLIC / "FileController.java").write_text(
+    _M475_CTRL.replace(
+        "  @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)\n", ""),
+    encoding="utf-8")
+check("M475：无管理员注解的 header_injection 不降噪（防放宽）",
+      wild_noise.classify({"category": "header_injection",
+                           "unit": "FileController.testDownloadFile",
+                           "file": "FileController.java"},
+                          _M475_PUBLIC)["blocked"], False)
+
+# --- M476：上传物持久化到外部对象存储 → NON_EXECUTABLE_UPLOAD ---
+_M476_UP = (
+    "package x;\n"
+    "@RestController\n"
+    "public class FileController {\n"
+    "  @PostMapping(\"/test/upload\")\n"
+    "  public BaseResponse<String> testUpload(\n"
+    "          @RequestPart(\"file\") MultipartFile multipartFile) {\n"
+    "    String filename = multipartFile.getOriginalFilename();\n"
+    "    String filepath = String.format(\"/test/%s\", filename);\n"
+    "    File file = File.createTempFile(filepath, null);\n"
+    "    multipartFile.transferTo(file);\n"
+    "    cosManager.putObject(filepath, file);\n"
+    "    return ResultUtils.success(filepath);\n"
+    "  }\n"
+    "}\n")
+_M476_REPO = Path(_ws_mkdtemp("smoke_m476_storage_"))
+(_M476_REPO / "FileController.java").write_text(_M476_UP, encoding="utf-8")
+check("M476：上传物进 COS（无静态挂载）→ NON_EXECUTABLE_UPLOAD",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "FileController.testUpload",
+                           "file": "FileController.java"},
+                          _M476_REPO)["code"], "NON_EXECUTABLE_UPLOAD")
+_M476_LOCAL = Path(_ws_mkdtemp("smoke_m476_local_"))
+(_M476_LOCAL / "FileController.java").write_text(
+    _M476_UP.replace("    cosManager.putObject(filepath, file);\n", ""),
+    encoding="utf-8")
+check("M476：只落本地且无防穿越/重命名 → 不降噪（防放宽）",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "FileController.testUpload",
+                           "file": "FileController.java"},
+                          _M476_LOCAL)["blocked"], False)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

@@ -112,6 +112,14 @@ NO_CMD_SINK = "NO_CMD_SINK"
 # M318：超管专属入口（haveSuperAdminAuth() 或 /superadmin/ 路径）——
 # 超管本就拥有全部权限，这类"路径拼接/缺注解"按厂商惯例不立项。
 SUPERADMIN_ONLY = "SUPERADMIN_ONLY"
+# M475：管理员角色专属入口。yu-picture 的 `@AuthCheck(mustRole =
+# UserConstant.ADMIN_ROLE)` 由同仓 AuthInterceptor 的
+# `@Around("@annotation(authCheck)")` 比对 UserRoleEnum.ADMIN，非管理员直接抛
+# NO_AUTH_ERROR —— 未登录/普通用户根本到不了这条路由。header_injection /
+# unrestricted_upload 这类"管理员自伤/自配置"面不占 A 板席位。
+# 只认**自定义角色注解 + 同仓 AOP 实锤**，不把 Spring 的 @PreAuthorize 一并
+# 扫进来（那条由 authz 判据负责，避免放宽真注入类漏洞）。
+ADMIN_ONLY_ENDPOINT = "ADMIN_ONLY_ENDPOINT"
 
 _CMD_SINK_RE = re.compile(
     r"\b(?:os\s*\.\s*(?:system|popen|exec\w*|spawn\w*)|"
@@ -905,6 +913,33 @@ _MODEL_WEIGHT_UPLOAD_RE = re.compile(
     r"(?i)(?:import_style|read_upstream_adapter|upstream_adapter|load_model"
     r"|\badapter\b|checkpoint|\.ckpt|\.safetensors|torch\.load|pickle\.load"
     r"|weights_only|model_path)")
+# M476：上传物持久化到**外部对象存储**（腾讯 COS / 阿里 OSS / AWS S3 /
+# MinIO SDK）—— 本应用没有把上传目录挂成静态资源，按扩展名拿不到同源页面。
+# yu-picture 的 `cosManager.putObject(filepath, file)` 即此形态。
+_OBJECT_STORAGE_UPLOAD_RE = re.compile(
+    r"(?i)\b(?:putObject|putObjectRequest|cosClient|cosManager|ossClient|"
+    r"s3Client|minioClient|uploadObject)\b")
+# M475：自定义角色注解（`@AuthCheck(mustRole = ...ADMIN...)` 等）+ 同仓 AOP
+# 实锤。只认"注解带 mustRole/role(s)/authority/permission 且值为 ADMIN"，
+# 且仓内确有 `@Around("@annotation(...)")` 切面做角色比较或拒绝。
+_ADMIN_GUARD_ANN_RE = re.compile(
+    r"@\w+\s*\([^)]{0,240}?(?:mustRole|roles?|authorit(?:y|ies)|permission)"
+    r"\w*\s*=\s*[^)]{0,120}?ADMIN", re.I)
+_ADMIN_AOP_RE = re.compile(
+    r"@Around\s*\(\s*[\"']@annotation\b", re.I)
+_ADMIN_ROLE_COMPARE_RE = re.compile(
+    r"(?:UserRoleEnum|RoleEnum|UserRole|Role)\s*\.\s*ADMIN|"
+    r"ROLE_ADMIN|hasRole\s*\(\s*[\"']ADMIN|"
+    r"[\"']ADMIN[\"']\s*\.\s*equals|isAdmin\s*\(", re.I)
+_ADMIN_DENY_RE = re.compile(
+    r"NO_AUTH_ERROR|NOT_LOGIN|AccessDeniedException|"
+    r"HttpStatus\s*\.\s*FORBIDDEN|sendError\s*\(\s*403|"
+    r"\b403\b|无权限|没有权限", re.I)
+_ADMIN_AOP_MEMO: dict[str, bool] = {}
+# 本轮只对"管理员自伤/自配置"性质的两类套用：注入类（sqli/cmdi/ssrf…）即便
+# 管理员专属仍可能是真洞（管理员账号被拿下后横向），不在此列。
+_ADMIN_ONLY_CATEGORIES = frozenset({"header_injection", "unrestricted_upload"})
+
 _PY_CALL_EXCLUDE = frozenset({
     "if", "for", "while", "with", "return", "print", "len", "str", "int",
     "float", "bool", "dict", "list", "set", "tuple", "open", "range",
@@ -950,6 +985,73 @@ def _upload_entry_text(src: str, unit: str, file: str) -> str:
         return src
     meth = str(unit or "").rsplit(".", 1)[-1]
     return _py_function_blocks(src, {meth}).get(meth) or src
+
+
+def _method_annotations(src: str, meth: str, window: int = 18) -> str:
+    """取 Java 方法声明之前的注解块（M475）。
+
+    优先用「行首修饰符 + 方法名」定位声明，避免方法名先出现在注释/javadoc 里
+    时把窗口锚到错误位置；找不到再退回裸 `\\bmeth(` 匹配。
+    """
+    src = src or ""
+    if not meth:
+        return ""
+    m = re.search(
+        rf"(?m)^[ \t]*(?:public|protected|private)\b[^\n]*\b{re.escape(meth)}"
+        r"\s*\(", src)
+    if not m:
+        m = re.search(rf"(?m)^[ \t]*[^\n]*\b{re.escape(meth)}\s*\(", src)
+    if not m:
+        return ""
+    return "\n".join(src[:m.start()].splitlines()[-window:])
+
+
+
+def _repo_enforces_role_aspect(repo_root: Path | None) -> bool:
+    """仓内是否存在"注解驱动 + 角色比较/403 拒绝"的 AOP 切面（M475）。
+
+    只看 `@Aspect` 类里带 `@Around("@annotation(...)")` 的文件，并要求同时出现
+    角色比较（`UserRoleEnum.ADMIN.equals(...)` / `hasRole('ADMIN')`）或拒绝
+    （`NO_AUTH_ERROR` / 403）。没有切面 = 注解是死的，不降噪。
+    """
+    if repo_root is None:
+        return False
+    root = Path(repo_root)
+    key = str(root)
+    if key in _ADMIN_AOP_MEMO:
+        return _ADMIN_AOP_MEMO[key]
+    found = False
+    scanned = 0
+    for p in root.rglob("*.java"):
+        if any(part in _SCAN_SKIP_DIRS for part in p.parts):
+            continue
+        scanned += 1
+        if scanned > 800:
+            break
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if "@Aspect" not in text or not _ADMIN_AOP_RE.search(text):
+            continue
+        if (_ADMIN_ROLE_COMPARE_RE.search(text)
+                or _ADMIN_DENY_RE.search(text)):
+            found = True
+            break
+    _ADMIN_AOP_MEMO[key] = found
+    return found
+
+
+def _admin_only_entry(src: str, unit: str, repo_root: Path | None) -> bool:
+    """入口是否"管理员角色专属"（M475）。"""
+    meth = str(unit or "").rsplit(".", 1)[-1]
+    anns = _method_annotations(src, meth)
+    if not anns or not _ADMIN_GUARD_ANN_RE.search(anns):
+        return False
+    if _JAVA_ANON_ANN_RE.search(anns):        # 显式放行注解优先
+        return False
+    return _repo_enforces_role_aspect(repo_root)
+
 
 
 def _repo_def_bodies(repo_root: Path, names: set[str],
@@ -1171,7 +1273,9 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
                 or _UPLOAD_REENCODE_RE.search(_entry))
             _model_loading = bool(_MODEL_WEIGHT_UPLOAD_RE.search(
                 f"{unit} {_entry} {_scope}"))
-            if ((_guarded or _whitelisted or _renamed)
+            _external_storage = bool(
+                _OBJECT_STORAGE_UPLOAD_RE.search(_scope))
+            if ((_guarded or _whitelisted or _renamed or _external_storage)
                     and not _model_loading
                     and not _repo_serves_uploads(repo_root)):
                 if (_UPLOAD_ATTACHMENT_RE.search(_up_src)
@@ -1183,12 +1287,30 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
                             "reason": ("已防路径穿越 / 服务端重写落盘名，"
                                        "且下载为 attachment 或仅内部"
                                        "语料入库，无静态挂载或内联渲染面")}
+                _storage_why = (
+                    "上传物持久化在外部对象存储（COS/OSS/S3/MinIO），"
+                    "本应用不按扩展名做静态解析"
+                    if _external_storage else
+                    "落盘目录非 Web 静态挂载（无 StaticFiles/"
+                    "addResourceHandlers 指向上传目录）")
                 return {"blocked": True, "code": NON_EXECUTABLE_UPLOAD,
                         "reason": ("已防路径穿越 / 服务端重写落盘名"
-                                   "（uuid4 随机名、序号名或图片重编码），"
-                                   "落盘目录非 Web 静态挂载"
-                                   "（无 StaticFiles/addResourceHandlers 指向"
-                                   "上传目录），上传物不可执行")}
+                                   "（uuid4 随机名、序号名或图片重编码）；"
+                                   f"{_storage_why}，上传物不可执行")}
+
+    # M475：管理员角色专属入口（自定义角色注解 + 同仓 AOP 实锤）——
+    # yu-picture `@AuthCheck(mustRole = ADMIN_ROLE)`：非管理员在切面里直接
+    # 被 NO_AUTH_ERROR 拒绝，header_injection / unrestricted_upload 这类
+    # "管理员自伤/自配置"面不进 A。
+    if (str(record.get("category") or "") in _ADMIN_ONLY_CATEGORIES
+            and repo_root is not None and file.endswith(".java")):
+        _asrc = _read(repo_root, str(record.get("file") or ""))
+        if _asrc and _admin_only_entry(_asrc, unit, repo_root):
+            return {"blocked": True, "code": ADMIN_ONLY_ENDPOINT,
+                    "reason": ("入口挂管理员角色注解（mustRole=ADMIN 等）"
+                               "且同仓 AOP 切面按角色比较拒绝非管理员；"
+                               "管理员专属的自伤/自配置面不占 A 板")}
+
 
     if str(record.get("category") or "") in SOLIDITY_ONLY and not file.endswith(
             ".sol"):
