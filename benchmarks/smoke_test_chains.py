@@ -15194,6 +15194,114 @@ check("M476：只落本地且无防穿越/重命名 → 不降噪（防放宽）
                            "file": "FileController.java"},
                           _M476_LOCAL)["blocked"], False)
 
+print("\n[356] M479：SQL 同名 extract / Literal 反射 / 无参反射 / 配置常量 / void 上传")
+
+# ① SQLAlchemy func.extract 不是 zip_slip；真解包仍 True
+_M479_ZIP_SQL = '''@app.get("/agent-performance")
+def get_agent_performance(db: Session = Depends(get_db)):
+    results = db.query(func.extract("epoch", AgentRun.completed_at)).all()
+    return {"items": results}
+'''
+check("M479：SQLAlchemy func.extract 不判 zip_slip",
+      verdict("zip_slip", _M479_ZIP_SQL), False)
+_M479_ZIP_REAL = '''import zipfile
+@app.post("/unzip")
+def unzip(path: str):
+    with zipfile.ZipFile(path) as z:
+        z.extractall("/tmp/out")
+'''
+check("M479：真实 zipfile.extractall 仍判 True（防放宽）",
+      verdict("zip_slip", _M479_ZIP_REAL), True)
+
+# ② Literal 形参 / 映射表白名单后的 getattr；无白名单仍 True
+_M479_REFLECT_LITERAL = '''async def get_run(run_id: str,
+                  section: Literal["input", "output"] = None):
+    value = await load(run_id)
+    return getattr(value, section)
+'''
+check("M479：Literal 白名单形参的 getattr 不判 unsafe_reflection",
+      verdict("unsafe_reflection", _M479_REFLECT_LITERAL), False)
+_M479_REFLECT_MAPPING = '''@app.post("/services/{service}/run")
+def run_operation(service: str, operation: str):
+    method_name = xform_name(operation)
+    client = get_isolated_client(service)
+    if client.meta.method_to_api_mapping.get(method_name) != operation:
+        raise HTTPException(status_code=400, detail="bad")
+    call = getattr(client, method_name)
+    return call()
+'''
+check("M479：映射表校验后的 getattr 不判 unsafe_reflection",
+      verdict("unsafe_reflection", _M479_REFLECT_MAPPING), False)
+_M479_REFLECT_BARE = '''@app.post("/run")
+def run(operation: str):
+    name = xform_name(operation)
+    target = getattr(client, name)
+    return target()
+'''
+check("M479：无白名单的 getattr 仍判 True（防放宽）",
+      verdict("unsafe_reflection", _M479_REFLECT_BARE), True)
+
+# ③ 无参入口的反射 invoke 不是 cmdi；带形参的反射 exec 仍 True
+_M479_CMDI_REFLECT = '''@PostMapping("refresh")
+public Object refresh() {
+    Reflections reflections = new Reflections("org.openwes");
+    Method method = ReflectionUtils.findMethod(c, "getName");
+    method.invoke(enumConstants[0]);
+    return Response.success();
+}
+'''
+check("M479：无参入口的反射 invoke 不判 cmdi",
+      verdict("cmdi", _M479_CMDI_REFLECT), False)
+_M479_CMDI_PAYLOAD = '''public R vul3(String payload) throws Exception {
+    Class<?> c = Class.forName("java.lang.Runtime");
+    Method method = c.getMethod("exec", String.class);
+    return (R) method.invoke(null, new String[]{payload}, null);
+}
+'''
+check("M479：带形参的反射 exec 仍判 True（防放宽）",
+      verdict("cmdi", _M479_CMDI_PAYLOAD), True)
+
+# ④ 前导下划线全大写配置常量不判 ssrf；形参 URL 仍 True
+_M479_SSRF_CONFIG = '''_CONFIG_SERVICE_URL = os.getenv("CONFIG_SERVICE_URL", "http://config-service:8080")
+
+@app.get("/memory/{episode_id}/reextract")
+async def memory_reextract(request: Request, episode_id: str):
+    run = httpx.get(f"{_CONFIG_SERVICE_URL}/api/v1/internal/agent-runs/{episode_id}", timeout=5.0)
+    return run.json()
+'''
+check("M479：前导下划线全大写配置常量不判 ssrf",
+      verdict("ssrf", _M479_SSRF_CONFIG), False)
+_M479_SSRF_BARE = '''@app.post("/fetch")
+def fetch(request: Request, target: str):
+    return httpx.get(target, timeout=5.0).text
+'''
+check("M479：形参 URL 仍判 ssrf True（防放宽）",
+      verdict("ssrf", _M479_SSRF_BARE), True)
+
+# ⑤ void 上传入口不判 XSS；写响应体的 void 回显仍 True
+_M479_XSS_VOID = '''@RestController
+public class PluginManageController {
+    @PostMapping(value = "/uploadPlugin", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public void uploadPlugin(@RequestPart("file") MultipartFile file) throws IOException {
+        String filePath = FileUtils.saveFile(file, pluginDir);
+        PluginDTO dto = pluginService.parseJarFile(filePath);
+        pluginService.addPlugin(dto);
+    }
+}
+'''
+check("M479：void 上传入口不判 xss",
+      verdict("xss", _M479_XSS_VOID), False)
+_M479_XSS_WRITER = '''@RestController
+public class EchoController {
+    @PostMapping("/echo")
+    public String echo(String name) {
+        return name;
+    }
+}
+'''
+check("M479：返回 String 的反射回显仍判 True（防放宽）",
+      verdict("xss", _M479_XSS_WRITER), True)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

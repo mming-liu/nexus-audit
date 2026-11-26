@@ -4208,6 +4208,16 @@ def xss_verdict(source: str) -> bool | None:
         and _json_type
         and not re.search(r"getWriter\s*\(|getOutputStream\s*\(|"
                           r"produces\s*=\s*\"text/html\"", body))
+    # M479：`void` 上传入口（MultipartFile/@RequestPart）全程不写响应体 ——
+    # 插件/文件上传的落点是磁盘+DB，不是 HTML 回显面（open-wes 的
+    # PluginManageController.uploadPlugin 被 2b 的 DB 串接误判成 XSS）。
+    # 它的真实风险面是 unrestricted_upload / 插件加载，不是 XSS。
+    if (_ret == "void"
+            and not re.search(r"getWriter\s*\(|getOutputStream\s*\(", body)
+            and re.search(r"\bMultipartFile\b|@RequestPart\s*\(",
+                          _entry_signature(source) or body)):
+        return False
+
     # 1) 反射型：有外部入参 + 有回显 + 无编码
     if has_param and not _rest_json and _echo_sink_hit(body):
         if XSS_ENCODE_RE.search(body):
@@ -4963,8 +4973,9 @@ def _url_var_is_config(var: str, source: str, body: str,
         if rhs is None and not re.search(
                 rf"(?m)^\s*{re.escape(var)}\s*=", source):
             return True
-    # 同文件顶部的全大写常量
-    if re.fullmatch(r"[A-Z][A-Z0-9_]*", var):
+    # 同文件顶部的全大写常量（M479：允许前导下划线，`_CONFIG_SERVICE_URL`
+    # 是模块私有的配置常量，不是请求入参）
+    if re.fullmatch(r"_?[A-Z][A-Z0-9_]*", var):
         cm = re.search(rf"(?m)^\s*{re.escape(var)}\s*=\s*([^\n]+)", source)
         if cm:
             return _config_rhs(cm.group(1), source, body)
@@ -5311,6 +5322,19 @@ def cmdi_verdict(source: str) -> bool | None:
     m = CMDI_SINK_RE.search(body)
     if not m:
         return None
+
+    # 1b) M479：无参入口 + 不读请求 + 唯一 sink 是 `method.invoke(...)` ——
+    # 这是反射调用（如 open-wes 的字典枚举扫描器），拿不到用户输入，也不
+    # 是命令执行。JavaSecLab vul3 的 `method.invoke(null, new String[]{payload},
+    # …)` 有形参，仍按命令注入判 True。
+    _sink_hits = list(CMDI_SINK_RE.finditer(body))
+    _types0 = _param_types(_entry_signature(body))
+    if (_sink_hits and not _types0
+            and not _REQUEST_READ_RE.search(body)
+            and all(re.match(r"method\s*\.\s*invoke\s*\(",
+                             body[h.start():h.start() + 60])
+                    for h in _sink_hits)):
+        return False
 
     # 1) 数字类型形参：exec(n) / load(id) 都没有注入面
     #    看**全部**实参而不是第一个 —— `method.invoke(null, new String[]{payload})`
@@ -11655,11 +11679,15 @@ def _reflect_dynamic(arg: str, params: set[str], body: str) -> bool | None:
 
 
 def _reflect_whitelisted(prefix: str, var: str) -> bool:
-    """调用点**之前**是否已有对该变量的白名单约束（M139）。
+    """调用点**之前**是否已有对该变量的白名单约束（M139 / M479）。
 
-    只认三种可核对形态：① `X.contains(var)`；② `var in X` / `var not in X`；
-    ③ `switch (var) { case "…": }`。字符过滤（replace/正则）不算 ——
-    它能改内容但不限定**取值集合**。
+    只认可核对形态：① `X.contains(var)`；② `var in X` / `var not in X`；
+    ③ `switch (var) { case "…": }`；④ **字典/映射表查表校验**
+    （`mapping.get(var) != expected` 后拒绝 —— stackport 的
+    `client.meta.method_to_api_mapping.get(method_name) != operation`）；
+    ⑤ 枚举/操作名集合校验（`operation_names` / `api_mapping` 等白名单
+    容器在同一条语句里约束了 var）。
+    字符过滤（replace/正则）不算 —— 它能改内容但不限定**取值集合**。
     """
     if not var or not re.fullmatch(r"[A-Za-z_]\w*", var):
         return False
@@ -11670,7 +11698,37 @@ def _reflect_whitelisted(prefix: str, var: str) -> bool:
         return True
     if re.search(rf"\bswitch\s*\(\s*{v}\s*\)\s*\{{[^}}]*\bcase\b", prefix, re.S):
         return True
+    # M479：映射表查表校验（`mapping.get(v) != none` / `== expected`）
+    if re.search(rf"\.\s*get\s*\(\s*{v}\s*[,)]\s*[!=]=", prefix):
+        return True
+    if re.search(rf"\.\s*get\s*\(\s*{v}\s*\)\s*(?:!=|==\s*None|is\s+None)",
+                 prefix):
+        return True
+    # M479：枚举/操作名白名单容器（botocore 的 operation_names /
+    # method_to_api_mapping）；要求容器名与 var 出现在同一行。
+    if re.search(rf"\b(?:operation_names|api_mapping|method_to_api_mapping|"
+                 rf"enum_values|allowed_values|valid_operations)\b"
+                 rf"[^\n]{{0,200}}?\b{v}\b", prefix, re.I):
+        return True
     return False
+
+
+def _literal_param_names(source: str) -> set[str]:
+    """入口签名里带 `Literal[...]` / `Enum` 注解的形参（M479）。
+
+    这类参数的取值在**类型/框架层**就被限死在一组字面量里，不是任意字符串：
+        section: Literal["input", "output", …] | None = None
+        mode: SomeEnum = SomeEnum.fast
+    反射汇聚点（`getattr(value, section)`）拿到的只能是白名单内的成员。
+    """
+    sig = _entry_signature(source) or ""
+    out: set[str] = set()
+    for name in set(re.findall(r"\b([A-Za-z_]\w*)\s*:", sig)):
+        if re.search(rf"\b{re.escape(name)}\s*:\s*[^,)=\n]{{0,200}}?"
+                     rf"(?:\bLiteral\s*\[|\b\w*Enum\b)", sig):
+            out.add(name)
+    return out
+
 
 
 def unsafe_reflection_verdict(source: str) -> bool | None:
@@ -11699,6 +11757,9 @@ def unsafe_reflection_verdict(source: str) -> bool | None:
     hits = list(pattern.finditer(body))
     if not hits:
         return None
+    # M479：Literal/Enum 注解形参 = 类型层白名单（agent-foundation 的
+    # `section: Literal["input", "output", …]` → `getattr(value, section)`）。
+    _literal_params = _literal_param_names(source) if is_py else set()
     saw_unknown = False
     for m in hits:
         arg = _reflect_sink_arg(m)
@@ -11711,6 +11772,8 @@ def unsafe_reflection_verdict(source: str) -> bool | None:
         if dyn is None:
             saw_unknown = True
             continue
+        if arg in _literal_params:
+            continue                       # 类型层已限定取值集合
         prefix = body[:m.start()]
         if _reflect_whitelisted(prefix, arg):
             continue
@@ -11739,6 +11802,21 @@ _ZIP_CANONICAL_GUARD_RE = re.compile(
     r"|\.\s*toRealPath\s*\(\s*\)[\s\S]{0,120}?\.\s*startsWith\s*\(")
 _PY_EXTRACT_RE = re.compile(
     r"\.\s*(?:extractall|extract)\s*\(\s*([^)]*)\)")
+# M479：`.extract(` 这个名字被 SQL/ORM/正则/DF 大量复用 —— SQLAlchemy 的
+# `func.extract("epoch", ...)`、pandas 的 `df.col.str.extract(...)`、
+# `re.extract(...)` 都不是归档解包。只有出现压缩包上下文（zipfile/tarfile/
+# shutil.unpack_archive/…) 时，`.extract(...)` 才按 Zip Slip 处理；否则把
+# 这些"同名非同物"的命中排除掉。OpenSRE 的 get_agent_performance 即
+# `func.extract("epoch", AgentRun.completed_at - ...)`。
+_PY_ARCHIVE_CTX_RE = re.compile(
+    r"\b(?:zipfile|tarfile|shutil\s*\.\s*unpack_archive|py7zr|rarfile|"
+    r"ZipFile|TarFile|is_zipfile|is_tarfile|zipfile\s*\.\s*Path|"
+    r"gzip|bz2|lzma)\b")
+_PY_NONARCHIVE_EXTRACT_RE = re.compile(
+    r"\b(?:func|re|df|pd|np|numpy|sqlalchemy|sa|str|series|column|table|"
+    r"row|obj|payload|data|expr|raw|text|value|values)\s*\.\s*"
+    r"(?:extractall|extract)\s*\(", re.I)
+
 _PY_ZIP_FILTER_RE = re.compile(r"filter\s*=\s*['\"]data['\"]")
 _PY_PATH_PREFIX_GUARD_RE = re.compile(
     r"os\s*\.\s*path\s*\.\s*(?:realpath|abspath)\s*\([^)]*\)[\s\S]{0,120}?"
@@ -11769,11 +11847,20 @@ def zip_slip_verdict(source: str) -> bool | None:
         hits = list(_PY_EXTRACT_RE.finditer(body))
         if not hits:
             return None
+        if not _PY_ARCHIVE_CTX_RE.search(source):
+            # 没有压缩包上下文时，只保留"不像 SQL/ORM/DF 同名调用"的命中。
+            # func.extract / str.extract / re.extract 这些是取值函数，不是解包。
+            hits = [m for m in hits
+                    if not _PY_NONARCHIVE_EXTRACT_RE.search(
+                        body[max(0, m.start() - 60):m.end()])]
+            if not hits:
+                return False           # 只有同名声，不是 Zip Slip
         if _PY_ZIP_FILTER_RE.search(body):
             return False
         if _PY_PATH_PREFIX_GUARD_RE.search(source):
             return False
         return True
+
     seven = _ZIP_SEVENZIP_TYPE_RE.search(source)
     has_entry = bool(_ZIP_ENTRY_TYPE_RE.search(source) or seven)
     name_in_body = bool(_ZIP_NAME_GET_RE.search(body)
