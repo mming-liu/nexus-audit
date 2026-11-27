@@ -29,3 +29,12 @@
 该文件只含代码定位与防御补丁，不含攻击载荷或 `curl` 攻击命令。
 
 每份都包含：Step 1 提交入口、Step 2 GitHub 标题/描述、Step 3 CVE.org 六框、Step 3B CVE Services 逐框值、过审三要素、固定答法、提交前检查。
+
+## v1.5.34 新增候选（防御修复包，未提交）
+
+| # | 单 | 文件 | 披露入口 | CWE | 状态 |
+|---|---|---|---|---|---|
+| 8 | youlai-boot 认证后任意文件删除 | [08_youlai_boot.md](08_youlai_boot.md) | MITRE CVE.org（仓库未开启私密 Advisory、无 SECURITY.md） | CWE-862（主）/ CWE-22（仅 local 存储） | **已归档，未外发**（2026-11-27） |
+
+> 触发前提：2.x 需 `oss.type=local`、4.x 需 `storage.type=local`；默认 `minio` / `s3` 下
+> 只有 CWE-862 对象删除面，CWE-22 不适用。核验记录见文件第 0 节（默认值 / release tag / Issues 查重）。
