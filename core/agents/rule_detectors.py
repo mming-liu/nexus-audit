@@ -335,24 +335,55 @@ def _from_config(source: str, config: dict[str, str] | None, hints: tuple[str, .
 # 任何一条不满足就退回原判定 —— 宁可漏压一条缓存键，也不放过口令哈希。
 _PY_WEAK_HASH_CALL_RE = re.compile(
     r"hashlib\s*\.\s*(?:md5|sha1)\s*\(", re.I)
+# M483：Java 侧同语义的弱哈希调用面。`SecureUtil.md5(tempFile)`（Hutool）、
+# `DigestUtils.md5DigestAsHex(queryCondition)`（Spring）与 Python hashlib
+# 完全同构 —— 缓存键、内容寻址文件名、去重指纹用的也是它们。11-27
+# ani-rss 与 11-25 yu-picture 的三条 A 板就是被 Python-only 判据整类漏掉的。
+_JAVA_WEAK_HASH_CALL_RE = re.compile(
+    r"SecureUtil\s*\.\s*(?:md5|sha1)\s*\("
+    r"|DigestUtils\s*\.\s*(?:md5DigestAsHex|md5Hex|sha1Hex|md5|sha1)\s*\("
+    r"|MD5Utils\s*\.\s*\w+\s*\("
+    r"|Hashing\s*\.\s*(?:md5|sha1)\s*\("
+    r"|MessageDigest\s*\.\s*getInstance\s*\(\s*[\"'](?:MD5|SHA-?1)[\"']",
+    re.I)
+_WEAK_HASH_CALL_RE = re.compile(
+    rf"(?:{_PY_WEAK_HASH_CALL_RE.pattern})|"
+    rf"(?:{_JAVA_WEAK_HASH_CALL_RE.pattern})", re.I)
 _HASH_NOSEC_RE = re.compile(r"#\s*nosec\b", re.I)
 _HASH_USED_FOR_SECURITY_FALSE_RE = re.compile(
     r"usedforsecurity\s*=\s*False", re.I)
+# M483：内容寻址/文件去重命名词。ani-rss 的
+# `String s = SecureUtil.md5(tempFile); String saveName = s + "." + extName;`
+# 一行之内就把"哈希 = 落盘名"说清楚了，窗口取 [i-1 .. i+2] 即可覆盖。
 _HASH_NON_SECURITY_CONTEXT_RE = re.compile(
-    r"cache|etag|W/\"|fingerprint|content_hash|checksum|dedup", re.I)
+    r"cache|etag|W/\"|fingerprint|content_hash|checksum|dedup|"
+    r"saveName|fileName|extName|tempFile|MultipartFile|fileKey|objectKey|"
+    r"redisKey|queryCondition", re.I)
 _HASH_SECURITY_CONTEXT_RE = re.compile(
     r"password|passwd|pwd|token|secret|sign|hmac|auth", re.I)
+# M483：注解行不参与安全语境判定。ani-rss 的上传入口挂 `@Auth`，整词
+# `auth` 会让"缓存键/落盘名"判据直接失效；而 `@Auth` 是**入口权限**，
+# 不是"这段哈希为鉴权服务"的证据（后者只会出现在方法体里）。
+_HASH_ANNOTATION_LINE_RE = re.compile(r"^[ \t]*@[\w.]+")
+
+
+def _hash_body_view(body: str) -> str:
+    """剥掉注解行后的方法体视图（M483）。"""
+    return "\n".join(
+        ln for ln in (body or "").splitlines()
+        if not _HASH_ANNOTATION_LINE_RE.match(ln))
 
 
 def _weak_hash_is_non_security(region: str, body: str) -> bool:
-    """M464：入口域里的弱哈希是否只用于缓存/指纹等非密码学用途。
+    """M464/M483：入口域里的弱哈希是否只用于缓存/指纹等非密码学用途。
 
     `region` 是**未剥注释**的入口段（能看见 `# nosec B324`），`body` 是剥完
     注释的入口方法体（用来做上下文归属）。
     """
-    if not _PY_WEAK_HASH_CALL_RE.search(region or ""):
+    if not _WEAK_HASH_CALL_RE.search(region or ""):
         return False
     # 1) 显式声明优先：入口段里每一处弱哈希调用都带 nosec / usedforsecurity=False。
+    #    只对 Python 的 hashlib 生效 —— Java 没有这两个开关。
     _calls = [ln for ln in region.splitlines()
               if _PY_WEAK_HASH_CALL_RE.search(ln)]
     if _calls and all(_HASH_NOSEC_RE.search(ln)
@@ -360,15 +391,16 @@ def _weak_hash_is_non_security(region: str, body: str) -> bool:
                       for ln in _calls):
         return True
     # 2) 上下文推断：先排除任何安全语义，再要求每处调用都在缓存/指纹语境。
-    lines = (body or "").splitlines()
+    _view = _hash_body_view(body)
+    lines = _view.splitlines()
     hit_idx = [i for i, ln in enumerate(lines)
-               if _PY_WEAK_HASH_CALL_RE.search(ln)]
+               if _WEAK_HASH_CALL_RE.search(ln)]
     if not hit_idx:
         return False
-    if _HASH_SECURITY_CONTEXT_RE.search(body or ""):
+    if _HASH_SECURITY_CONTEXT_RE.search(_view):
         return False
     for i in hit_idx:
-        ctx = " ".join(lines[max(0, i - 2): i + 1])
+        ctx = " ".join(lines[max(0, i - 1): i + 3])
         if not _HASH_NON_SECURITY_CONTEXT_RE.search(ctx):
             return False
     return True

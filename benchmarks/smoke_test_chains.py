@@ -15302,6 +15302,195 @@ public class EchoController {
 check("M479：返回 String 的反射回显仍判 True（防放宽）",
       verdict("xss", _M479_XSS_WRITER), True)
 
+print("\n[357] M483–M484：Java 非密码学弱哈希 / 内容哈希命名 / 有实锤的自定义鉴权注解")
+
+# --- M483：Java 弱哈希落在缓存键/内容寻址文件名语境 → 不判 hash ---
+# ani-rss 形态：`@Auth` 注解 + `SecureUtil.md5(tempFile)` → saveName。
+_M483_ANI = '''@RestController
+public class UploadController extends BaseController {
+    @Auth
+    @Operation(summary = "upload")
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<Object> upload(@RequestParam("file") MultipartFile file) throws IOException {
+        InputStream inputStream = file.getInputStream();
+        File tempFile = FileUtil.createTempFile();
+        FileUtil.writeFromStream(inputStream, tempFile);
+        String s = SecureUtil.md5(tempFile);
+        String fileName = file.getOriginalFilename();
+        String saveName = s + "." + FileUtil.extName(fileName);
+        File saveFile = new File(new File(ConfigUtil.getConfigDir(), "/files"), saveName);
+        FileUtil.move(tempFile, saveFile, true);
+        return new Result<>().setData(saveName);
+    }
+}
+'''
+check("M483：Java SecureUtil.md5(tempFile) 拼 saveName 不判 hash",
+      verdict("hash", _M483_ANI), False)
+# yu-picture 形态：DigestUtils.md5DigestAsHex 作缓存键。
+_M483_YU = '''@Deprecated
+@PostMapping("/list/page/vo/cache")
+public BaseResponse<Page<PictureVO>> listPictureVOByPageWithCache(@RequestBody PictureQueryRequest pictureQueryRequest) {
+    String queryCondition = JSONUtil.toJsonStr(pictureQueryRequest);
+    String hashKey = DigestUtils.md5DigestAsHex(queryCondition.getBytes());
+    String cacheKey = String.format("yupicture:listPictureVOByPage:%s", hashKey);
+    String cachedValue = LOCAL_CACHE.getIfPresent(cacheKey);
+    return ResultUtils.success(JSONUtil.toBean(cachedValue, Page.class));
+}
+'''
+check("M483：Java DigestUtils.md5DigestAsHex 缓存键不判 hash",
+      verdict("hash", _M483_YU), False)
+_M483_PWD = '''public class UserServiceImpl {
+    public String getEncryptPassword(String userPassword) {
+        return DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
+    }
+}
+'''
+check("M483：口令 MD5（方法体含 password）仍判 hash True（防放宽）",
+      verdict("hash", _M483_PWD), True)
+_M483_PWD2 = '''public class UserController {
+    public String encrypt(String pwd) {
+        return SecureUtil.md5(pwd);
+    }
+}
+'''
+check("M483：SecureUtil.md5(userPwd) 仍判 hash True（防放宽）",
+      verdict("hash", _M483_PWD2), True)
+
+# --- M484：内容哈希落盘名 + 非静态挂载 → NON_EXECUTABLE_UPLOAD ---
+_M484_UP = '''package x;
+@RestController
+public class UploadController extends BaseController {
+    @Auth
+    @PostMapping("/upload")
+    public Result<Object> upload(@RequestParam("file") MultipartFile file) throws IOException {
+        InputStream inputStream = file.getInputStream();
+        File tempFile = FileUtil.createTempFile();
+        FileUtil.writeFromStream(inputStream, tempFile);
+        String s = SecureUtil.md5(tempFile);
+        String fileName = file.getOriginalFilename();
+        String saveName = s + "." + FileUtil.extName(fileName);
+        File saveFile = new File(new File(ConfigUtil.getConfigDir(), "/files"), saveName);
+        FileUtil.move(tempFile, saveFile, true);
+        return new Result<>().setData(saveName);
+    }
+}
+'''
+_M484_REPO = Path(_ws_mkdtemp("smoke_m484_hashname_"))
+(_M484_REPO / "UploadController.java").write_text(_M484_UP, encoding="utf-8")
+check("M484：内容哈希落盘名（SecureUtil.md5 + saveName）→ NON_EXECUTABLE_UPLOAD",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "UploadController.upload",
+                           "file": "UploadController.java"},
+                          _M484_REPO)["code"], "NON_EXECUTABLE_UPLOAD")
+# Java UUID 随机名同样算"服务端重写落盘名"。
+_M484_UUID_REPO = Path(_ws_mkdtemp("smoke_m484_uuid_"))
+(_M484_UUID_REPO / "FileController.java").write_text(
+    "package x;\n@RestController\npublic class FileController {\n"
+    "  @PostMapping(\"/upload\")\n"
+    "  public Result<Object> upload(@RequestParam(\"file\") MultipartFile file) {\n"
+    "    String name = UUID.randomUUID().toString();\n"
+    "    file.transferTo(new File(dir, name));\n"
+    "    return new Result<>().setData(name);\n"
+    "  }\n"
+    "}\n", encoding="utf-8")
+check("M484：UUID.randomUUID 重写落盘名 → NON_EXECUTABLE_UPLOAD",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "FileController.upload",
+                           "file": "FileController.java"},
+                          _M484_UUID_REPO)["code"], "NON_EXECUTABLE_UPLOAD")
+# 反例：插件安装包上传即便带 UUID 随机名也不压 B（可执行包面）。
+_M484_PLUGIN_REPO = Path(_ws_mkdtemp("smoke_m484_plugin_"))
+(_M484_PLUGIN_REPO / "PluginController.java").write_text(
+    "package x;\n@RestController\npublic class PluginController {\n"
+    "  @PostMapping(\"/plugin/install_plugin\")\n"
+    "  public R install_plugin(@RequestParam(\"file\") MultipartFile file) {\n"
+    "    String name = UUID.randomUUID().toString() + \".jar\";\n"
+    "    FileUtil.writeFromStream(file.getInputStream(), new File(dir, name));\n"
+    "    pluginService.loadPlugin(name);\n"
+    "    return R.ok();\n"
+    "  }\n"
+    "}\n", encoding="utf-8")
+check("M484：install_plugin 上传带 UUID 仍不压 B（可执行包面，防放宽）",
+      wild_noise.classify({"category": "unrestricted_upload",
+                           "unit": "PluginController.install_plugin",
+                           "file": "PluginController.java"},
+                          _M484_PLUGIN_REPO)["blocked"], False)
+
+# --- M484：自定义鉴权注解必须同仓落地实锤 ---
+_M484_AUTH_CTRL = '''package x;
+@RestController
+public class OrderController {
+    @Auth
+    @PostMapping("/order/delete")
+    public R delete(Long id) {
+        return service.delete(id);
+    }
+}
+'''
+_M484_AUTH_INTERCEPTOR = '''package x;
+@Component
+public class AuthInterceptor implements HandlerInterceptor {
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        HandlerMethod method = (HandlerMethod) handler;
+        Auth auth = method.getMethodAnnotation(Auth.class);
+        if (auth != null && !TOKEN.get().equals(request.getHeader("token"))) {
+            response.setStatus(403);
+            return false;
+        }
+        return true;
+    }
+}
+'''
+_M484_AUTH_REPO = Path(_ws_mkdtemp("smoke_m484_auth_"))
+(_M484_AUTH_REPO / "OrderController.java").write_text(
+    _M484_AUTH_CTRL, encoding="utf-8")
+(_M484_AUTH_REPO / "AuthInterceptor.java").write_text(
+    _M484_AUTH_INTERCEPTOR, encoding="utf-8")
+check("M484：自定义 @Auth + 落地 getMethodAnnotation 实锤 → AUTHZ_CLASS_OR_BASE_GUARD",
+      wild_noise.classify({"category": "authz",
+                           "unit": "OrderController.delete",
+                           "file": "OrderController.java"},
+                          _M484_AUTH_REPO)["code"],
+      "AUTHZ_CLASS_OR_BASE_GUARD")
+_M484_DEAD_REPO = Path(_ws_mkdtemp("smoke_m484_dead_"))
+(_M484_DEAD_REPO / "OrderController.java").write_text(
+    _M484_AUTH_CTRL, encoding="utf-8")
+check("M484：自定义 @Auth 无落地实现 → 不降噪（防空壳注解洗白）",
+      wild_noise.classify({"category": "authz",
+                           "unit": "OrderController.delete",
+                           "file": "OrderController.java"},
+                          _M484_DEAD_REPO)["blocked"], False)
+_M484_OFF_REPO = Path(_ws_mkdtemp("smoke_m484_off_"))
+(_M484_OFF_REPO / "OrderController.java").write_text(
+    _M484_AUTH_CTRL.replace("@Auth", "@Auth(required = false)"),
+    encoding="utf-8")
+(_M484_OFF_REPO / "AuthInterceptor.java").write_text(
+    _M484_AUTH_INTERCEPTOR, encoding="utf-8")
+check("M484：@Auth(required = false) 即使有实锤也不降噪（防放宽）",
+      wild_noise.classify({"category": "authz",
+                           "unit": "OrderController.delete",
+                           "file": "OrderController.java"},
+                          _M484_OFF_REPO)["blocked"], False)
+# ani-rss 的 `@Auth` 用 value() 开关：`@Auth(value = false)` 同样是关闭校验。
+_M484_OFF2_REPO = Path(_ws_mkdtemp("smoke_m484_off2_"))
+(_M484_OFF2_REPO / "OrderController.java").write_text(
+    _M484_AUTH_CTRL.replace("@Auth", "@Auth(value = false)"),
+    encoding="utf-8")
+(_M484_OFF2_REPO / "AuthInterceptor.java").write_text(
+    _M484_AUTH_INTERCEPTOR, encoding="utf-8")
+check("M484：@Auth(value = false) 即使有实锤也不降噪（防放宽）",
+      wild_noise.classify({"category": "authz",
+                           "unit": "OrderController.delete",
+                           "file": "OrderController.java"},
+                          _M484_OFF2_REPO)["blocked"], False)
+# 自定义注解只作用于 authz：注入类目不得被同名注解豁免。
+check("M484：自定义 @Auth 不豁免 sqli（只对 authz 生效）",
+      wild_noise.classify({"category": "sqli",
+                           "unit": "OrderController.delete",
+                           "file": "OrderController.java"},
+                          _M484_AUTH_REPO)["blocked"], False)
+
 check("M148：失败清单为空", len(FAILS), 0)
 
 print()

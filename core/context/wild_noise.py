@@ -213,6 +213,37 @@ _JAVA_ANON_ANN_RE = re.compile(
     r"@Permission\s*\(\s*authorize\s*=\s*false\s*\)|"
     r"\blogin\s*=\s*false\b|"
     r"\bauthorize\s*=\s*false\b")
+# M484：自定义鉴权注解（`@Auth` / `@CheckLogin` / `@HasRole` …）—— 注解名
+# 本身**不构成**鉴权证据。CourseArragement 的空壳/失效拦截器就是教训：
+# 只看名字会把"真没有校验"的入口洗白。必须同仓找到落地读取实现。
+_JAVA_CUSTOM_AUTHZ_ANN_RE = re.compile(
+    r"@([A-Za-z0-9_]*(?:Auth|Login|Permission|Role|Guard)[A-Za-z0-9_]*)\b")
+# 名字里恰好含 Auth/Role 字样但不是"入口鉴权"的框架注解（Lombok/Swagger/
+# Jackson/Spring MVC/校验）。标准鉴权注解另见 `_JAVA_STD_AUTHZ_ANNS`。
+_JAVA_NON_AUTHZ_ANN_RE = re.compile(
+    r"^(?:RestController|Controller|Service|Component|Configuration|"
+    r"Repository|Mapper|Bean|Autowired|Resource|Value|Qualifier|Scope|"
+    r"Data|Builder|Getter|Setter|ToString|EqualsAndHashCode|"
+    r"NoArgsConstructor|AllArgsConstructor|RequiredArgsConstructor|"
+    r"Slf4j|Log4j2|Operation|Parameter|Schema|Tag|Api|ApiOperation|"
+    r"ApiModel|ApiModelProperty|ApiImplicitParam|JsonProperty|JsonIgnore|"
+    r"JsonFormat|JsonInclude|NotEmpty|NotNull|NotBlank|Valid|Validated|"
+    r"Transactional|Deprecated|Override|SuppressWarnings|RequestMapping|"
+    r"GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping|"
+    r"RequestParam|PathVariable|RequestBody|RequestHeader|ResponseBody|"
+    r"Scheduled|Async)$")
+# 已由 M435/M449 的声明式判据覆盖，不再走"需要实锤"的自定义路径。
+_JAVA_STD_AUTHZ_ANNS = frozenset({
+    "Permission", "SaCheckLogin", "SaCheckPermission", "PreAuthorize",
+    "RequiresPermissions", "RequiresAuthentication", "RequiresUser",
+    "CsPermission", "HasPermission",
+})
+# 注解显式关闭校验：`@Auth(required = false)` / `ignore = true` / `skip = true`
+# / `value = false`（ani-rss 的 `@Auth` 就是 `value()` 开关）。
+_JAVA_ANN_DISABLED_RE = re.compile(
+    r"required\s*=\s*false|ignore\s*=\s*true|skip\s*=\s*true|"
+    r"value\s*=\s*false", re.I)
+_CUSTOM_ANN_EVIDENCE_MEMO: dict[tuple[str, str], bool] = {}
 
 
 def _java_annotations_before(lines: list[str], idx: int) -> str:
@@ -313,6 +344,69 @@ def _py_authz_guard_present(source: str, body: str) -> bool:
     return False
 
 
+def _java_custom_authz_anns(anns: str) -> list[str]:
+    """从注解块里取"自定义鉴权注解"名（M484）。"""
+    out: list[str] = []
+    for m in _JAVA_CUSTOM_AUTHZ_ANN_RE.finditer(anns or ""):
+        name = m.group(1)
+        if name in _JAVA_STD_AUTHZ_ANNS or _JAVA_NON_AUTHZ_ANN_RE.match(name):
+            continue
+        if name not in out:
+            out.append(name)
+    return out
+
+
+def _repo_enforces_custom_ann(repo_root: Path | None, ann: str) -> bool:
+    """仓内是否有把 `@ann` 真正读出来做校验的实现（M484）。
+
+    两种"落地读取"形态任一即可：
+      · 显式读取：`getMethodAnnotation(Ann.class)` / `getAnnotation(Ann.class)` /
+        `getDeclaredAnnotation(Ann.class)` / `isAnnotationPresent(Ann.class)`；
+      · AOP 切面：`@Around|@Before("@annotation(...)")` 且通知形参是 `Ann`
+        （ani-rss `AuthAspect` 的 `before(JoinPoint, Auth auth)`），并要求文件
+        带 `@Aspect` / `*Interceptor` / `*Filter` 语义。
+    没有落地实现 = 注解是死的，不能据此降噪（CourseArragement 空壳拦截器）。
+    """
+    if repo_root is None or not ann:
+        return False
+    root = Path(repo_root)
+    key = (str(root), ann)
+    if key in _CUSTOM_ANN_EVIDENCE_MEMO:
+        return _CUSTOM_ANN_EVIDENCE_MEMO[key]
+    decl_re = re.compile(
+        rf"(?:getMethodAnnotation|getDeclaredAnnotation|getAnnotation|"
+        rf"isAnnotationPresent)\s*\(\s*{re.escape(ann)}\s*\.\s*class")
+    aop_re = re.compile(
+        r"@(?:Around|Before|AfterReturning|AfterThrowing)\s*\(\s*[\"'][^\"']*"
+        r"@annotation\s*\(")
+    typed_re = re.compile(rf"(?<![\w.]){re.escape(ann)}\s+\w+")
+    guard_face_re = re.compile(r"@Aspect\b|\b[A-Za-z_]\w*Interceptor\b|"
+                               r"\b[A-Za-z_]\w*Filter\b|\bHandlerInterceptor\b")
+    found = False
+    scanned = 0
+    for p in root.rglob("*.java"):
+        if any(part in _SCAN_SKIP_DIRS for part in p.parts):
+            continue
+        scanned += 1
+        if scanned > 800:
+            break
+        try:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if ann not in text:
+            continue
+        if decl_re.search(text):
+            found = True
+            break
+        if (aop_re.search(text) and typed_re.search(text)
+                and guard_face_re.search(text)):
+            found = True
+            break
+    _CUSTOM_ANN_EVIDENCE_MEMO[key] = found
+    return found
+
+
 def _java_authz_class_guard(repo_root: Path | None, rel: str,
                             unit: str) -> bool:
     """当前类或其 `extends Base*` 父类是否有类级鉴权注解（M435）。"""
@@ -326,13 +420,22 @@ def _java_authz_class_guard(repo_root: Path | None, rel: str,
     mi, ci, _cls, parent = _java_method_and_class(lines, method)
     if mi < 0 or ci < 0:
         return False
-    if _JAVA_ANON_ANN_RE.search(_java_annotations_before(lines, mi)):
+    _m_anns = _java_annotations_before(lines, mi)
+    if _JAVA_ANON_ANN_RE.search(_m_anns):
         return False
     # M449：方法级权限注解（CordysCRM @CsPermission / Shiro / Sa-Token）。
-    if _JAVA_METHOD_GUARD_RE.search(_java_annotations_before(lines, mi)):
+    if _JAVA_METHOD_GUARD_RE.search(_m_anns):
         return True
-    if _JAVA_AUTHZ_ANN_RE.search(_java_annotations_before(lines, ci)):
+    _c_anns = _java_annotations_before(lines, ci)
+    if _JAVA_AUTHZ_ANN_RE.search(_c_anns):
         return _repo_has_authz_framework(Path(repo_root))
+    # M484：自定义鉴权注解 + 同仓落地实锤。`required=false` / `ignore=true`
+    # / `skip=true` 显式关闭校验时不算守卫；只认 authz 类目（调用方已限定）。
+    _anns_all = "\n".join((_m_anns, _c_anns))
+    if not _JAVA_ANN_DISABLED_RE.search(_anns_all):
+        for _ann in _java_custom_authz_anns(_anns_all):
+            if _repo_enforces_custom_ann(repo_root, _ann):
+                return True
     # M449：仓级全局鉴权链（Shiro authc / 全路径 interceptor）覆盖所有入口。
     if _repo_has_global_auth_filter(Path(repo_root)):
         return True
@@ -897,7 +1000,18 @@ _UPLOAD_EXT_WHITELIST_RE = re.compile(
     r"\b(?:EXTENSIONS?|ALLOWED_\w+|SUPPORTED_\w+|WHITELIST)\b\s*(?:=|:)|"
     r"\.\s*suffix\b[^\n]{0,60}\bin\b)", re.I)
 _UPLOAD_GENERATED_NAME_RE = re.compile(
-    r"uuid\s*\.\s*uuid4|uuid4\s*\(|secrets\s*\.\s*token_hex", re.I)
+    r"uuid\s*\.\s*uuid4|uuid4\s*\(|secrets\s*\.\s*token_hex|"
+    r"UUID\s*\.\s*randomUUID\s*\(|"
+    r"IdUtil\s*\.\s*(?:simpleUUID|fastSimpleUUID|randomUUID)\s*\(", re.I)
+# M484：内容哈希落盘名 —— 上传物按内容摘要寻址，落盘名与用户原始文件名
+# 彻底解耦（ani-rss `saveName = SecureUtil.md5(tempFile) + "." + extName`）。
+# 必须同时看到"名字装配/落盘"证据，否则只是做去重指纹，不能算重命名。
+_UPLOAD_CONTENT_HASH_NAME_RE = re.compile(
+    r"(?:SecureUtil|DigestUtils|Hashing)\s*\.\s*(?:md5|md5Hex|md5DigestAsHex|"
+    r"sha1|sha1Hex|sha256)\s*\(", re.I)
+_UPLOAD_NAME_WIRING_RE = re.compile(
+    r"saveName|fileName|extName|FileUtil\s*\.\s*move|transferTo|\.\s*move\s*\(",
+    re.I)
 # M472：服务端重写落盘名 —— 上传物不再使用用户原始文件名，路径不可穿越。
 #   Maestro launch.py:         unique_name = f"{uuid.uuid4().hex[:8]}{ext}"
 #   Maestro trajectory_editor: fname = f"{idx:02d}.{ext}"（idx 为服务端计数）
@@ -1270,7 +1384,9 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
             _renamed = bool(
                 _UPLOAD_GENERATED_NAME_RE.search(_entry)
                 or _UPLOAD_SERVER_INDEX_NAME_RE.search(_entry)
-                or _UPLOAD_REENCODE_RE.search(_entry))
+                or _UPLOAD_REENCODE_RE.search(_entry)
+                or (_UPLOAD_CONTENT_HASH_NAME_RE.search(_entry)
+                    and _UPLOAD_NAME_WIRING_RE.search(_entry)))
             _model_loading = bool(_MODEL_WEIGHT_UPLOAD_RE.search(
                 f"{unit} {_entry} {_scope}"))
             _external_storage = bool(
@@ -1295,8 +1411,8 @@ def classify(record: dict, repo_root: Path | None = None) -> dict:
                     "addResourceHandlers 指向上传目录）")
                 return {"blocked": True, "code": NON_EXECUTABLE_UPLOAD,
                         "reason": ("已防路径穿越 / 服务端重写落盘名"
-                                   "（uuid4 随机名、序号名或图片重编码）；"
-                                   f"{_storage_why}，上传物不可执行")}
+                                   "（uuid4 随机名、序号名、内容哈希名或图片"
+                                   f"重编码）；{_storage_why}，上传物不可执行")}
 
     # M475：管理员角色专属入口（自定义角色注解 + 同仓 AOP 实锤）——
     # yu-picture `@AuthCheck(mustRole = ADMIN_ROLE)`：非管理员在切面里直接
